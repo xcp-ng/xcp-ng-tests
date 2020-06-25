@@ -1,0 +1,25 @@
+# Configuration file, to be adapted to one's needs
+
+# Default user and password to connect to a host through XAPI
+# Note: this won't be used for SSH.
+# You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
+HOST_DEFAULT_USER = "root"
+HOST_DEFAULT_PASSWORD = ""
+
+# Override settings for specific hosts
+# skip_xo_config allows to not touch XO's configuration regarding the host
+# Else the default behaviour is to add the host to XO servers at the beginning
+# of the testing session and remove it at the end.
+HOSTS = {
+#    "10.0.0.1": {"user": "root", "password": ""},
+#    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
+}
+
+# Default VM images location
+DEF_VM_URL = 'http://pxe/images/'
+
+# Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
+VM_IMAGES = {
+    'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
+    'mini-linux-x86_64-uefi': 'alpine-uefi-minimal-3.12.0.xva'
+}
