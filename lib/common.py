@@ -97,6 +97,10 @@ class Host:
         return ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                    suppress_fingerprint_warnings=suppress_fingerprint_warnings, background=background)
 
+    def ssh_with_result(self, cmd):
+        # doesn't raise if the command's return is nonzero, unless there's a SSH error
+        return self.ssh(cmd, check=False, simple_output=False)
+
     def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
         maybe_param_minimal = ['--minimal'] if minimal else []
         return self.ssh(
@@ -152,9 +156,14 @@ class Host:
     def xo_server_connected(self):
         return self.xo_server_status() == "connected"
 
-    def import_vm_url(self, url):
+    def import_vm_url(self, url, sr_uuid=None):
         print("Import VM %s on host %s" % (url, self))
-        vm = VM(self.xe('vm-import', {'url': url}), self)
+        params = {
+            'url': url
+        }
+        if sr_uuid is not None:
+            params['sr-uuid'] = sr_uuid
+        vm = VM(self.xe('vm-import', params), self)
         # Set VM VIF networks to the host's management network
         for vif in vm.vifs():
             vif.move(self.management_network())
@@ -193,6 +202,14 @@ class Host:
             else:
                 raise
 
+    def yum_install(self, packages):
+        print('Install packages: %s' % ' '.join(packages))
+        return self.ssh(['yum', 'install', '-y'] + packages)
+
+    def yum_remove(self, packages):
+        print('Remove packages: %s' % ' '.join(packages))
+        return self.ssh(['yum', 'remove', '-y'] + packages)
+
     def reboot(self):
         print("Reboot host %s" % self)
         try:
@@ -207,6 +224,27 @@ class Host:
 
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
+
+    def disks(self):
+        """ List of SCSI disks, e.g ['sda', 'sdb'] """
+        disks = self.ssh(['lsblk', '-nd', '-I', '8', '--output', 'NAME']).splitlines()
+        disks.sort()
+        return disks
+
+    def file_exists(self, filepath):
+        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+
+    def sr_create(self, sr_type, device, label):
+        params = {
+            'host-uuid': self.uuid,
+            'type': sr_type,
+            'name-label': label,
+            'device-config:device': device
+        }
+        print("Create %s SR on host %s's %s device with label '%s'" % (sr_type, self, device, label))
+        sr_uuid = self.xe('sr-create', params)
+        return SR(sr_uuid, self)
+
 
 class BaseVM:
     def __init__(self, uuid, host):
@@ -397,3 +435,44 @@ class VIF:
 
     def move(self, network_uuid):
         self.vm.host.xe('vif-move', {'uuid': self.uuid, 'network-uuid': network_uuid})
+
+class SR:
+    def __init__(self, uuid, host):
+        self.uuid = uuid
+        self.host = host
+
+    def pbd_uuids(self):
+        return self.host.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True).split(',')
+
+    def unplug_pbds(self):
+        print("Unplug PBDs")
+        for pbd_uuid in self.pbd_uuids():
+            self.host.xe('pbd-unplug', {'uuid': pbd_uuid})
+
+    def all_pbds_attached(self):
+        all_attached = True
+        for pbd_uuid in self.pbd_uuids():
+            all_attached = all_attached and self.host.xe('pbd-param-get', {'uuid': pbd_uuid, 'param-name': 'currently-attached'}) == 'true'
+        return all_attached
+
+    def plug_pbds(self):
+        print("Attach PBDs")
+        for pbd_uuid in self.pbd_uuids():
+            self.host.xe('pbd-plug', {'uuid': pbd_uuid})
+
+    def destroy(self):
+        self.unplug_pbds()
+        print("Destroy SR " + self.uuid)
+        self.host.xe('sr-destroy', {'uuid': self.uuid})
+
+    def forget(self):
+        self.unplug_pbds()
+        print("Forget SR " + self.uuid)
+        self.host.xe('sr-forget', {'uuid': self.uuid})
+
+    def exists(self):
+        return self.host.xe('sr-list', {'uuid': self.uuid}, minimal=True) == self.uuid
+
+    def scan(self):
+        print("Scan SR " + self.uuid)
+        self.host.xe('sr-scan', {'uuid': self.uuid})
