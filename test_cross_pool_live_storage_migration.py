@@ -6,7 +6,7 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 def test_basic_vm_crosspool_migrate(hosts, vm_ref):
     host1 = hosts[0]
     host2 = hosts[1]
-    assert(host1.pool_uuid() != host2.pool_uuid())
+    assert host1.pool_uuid() != host2.pool_uuid()
 
     vm = host1.import_vm_url(vm_ref)
     vm.start()

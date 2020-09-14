@@ -299,7 +299,7 @@ class VM(BaseVM):
         wait_for(self.is_running, "Wait for VM running")
         if wait_for_ip:
             wait_for(self.try_get_and_store_ip, "Wait for VM IP")
-        assert(self.ip is not None)
+        assert self.ip is not None
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
     def ssh_touch_file(self, filepath):
@@ -374,11 +374,11 @@ class Snapshot(BaseVM):
         return self.host.xe('snapshot-disk-list', {'uuid': self.uuid}, minimal=True)
 
     def destroy(self):
-        print("Delete snapshot")
+        print("Delete snapshot " + self.uuid)
         # that uninstall command apparently works better for snapshots than for VMs apparently
         self.host.xe('snapshot-uninstall', {'uuid': self.uuid, 'force': 'true'})
         print("Check snapshot doesn't exist anymore")
-        assert(not self.exists())
+        assert not self.exists()
 
 #     def _destroy(self):
 #         self.host.xe('snapshot-destroy', {'uuid': self.uuid})

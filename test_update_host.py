@@ -13,4 +13,4 @@ def test(host):
     wait_for_not(host.is_enabled, "Wait for host down")
     wait_for(host.is_enabled, "Wait for host up", timeout_secs=300)
     print("Check for updates again")
-    assert(not host.has_updates())
+    assert not host.has_updates()
