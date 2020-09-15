@@ -2,6 +2,7 @@ import json
 import subprocess
 import time
 from subprocess import CalledProcessError
+from uuid import UUID
 
 # Common VM images used in tests
 def vm_image(vm_key):
@@ -29,6 +30,13 @@ def wait_for(fn, msg=None, timeout_secs=120, retry_delay_secs=2, invert=False):
 
 def wait_for_not(*args, **kwargs):
     return wait_for(*args, **kwargs, invert=True)
+
+def is_uuid(maybe_uuid):
+    try:
+        UUID(maybe_uuid, version=4)
+        return True
+    except ValueError:
+        return False
 
 def xo_cli(action, args={}, check=True, simple_output=True):
     res = subprocess.run(
@@ -245,6 +253,11 @@ class Host:
         sr_uuid = self.xe('sr-create', params)
         return SR(sr_uuid, self)
 
+    def is_master(self):
+        return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
+
+    def pool_member_uuids(self):
+        return self.xe('host-list', {}, minimal=True).split(',')
 
 class BaseVM:
     def __init__(self, uuid, host):

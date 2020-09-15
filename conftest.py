@@ -1,7 +1,6 @@
 import pytest
 #import json
-from lib.common import wait_for, wait_for_not, VM, Host, vm_image
-from uuid import UUID
+from lib.common import wait_for, wait_for_not, VM, Host, vm_image, is_uuid
 
 # *** Support for incremental tests in test classes ***
 # From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
@@ -56,11 +55,13 @@ def host_data(hostname_or_ip):
 def setup_host(hostname_or_ip):
     print(">>> Connect host %s" % hostname_or_ip)
     h = Host(hostname_or_ip)
+    h.initialize()
+    assert h.is_master(), "we connect only to master hosts during initial setup"
+    # XO connection
     h_data = host_data(hostname_or_ip)
     skip_xo_config = h_data.get('skip_xo_config', False)
     if not skip_xo_config:
         h.xo_server_add(h_data['user'], h_data['password'])
-    h.initialize()
     wait_for(h.xo_server_connected, timeout_secs=10)
     return h, skip_xo_config
 
@@ -74,7 +75,7 @@ def host(request):
         print("<<< Disconnect host %s" % h)
         h.xo_server_remove()
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def hosts(request):
     # a list of hosts rather than a single host
     hostname_list = request.param.split(',')
@@ -85,13 +86,6 @@ def hosts(request):
         if not skip_xo_config:
             print("<<< Disconnect host %s" % h)
             h.xo_server_remove()
-
-def is_uuid(maybe_uuid):
-    try:
-        UUID(maybe_uuid, version=4)
-        return True
-    except ValueError:
-        return False
 
 @pytest.fixture(scope='module')
 def vm_ref(request):
@@ -133,7 +127,7 @@ def vm_refs(request):
             vm_list = ['mini-linux-x86_64-bios', 'mini-linux-x86_64-uefi']
     # TODO: finish implementation using vm_image
 
-# TODO: make it a fixture factory
+# TODO: make it a fixture factory?
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
     if is_uuid(vm_ref):
