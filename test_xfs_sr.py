@@ -1,6 +1,10 @@
 import pytest
-from lib.common import wait_for, wait_for_not, vm_image, SR
+from lib.common import wait_for, wait_for_not, vm_image
 import time
+
+# Requirements:
+# - one XCP-ng host >= 8.2 with an additional unused disk for the SR
+# - access to XCP-ng RPM repository from the host
 
 @pytest.fixture(scope='module')
 def sr_disk(host):
@@ -20,7 +24,6 @@ def host_with_xfsprogs(host):
 @pytest.mark.incremental
 class TestXFSSR:
     sr = None
-    xfsprogs_installed = False
     vm = None
 
     def test_create_xfs_sr_without_xfsprogs(self, host, sr_disk):
@@ -37,8 +40,6 @@ class TestXFSSR:
     # Impact on other tests: installs xfsprogs and creates the SR
     def test_create_sr(self, host_with_xfsprogs, sr_disk):
         host = host_with_xfsprogs
-        host.yum_install(['xfsprogs'])
-        TestXFSSR.xfsprogs_installed = True
         TestXFSSR.sr = host.sr_create('xfs', '/dev/' + sr_disk, "XFS-local-SR")
         wait_for(TestXFSSR.sr.exists, "Wait for SR to exist")
 
@@ -48,8 +49,19 @@ class TestXFSSR:
         TestXFSSR.vm = vm # for teardown
         vm.start()
         vm.wait_for_vm_running_and_ssh_up(wait_for_ip=True)
+
+    # Impact on other tests: none if succeeds
+    def test_snapshot(self):
+        vm = TestXFSSR.vm
+        vm.test_snapshot_on_linux_vm()
+
+    # Impact on other tests: VM shutdown cleanly
+    def test_vm_shutdown(self):
+        vm = TestXFSSR.vm
         vm.shutdown()
         wait_for(vm.is_halted)
+
+    # *** tests with reboots (longer tests). To be moved to another file?
 
     # Impact on other tests: none if succeeds
     def test_reboot(self, host):
@@ -89,6 +101,9 @@ class TestXFSSR:
         finally:
             if not TestXFSSR.xfsprogs_installed:
                 host.yum_install(['xfsprogs'])
+                TestXFSSR.xfsprogs_installed = True
+
+    # *** End of tests with reboots
 
     # Impact on other tests: VM removed, leaving SR empty (and thus destroyable)
     def test_destroy_vm(self):

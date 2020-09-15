@@ -19,15 +19,7 @@ def test_suspend(running_linux_vm):
 
 def test_snapshot(running_linux_vm):
     vm = running_linux_vm
-    snapshot = vm.snapshot()
-    filepath = '/tmp/%s' % snapshot.uuid
-    vm.ssh_touch_file(filepath)
-    snapshot.revert()
-    vm.start()
-    vm.wait_for_vm_running_and_ssh_up()
-    print("Check file does not exist anymore")
-    vm.ssh(['test ! -f ' + filepath])
-    snapshot.destroy()
+    vm.test_snapshot_on_linux_vm()
 
 def test_checkpoint(running_linux_vm):
     vm = running_linux_vm

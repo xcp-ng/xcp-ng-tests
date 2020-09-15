@@ -420,6 +420,22 @@ class VM(BaseVM):
         return _vifs
 
 
+    # *** Common reusable tests
+
+    def test_snapshot_on_linux_vm(self):
+        snapshot = self.snapshot()
+        try:
+            filepath = '/tmp/%s' % snapshot.uuid
+            self.ssh_touch_file(filepath)
+            snapshot.revert()
+            self.start()
+            self.wait_for_vm_running_and_ssh_up()
+            print("Check file does not exist anymore")
+            self.ssh(['test ! -f ' + filepath])
+        finally:
+            snapshot.destroy()
+
+
 class Snapshot(BaseVM):
     def _disk_list(self):
         return self.host.xe('snapshot-disk-list', {'uuid': self.uuid}, minimal=True)
