@@ -85,6 +85,23 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
 def to_xapi_bool(b):
     return 'true' if b else 'false'
 
+class Pool:
+    def __init__(self, master):
+        self.master = master
+        self.hosts = [master]
+        for host_uuid in self.hosts_uuids():
+            if host_uuid != self.hosts[0].uuid:
+                host = Host(self.host_ip(host_uuid))
+                host.initialize(pool=self)
+                self.hosts.append(host)
+        self.uuid = self.master.xe('pool-list', minimal=True)
+
+    def hosts_uuids(self):
+        return self.master.xe('host-list', {}, minimal=True).split(',')
+
+    def host_ip(self, host_uuid):
+        return self.master.xe('host-param-get', {'uuid': host_uuid, 'param-name': 'address'})
+
 class Host:
     def __init__(self, hostname_or_ip):
         self.hostname_or_ip = hostname_or_ip
@@ -97,9 +114,13 @@ class Host:
     def __str__(self):
         return self.hostname_or_ip
 
-    def initialize(self):
+    def initialize(self, pool=None):
         self.inventory = self._get_xensource_inventory()
         self.uuid = self.inventory['INSTALLATION_UUID']
+        if self.is_master():
+            self.pool = Pool(self)
+        else:
+            self.pool = pool
 
     def ssh(self, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True, background=False):
         return ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
@@ -227,9 +248,6 @@ class Host:
             if "closed by remote host" in e.stdout.decode().strip():
                 return
 
-    def pool_uuid(self):
-        return self.xe('pool-list', minimal=True)
-
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
 
@@ -256,8 +274,7 @@ class Host:
     def is_master(self):
         return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
 
-    def pool_member_uuids(self):
-        return self.xe('host-list', {}, minimal=True).split(',')
+
 
 class BaseVM:
     def __init__(self, uuid, host):
