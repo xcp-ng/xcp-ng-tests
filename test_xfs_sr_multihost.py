@@ -51,6 +51,15 @@ def local_sr_on_pool_other_host(hosts):
     yield srs[0]
 
 @pytest.fixture(scope='module')
+def local_sr_on_other_pool(hosts):
+    """ a local SR on the second pool's master """
+    host = hosts[1]
+    srs = host.local_vm_srs()
+    assert len(srs) > 0, "a local SR is required on the second pool's master"
+    # use the first local SR found
+    yield srs[0]
+
+@pytest.fixture(scope='module')
 def vm_on_xfs_sr(xfs_sr, vm_ref, hosts):
     host = hosts[0]
     print(">> ", end='')
@@ -87,5 +96,25 @@ class TestXFSSRMultiHost:
         # Stop VM
         vm.shutdown(verify=True)
 
-    def test_cold_crosspool_migration(self, vm_on_xfs_sr):
-        pass
+    def test_cold_crosspool_migration(self, hosts, vm_on_xfs_sr, xfs_sr, local_sr_on_other_pool):
+        vm = vm_on_xfs_sr
+        assert vm.is_halted()
+        host = vm.host
+        # Move the VM to the other pool
+        host2 = hosts[1]
+        vm.migrate(host2, local_sr_on_other_pool)
+        # Wait for VDIs to have moved
+        wait_for(lambda: vm.all_vdis_on_host(host2), "Wait for all VDIs on host2")
+        # Start VM to make sure it works
+        vm.start()
+        vm.wait_for_os_booted()
+        # Stop VM
+        vm.shutdown(verify=True)
+        # Migrate it back to the first host on XFS SR
+        vm.migrate(host, xfs_sr)
+        # Wait for VDIs to have moved back
+        wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host")
+        vm.start()
+        vm.wait_for_os_booted()
+        # Stop VM
+        vm.shutdown(verify=True)
