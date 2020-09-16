@@ -1,4 +1,5 @@
 import pytest
+import tempfile
 # import json
 from lib.common import wait_for, VM, Host, vm_image, is_uuid
 
@@ -42,6 +43,12 @@ def pytest_addoption(parser):
         default=[],
         help="device-config keys and values for a remote SR. " \
              "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
+    )
+    parser.addoption(
+        "--additional-repos",
+        action="append",
+        default=[],
+        help="Additional repo URLs added to the yum config"
     )
 
 def host_data(hostname_or_ip):
@@ -228,6 +235,35 @@ def sr_device_config(request):
         config[key] = value
     return config
 
+@pytest.fixture(scope='session')
+def additional_repos(request, hosts):
+    if request.param is None:
+        yield []
+        return
+
+    repo_file = '/etc/yum.repos.d/xcp-ng-additional-tester.repo'
+    url_list = request.param.split(',')
+
+    with tempfile.NamedTemporaryFile('wt') as temp:
+        for id, url in enumerate(url_list):
+            temp.write("""[xcp-ng-tester-{}]
+name=XCP-ng Tester {}
+baseurl={}
+enabled=1
+gpgcheck=0
+""".format(id, id, url))
+        temp.flush()
+
+        for host in hosts:
+            for host_ in host.pool.hosts:
+                host_.scp(temp.name, repo_file)
+
+    yield url_list
+
+    for host in hosts:
+        for host_ in host.pool.hosts:
+            host_.ssh(['rm', '-f', repo_file])
+
 def pytest_generate_tests(metafunc):
     if "hosts" in metafunc.fixturenames:
         metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
@@ -248,3 +284,11 @@ def pytest_generate_tests(metafunc):
             # For us it means use the defaults.
             configs = [None]
         metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
+    if "additional_repos" in metafunc.fixturenames:
+        repos = metafunc.config.getoption("additional_repos")
+        if not repos:
+            # No --additional-repos parameter doesn't mean skip the test.
+            # It's an optional parameter, if missing we must execute additional_repos fixture
+            # without error.
+            repos = [None]
+        metafunc.parametrize("additional_repos", repos, indirect=True, scope="session")
