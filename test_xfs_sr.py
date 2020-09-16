@@ -48,9 +48,10 @@ class TestXFSSR:
         vm = host.import_vm_url(vm_image('mini-linux-x86_64-bios'), TestXFSSR.sr.uuid)
         TestXFSSR.vm = vm # for teardown
         vm.start()
-        vm.wait_for_vm_running_and_ssh_up(wait_for_ip=True)
+        vm.wait_for_os_booted()
 
     # Impact on other tests: none if succeeds
+    # FIXME: only suited to linux VMs
     def test_snapshot(self):
         vm = TestXFSSR.vm
         vm.test_snapshot_on_linux_vm()
@@ -71,7 +72,7 @@ class TestXFSSR:
         wait_for(TestXFSSR.sr.all_pbds_attached, "Wait for PDB attached")
         vm = TestXFSSR.vm
         vm.start()
-        vm.wait_for_vm_running_and_ssh_up(wait_for_ip=True)
+        vm.wait_for_os_booted()
         vm.shutdown()
         wait_for(vm.is_halted)
 

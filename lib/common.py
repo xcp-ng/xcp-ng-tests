@@ -265,16 +265,23 @@ class Host:
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': label,
-            'device-config:device': device
+            'device-config:device': device,
+            'content-type': 'user'
         }
         print("Create %s SR on host %s's %s device with label '%s'" % (sr_type, self, device, label))
         sr_uuid = self.xe('sr-create', params)
-        return SR(sr_uuid, self)
+        return SR(sr_uuid, self.pool)
 
     def is_master(self):
         return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
 
-
+    def local_vm_srs(self):
+        srs = []
+        for sr_uuid in self.xe('pbd-list', {'host-uuid': self.uuid, 'params': 'sr-uuid'}, minimal=True).split(','):
+            sr = SR(sr_uuid, self.pool)
+            if sr.content_type() == 'user' and not sr.is_shared():
+                srs.append(sr)
+        return srs
 
 class BaseVM:
     """ Base class for VM and Snapshot """
@@ -310,6 +317,16 @@ class BaseVM:
         for vdi_uuid in self.vdi_uuids():
             self.destroy_vdi(vdi_uuid)
         self._destroy()
+
+    def get_vdi_sr_uuid(self, vdi_uuid):
+        return self.host.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
+
+    def all_vdis_on_host(self, host):
+        for vdi_uuid in self.vdi_uuids():
+            sr = SR(self.get_vdi_sr_uuid(vdi_uuid), self.host.pool)
+            if not sr.attached_to_host(host):
+                return False
+        return True
 
 class VM(BaseVM):
     def __init__(self, uuid, host):
@@ -364,10 +381,16 @@ class VM(BaseVM):
             # probably not up yet
             return False
 
-    def wait_for_vm_running_and_ssh_up(self, wait_for_ip=False):
+    def wait_for_os_booted(self, wait_for_ip=True):
         wait_for(self.is_running, "Wait for VM running")
         if wait_for_ip:
+            # waiting for the IP:
+            # - allows to make sure the OS actually started (on VMs that have the management agent)
+            # - allows to store the IP for future use in the VM object
             wait_for(self.try_get_and_store_ip, "Wait for VM IP")
+
+    def wait_for_linux_vm_running_and_ssh_up(self, wait_for_ip=True):
+        self.wait_for_os_booted(wait_for_ip)
         assert self.ip is not None
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
@@ -412,12 +435,19 @@ class VM(BaseVM):
     def exists_on_previous_pool(self):
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host):
-        print("Migrate VM to host %s" % target_host)
-        xo_cli('vm.migrate', {'vm': self.uuid, 'targetHost': target_host.uuid})
-        previous_host = self.host
+    def migrate(self, target_host, sr=None):
+        msg = "Migrate VM to host %s" % target_host
+        params = {
+            'vm': self.uuid,
+            'targetHost': target_host.uuid
+        }
+        if sr is not None:
+            msg += " (SR: %s)" % sr.uuid
+            params['sr'] = sr.uuid
+        print(msg)
+        xo_cli('vm.migrate', params)
+        self.previous_host = self.host
         self.host = target_host
-        self.previous_host = previous_host
 
     def snapshot(self):
         print("Snapshot VM")
@@ -447,7 +477,7 @@ class VM(BaseVM):
             self.ssh_touch_file(filepath)
             snapshot.revert()
             self.start()
-            self.wait_for_vm_running_and_ssh_up()
+            self.wait_for_linux_vm_running_and_ssh_up()
             print("Check file does not exist anymore")
             self.ssh(['test ! -f ' + filepath])
         finally:
@@ -484,42 +514,54 @@ class VIF:
         self.vm.host.xe('vif-move', {'uuid': self.uuid, 'network-uuid': network_uuid})
 
 class SR:
-    def __init__(self, uuid, host):
+    def __init__(self, uuid, pool):
         self.uuid = uuid
-        self.host = host
+        self.pool = pool
 
     def pbd_uuids(self):
-        return self.host.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True).split(',')
+        return self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True).split(',')
 
     def unplug_pbds(self):
         print("Unplug PBDs")
         for pbd_uuid in self.pbd_uuids():
-            self.host.xe('pbd-unplug', {'uuid': pbd_uuid})
+            self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
 
     def all_pbds_attached(self):
         all_attached = True
         for pbd_uuid in self.pbd_uuids():
-            all_attached = all_attached and self.host.xe('pbd-param-get', {'uuid': pbd_uuid, 'param-name': 'currently-attached'}) == 'true'
+            all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid, 'param-name': 'currently-attached'}) == 'true'
         return all_attached
 
     def plug_pbds(self):
         print("Attach PBDs")
         for pbd_uuid in self.pbd_uuids():
-            self.host.xe('pbd-plug', {'uuid': pbd_uuid})
+            self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
 
     def destroy(self):
         self.unplug_pbds()
         print("Destroy SR " + self.uuid)
-        self.host.xe('sr-destroy', {'uuid': self.uuid})
+        self.pool.master.xe('sr-destroy', {'uuid': self.uuid})
 
     def forget(self):
         self.unplug_pbds()
         print("Forget SR " + self.uuid)
-        self.host.xe('sr-forget', {'uuid': self.uuid})
+        self.pool.master.xe('sr-forget', {'uuid': self.uuid})
 
     def exists(self):
-        return self.host.xe('sr-list', {'uuid': self.uuid}, minimal=True) == self.uuid
+        return self.pool.master.xe('sr-list', {'uuid': self.uuid}, minimal=True) == self.uuid
 
     def scan(self):
         print("Scan SR " + self.uuid)
-        self.host.xe('sr-scan', {'uuid': self.uuid})
+        self.pool.master.xe('sr-scan', {'uuid': self.uuid})
+
+    def hosts_uuids(self):
+        return self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid, 'params': 'host-uuid'}, minimal=True).split(',')
+
+    def attached_to_host(self, host):
+        return host.uuid in self.hosts_uuids()
+
+    def content_type(self):
+        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
+
+    def is_shared(self):
+        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'}) == 'true'

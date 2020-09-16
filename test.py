@@ -8,14 +8,14 @@ def test_pause(running_linux_vm):
     vm.pause()
     wait_for(vm.is_paused, "Wait for VM paused")
     vm.unpause()
-    vm.wait_for_vm_running_and_ssh_up()
+    vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
 
 def test_suspend(running_linux_vm):
     vm = running_linux_vm
     vm.suspend()
     wait_for(vm.is_suspended, "Wait for VM suspended")
     vm.resume()
-    vm.wait_for_vm_running_and_ssh_up()
+    vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
 
 def test_snapshot(running_linux_vm):
     vm = running_linux_vm
@@ -30,7 +30,7 @@ def test_checkpoint(running_linux_vm):
     vm.ssh_touch_file(filepath)
     snapshot.revert()
     vm.resume()
-    vm.wait_for_vm_running_and_ssh_up()
+    vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
     print("Check file does not exist anymore")
     vm.ssh(['test ! -f ' + filepath])
     print("Check 'sleep' process is still running")
