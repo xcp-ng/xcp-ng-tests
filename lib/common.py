@@ -239,14 +239,17 @@ class Host:
         print('Remove packages: %s from host %s' % (' '.join(packages), self))
         return self.ssh(['yum', 'remove', '-y'] + packages)
 
-    def reboot(self):
+    def reboot(self, verify=False):
         print("Reboot host %s" % self)
         try:
             self.ssh(['reboot'])
         except subprocess.CalledProcessError as e:
             # ssh connection may get killed by the reboot and terminate with an error code
             if "closed by remote host" in e.stdout.decode().strip():
-                return
+                pass
+        if verify:
+            wait_for_not(self.is_enabled, "Wait for host down")
+            wait_for(self.is_enabled, "Wait for host up", timeout_secs=300)
 
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
@@ -353,9 +356,11 @@ class VM(BaseVM):
         print("Start VM")
         return self.host.xe('vm-start', {'uuid': self.uuid})
 
-    def shutdown(self, force=False):
+    def shutdown(self, force=False, verify=False):
         print("Shutdown VM")
         return self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
+        if verify:
+            wait_for(self.is_halted, "Wait for VM halted")
 
     def try_get_and_store_ip(self):
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
@@ -400,17 +405,21 @@ class VM(BaseVM):
         print("Check file created")
         self.ssh(['test -f ' + filepath])
 
-    def suspend(self):
+    def suspend(self, verify=False):
         print("Suspend VM")
         self.host.xe('vm-suspend', {'uuid': self.uuid})
+        if verify:
+            wait_for(self.is_suspended, "Wait for VM suspended")
 
     def resume(self):
         print("Resume VM")
         self.host.xe('vm-resume', {'uuid': self.uuid})
 
-    def pause(self):
+    def pause(self, verify=False):
         print("Pause VM")
         self.host.xe('vm-pause', {'uuid': self.uuid})
+        if verify:
+            wait_for(self.is_paused, "Wait for VM paused")
 
     def unpause(self):
         print("Unpause VM")
@@ -422,12 +431,14 @@ class VM(BaseVM):
     def _destroy(self):
         self.host.xe('vm-destroy', {'uuid': self.uuid})
 
-    def destroy(self):
+    def destroy(self, verify=False):
         # Note: not using xe vm-uninstall (which would be convenient) because it leaves a VDI behind
         # See https://github.com/xapi-project/xen-api/issues/4145
         if not self.is_halted():
             self.shutdown(force=True)
         super().destroy()
+        if verify:
+            wait_for_not(self.exists, "Wait for VM destroyed")
 
     def exists(self):
         return self.host.pool_has_vm(self.uuid)
@@ -481,19 +492,20 @@ class VM(BaseVM):
             print("Check file does not exist anymore")
             self.ssh(['test ! -f ' + filepath])
         finally:
-            snapshot.destroy()
+            snapshot.destroy(verify=True)
 
 
 class Snapshot(BaseVM):
     def _disk_list(self):
         return self.host.xe('snapshot-disk-list', {'uuid': self.uuid}, minimal=True)
 
-    def destroy(self):
+    def destroy(self, verify=False):
         print("Delete snapshot " + self.uuid)
         # that uninstall command apparently works better for snapshots than for VMs apparently
         self.host.xe('snapshot-uninstall', {'uuid': self.uuid, 'force': 'true'})
-        print("Check snapshot doesn't exist anymore")
-        assert not self.exists()
+        if verify:
+            print("Check snapshot doesn't exist anymore")
+            assert not self.exists()
 
 #     def _destroy(self):
 #         self.host.xe('snapshot-destroy', {'uuid': self.uuid})
@@ -532,15 +544,19 @@ class SR:
             all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid, 'param-name': 'currently-attached'}) == 'true'
         return all_attached
 
-    def plug_pbds(self):
+    def plug_pbds(self, verify=True):
         print("Attach PBDs")
         for pbd_uuid in self.pbd_uuids():
             self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
+        if verify:
+            wait_for(self.all_pbds_attached, "Wait for PDBs attached")
 
-    def destroy(self):
+    def destroy(self, verify=False):
         self.unplug_pbds()
         print("Destroy SR " + self.uuid)
         self.pool.master.xe('sr-destroy', {'uuid': self.uuid})
+        if verify:
+            wait_for_not(self.exists, "Wait for SR destroyed")
 
     def forget(self):
         self.unplug_pbds()

@@ -58,8 +58,7 @@ def vm_on_xfs_sr(xfs_sr, vm_ref, hosts):
     yield vm
     # teardown
     print("<< Destroy VM")
-    vm.destroy()
-    wait_for_not(vm.exists, "<< Wait for VM destroyed")
+    vm.destroy(verify=True)
 
 #@pytest.mark.incremental
 @pytest.mark.usefixtures("two_hosts_one_of_them_in_a_pool")
@@ -79,8 +78,7 @@ class TestXFSSRMultiHost:
         vm.start()
         vm.wait_for_os_booted()
         # Stop VM
-        vm.shutdown()
-        wait_for(vm.is_halted, "Wait for VM halted")
+        vm.shutdown(verify=True)
         # Migrate it back to the first host on XFS SR
         vm.migrate(host, xfs_sr)
         # Wait for VDIs to have moved back
@@ -88,7 +86,7 @@ class TestXFSSRMultiHost:
         vm.start()
         vm.wait_for_os_booted()
         # Stop VM
-        vm.shutdown()
+        vm.shutdown(verify=True)
 
     def test_cold_crosspool_migration(self, vm_on_xfs_sr):
         pass

@@ -5,15 +5,13 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 
 def test_pause(running_linux_vm):
     vm = running_linux_vm
-    vm.pause()
-    wait_for(vm.is_paused, "Wait for VM paused")
+    vm.pause(verify=True)
     vm.unpause()
     vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
 
 def test_suspend(running_linux_vm):
     vm = running_linux_vm
-    vm.suspend()
-    wait_for(vm.is_suspended, "Wait for VM suspended")
+    vm.suspend(verify=True)
     vm.resume()
     vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
 
@@ -41,4 +39,4 @@ def test_checkpoint(running_linux_vm):
     wait_for(lambda: vm.ssh(['! ps -edf | grep -s grep | grep "sleep 100000"'], check=False, simple_output=False).returncode != 0,
              "Wait for process %s not running anymore" % pid,
              timeout_secs=10)
-    snapshot.destroy()
+    snapshot.destroy(verify=True)

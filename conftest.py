@@ -140,8 +140,7 @@ def imported_vm(host, vm_ref):
     # teardown
     if not is_uuid(vm_ref):
         print("<< Destroy VM")
-        vm.destroy()
-        wait_for_not(vm.exists, "<< Wait for VM destroyed")
+        vm.destroy(verify=True)
 
 # TODO: make it a fixture factory?
 @pytest.fixture(scope="module")

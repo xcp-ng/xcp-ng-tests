@@ -59,22 +59,18 @@ class TestXFSSR:
     # Impact on other tests: VM shutdown cleanly
     def test_vm_shutdown(self):
         vm = TestXFSSR.vm
-        vm.shutdown()
-        wait_for(vm.is_halted, "Wait for VM halted")
+        vm.shutdown(verify=True)
 
     # *** tests with reboots (longer tests). To be moved to another file?
 
     # Impact on other tests: none if succeeds
     def test_reboot(self, host):
-        host.reboot()
-        wait_for_not(host.is_enabled, "Wait for host down")
-        wait_for(host.is_enabled, "Wait for host up", timeout_secs=300)
+        host.reboot(verify=True)
         wait_for(TestXFSSR.sr.all_pbds_attached, "Wait for PDB attached")
         vm = TestXFSSR.vm
         vm.start()
         vm.wait_for_os_booted()
-        vm.shutdown()
-        wait_for(vm.is_halted)
+        vm.shutdown(verify=True)
 
     # Impact on other tests: none if succeeds
     def test_xfsprogs_missing(self, host):
@@ -87,17 +83,14 @@ class TestXFSSR:
                 assert False, "SR scan should have failed"
             except:
                 print("SR scan failed as expected.")
-            host.reboot()
-            wait_for_not(host.is_enabled, "Wait for host down")
-            wait_for(host.is_enabled, "Wait for host up", timeout_secs=300)
+            host.reboot(verify=True)
             # give the host some time to try to attach the SR
             time.sleep(10)
             print("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['xfsprogs'])
             TestXFSSR.xfsprogs_installed = True
-            sr.plug_pbds()
-            wait_for(sr.all_pbds_attached, "Wait for PDB attached")
+            sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not TestXFSSR.xfsprogs_installed:
@@ -109,14 +102,12 @@ class TestXFSSR:
     # Impact on other tests: VM removed, leaving SR empty (and thus destroyable)
     def test_destroy_vm(self):
         if TestXFSSR.vm is not None:
-            TestXFSSR.vm.destroy()
-            wait_for_not(TestXFSSR.vm.exists, "Wait for VM destroyed")
+            TestXFSSR.vm.destroy(verify=True)
 
     # Impact on other tests: SR destroyed
     # Prerequisites: SR attached but empty
     def destroy_sr(self):
-        TestXFSSR.sr.destroy()
-        wait_for_not(TestXFSSR.sr.exists, "Wait for SR destroyed")
+        TestXFSSR.sr.destroy(verify=True)
 
     @classmethod
     def teardown_class(cls):
