@@ -112,6 +112,6 @@ class TestXFSSR:
     @classmethod
     def teardown_class(cls):
         if cls.sr is not None and cls.sr.exists():
-            # forget the SR: easier than destroy, especially if there are VDIs
-            cls.sr.forget()
-
+            if cls.vm is not None and cls.vm.exists():
+                cls.vm.destroy()
+            cls.sr.destroy(verify=True)
