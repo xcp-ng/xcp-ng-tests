@@ -17,7 +17,7 @@ def test_suspend(running_linux_vm):
 
 def test_snapshot(running_linux_vm):
     vm = running_linux_vm
-    vm.test_snapshot_on_linux_vm()
+    vm.test_snapshot_on_running_linux_vm()
 
 def test_checkpoint(running_linux_vm):
     vm = running_linux_vm

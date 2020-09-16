@@ -481,7 +481,8 @@ class VM(BaseVM):
 
     # *** Common reusable tests
 
-    def test_snapshot_on_linux_vm(self):
+    def test_snapshot_on_running_linux_vm(self):
+        self.wait_for_linux_vm_running_and_ssh_up()
         snapshot = self.snapshot()
         try:
             filepath = '/tmp/%s' % snapshot.uuid

@@ -52,12 +52,12 @@ class TestXFSSR:
 
     # Impact on other tests: none if succeeds
     # FIXME: only suited to linux VMs
-    def test_snapshot(self):
+    def test_snapshot(self, host):
         vm = TestXFSSR.vm
-        vm.test_snapshot_on_linux_vm()
+        vm.test_snapshot_on_running_linux_vm()
 
     # Impact on other tests: VM shutdown cleanly
-    def test_vm_shutdown(self):
+    def test_vm_shutdown(self, host):
         vm = TestXFSSR.vm
         vm.shutdown(verify=True)
 
@@ -100,13 +100,13 @@ class TestXFSSR:
     # *** End of tests with reboots
 
     # Impact on other tests: VM removed, leaving SR empty (and thus destroyable)
-    def test_destroy_vm(self):
+    def test_destroy_vm(self, host):
         if TestXFSSR.vm is not None:
             TestXFSSR.vm.destroy(verify=True)
 
     # Impact on other tests: SR destroyed
     # Prerequisites: SR attached but empty
-    def destroy_sr(self):
+    def destroy_sr(self, host):
         TestXFSSR.sr.destroy(verify=True)
 
     @classmethod
