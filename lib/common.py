@@ -478,6 +478,9 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
+    def is_running_on_host(self, host):
+        return self.is_running() and self.param_get('resident-on') == host.uuid
+
 
     # *** Common reusable tests
 

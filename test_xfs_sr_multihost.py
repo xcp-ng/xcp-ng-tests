@@ -80,20 +80,34 @@ class TestXFSSRMultiHost:
         # Move the VM to another host of the pool
         host2 = host.pool.hosts[1]
         vm.migrate(host2, local_sr_on_pool_other_host)
-        # Wait for VDIs to have moved
         wait_for(lambda: vm.all_vdis_on_host(host2), "Wait for all VDIs on host2")
         # Start VM to make sure it works
         vm.start()
         vm.wait_for_os_booted()
-        # Stop VM
         vm.shutdown(verify=True)
         # Migrate it back to the first host on XFS SR
         vm.migrate(host, xfs_sr)
-        # Wait for VDIs to have moved back
         wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host")
+        # Start VM to make sure it works
         vm.start()
         vm.wait_for_os_booted()
-        # Stop VM
+        vm.shutdown(verify=True)
+
+    def test_live_intrapool_migration(self, vm_on_xfs_sr, xfs_sr, local_sr_on_pool_other_host):
+        vm = vm_on_xfs_sr
+        host = vm.host
+        # start VM
+        vm.start()
+        vm.wait_for_os_booted()
+        # Move the VM to another host of the pool
+        host2 = host.pool.hosts[1]
+        vm.migrate(host2, local_sr_on_pool_other_host)
+        wait_for(lambda: vm.all_vdis_on_host(host2), "Wait for all VDIs on host2")
+        wait_for(lambda: vm.is_running_on_host(host2), "Wait for VM to be running on host2")
+        # Migrate it back to the first host on XFS SR
+        vm.migrate(host, xfs_sr)
+        wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host")
+        wait_for(lambda: vm.is_running_on_host(host), "Wait for VM to be running on host")
         vm.shutdown(verify=True)
 
     def test_cold_crosspool_migration(self, hosts, vm_on_xfs_sr, xfs_sr, local_sr_on_other_pool):
@@ -103,18 +117,32 @@ class TestXFSSRMultiHost:
         # Move the VM to the other pool
         host2 = hosts[1]
         vm.migrate(host2, local_sr_on_other_pool)
-        # Wait for VDIs to have moved
         wait_for(lambda: vm.all_vdis_on_host(host2), "Wait for all VDIs on host2")
         # Start VM to make sure it works
         vm.start()
         vm.wait_for_os_booted()
-        # Stop VM
         vm.shutdown(verify=True)
         # Migrate it back to the first host on XFS SR
         vm.migrate(host, xfs_sr)
-        # Wait for VDIs to have moved back
         wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host")
+        # Start VM to make sure it works
         vm.start()
         vm.wait_for_os_booted()
-        # Stop VM
+        vm.shutdown(verify=True)
+
+    def test_live_crosspool_migration(self, hosts, vm_on_xfs_sr, xfs_sr, local_sr_on_other_pool):
+        vm = vm_on_xfs_sr
+        host = vm.host
+        # start VM
+        vm.start()
+        vm.wait_for_os_booted()
+        # Move the VM to the other pool
+        host2 = hosts[1]
+        vm.migrate(host2, local_sr_on_other_pool)
+        wait_for(lambda: vm.all_vdis_on_host(host2), "Wait for all VDIs on host2")
+        wait_for(lambda: vm.is_running_on_host(host2), "Wait for VM to be running on host2")
+        # Migrate it back to the first host on XFS SR
+        vm.migrate(host, xfs_sr)
+        wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host")
+        wait_for(lambda: vm.is_running_on_host(host), "Wait for VM to be running on host")
         vm.shutdown(verify=True)
