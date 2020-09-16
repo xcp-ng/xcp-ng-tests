@@ -59,7 +59,7 @@ class TestXFSSR:
     def test_vm_shutdown(self):
         vm = TestXFSSR.vm
         vm.shutdown()
-        wait_for(vm.is_halted)
+        wait_for(vm.is_halted, "Wait for VM halted")
 
     # *** tests with reboots (longer tests). To be moved to another file?
 

@@ -232,11 +232,11 @@ class Host:
                 raise
 
     def yum_install(self, packages):
-        print('Install packages: %s' % ' '.join(packages))
+        print('Install packages: %s on host %s' % (' '.join(packages), self))
         return self.ssh(['yum', 'install', '-y'] + packages)
 
     def yum_remove(self, packages):
-        print('Remove packages: %s' % ' '.join(packages))
+        print('Remove packages: %s from host %s' % (' '.join(packages), self))
         return self.ssh(['yum', 'remove', '-y'] + packages)
 
     def reboot(self):
@@ -277,6 +277,7 @@ class Host:
 
 
 class BaseVM:
+    """ Base class for VM and Snapshot """
     def __init__(self, uuid, host):
         self.uuid = uuid
         self.host = host
@@ -304,7 +305,7 @@ class BaseVM:
     def destroy_vdi(self, vdi_uuid):
         self.host.xe('vdi-destroy', {'uuid': vdi_uuid})
 
-    # move this method and the above back to class VM if not useful in Snapshot class?
+    # FIXME: move this method and the above back to class VM if not useful in Snapshot class?
     def destroy(self):
         for vdi_uuid in self.vdi_uuids():
             self.destroy_vdi(vdi_uuid)
