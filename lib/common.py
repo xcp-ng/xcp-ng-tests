@@ -216,7 +216,7 @@ class Host:
         try:
             return self.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}) == 'true'
         except subprocess.CalledProcessError:
-            # If XAPI is not ready yet, this will throw. We return False in that case.
+            # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
     def has_updates(self):

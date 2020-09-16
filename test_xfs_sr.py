@@ -43,7 +43,7 @@ class TestXFSSR:
         TestXFSSR.sr = host.sr_create('xfs', '/dev/' + sr_disk, "XFS-local-SR")
         wait_for(TestXFSSR.sr.exists, "Wait for SR to exist")
 
-    # Impact on other tests: creates a VM on the SR
+    # Impact on other tests: creates a VM on the SR and starts it
     def test_import_and_start_VM(self, host):
         vm = host.import_vm_url(vm_image('mini-linux-x86_64-bios'), TestXFSSR.sr.uuid)
         TestXFSSR.vm = vm # for teardown
@@ -75,9 +75,10 @@ class TestXFSSR:
     # Impact on other tests: none if succeeds
     def test_xfsprogs_missing(self, host):
         sr = TestXFSSR.sr
+        xfsprogs_installed = True
         try:
             host.yum_remove(['xfsprogs'])
-            TestXFSSR.xfsprogs_installed = False
+            xfsprogs_installed = False
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
@@ -89,13 +90,12 @@ class TestXFSSR:
             print("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['xfsprogs'])
-            TestXFSSR.xfsprogs_installed = True
+            xfsprogs_installed = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
-            if not TestXFSSR.xfsprogs_installed:
+            if not xfsprogs_installed:
                 host.yum_install(['xfsprogs'])
-                TestXFSSR.xfsprogs_installed = True
 
     # *** End of tests with reboots
 

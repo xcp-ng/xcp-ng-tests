@@ -70,7 +70,6 @@ class TestXFSSRMultiHost:
         host = vm.host
         # Move the VM to another host of the pool
         host2 = host.pool.hosts[1]
-        # Fixme find SR writable, first of content-type user
         vm.migrate(host2, local_sr_on_pool_other_host)
         # Wait for VDIs to have moved
         wait_for(lambda: vm.all_vdis_on_host(host2), "Wait for all VDIs on host2")
@@ -82,7 +81,7 @@ class TestXFSSRMultiHost:
         # Migrate it back to the first host on XFS SR
         vm.migrate(host, xfs_sr)
         # Wait for VDIs to have moved back
-        wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host2")
+        wait_for(lambda: vm.all_vdis_on_host(host), "Wait for all VDIs back on host")
         vm.start()
         vm.wait_for_os_booted()
         # Stop VM
