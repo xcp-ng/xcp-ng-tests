@@ -19,16 +19,10 @@ def pytest_runtest_setup(item):
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--host",
-        action="append",
-        default=[],
-        help="XCP-ng or XS host for tests that require only one host",
-    )
-    parser.addoption(
         "--hosts",
         action="append",
         default=[],
-        help="XCP-ng or XS list of hosts (comma-separated) for tests that require only one host",
+        help="XCP-ng or XS list of master hosts (comma-separated)",
     )
     parser.addoption(
         "--vm",
@@ -66,14 +60,8 @@ def setup_host(hostname_or_ip):
     return h, skip_xo_config
 
 @pytest.fixture(scope='session')
-def host(request):
-    hostname_or_ip = request.param
-    h, skip_xo_config = setup_host(hostname_or_ip)
-    yield h
-    # teardown
-    if not skip_xo_config:
-        print("<<< Disconnect host %s" % h)
-        h.xo_server_remove()
+def host(hosts):
+    yield hosts[0]
 
 @pytest.fixture(scope='session')
 def hosts(request):
@@ -166,8 +154,6 @@ def running_linux_vm(imported_vm):
 #     return data
 
 def pytest_generate_tests(metafunc):
-    if "host" in metafunc.fixturenames:
-        metafunc.parametrize("host", metafunc.config.getoption("host"), indirect=True, scope="session")
     if "hosts" in metafunc.fixturenames:
         metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
     if "vm_ref" in metafunc.fixturenames:

@@ -21,16 +21,18 @@ A crash-course about pytest will help you understanding how to start tests or gr
 
 Examples:
 ```
-pytest test_update_host.py --host=10.0.0.1
+pytest test_update_host.py --hosts=10.0.0.1
 pytest test_cross_pool_live_storage_migration.py --hosts=10.0.0.1,10.0.0.2 --vm=mini-linux-x86_64-uefi
-pytest test.py --host=10.0.0.1 --vm=mini-linux-x86_64-bios --vm=mini-linux-x86_64-uefi
+pytest test.py --hosts=10.0.0.1 --vm=mini-linux-x86_64-bios --vm=mini-linux-x86_64-uefi
 ```
 
-Most tests take a `--host=yourtesthost` parameter if they need a single host to run on, or a `--hosts=host1,host2,host3` parameter if they need several hosts (e.g.: migration tests). The `--host` parameter can be specified several times. Then `pytest` will run the tests on each host, sequentially. Same with `--hosts` if you want to test several distinct groups of hosts in the same session.
+Most tests take a `--hosts=yourtesthost` (or `--hosts=host1,host2,...` if they need several hosts, e.g. migration tests).
+The `--hosts` parameter can be specified several times. Then `pytest` will run the tests on each host or group of hosts, sequentially.
 
 Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those are tests that will import a VM before testing stuff on it:
 * `OVA_URL` is an URL to download an OVA. It can also be a simple a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
 * `VM_key` refers to a key in `data.py`'s `VM_IMAGES` dict. Example: `mini-linux-x86_64-uefi`.
 * `IP_address` allows to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
-If `--vm` is not specified, defaults defined by the tests will be used. The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
+If `--vm` is not specified, defaults defined by the tests will be used.
+The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
