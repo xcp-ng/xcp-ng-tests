@@ -585,3 +585,37 @@ class SR:
 
     def is_shared(self):
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'}) == 'true'
+
+
+
+def cold_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
+    """ Storage migration of a shutdown VM, then migrate it back """
+    assert vm.is_halted()
+    # Move the VM to another host of the pool
+    vm.migrate(dest_host, dest_sr)
+    wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
+    # Start VM to make sure it works
+    vm.start()
+    vm.wait_for_os_booted()
+    vm.shutdown(verify=True)
+    # Migrate it back to the first host on XFS SR
+    vm.migrate(prov_host, prov_sr)
+    wait_for(lambda: vm.all_vdis_on_host(prov_host), "Wait for all VDIs back on provenance host")
+    # Start VM to make sure it works
+    vm.start()
+    vm.wait_for_os_booted()
+    vm.shutdown(verify=True)
+
+def live_storage_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
+    # start VM
+    vm.start()
+    vm.wait_for_os_booted()
+    # Move the VM to another host of the pool
+    vm.migrate(dest_host, dest_sr)
+    wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
+    wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
+    # Migrate it back to the first host on XFS SR
+    vm.migrate(prov_host, prov_sr)
+    wait_for(lambda: vm.all_vdis_on_host(prov_host), "Wait for all VDIs back on provenance host")
+    wait_for(lambda: vm.is_running_on_host(prov_host), "Wait for VM to be running on provenance host")
+    vm.shutdown(verify=True)

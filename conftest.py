@@ -1,6 +1,6 @@
 import pytest
 #import json
-from lib.common import wait_for, wait_for_not, VM, Host, vm_image, is_uuid
+from lib.common import wait_for, VM, Host, vm_image, is_uuid
 
 # *** Support for incremental tests in test classes ***
 # From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
@@ -60,12 +60,8 @@ def setup_host(hostname_or_ip):
     return h, skip_xo_config
 
 @pytest.fixture(scope='session')
-def host(hosts):
-    yield hosts[0]
-
-@pytest.fixture(scope='session')
 def hosts(request):
-    # a list of hosts rather than a single host
+    # a list of master hosts, each from a different pool
     hostname_list = request.param.split(',')
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
     yield [tup[0] for tup in host_list]
@@ -74,6 +70,53 @@ def hosts(request):
         if not skip_xo_config:
             print("<<< Disconnect host %s" % h)
             h.xo_server_remove()
+
+@pytest.fixture(scope='session')
+def hostA1(hosts):
+    """ Master of first pool (pool A) """
+    yield hosts[0]
+
+@pytest.fixture(scope='session')
+def host(hostA1):
+    """ Convenience fixture for hostA1 """
+    yield hostA1
+
+@pytest.fixture(scope='session')
+def hostA2(hostA1):
+    """ Second host of pool A """
+    assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
+    yield hostA1.pool.hosts[1]
+
+@pytest.fixture(scope='session')
+def hostB1(hosts):
+    """ Master of second pool (pool B) """
+    assert len(hosts) > 1, "A second pool is required"
+    assert hosts[0].pool.uuid != hosts[1].pool.uuid
+    yield hosts[1]
+
+@pytest.fixture(scope='session')
+def local_sr_on_hostA2(hostA2):
+    """ a local SR on the pool's second host """
+    srs = hostA2.local_vm_srs()
+    assert len(srs) > 0, "a local SR is required on the pool's second host"
+    # use the first local SR found
+    yield srs[0]
+
+@pytest.fixture(scope='session')
+def local_sr_on_hostB1(hostB1):
+    """ a local SR on the second pool's master """
+    srs = hostB1.local_vm_srs()
+    assert len(srs) > 0, "a local SR is required on the second pool's master"
+    # use the first local SR found
+    yield srs[0]
+
+@pytest.fixture(scope='session')
+def sr_disk(host):
+    disks = host.disks()
+    # there must be at least 2 disks
+    assert len(disks) > 1, "at least two disks are required on the first host"
+    # Using the second disk for SR
+    yield disks[1]
 
 @pytest.fixture(scope='module')
 def vm_ref(request):

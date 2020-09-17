@@ -1,18 +1,10 @@
 import pytest
-from lib.common import wait_for, wait_for_not, vm_image
+from lib.common import wait_for
 import time
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
 # - access to XCP-ng RPM repository from the host
-
-@pytest.fixture(scope='module')
-def sr_disk(host):
-    disks = host.disks()
-    # there must be at least 2 disks
-    assert len(disks) > 1, "at least two disks are required"
-    # Using the second disk for SR
-    yield disks[1]
 
 @pytest.fixture(scope='module')
 def host_with_xfsprogs(host):
@@ -44,8 +36,8 @@ class TestXFSSR:
         wait_for(TestXFSSR.sr.exists, "Wait for SR to exist")
 
     # Impact on other tests: creates a VM on the SR and starts it
-    def test_import_and_start_VM(self, host):
-        vm = host.import_vm_url(vm_image('mini-linux-x86_64-bios'), TestXFSSR.sr.uuid)
+    def test_import_and_start_VM(self, host, vm_ref):
+        vm = host.import_vm_url(vm_ref, TestXFSSR.sr.uuid)
         TestXFSSR.vm = vm # for teardown
         vm.start()
         vm.wait_for_os_booted()
@@ -106,7 +98,7 @@ class TestXFSSR:
 
     # Impact on other tests: SR destroyed
     # Prerequisites: SR attached but empty
-    def destroy_sr(self, host):
+    def test_destroy_sr(self, host):
         TestXFSSR.sr.destroy(verify=True)
 
     @classmethod
