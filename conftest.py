@@ -1,5 +1,5 @@
 import pytest
-#import json
+# import json
 from lib.common import wait_for, VM, Host, vm_image, is_uuid
 
 # *** Support for incremental tests in test classes ***
