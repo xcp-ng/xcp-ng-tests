@@ -56,6 +56,8 @@ def setup_host(hostname_or_ip):
     skip_xo_config = h_data.get('skip_xo_config', False)
     if not skip_xo_config:
         h.xo_server_add(h_data['user'], h_data['password'])
+    else:
+        h.xo_get_server_id(store=True)
     wait_for(h.xo_server_connected, timeout_secs=10)
     return h, skip_xo_config
 

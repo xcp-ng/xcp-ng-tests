@@ -50,6 +50,10 @@ def xo_cli(action, args={}, check=True, simple_output=True):
     else:
         return res
 
+def xo_object_exists(uuid):
+    lst = json.loads(xo_cli('--list-objects', {'uuid':uuid}))
+    return len(lst) > 0
+
 class SSHException(Exception):
     pass
 
@@ -146,6 +150,15 @@ class Host:
             inventory[key] = raw_value.strip('\'')
         return inventory
 
+    def xo_get_server_id(self, store=True):
+        servers = json.loads(xo_cli('server.getAll'))
+        for server in servers:
+            if server['host'] == self.hostname_or_ip:
+                if store:
+                    self.xo_srv_id = server['id']
+                return server['id']
+        return None
+
     def xo_server_remove(self):
         if self.xo_srv_id is not None:
             xo_cli('server.remove', {'id': self.xo_srv_id})
@@ -185,6 +198,12 @@ class Host:
     def xo_server_connected(self):
         return self.xo_server_status() == "connected"
 
+    def xo_server_reconnect(self):
+        print("Reconnect XO to host %s" % self)
+        xo_cli('server.disable', {'id': self.xo_srv_id})
+        xo_cli('server.enable', {'id': self.xo_srv_id})
+        wait_for(self.xo_server_connected, timeout_secs=10)
+
     def import_vm_url(self, url, sr_uuid=None):
         print("Import VM %s on host %s" % (url, self))
         params = {
@@ -192,7 +211,9 @@ class Host:
         }
         if sr_uuid is not None:
             params['sr-uuid'] = sr_uuid
-        vm = VM(self.xe('vm-import', params), self)
+        vm_uuid = self.xe('vm-import', params)
+        print("VM UUID: %s" % vm_uuid)
+        vm = VM(vm_uuid, self)
         # Set VM VIF networks to the host's management network
         for vif in vm.vifs():
             vif.move(self.management_network())
@@ -208,9 +229,11 @@ class Host:
         print("Install updates on host %s" % self)
         return self.ssh(['yum', 'update', '-y'])
 
-    def restart_toolstack(self):
+    def restart_toolstack(self, verify=False):
         print("Restart toolstack on host %s" % self)
         return self.ssh(['xe-toolstack-restart'])
+        if verify:
+            wait_for(self.is_enabled, "Wait for host enabled")
 
     def is_enabled(self):
         try:
@@ -239,7 +262,7 @@ class Host:
         print('Remove packages: %s from host %s' % (' '.join(packages), self))
         return self.ssh(['yum', 'remove', '-y'] + packages)
 
-    def reboot(self, verify=False):
+    def reboot(self, verify=False, reconnect_xo=True):
         print("Reboot host %s" % self)
         try:
             self.ssh(['reboot'])
@@ -247,9 +270,11 @@ class Host:
             # ssh connection may get killed by the reboot and terminate with an error code
             if "closed by remote host" in e.stdout.decode().strip():
                 pass
-        if verify:
+        if verify or reconnect_xo:
             wait_for_not(self.is_enabled, "Wait for host down")
             wait_for(self.is_enabled, "Wait for host up", timeout_secs=300)
+        if reconnect_xo and self.is_master():
+            self.xo_server_reconnect()
 
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
@@ -447,6 +472,17 @@ class VM(BaseVM):
         return self.previous_host.pool_has_vm(self.uuid)
 
     def migrate(self, target_host, sr=None):
+        # workaround XO bug where sometimes it loses connection without knowing it
+        self.host.pool.master.xo_server_reconnect()
+        if target_host.pool != self.host.pool:
+            target_host.pool.master.xo_server_reconnect()
+
+        # Sometimes we migrate VMs right after creating them
+        # In that case we need to ensure that XO knows about the new VM
+        # Else we risk getting a "no such VM" error
+        # Thus, let's first wait for XO to know about the VM
+        wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about VM %s" % self.uuid)
+
         msg = "Migrate VM to host %s" % target_host
         params = {
             'vm': self.uuid,
