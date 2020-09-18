@@ -288,15 +288,21 @@ class Host:
     def file_exists(self, filepath):
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
-    def sr_create(self, sr_type, device, label):
+    def sr_create(self, sr_type, label, device_config, shared=False):
         params = {
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': label,
-            'device-config:device': device,
-            'content-type': 'user'
+            'content-type': 'user',
+            'shared': shared
         }
-        print("Create %s SR on host %s's %s device with label '%s'" % (sr_type, self, device, label))
+        for key, value in device_config.items():
+            params['device-config:{}'.format(key)] = value
+
+        print(
+            "Create %s SR on host %s's %s device-config with label '%s'" %
+            (sr_type, self, str(device_config), label)
+        )
         sr_uuid = self.xe('sr-create', params)
         return SR(sr_uuid, self.pool)
 

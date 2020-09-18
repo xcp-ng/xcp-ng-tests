@@ -11,7 +11,7 @@ class TestEXTSR:
 
     # Impact on other tests: installs xfsprogs and creates the SR
     def test_create_sr(self, host, sr_disk):
-        TestEXTSR.sr = host.sr_create('ext', '/dev/' + sr_disk, "EXT-local-SR")
+        TestEXTSR.sr = host.sr_create('ext', "EXT-local-SR", {'device': '/dev/' + sr_disk})
         wait_for(TestEXTSR.sr.exists, "Wait for SR to exist")
 
     # Impact on other tests: creates a VM on the SR and starts it

@@ -17,7 +17,7 @@ def xfs_sr(host, sr_disk):
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
             "xfsprogs must not be installed on the host at the beginning of the tests"
     host.yum_install(['xfsprogs'])
-    sr = host.sr_create('xfs', '/dev/' + sr_disk, "XFS-local-SR")
+    sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
     sr.destroy()
