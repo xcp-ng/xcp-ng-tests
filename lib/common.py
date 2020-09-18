@@ -393,6 +393,14 @@ class VM(BaseVM):
         if verify:
             wait_for(self.is_halted, "Wait for VM halted")
 
+    def convert_type(self, vmtype):
+        print(str(self))
+        params = {
+            'id': self.uuid,
+            'virtualizationMode': vmtype,
+        }
+        return xo_cli('vm.set', params)
+
     def try_get_and_store_ip(self):
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
