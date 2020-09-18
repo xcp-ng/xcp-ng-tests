@@ -24,7 +24,7 @@ class TestXFSSR:
             "xfsprogs must not be installed on the host at the beginning of the tests"
         try:
             # though it is expected to fail, result assigned to TestXFSSR.sr for teardown in case it succeeds
-            TestXFSSR.sr = host.sr_create('xfs', '/dev/' + sr_disk, "XFS-local-SR")
+            TestXFSSR.sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
             assert False, "SR creation should not have succeeded!"
         except:
             print("SR creation failed, as expected.")
@@ -32,7 +32,7 @@ class TestXFSSR:
     # Impact on other tests: installs xfsprogs and creates the SR
     def test_create_sr(self, host_with_xfsprogs, sr_disk):
         host = host_with_xfsprogs
-        TestXFSSR.sr = host.sr_create('xfs', '/dev/' + sr_disk, "XFS-local-SR")
+        TestXFSSR.sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
         wait_for(TestXFSSR.sr.exists, "Wait for SR to exist")
 
     # Impact on other tests: creates a VM on the SR and starts it

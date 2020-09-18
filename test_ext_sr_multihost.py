@@ -12,7 +12,7 @@ from lib.common import cold_migration_then_come_back, live_storage_migration_the
 @pytest.fixture(scope='module')
 def ext_sr(host, sr_disk):
     """ an EXT SR on first host """
-    sr = host.sr_create('ext', '/dev/' + sr_disk, "EXT-local-SR")
+    sr = host.sr_create('ext', "EXT-local-SR", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
     sr.destroy()
