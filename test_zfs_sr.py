@@ -35,13 +35,13 @@ class TestZFSSR:
         assert not host.file_exists('/usr/sbin/zpool'), \
             "zfs must not be installed on the host at the beginning of the tests"
         try:
-            # though it is expected to fail, result assigned to TestXFSSR.sr for teardown in case it succeeds
+            # though it is expected to fail, result assigned to TestZFSSR.sr for teardown in case it succeeds
             TestZFSSR.sr = host.sr_create('zfs', "ZFS-local-SR", {'location': 'vol0'})
             assert False, "SR creation should not have succeeded!"
         except:
             print("SR creation failed, as expected.")
 
-    # Impact on other tests: installs xfsprogs and creates the SR
+    # Impact on other tests: installs zfs and creates the SR
     def test_create_sr(self, host_with_zfs, sr_disk):
         host = host_with_zfs
         TestZFSSR.sr = host.sr_create('zfs', "ZFS-local-SR", {'location': 'vol0'})
