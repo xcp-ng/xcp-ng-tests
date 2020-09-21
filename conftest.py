@@ -36,6 +36,13 @@ def pytest_addoption(parser):
         default=[],
         help="VM keys or OVA URLs for tests that require several VMs",
     )
+    parser.addoption(
+        "--sr-device-config",
+        action="append",
+        default=[],
+        help="device-config keys and values for a remote SR. " \
+             "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
+    )
 
 def host_data(hostname_or_ip):
     # read from data.py
@@ -190,6 +197,38 @@ def running_linux_vm(imported_vm):
     return vm
     # no teardown
 
+@pytest.fixture(scope='session')
+def sr_device_config(request):
+    raw_config = request.param
+
+    if raw_config is None:
+        # Use defaults
+        return None
+
+    config = {}
+    for key_val in raw_config.split(','):
+        key = key_val.split(':')[0]
+        value = key_val[key_val.index(':')+1:]
+        config[key] = value
+    return config
+
+@pytest.fixture(scope='session')
+def cephfs_device_config(sr_device_config):
+    if sr_device_config is not None:
+        # SR device config from CLI param
+        config = sr_device_config
+    else:
+        # SR device config from data.py defaults
+        try:
+            from data import DEFAULT_CEPHFS_DEVICE_CONFIG
+        except ImportError:
+            DEFAULT_CEPHFS_DEVICE_CONFIG = {}
+        if DEFAULT_CEPHFS_DEVICE_CONFIG:
+            config = DEFAULT_CEPHFS_DEVICE_CONFIG
+        else:
+            raise Exception("No default CephFS device-config found, neither in CLI nor in data.py defaults")
+    return config
+
 # @pytest.fixture(scope="session")
 # def context():
 #     # Sort of global context to pass general information and configuration to test functions
@@ -211,3 +250,10 @@ def pytest_generate_tests(metafunc):
         if not vm_lists:
             vm_lists = [None] # no --vms parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_refs", vm_lists, indirect=True, scope="module")
+    if "sr_device_config" in metafunc.fixturenames:
+        configs = metafunc.config.getoption("sr_device_config")
+        if not configs:
+            # No --sr-device-config parameter doesn't mean skip the test.
+            # For us it means use the defaults.
+            configs = [None]
+        metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
