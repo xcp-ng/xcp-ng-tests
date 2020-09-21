@@ -114,6 +114,7 @@ class Host:
         self.xo_srv_id = None
         self.user = None
         self.password = None
+        self.saved_packages_list = None
 
     def __str__(self):
         return self.hostname_or_ip
@@ -254,13 +255,35 @@ class Host:
             else:
                 raise
 
-    def yum_install(self, packages):
+    def yum_install(self, packages, save_state=False):
         print('Install packages: %s on host %s' % (' '.join(packages), self))
+        if save_state:
+            # For now, that saved state feature does not support several saved states
+            assert self.saved_packages_list is None
+            self.saved_packages_list = self.packages()
         return self.ssh(['yum', 'install', '-y'] + packages)
 
     def yum_remove(self, packages):
         print('Remove packages: %s from host %s' % (' '.join(packages), self))
         return self.ssh(['yum', 'remove', '-y'] + packages)
+
+    def packages(self):
+        """ returns the list of installed RPMs - without their version """
+        return sorted(self.ssh(['rpm', '-qa', '--qf', '%{NAME}\\\\n']).splitlines())
+
+    def yum_remove_added_packages(self, base_packages):
+        """ Compare the list of installed packages with a previous known list and remove the added ones """
+        packages = self.packages()
+        packages_to_remove = [p for p in packages if p not in base_packages]
+        if packages_to_remove:
+            return self.yum_remove(packages_to_remove)
+        else:
+            print("No added packages to remove.")
+
+    def yum_restore_saved_state(self):
+        """ Currently only able to remove added packages """
+        assert self.saved_packages_list is not None, "Can't restore previous state without a package list"
+        self.yum_remove_added_packages(self.saved_packages_list)
 
     def reboot(self, verify=False, reconnect_xo=True):
         print("Reboot host %s" % self)

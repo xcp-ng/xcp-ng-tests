@@ -8,14 +8,14 @@ import time
 
 @pytest.fixture(scope='module')
 def host_with_zfs(host, sr_disk):
-    host.yum_install(['zfs'])
+    host.yum_install(['zfs'], save_state=True)
     disk = sr_disk
     host.ssh(['modprobe', 'zfs'])
     host.ssh(['zpool', 'create', 'vol0', '/dev/' + disk])
     yield host
     # teardown
     host.ssh(['zpool', 'destroy', 'vol0'])
-    host.yum_remove(['zfs'])
+    host.yum_restore_saved_state()
 
 @pytest.mark.incremental
 class TestZFSSR:

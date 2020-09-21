@@ -8,10 +8,10 @@ import time
 
 @pytest.fixture(scope='module')
 def host_with_xfsprogs(host):
-    host.yum_install(['xfsprogs'])
+    host.yum_install(['xfsprogs'], save_state=True)
     yield host
     # teardown
-    host.yum_remove(['xfsprogs'])
+    host.yum_restore_saved_state()
 
 @pytest.mark.incremental
 class TestXFSSR:

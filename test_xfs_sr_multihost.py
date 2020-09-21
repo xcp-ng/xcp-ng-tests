@@ -16,12 +16,12 @@ def xfs_sr(host, sr_disk):
     """ a XFS SR on first host """
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
         "xfsprogs must not be installed on the host at the beginning of the tests"
-    host.yum_install(['xfsprogs'])
+    host.yum_install(['xfsprogs'], save_state=True)
     sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
     sr.destroy()
-    host.yum_remove(['xfsprogs'])
+    host.yum_restore_saved_state()
 
 @pytest.fixture(scope='module')
 def vm_on_xfs_sr(host, xfs_sr, vm_ref):
