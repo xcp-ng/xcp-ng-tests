@@ -15,7 +15,7 @@ from lib.common import cold_migration_then_come_back, live_storage_migration_the
 def xfs_sr(host, sr_disk):
     """ a XFS SR on first host """
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
-            "xfsprogs must not be installed on the host at the beginning of the tests"
+        "xfsprogs must not be installed on the host at the beginning of the tests"
     host.yum_install(['xfsprogs'])
     sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
     yield sr

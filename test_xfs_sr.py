@@ -26,7 +26,7 @@ class TestXFSSR:
             # though it is expected to fail, result assigned to TestXFSSR.sr for teardown in case it succeeds
             TestXFSSR.sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
             assert False, "SR creation should not have succeeded!"
-        except:
+        except Exception:
             print("SR creation failed, as expected.")
 
     # Impact on other tests: installs xfsprogs and creates the SR
@@ -74,7 +74,7 @@ class TestXFSSR:
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
-            except:
+            except Exception:
                 print("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR

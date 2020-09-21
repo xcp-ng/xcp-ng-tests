@@ -51,7 +51,7 @@ def xo_cli(action, args={}, check=True, simple_output=True):
         return res
 
 def xo_object_exists(uuid):
-    lst = json.loads(xo_cli('--list-objects', {'uuid':uuid}))
+    lst = json.loads(xo_cli('--list-objects', {'uuid': uuid}))
     return len(lst) > 0
 
 class SSHException(Exception):
@@ -137,7 +137,7 @@ class Host:
     def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
         maybe_param_minimal = ['--minimal'] if minimal else []
         return self.ssh(
-            ['xe', action]  + maybe_param_minimal + ["%s=%s" % (key, value) for key, value in args.items()],
+            ['xe', action] + maybe_param_minimal + ["%s=%s" % (key, value) for key, value in args.items()],
             check=check,
             simple_output=simple_output
         )
@@ -511,7 +511,7 @@ class VM(BaseVM):
     def checkpoint(self):
         print("Checkpoint VM")
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
-                                                     'new-name-label': '"Checkpoint of %s"' % self.uuid}),
+                                                       'new-name-label': '"Checkpoint of %s"' % self.uuid}),
                         self.host)
 
     def vifs(self):
@@ -522,7 +522,6 @@ class VM(BaseVM):
 
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
-
 
     # *** Common reusable tests
 
@@ -587,7 +586,8 @@ class SR:
     def all_pbds_attached(self):
         all_attached = True
         for pbd_uuid in self.pbd_uuids():
-            all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid, 'param-name': 'currently-attached'}) == 'true'
+            all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid,
+                                                                'param-name': 'currently-attached'}) == 'true'
         return all_attached
 
     def plug_pbds(self, verify=True):
@@ -627,7 +627,6 @@ class SR:
 
     def is_shared(self):
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'}) == 'true'
-
 
 
 def cold_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
