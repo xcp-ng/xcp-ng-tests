@@ -7,14 +7,6 @@ import time
 # - access to XCP-ng RPM repository from the host
 
 @pytest.fixture(scope='module')
-def sr_disk(host):
-    disks = host.disks()
-    # there must be at least 2 disks
-    assert len(disks) > 1, "at least two disks are required"
-    # Using the second disk for SR
-    yield disks[1]
-
-@pytest.fixture(scope='module')
 def host_with_zfs(host, sr_disk):
     host.yum_install(['zfs'])
     disk = sr_disk
