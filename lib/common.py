@@ -255,13 +255,14 @@ class Host:
             else:
                 raise
 
-    def yum_install(self, packages, save_state=False):
+    def yum_install(self, packages, enablerepo=None, save_state=False):
         print('Install packages: %s on host %s' % (' '.join(packages), self))
         if save_state:
             # For now, that saved state feature does not support several saved states
             assert self.saved_packages_list is None
             self.saved_packages_list = self.packages()
-        return self.ssh(['yum', 'install', '-y'] + packages)
+        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
+        return self.ssh(['yum', 'install', '-y'] + enablerepo_cmd + packages)
 
     def yum_remove(self, packages):
         print('Remove packages: %s from host %s' % (' '.join(packages), self))

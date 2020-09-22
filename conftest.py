@@ -228,23 +228,6 @@ def sr_device_config(request):
         config[key] = value
     return config
 
-@pytest.fixture(scope='session')
-def cephfs_device_config(sr_device_config):
-    if sr_device_config is not None:
-        # SR device config from CLI param
-        config = sr_device_config
-    else:
-        # SR device config from data.py defaults
-        try:
-            from data import DEFAULT_CEPHFS_DEVICE_CONFIG
-        except ImportError:
-            DEFAULT_CEPHFS_DEVICE_CONFIG = {}
-        if DEFAULT_CEPHFS_DEVICE_CONFIG:
-            config = DEFAULT_CEPHFS_DEVICE_CONFIG
-        else:
-            raise Exception("No default CephFS device-config found, neither in CLI nor in data.py defaults")
-    return config
-
 def pytest_generate_tests(metafunc):
     if "hosts" in metafunc.fixturenames:
         metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
