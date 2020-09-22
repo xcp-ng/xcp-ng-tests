@@ -16,7 +16,7 @@ def zfs_sr(host, sr_disk):
     """ a ZFS SR on first host """
     assert not host.file_exists('/usr/sbin/zpool'), \
         "zfs must not be installed on the host at the beginning of the tests"
-    host.yum_install(['zfs'])
+    host.yum_install(['zfs'], save_state=True)
     host.ssh(['modprobe', 'zfs'])
     host.ssh(['zpool', 'create', 'vol0', '/dev/' + sr_disk])
     sr = host.sr_create('zfs', "ZFS-local-SR", {'location': 'vol0'})
@@ -24,7 +24,7 @@ def zfs_sr(host, sr_disk):
     # teardown
     sr.destroy()
     host.ssh(['zpool', 'destroy', 'vol0'])
-    host.yum_remove(['zfs'])
+    host.yum_restore_saved_state()
 
 @pytest.fixture(scope='module')
 def vm_on_zfs_sr(host, zfs_sr, vm_ref):

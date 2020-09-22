@@ -86,7 +86,6 @@ class TestZFSSR:
             assert not sr.all_pbds_attached()
             host.yum_install(['zfs'])
             host.ssh(['modprobe', 'zfs'])
-            # TODO: Remove import once done by the driver
             host.ssh(['zpool', 'import', 'vol0'])
             zfs_installed = True
             sr.plug_pbds(verify=True)
@@ -114,7 +113,6 @@ class TestZFSSR:
             time.sleep(10)
             print("Assert PBD not attached")
             assert not sr.all_pbds_attached()
-            # TODO: Remove import once done by the driver
             host.ssh(['zpool', 'import', 'vol0'])
             pool_imported = True
             sr.plug_pbds(verify=True)
