@@ -9,9 +9,8 @@ import time
 @pytest.fixture(scope='module')
 def host_with_zfs(host, sr_disk):
     host.yum_install(['zfs'], save_state=True)
-    disk = sr_disk
     host.ssh(['modprobe', 'zfs'])
-    host.ssh(['zpool', 'create', 'vol0', '/dev/' + disk])
+    host.ssh(['zpool', 'create', 'vol0', '/dev/' + sr_disk])
     yield host
     # teardown
     host.ssh(['zpool', 'destroy', 'vol0'])
@@ -86,12 +85,43 @@ class TestZFSSR:
             print("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['zfs'])
+            host.ssh(['modprobe', 'zfs'])
+            # TODO: Remove import once done by the driver
+            host.ssh(['zpool', 'import', 'vol0'])
             zfs_installed = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not zfs_installed:
                 host.yum_install(['zfs'])
+                host.ssh(['modprobe', 'zfs'])
+
+    # Impact on other tests: none if succeeds
+    def test_zfs_unmounted(self, host):
+        sr = TestZFSSR.sr
+        pool_imported = True
+        try:
+            # Simulate broken mountpoint
+            host.ssh(['zpool', 'export', 'vol0'])
+            pool_imported = False
+            try:
+                sr.scan()
+                assert False, "SR scan should have failed"
+            except:
+                print("SR scan failed as expected.")
+            host.reboot(verify=True)
+            # give the host some time to try to attach the SR
+            time.sleep(10)
+            print("Assert PBD not attached")
+            assert not sr.all_pbds_attached()
+            # TODO: Remove import once done by the driver
+            host.ssh(['zpool', 'import', 'vol0'])
+            pool_imported = True
+            sr.plug_pbds(verify=True)
+            sr.scan()
+        finally:
+            if not pool_imported:
+                host.ssh(['zpool', 'import', 'vol0'])
 
     # *** End of tests with reboots
 
