@@ -94,14 +94,18 @@ def host(hostA1):
 def hostA2(hostA1):
     """ Second host of pool A """
     assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
-    yield hostA1.pool.hosts[1]
+    _hostA2 = hostA1.pool.hosts[1]
+    print(">>> hostA2 present: %s" % _hostA2)
+    yield _hostA2
 
 @pytest.fixture(scope='session')
 def hostB1(hosts):
     """ Master of second pool (pool B) """
     assert len(hosts) > 1, "A second pool is required"
     assert hosts[0].pool.uuid != hosts[1].pool.uuid
-    yield hosts[1]
+    _hostB1 = hosts[1]
+    print(">>> hostB1 present: %s" % _hostB1)
+    yield _hostB1
 
 @pytest.fixture(scope='session')
 def local_sr_on_hostA2(hostA2):
@@ -109,7 +113,9 @@ def local_sr_on_hostA2(hostA2):
     srs = hostA2.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the pool's second host"
     # use the first local SR found
-    yield srs[0]
+    sr = srs[0]
+    print(">> local SR on hostA2 present : %s" % sr.uuid)
+    yield sr
 
 @pytest.fixture(scope='session')
 def local_sr_on_hostB1(hostB1):
@@ -117,7 +123,9 @@ def local_sr_on_hostB1(hostB1):
     srs = hostB1.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the second pool's master"
     # use the first local SR found
-    yield srs[0]
+    sr = srs[0]
+    print(">> local SR on hostB1 present : %s" % sr.uuid)
+    yield sr
 
 @pytest.fixture(scope='session')
 def sr_disk(host):
@@ -125,7 +133,15 @@ def sr_disk(host):
     # there must be at least 2 disks
     assert len(disks) > 1, "at least two disks are required on the first host"
     # Using the second disk for SR
-    yield disks[1]
+    disk = disks[1]
+    print(">> a second disk for a local SR is present on hostA1: %s" % disk)
+    yield disk
+
+@pytest.fixture(scope='session')
+def sr_disk_wiped(host, sr_disk):
+    print(">> wipe disk %s" % sr_disk)
+    host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
+    yield sr_disk
 
 @pytest.fixture(scope='module')
 def vm_ref(request):

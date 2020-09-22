@@ -311,7 +311,7 @@ class Host:
     def file_exists(self, filepath):
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
-    def sr_create(self, sr_type, label, device_config, shared=False):
+    def sr_create(self, sr_type, label, device_config, shared=False, verify=False):
         params = {
             'host-uuid': self.uuid,
             'type': sr_type,
@@ -327,7 +327,10 @@ class Host:
             (sr_type, self, str(device_config), label)
         )
         sr_uuid = self.xe('sr-create', params)
-        return SR(sr_uuid, self.pool)
+        sr = SR(sr_uuid, self.pool)
+        if verify:
+            wait_for(sr.exists, "Wait for SR to exist")
+        return sr
 
     def is_master(self):
         return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
