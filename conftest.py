@@ -229,14 +229,6 @@ def cephfs_device_config(sr_device_config):
             raise Exception("No default CephFS device-config found, neither in CLI nor in data.py defaults")
     return config
 
-# @pytest.fixture(scope="session")
-# def context():
-#     # Sort of global context to pass general information and configuration to test functions
-#     data = {}
-#     with open('vms.json') as f:
-#         data['VMs'] = json.loads(f.read())
-#     return data
-
 def pytest_generate_tests(metafunc):
     if "hosts" in metafunc.fixturenames:
         metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
