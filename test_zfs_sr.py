@@ -98,11 +98,11 @@ class TestZFSSR:
     # Impact on other tests: none if succeeds
     def test_zfs_unmounted(self, host):
         sr = TestZFSSR.sr
-        pool_imported = True
+        zpool_imported = True
         try:
             # Simulate broken mountpoint
             host.ssh(['zpool', 'export', 'vol0'])
-            pool_imported = False
+            zpool_imported = False
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
@@ -114,11 +114,11 @@ class TestZFSSR:
             print("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.ssh(['zpool', 'import', 'vol0'])
-            pool_imported = True
+            zpool_imported = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
-            if not pool_imported:
+            if not zpool_imported:
                 host.ssh(['zpool', 'import', 'vol0'])
 
     # *** End of tests with reboots
