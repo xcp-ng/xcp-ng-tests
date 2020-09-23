@@ -21,13 +21,15 @@ A crash-course about pytest will help you understanding how to start tests or gr
 
 Examples:
 ```
-pytest test_update_host.py --hosts=10.0.0.1
-pytest test_cross_pool_live_storage_migration.py --hosts=10.0.0.1,10.0.0.2 --vm=mini-linux-x86_64-uefi
-pytest test.py --hosts=10.0.0.1 --vm=mini-linux-x86_64-bios --vm=mini-linux-x86_64-uefi
+pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1
+pytest tests/storage/zfs/test_zfs_sr_crosspool_migration.py --hosts=10.0.0.1,10.0.0.2 --vm=mini-linux-x86_64-uefi
+pytest tests/misc/test_vm_basic_operations.py --hosts=10.0.0.1 --vm=mini-linux-x86_64-bios --vm=mini-linux-x86_64-uefi
 ```
 
-Most tests take a `--hosts=yourtesthost` (or `--hosts=host1,host2,...` if they need several hosts, e.g. migration tests).
+Most tests take a `--hosts=yourtesthost` (or `--hosts=host1,host2,...` if they need several pools, e.g. crosspool migration tests).
 The `--hosts` parameter can be specified several times. Then `pytest` will run the tests on each host or group of hosts, sequentially.
+
+When a test requires a single pool of several hosts, only mention the master host in the `--hosts` option.
 
 Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those are tests that will import a VM before testing stuff on it:
 * `OVA_URL` is an URL to download an OVA. It can also be a simple a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
