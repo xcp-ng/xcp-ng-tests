@@ -1,0 +1,98 @@
+from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
+from lib.common import wait_for
+from subprocess import CalledProcessError
+import pytest
+import time
+
+# Requirements:
+# - one XCP-ng host >= 8.2 with an additional unused disk for the SR
+# - access to XCP-ng RPM repository from the host
+# - a repo with the LINSTOR RPMs must be given using the command line param `--additional-repos`
+
+class TestLinstorSRCreateDestroy:
+    vm = None
+
+    def test_create_sr_without_linstor(self, hosts, lvm_disks):
+        master = hosts[0]
+
+        # This test must be the first in the series in this module
+        assert not master.binary_exists('linstor'), \
+            "linstor must not be installed on the host at the beginning of the tests"
+        try:
+            sr = master.sr_create('linstor', 'LINSTOR-SR', {
+                'hosts': ','.join([host.hostname() for host in hosts]),
+                'group-name': GROUP_NAME,
+                'redundancy': len(hosts),
+                'provisioning': 'thick'
+            }, shared=True)
+            try:
+                sr.destroy()
+            except Exception:
+                pass
+            assert False, "SR creation should not have succeeded!"
+        except CalledProcessError as e:
+            print("SR creation failed, as expected: {}".format(e))
+
+    def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks, vm_ref):
+        # Create and destroy tested in the same test to leave the host as unchanged as possible
+        master = hosts_with_linstor[0]
+        sr = create_linstor_sr(hosts_with_linstor)
+        # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
+        # the next tests, because errors in fixtures break teardown
+        vm = master.import_vm_url(vm_ref, sr.uuid)
+        vm.destroy(verify=True)
+        destroy_linstor_sr(hosts_with_linstor, sr)
+
+@pytest.mark.usefixtures("linstor_sr", "vm_on_linstor_sr")
+class TestLinstorSR:
+    def test_start_and_shutdown_VM(self, vm_on_linstor_sr):
+        vm = vm_on_linstor_sr
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.shutdown(verify=True)
+
+    def test_snapshot(self, vm_on_linstor_sr):
+        vm = vm_on_linstor_sr
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.test_snapshot_on_running_linux_vm()
+        vm.shutdown(verify=True)
+
+    # *** tests with reboots (longer tests).
+
+    def test_reboot(self, host, linstor_sr, vm_on_linstor_sr):
+        sr = linstor_sr
+        vm = vm_on_linstor_sr
+        host.reboot(verify=True)
+        wait_for(sr.all_pbds_attached, "Wait for PDB attached")
+        # start the VM as a way to check that the underlying SR is operational
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.shutdown(verify=True)
+
+    def test_linstor_missing(self, linstor_sr, host):
+        packages = ['python-linstor', 'linstor-client']
+        sr = linstor_sr
+        linstor_installed = True
+        try:
+            host.yum_remove(packages)
+            linstor_installed = False
+            try:
+                sr.scan()
+                assert False, "SR scan should have failed"
+            except CalledProcessError:
+                print("SR scan failed as expected.")
+            host.reboot(verify=True)
+            # give the host some time to try to attach the SR
+            time.sleep(10)
+            print("Assert PBD not attached")
+            assert not sr.all_pbds_attached()
+            host.yum_install(packages)
+            linstor_installed = True
+            sr.plug_pbds(verify=True)
+            sr.scan()
+        finally:
+            if not linstor_installed:
+                host.yum_install(packages)
+
+    # *** End of tests with reboots

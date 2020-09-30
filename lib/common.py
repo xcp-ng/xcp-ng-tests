@@ -86,6 +86,23 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
     else:
         return res
 
+def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True):
+    options = ""
+    if suppress_fingerprint_warnings:
+        # Suppress warnings and questions related to host key fingerprints
+        # because on a test network IPs get reused, VMs are reinstalled, etc.
+        # Based on https://unix.stackexchange.com/a/365976/257493
+        options = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+
+    res = subprocess.run(
+        "scp {} {} root@{}:{}".format(options, src, hostname_or_ip, dest),
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=check
+    )
+    return res
+
 def to_xapi_bool(b):
     return 'true' if b else 'false'
 
@@ -134,6 +151,11 @@ class Host:
     def ssh_with_result(self, cmd):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return self.ssh(cmd, check=False, simple_output=False)
+
+    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True):
+        return scp(
+            self.hostname_or_ip, src, dest, check=check, suppress_fingerprint_warnings=suppress_fingerprint_warnings
+        )
 
     def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
         maybe_param_minimal = ['--minimal'] if minimal else []
@@ -272,6 +294,10 @@ class Host:
         """ returns the list of installed RPMs - without their version """
         return sorted(self.ssh(['rpm', '-qa', '--qf', '%{NAME}\\\\n']).splitlines())
 
+    def check_packages_available(self, packages):
+        """ Check if a given package list is available in the YUM repositories """
+        return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
+
     def yum_remove_added_packages(self, base_packages):
         """ Compare the list of installed packages with a previous known list and remove the added ones """
         packages = self.packages()
@@ -296,7 +322,7 @@ class Host:
                 pass
         if verify or reconnect_xo:
             wait_for_not(self.is_enabled, "Wait for host down")
-            wait_for(self.is_enabled, "Wait for host up", timeout_secs=300)
+            wait_for(self.is_enabled, "Wait for host up", timeout_secs=600)
         if reconnect_xo and self.is_master():
             self.xo_server_reconnect()
 
@@ -311,6 +337,9 @@ class Host:
 
     def file_exists(self, filepath):
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+
+    def binary_exists(self, binary):
+        return self.ssh_with_result(['which', binary]).returncode == 0
 
     def sr_create(self, sr_type, label, device_config, shared=False, verify=False):
         params = {
@@ -343,6 +372,9 @@ class Host:
             if sr.content_type() == 'user' and not sr.is_shared():
                 srs.append(sr)
         return srs
+
+    def hostname(self):
+        return self.ssh(['hostname'])
 
 class BaseVM:
     """ Base class for VM and Snapshot """
@@ -605,10 +637,17 @@ class SR:
     def pbd_uuids(self):
         return self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True).split(',')
 
-    def unplug_pbds(self):
+    def unplug_pbds(self, force=False):
         print("Unplug PBDs")
         for pbd_uuid in self.pbd_uuids():
-            self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
+            try:
+                self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
+            except subprocess.CalledProcessError as e:
+                # We must be sure to execute correctly "unplug" on unplugged VDIs without error
+                # if force is set.
+                if not force:
+                    raise
+                print('Ignore exception during PBD unplug: {}'.format(e))
 
     def all_pbds_attached(self):
         all_attached = True
@@ -624,15 +663,15 @@ class SR:
         if verify:
             wait_for(self.all_pbds_attached, "Wait for PDBs attached")
 
-    def destroy(self, verify=False):
-        self.unplug_pbds()
+    def destroy(self, verify=False, force=False):
+        self.unplug_pbds(force)
         print("Destroy SR " + self.uuid)
         self.pool.master.xe('sr-destroy', {'uuid': self.uuid})
         if verify:
             wait_for_not(self.exists, "Wait for SR destroyed")
 
-    def forget(self):
-        self.unplug_pbds()
+    def forget(self, force=False):
+        self.unplug_pbds(force)
         print("Forget SR " + self.uuid)
         self.pool.master.xe('sr-forget', {'uuid': self.uuid})
 
