@@ -30,7 +30,7 @@ class TestXFSSRCreateDestroy:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_xfsprogs
         sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk}, verify=True)
-        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
+        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm_url(vm_ref, sr_uuid=sr.uuid)
         vm.destroy(verify=True)
