@@ -1,5 +1,6 @@
 import json
 import subprocess
+import tempfile
 import time
 from subprocess import CalledProcessError
 from uuid import UUID
@@ -57,34 +58,50 @@ def xo_object_exists(uuid):
 class SSHException(Exception):
     pass
 
-def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True, background=False):
-    options = ""
+def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+        background=False, target_os='linux'):
+    options = []
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        options = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+        options.append('-o "StrictHostKeyChecking no"')
+        options.append('-o "LogLevel ERROR"')
+        options.append('-o "UserKnownHostsFile /dev/null"')
 
     command = " ".join(cmd)
-    if background:
+    if background and target_os != "windows":
         # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
         command = "nohup %s &>/dev/null &" % command
-    res = subprocess.run(
-        "ssh root@%s %s '%s'" % (hostname_or_ip, options, command),
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=check
-    )
 
-    # Even if check is False, we still raise in case of return code 255, which means a SSH error.
-    if res.returncode == 255:
-        raise SSHException("SSH Error: %s" % res.stdout.decode())
-
-    if simple_output:
-        return res.stdout.decode().strip()
+    if background and target_os == "windows":
+        # Unfortunately the "nohup" solution doesn't always work well with windows+openssh+git-bash
+        # Sometimes commands that end in '&' are not executed at all
+        # So we spawn the ssh process in the background
+        return subprocess.Popen(
+            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command),
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
     else:
-        return res
+        # Common case
+        res = subprocess.run(
+            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command),
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=check
+        )
+
+        # Even if check is False, we still raise in case of return code 255, which means a SSH error.
+        if res.returncode == 255:
+            raise SSHException("SSH Error: %s" % res.stdout.decode())
+
+        if simple_output:
+            return res.stdout.decode().strip()
+        else:
+            return res
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True):
     options = ""
@@ -426,6 +443,7 @@ class VM(BaseVM):
         super().__init__(uuid, host)
         self.ip = None
         self.previous_host = None # previous host when migrated or being migrated
+        self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
 
     def power_state(self):
         return self.param_get('power-state')
@@ -455,19 +473,28 @@ class VM(BaseVM):
     def try_get_and_store_ip(self):
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
-        if not ip:
+        # An IP that starts with 169.254. is not a real routable IP.
+        # VMs may return such an IP before they get an actual one from DHCP.
+        if not ip or ip.startswith('169.254.'):
             return False
         else:
+            print("VM IP: %s" % ip)
             self.ip = ip
             return True
 
     def ssh(self, cmd, check=True, simple_output=True, background=False):
         # raises by default for any nonzero return code
-        return ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background)
+        target_os = "windows" if self.is_windows else "linux"
+        return ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background, target_os=target_os)
 
     def ssh_with_result(self, cmd):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return self.ssh(cmd, check=False, simple_output=False)
+
+    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True):
+        return scp(
+            self.ip, src, dest, check=check, suppress_fingerprint_warnings=suppress_fingerprint_warnings
+        )
 
     def is_ssh_up(self):
         try:
@@ -476,17 +503,20 @@ class VM(BaseVM):
             # probably not up yet
             return False
 
-    def wait_for_os_booted(self, wait_for_ip=True):
-        wait_for(self.is_running, "Wait for VM running")
-        if wait_for_ip:
-            # waiting for the IP:
-            # - allows to make sure the OS actually started (on VMs that have the management agent)
-            # - allows to store the IP for future use in the VM object
-            wait_for(self.try_get_and_store_ip, "Wait for VM IP")
+    def is_management_agent_up(self):
+        return self.param_get('PV-drivers-version', 'major', accept_unknown_key=True) is not None
 
-    def wait_for_linux_vm_running_and_ssh_up(self, wait_for_ip=True):
-        self.wait_for_os_booted(wait_for_ip)
-        assert self.ip is not None
+    def wait_for_os_booted(self):
+        wait_for(self.is_running, "Wait for VM running")
+        # waiting for the IP:
+        # - allows to make sure the OS actually started (on VMs that have the management agent)
+        # - allows to store the IP for future use in the VM object
+        wait_for(self.try_get_and_store_ip, "Wait for VM IP")
+        # now wait also for the management agent to have started
+        wait_for(self.is_management_agent_up, "Wait for management agent up")
+
+    def wait_for_vm_running_and_ssh_up(self):
+        self.wait_for_os_booted()
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
     def ssh_touch_file(self, filepath):
@@ -582,17 +612,37 @@ class VM(BaseVM):
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
-    # *** Common reusable tests
+    def start_background_process(self, cmd):
+        script = "/tmp/bg_process.sh"
+        pidfile = "/tmp/bg_process.pid"
+        with tempfile.NamedTemporaryFile('w') as f:
+            f.writelines([
+                'echo $$>%s\n' % pidfile,
+                cmd + '\n'
+            ])
+            f.flush()
+            self.scp(f.name, script)
+            self.ssh(['sh', script], background=True)
+            wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]),
+                     "wait for pid file %s to exist" % pidfile)
+            pid = self.ssh(['cat', pidfile])
+            self.ssh(['rm', '-f', script])
+            self.ssh(['rm', '-f', pidfile])
+            return pid
 
-    def test_snapshot_on_running_linux_vm(self):
-        self.wait_for_linux_vm_running_and_ssh_up()
+    def pid_exists(self, pid):
+        return self.ssh_with_result(['test', '-d', '/proc/%s' % pid]).returncode == 0
+
+    # *** Common reusable test fragments
+    def test_snapshot_on_running_vm(self):
+        self.wait_for_vm_running_and_ssh_up()
         snapshot = self.snapshot()
         try:
             filepath = '/tmp/%s' % snapshot.uuid
             self.ssh_touch_file(filepath)
             snapshot.revert()
             self.start()
-            self.wait_for_linux_vm_running_and_ssh_up()
+            self.wait_for_vm_running_and_ssh_up()
             print("Check file does not exist anymore")
             self.ssh(['test ! -f ' + filepath])
         finally:

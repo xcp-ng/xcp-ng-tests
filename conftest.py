@@ -207,7 +207,7 @@ def imported_vm(host, vm_ref):
 
 # TODO: make it a fixture factory?
 @pytest.fixture(scope="module")
-def running_linux_vm(imported_vm):
+def running_vm(imported_vm):
     vm = imported_vm
 
     # may be already running if we skipped the import to use an existing VM

@@ -1,5 +1,5 @@
 from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
-from lib.common import wait_for
+from lib.common import wait_for, vm_image
 from subprocess import CalledProcessError
 import pytest
 import time
@@ -33,13 +33,13 @@ class TestLinstorSRCreateDestroy:
         except CalledProcessError as e:
             print("SR creation failed, as expected: {}".format(e))
 
-    def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks, vm_ref):
+    def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = hosts_with_linstor[0]
         sr = create_linstor_sr(hosts_with_linstor)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
-        vm = master.import_vm_url(vm_ref, sr.uuid)
+        vm = master.import_vm_url(vm_image('mini-linux-x86_64-bios'), sr.uuid)
         vm.destroy(verify=True)
         destroy_linstor_sr(hosts_with_linstor, sr)
 
@@ -55,7 +55,7 @@ class TestLinstorSR:
         vm = vm_on_linstor_sr
         vm.start()
         vm.wait_for_os_booted()
-        vm.test_snapshot_on_running_linux_vm()
+        vm.test_snapshot_on_running_vm()
         vm.shutdown(verify=True)
 
     # *** tests with reboots (longer tests).

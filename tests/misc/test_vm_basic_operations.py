@@ -1,42 +1,39 @@
 import pytest
-from lib.common import wait_for
+from lib.common import wait_for_not
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 
-def test_pause(running_linux_vm):
-    vm = running_linux_vm
+def test_pause(running_vm):
+    vm = running_vm
     vm.pause(verify=True)
     vm.unpause()
-    vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
+    vm.wait_for_vm_running_and_ssh_up()
 
-def test_suspend(running_linux_vm):
-    vm = running_linux_vm
+def test_suspend(running_vm):
+    vm = running_vm
     vm.suspend(verify=True)
     vm.resume()
-    vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
+    vm.wait_for_vm_running_and_ssh_up()
 
-def test_snapshot(running_linux_vm):
-    vm = running_linux_vm
-    vm.test_snapshot_on_running_linux_vm()
+def test_snapshot(running_vm):
+    vm = running_vm
+    vm.test_snapshot_on_running_vm()
 
-def test_checkpoint(running_linux_vm):
-    vm = running_linux_vm
+def test_checkpoint(running_vm):
+    vm = running_vm
     print("Start a 'sleep' process on VM through SSH")
-    vm.ssh(['sleep 100000'], background=True)
+    pid = vm.start_background_process('sleep 10000')
     snapshot = vm.checkpoint()
     filepath = '/tmp/%s' % snapshot.uuid
     vm.ssh_touch_file(filepath)
     snapshot.revert()
     vm.resume()
-    vm.wait_for_linux_vm_running_and_ssh_up(wait_for_ip=False)
+    vm.wait_for_vm_running_and_ssh_up()
     print("Check file does not exist anymore")
     vm.ssh(['test ! -f ' + filepath])
     print("Check 'sleep' process is still running")
-    output = vm.ssh(['ps -edf | grep -v grep | grep "sleep 100000"'])
-    print("Kill 'sleep' process")
-    pid = output.split()[0]
-    output = vm.ssh(['kill ' + pid])
-    wait_for(lambda: vm.ssh(['! ps -edf | grep -s grep | grep "sleep 100000"'], check=False, simple_output=False).returncode != 0,
-             "Wait for process %s not running anymore" % pid,
-             timeout_secs=10)
+    assert vm.pid_exists(pid)
+    print("Kill background process")
+    vm.ssh(['kill ' + pid])
+    wait_for_not(lambda: vm.pid_exists(pid), "Wait for process %s not running anymore" % pid)
     snapshot.destroy(verify=True)
