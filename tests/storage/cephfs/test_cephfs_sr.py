@@ -1,5 +1,5 @@
 import pytest
-from lib.common import wait_for
+from lib.common import wait_for, vm_image
 import time, subprocess
 
 # Requirements:
@@ -27,13 +27,13 @@ class TestCephFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host_with_ceph, cephfs_device_config, vm_ref):
+    def test_create_and_destroy_sr(self, host_with_ceph, cephfs_device_config):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_ceph
         sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm_url(vm_ref, sr_uuid=sr.uuid)
+        vm = host.import_vm_url(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
@@ -46,12 +46,11 @@ class TestCephFSSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
-    # FIXME: only suited to linux VMs
     def test_snapshot(self, vm_on_cephfs_sr):
         vm = vm_on_cephfs_sr
         vm.start()
         vm.wait_for_os_booted()
-        vm.test_snapshot_on_running_linux_vm()
+        vm.test_snapshot_on_running_vm()
         vm.shutdown(verify=True)
 
     # *** tests with reboots (longer tests).
