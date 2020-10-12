@@ -198,7 +198,7 @@ def imported_vm(host, vm_ref):
         vm = VM(vm_ref, host)
     else:
         print(">> ", end='')
-        vm = host.import_vm_url(vm_ref)
+        vm = host.import_vm(vm_ref)
     yield vm
     # teardown
     if not is_uuid(vm_ref):

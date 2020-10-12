@@ -20,7 +20,7 @@ def xfs_sr(host_with_xfsprogs, sr_disk):
 @pytest.fixture(scope='module')
 def vm_on_xfs_sr(host, xfs_sr, vm_ref):
     print(">> ", end='')
-    vm = host.import_vm_url(vm_ref, sr_uuid=xfs_sr.uuid)
+    vm = host.import_vm(vm_ref, sr_uuid=xfs_sr.uuid)
     yield vm
     # teardown
     print("<< Destroy VM")

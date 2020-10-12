@@ -33,7 +33,7 @@ class TestCephFSSRCreateDestroy:
         sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm_url(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
+        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
