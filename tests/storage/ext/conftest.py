@@ -11,7 +11,7 @@ def ext_sr(host, sr_disk):
 @pytest.fixture(scope='module')
 def vm_on_ext_sr(host, ext_sr, vm_ref):
     print(">> ", end='')
-    vm = host.import_vm_url(vm_ref, sr_uuid=ext_sr.uuid)
+    vm = host.import_vm(vm_ref, sr_uuid=ext_sr.uuid)
     yield vm
     # teardown
     print("<< Destroy VM")

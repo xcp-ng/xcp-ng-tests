@@ -8,7 +8,7 @@ def test_basic_vm_crosspool_migrate(hosts, vm_ref):
     host2 = hosts[1]
     assert host1.pool.uuid != host2.pool.uuid
 
-    vm = host1.import_vm_url(vm_ref)
+    vm = host1.import_vm(vm_ref)
     vm.start()
     vm.wait_for_os_booted()
     vm.migrate(host2)

@@ -28,7 +28,7 @@ def zfs_sr(host, zpool_vol0):
 @pytest.fixture(scope='module')
 def vm_on_zfs_sr(host, zfs_sr, vm_ref):
     print(">> ", end='')
-    vm = host.import_vm_url(vm_ref, sr_uuid=zfs_sr.uuid)
+    vm = host.import_vm(vm_ref, sr_uuid=zfs_sr.uuid)
     yield vm
     # teardown
     print("<< Destroy VM")

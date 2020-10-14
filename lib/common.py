@@ -244,13 +244,17 @@ class Host:
         xo_cli('server.enable', {'id': self.xo_srv_id})
         wait_for(self.xo_server_connected, timeout_secs=10)
 
-    def import_vm_url(self, url, sr_uuid=None):
-        print("Import VM %s on host %s" % (url, self))
-        params = {
-            'url': url
-        }
+    def import_vm(self, uri, sr_uuid=None):
+        params = {}
+        msg = "Import VM %s" % uri
+        if '://' in uri:
+            params['url'] = uri
+        else:
+            params['filename'] = uri
         if sr_uuid is not None:
+            msg += " (SR: %s)" % sr_uuid
             params['sr-uuid'] = sr_uuid
+        print(msg)
         vm_uuid = self.xe('vm-import', params)
         print("VM UUID: %s" % vm_uuid)
         vm = VM(vm_uuid, self)
@@ -437,6 +441,15 @@ class BaseVM:
             if not sr.attached_to_host(host):
                 return False
         return True
+
+    def export(self, filepath, compress="false"):
+        print("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
+        params = {
+            'uuid': self.uuid,
+            'compress': compress,
+            'filename': filepath
+        }
+        self.host.xe('vm-export', params)
 
 class VM(BaseVM):
     def __init__(self, uuid, host):

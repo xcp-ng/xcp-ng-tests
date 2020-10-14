@@ -38,7 +38,7 @@ def cephfs_sr(cephfs_device_config, host_with_ceph):
 @pytest.fixture(scope='module')
 def vm_on_cephfs_sr(host, cephfs_sr, vm_ref):
     print(">> ", end='')
-    vm = host.import_vm_url(vm_ref, sr_uuid=cephfs_sr.uuid)
+    vm = host.import_vm(vm_ref, sr_uuid=cephfs_sr.uuid)
     yield vm
     # teardown
     print("<< Destroy VM")

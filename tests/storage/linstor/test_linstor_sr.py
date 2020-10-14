@@ -39,7 +39,7 @@ class TestLinstorSRCreateDestroy:
         sr = create_linstor_sr(hosts_with_linstor)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
-        vm = master.import_vm_url(vm_image('mini-linux-x86_64-bios'), sr.uuid)
+        vm = master.import_vm(vm_image('mini-linux-x86_64-bios'), sr.uuid)
         vm.destroy(verify=True)
         destroy_linstor_sr(hosts_with_linstor, sr)
 
