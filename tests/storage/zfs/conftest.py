@@ -20,7 +20,7 @@ def zpool_vol0(host_with_zfs, sr_disk_wiped):
 @pytest.fixture(scope='session')
 def zfs_sr(host, zpool_vol0):
     """ a ZFS SR on first host """
-    sr = host.sr_create('zfs', "ZFS-local-SR", {'location': 'vol0'})
+    sr = host.sr_create('zfs', "ZFS-local-SR", {'location': '/vol0'})
     yield sr
     # teardown
     sr.destroy()

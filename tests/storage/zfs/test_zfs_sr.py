@@ -20,7 +20,7 @@ class TestZFSSRCreateDestroy:
             "zfs must not be installed on the host at the beginning of the tests"
         sr = None
         try:
-            sr = host.sr_create('zfs', "ZFS-local-SR", {'location': 'vol0'})
+            sr = host.sr_create('zfs', "ZFS-local-SR", {'location': '/vol0'})
         except Exception:
             print("SR creation failed, as expected.")
         if sr is not None:
@@ -30,7 +30,7 @@ class TestZFSSRCreateDestroy:
     @pytest.mark.usefixtures("zpool_vol0")
     def test_create_and_destroy_sr(self, host):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('zfs', "ZFS-local-SR", {'location': 'vol0'}, verify=True)
+        sr = host.sr_create('zfs', "ZFS-local-SR", {'location': '/vol0'}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
