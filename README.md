@@ -1,22 +1,22 @@
-## Test scripts for XCP-ng
+# Test scripts for XCP-ng
 
-Note: this is work in progress.
+Note: this is a work in progress.
 
-### Main requirements
+## Main requirements
 * python >= 3.5
 * pytest >= 5.4 (python3 version)
 * xo-cli installed, in the PATH, and registered to an instance of XO that will be used during the tests
 
-### Other requirements
+## Other requirements
 * XCP-ng hosts that you can ssh to using a SSH key, non-interactively
 * VM images suited to what the tests want. Some tests want a linux VM with SSH, available to import as an OVA over HTTP, for example.
 
 On XCP-ng's test lab, the CI SSH private key allows to connect to any host installed for CI via PXE, and to any linux VM imported from pre-made images (OVA) and started.
 
-### Configuration
+## Configuration
 The main configuration file is data.py. Copy data.py-dist to data.py and modify it if needed.
 
-### Running tests
+## Running tests
 A crash-course about pytest will help you understanding how to start tests or groups of tests.
 
 Examples:
@@ -38,3 +38,56 @@ Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those 
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
+## VM setup
+Many tests expect VMs with:
+* OpenSSH server installed and accepting pubkey authentication for the `root` user
+* Guest tools installed so that the VM reports its IP address, can be shutdown cleanly, and migrated without issues
+
+Here are instructions that should help creating such VMs.
+
+### Linux
+
+* Eject installation ISO
+* Setup network
+* Install openssh-server and enable it
+* Install guest tools, then eject guest tools ISO
+* Add XCP-ng's CI public key in /root/.ssh/authorized_keys (mode 0600)
+* Test you can ssh to it
+* Reboot, check everything is fine
+* Poweroff
+
+Special cases:
+* CentOS 6:
+  * requires this: `restorecon -r /root/.ssh`
+  * comment out HWADDR in `/etc/sysconfig/network-scripts/ifcfg-eth0` else any copy of this VM will refuse to start the network on eth0 because the MAC address changed
+
+### Windows 10
+
+* Create user root
+* Eject installation ISO
+* Install OpenSSH Server: Apps & Features > Optional features > Add a feature > Open SSH server
+* Enable it: https://docs.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse#initial-configuration-of-ssh-server
+```
+Start-Service sshd
+Set-Service -Name sshd -StartupType 'Automatic'
+# Confirm the Firewall rule is configured. It should be created automatically by setup.
+Get-NetFirewallRule -Name *ssh*
+# There should be a firewall rule named "OpenSSH-Server-In-TCP", which should be enabled
+# If the firewall does not exist, create one
+New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+```
+* Try to login as root
+* Install git for windows (includes git-bash)
+* Make bash the default shell for OpenSSH sessions: https://docs.microsoft.com/en-us/windows-server/administration/openssh/openssh_server_configuration
+```
+New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Program Files\Git\bin\bash.exe" -PropertyType String -Force
+```
+* Allow pubkey authentication with XCP-ng's CI key
+  * From linux: `ssh-copy-id -i ~/.ssh/id_rsa_xcpngci.pub root@{VM IP address}`
+  * Then fix the rights of C:\Users\root\.ssh\authorized_keys:
+    * Properties > Security > Advanced > Disabled inheritance > Convert inherited permissions > Leave only exactly two entries: SYSTEM and root.
+  * Also copy the authorized_keys file to C:\ProgramData\ssh\administrators_authorized_keys
+  * Fix its rights: leave only Administrators and SYSTEM.
+* Check ssh to the VM works without asking for a password and opens bash as expected
+* Reboot, check it's still OK
+* Poweroff
