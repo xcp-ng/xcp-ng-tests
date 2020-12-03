@@ -460,6 +460,16 @@ class BaseVM:
                 raise
         return value
 
+    def param_set(self, param_name, key, value):
+        args = {'uuid': self.uuid}
+
+        if key is not None:
+            param_name = '{}:{}'.format(param_name, key)
+
+        args[param_name] = value
+
+        return self.host.xe('vm-param-set', args)
+
     def vdi_uuids(self):
         output = self._disk_list()
         vdis = []
