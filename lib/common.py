@@ -783,6 +783,23 @@ class VM(BaseVM):
         finally:
             snapshot.destroy(verify=True)
 
+    def get_messages(self, name):
+        args = {
+            'obj-uuid': self.uuid,
+            'name': name,
+            'params': 'uuid',
+        }
+
+        lines = self.host.xe('message-list', args).strip().split('\n')
+
+        # Extracts uuids from lines of: "uuid ( RO) : <uuid>"
+        return [e.split(':')[1].strip() for e in lines if e]
+
+    def rm_messages(self, name):
+        msgs = self.get_messages(name)
+
+        for msg in msgs:
+            self.host.xe('message-destroy', {'uuid': msg})
 
 class Snapshot(BaseVM):
     def _disk_list(self):
