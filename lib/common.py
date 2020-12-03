@@ -109,7 +109,7 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         else:
             return res
 
-def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True):
+def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
     options = ""
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
@@ -117,8 +117,13 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
         # Based on https://unix.stackexchange.com/a/365976/257493
         options = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
+    if local_dest:
+        src = 'root@{}:{}'.format(hostname_or_ip, src)
+    else:
+        dest = 'root@{}:{}'.format(hostname_or_ip, dest)
+
     res = subprocess.run(
-        "scp {} {} root@{}:{}".format(options, src, hostname_or_ip, dest),
+        "scp {} {} {}".format(options, src, dest),
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -188,9 +193,9 @@ class Host:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return self.ssh(cmd, check=False, simple_output=False)
 
-    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True):
+    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         return scp(
-            self.hostname_or_ip, src, dest, check=check, suppress_fingerprint_warnings=suppress_fingerprint_warnings
+            self.hostname_or_ip, src, dest, check=check, suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
     def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
@@ -573,9 +578,10 @@ class VM(BaseVM):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return self.ssh(cmd, check=False, simple_output=False)
 
-    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True):
+    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         return scp(
-            self.ip, src, dest, check=check, suppress_fingerprint_warnings=suppress_fingerprint_warnings
+            self.ip, src, dest, check=check,
+            suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
     def is_ssh_up(self):
