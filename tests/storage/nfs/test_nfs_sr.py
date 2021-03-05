@@ -3,9 +3,8 @@ from lib.common import wait_for, vm_image
 import time, subprocess
 
 # Requirements:
-# - one XCP-ng host >= 8.2 with an additional unused disk for the SR
+# - one XCP-ng host >= 8.0 with an additional unused disk for the SR
 
-@pytest.mark.usefixtures("nfs_device_config")
 class TestNFSSRCreateDestroy:
     def test_create_and_destroy_sr(self, host, sr_disk, nfs_device_config):
         # Create and destroy tested in the same test to leave the host as unchanged as possible

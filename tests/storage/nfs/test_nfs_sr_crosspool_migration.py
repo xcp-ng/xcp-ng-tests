@@ -3,7 +3,7 @@ from lib.common import cold_migration_then_come_back, live_storage_migration_the
 
 # Requirements:
 # From --hosts parameter:
-# - host(A1): first XCP-ng host >= 8.2 with an additional unused disk for the SR.
+# - host(A1): first XCP-ng host >= 8.0 with an additional unused disk for the SR.
 # - hostB1: Master of a second pool. Any local SR.
 # From --vm parameter
 # - A VM to import to the NFS SR
