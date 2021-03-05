@@ -4,7 +4,6 @@ import time, subprocess
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
-# - access to XCP-ng RPM repository from the host
 
 @pytest.mark.usefixtures("nfs_device_config")
 class TestNFSSRCreateDestroy:
