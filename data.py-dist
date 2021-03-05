@@ -28,3 +28,9 @@ DEFAULT_CEPHFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
 }
+
+# Default NFS device config:
+DEFAULT_NFS_DEVICE_CONFIG = {
+#    'server': '10.0.0.2', # URL/Hostname of NFS server
+#    'serverpath': '/path/to/shared/mount' # Path to shared mountpoint
+}
