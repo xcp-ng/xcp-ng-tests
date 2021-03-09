@@ -166,6 +166,17 @@ def sr_disk_wiped(host, sr_disk):
     host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
     yield sr_disk
 
+@pytest.fixture(scope='session')
+def sr_disk_for_all_hosts(host, sr_disk):
+    for h in host.pool.hosts[1:]:
+        disks = h.disks()
+        # there must be at least 2 disks
+        assert len(disks) > 1, "at least two disks are required on all pool's hosts, missing on host: %s" % h
+        # Using the second disk for SR
+        disk = next(d for d in disks if d == sr_disk)
+        print(">> a second disk for a local SR is present on host %s: %s" % (h, disk))
+    yield sr_disk
+
 @pytest.fixture(scope='module')
 def vm_ref(request):
     ref = request.param
