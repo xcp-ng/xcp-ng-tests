@@ -341,15 +341,6 @@ ID     | Command line             | Date and time    | Action(s)      | Altered
         """ Check if a given package list is available in the YUM repositories """
         return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
 
-    def yum_remove_added_packages(self, base_packages):
-        """ Compare the list of installed packages with a previous known list and remove the added ones """
-        packages = self.packages()
-        packages_to_remove = [p for p in packages if p not in base_packages]
-        if packages_to_remove:
-            return self.yum_remove(packages_to_remove)
-        else:
-            print("No added packages to remove.")
-
     def yum_restore_saved_state(self):
         """ Restore yum state to saved state """
         assert self.saved_packages_list is not None, "Can't restore previous state without a package list: no saved packages list"
