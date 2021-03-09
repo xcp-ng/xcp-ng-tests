@@ -354,7 +354,7 @@ ID     | Command line             | Date and time    | Action(s)      | Altered
         """ Restore yum state to saved state """
         assert self.saved_packages_list is not None, "Can't restore previous state without a package list: no saved packages list"
         assert self.saved_rollback_id is not None, "Can't restore previous state without a package list: no rollback id"
-        self.ssh(['yum', 'history', 'rollback', '--enablerepo=*', self.saved_rollback_id, '-y'])
+        self.ssh(['yum', 'history', 'rollback', '--enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates', self.saved_rollback_id, '-y'])
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
             missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
