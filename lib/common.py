@@ -149,6 +149,7 @@ class Host:
         self.user = None
         self.password = None
         self.saved_packages_list = None
+        self.saved_rollback_id = None
 
     def __str__(self):
         return self.hostname_or_ip
@@ -298,12 +299,31 @@ class Host:
             else:
                 raise
 
+    def get_last_yum_history_tid(self):
+        """
+        Get the last transaction in yum history.
+
+        The output looks like this:
+
+Loaded plugins: fastestmirror
+ID     | Command line             | Date and time    | Action(s)      | Altered
+-------------------------------------------------------------------------------
+    37 | install -y --enablerepo= | 2021-03-08 15:27 | Install        |    1
+    36 | remove ceph-common       | 2021-03-08 15:26 | Erase          |    1
+    35 | install -y --enablerepo= | 2021-03-08 15:19 | Install        |    1
+    34 | remove -y ceph-common    | 2021-03-08 15:13 | Erase          |    1
+
+        """
+        history = self.ssh(['yum', 'history', 'list']).splitlines()
+        return history[3].split()[0]
+
     def yum_install(self, packages, enablerepo=None, save_state=False):
         print('Install packages: %s on host %s' % (' '.join(packages), self))
         if save_state:
             # For now, that saved state feature does not support several saved states
-            assert self.saved_packages_list is None
+            assert self.saved_packages_list is None and self.saved_rollback_id is None
             self.saved_packages_list = self.packages()
+            self.saved_rollback_id = self.get_last_yum_history_tid()
         enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
         return self.ssh(['yum', 'install', '-y'] + enablerepo_cmd + packages)
 
@@ -312,8 +332,10 @@ class Host:
         return self.ssh(['yum', 'remove', '-y'] + packages)
 
     def packages(self):
-        """ returns the list of installed RPMs - without their version """
-        return sorted(self.ssh(['rpm', '-qa', '--qf', '%{NAME}\\\\n']).splitlines())
+        """ returns the list of installed RPMs - with version, release, arch and epoch """
+        return sorted(
+            self.ssh(['rpm', '-qa', '--qf', '%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\\\\n']).splitlines()
+        )
 
     def check_packages_available(self, packages):
         """ Check if a given package list is available in the YUM repositories """
@@ -329,9 +351,15 @@ class Host:
             print("No added packages to remove.")
 
     def yum_restore_saved_state(self):
-        """ Currently only able to remove added packages """
-        assert self.saved_packages_list is not None, "Can't restore previous state without a package list"
-        self.yum_remove_added_packages(self.saved_packages_list)
+        """ Restore yum state to saved state """
+        assert self.saved_packages_list is not None, "Can't restore previous state without a package list: no saved packages list"
+        assert self.saved_rollback_id is not None, "Can't restore previous state without a package list: no rollback id"
+        self.ssh(['yum', 'history', 'rollback', '--enablerepo=*', self.saved_rollback_id, '-y'])
+        pkgs = self.packages()
+        if self.saved_packages_list != pkgs:
+            missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
+            extra = [x for x in pkgs if x not in set(self.saved_packages_list)]
+            raise Exception("Yum state badly restored missing: [%s], extra: [%s]." % (' '.join(missing), ' '.join(extra)))
 
     def reboot(self, verify=False, reconnect_xo=True):
         print("Reboot host %s" % self)
