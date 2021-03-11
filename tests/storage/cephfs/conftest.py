@@ -1,14 +1,20 @@
 import pytest
 
-@pytest.fixture(scope='session')
-def host_with_ceph(host):
+def _setup_host_with_ceph(host):
     assert not host.file_exists('/usr/sbin/mount.ceph'), \
         "mount.ceph must not be installed on the host at the beginning of the tests"
     host.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras", save_state=True)
     host.yum_install(['ceph-common'], enablerepo="base,extras")
-    yield host
+
+@pytest.fixture(scope='session')
+def pool_with_ceph(host):
+    for h in host.pool.hosts:
+        _setup_host_with_ceph(h)
+
+    yield
     # teardown
-    host.yum_restore_saved_state()
+    for h in host.pool.hosts:
+        h.yum_restore_saved_state()
 
 @pytest.fixture(scope='session')
 def cephfs_device_config(sr_device_config):
@@ -28,9 +34,9 @@ def cephfs_device_config(sr_device_config):
     return config
 
 @pytest.fixture(scope='session')
-def cephfs_sr(cephfs_device_config, host_with_ceph):
+def cephfs_sr(host, cephfs_device_config, pool_with_ceph):
     """ a CephFS SR on first host """
-    sr = host_with_ceph.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True)
+    sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True)
     yield sr
     # teardown
     sr.destroy()
