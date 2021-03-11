@@ -7,7 +7,7 @@ def _setup_host_with_cephfs(host):
     host.yum_install(['ceph-common'], enablerepo="base,extras")
 
 @pytest.fixture(scope='session')
-def pool_with_cephfs(host):
+def pool_with_ceph(host):
     for h in host.pool.hosts:
         _setup_host_with_cephfs(h)
 
@@ -34,7 +34,7 @@ def cephfs_device_config(sr_device_config):
     return config
 
 @pytest.fixture(scope='session')
-def cephfs_sr(host, cephfs_device_config, pool_with_cephfs):
+def cephfs_sr(host, cephfs_device_config, pool_with_ceph):
     """ a CephFS SR on first host """
     sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True)
     yield sr
