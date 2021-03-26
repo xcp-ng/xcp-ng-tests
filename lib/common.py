@@ -502,9 +502,10 @@ class VM(BaseVM):
 
     def shutdown(self, force=False, verify=False):
         print("Shutdown VM")
-        return self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
+        ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
         if verify:
             wait_for(self.is_halted, "Wait for VM halted")
+        return ret
 
     def try_get_and_store_ip(self):
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
