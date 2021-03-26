@@ -123,6 +123,16 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
 def to_xapi_bool(b):
     return 'true' if b else 'false'
 
+def parse_xe_dict(xe_dict):
+    """ Parses a xe param containing keys and values, e.g. "major: 7; minor: 20; micro: 0; build: 3"
+        Data type remains str for all values.
+    """
+    res = {}
+    for pair in xe_dict.split(';'):
+        key, value = pair.split(':')
+        res[key.strip()] = value.strip()
+    return res
+
 class Pool:
     def __init__(self, master):
         self.master = master
@@ -514,6 +524,16 @@ class VM(BaseVM):
             wait_for(self.is_halted, "Wait for VM halted")
         return ret
 
+    def reboot(self, force=False, verify=False):
+        print("Reboot VM")
+        ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
+        if verify:
+            # No need to verify that the reboot actually happened because the xe command
+            # does that for us already (it only finishes once the reboot started).
+            # So we just wait for the VM to be operational again
+            self.wait_for_vm_running_and_ssh_up()
+        return ret
+
     def try_get_and_store_ip(self):
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
@@ -676,6 +696,55 @@ class VM(BaseVM):
 
     def pid_exists(self, pid):
         return self.ssh_with_result(['test', '-d', '/proc/%s' % pid]).returncode == 0
+
+    def execute_script(self, script_contents, simple_output=True):
+        with tempfile.NamedTemporaryFile('w') as f:
+            f.write(script_contents)
+            f.flush()
+            self.scp(f.name, f.name)
+            try:
+                res = self.ssh(['sh', f.name], simple_output=simple_output)
+                return res
+            finally:
+                self.ssh(['rm', '-f', f.name])
+
+    def distro(self):
+        """ Returns the distro name as detected by the guest tools.
+            If the distro name was not detected, the result will be an empty string
+        """
+        script = "eval $(xe-linux-distribution)\n"
+        script += "echo $os_distro\n"
+        return self.execute_script(script)
+
+    def tools_version_dict(self):
+        """ Returns the guest tools version as detected by the guest tools,
+            as a {major:, minor:, micro:, build:} dict. Values are strings.
+        """
+        return parse_xe_dict(self.param_get('PV-drivers-version'))
+
+    def tools_version(self):
+        """ Returns the tools version in the form major.minor.micro-build """
+        version_dict = self.tools_version_dict()
+        return "{major}.{minor}.{micro}-{build}".format(**version_dict)
+
+    def file_exists(self, filepath):
+        '''Test that the file at filepath exists.'''
+        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+
+    def detect_package_manager(self):
+        """ Heuristic to determine the package manager on a unix distro """
+        if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
+            return 'rpm'
+        elif self.file_exists('/usr/bin/apt-get'):
+            return 'apt-get'
+        else:
+            return 'unknown'
+
+    def mount_guest_tools_iso(self):
+        self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': 'guest-tools.iso'})
+
+    def unmount_guest_tools_iso(self):
+        self.host.xe('vm-cd-eject', {'uuid': self.uuid})
 
     # *** Common reusable test fragments
     def test_snapshot_on_running_vm(self):
