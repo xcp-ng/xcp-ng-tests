@@ -492,9 +492,13 @@ class VM(BaseVM):
     def is_paused(self):
         return self.power_state() == 'paused'
 
-    def start(self):
+    # By xe design on must be an host name-label
+    def start(self, on=None):
         print("Start VM")
-        return self.host.xe('vm-start', {'uuid': self.uuid})
+        args = {'uuid': self.uuid}
+        if on is not None:
+            args['on'] = on
+        return self.host.xe('vm-start', args)
 
     def shutdown(self, force=False, verify=False):
         print("Shutdown VM")
