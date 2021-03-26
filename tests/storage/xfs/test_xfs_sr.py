@@ -1,6 +1,7 @@
 import pytest
 from lib.common import wait_for, vm_image
-import time, subprocess
+import time
+import subprocess
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR

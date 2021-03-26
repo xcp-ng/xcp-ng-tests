@@ -41,7 +41,7 @@ def pytest_addoption(parser):
         "--sr-device-config",
         action="append",
         default=[],
-        help="device-config keys and values for a remote SR. " \
+        help="device-config keys and values for a remote SR. "
              "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
     )
     parser.addoption(
@@ -237,7 +237,7 @@ def sr_device_config(request):
     config = {}
     for key_val in raw_config.split(','):
         key = key_val.split(':')[0]
-        value = key_val[key_val.index(':')+1:]
+        value = key_val[key_val.index(':') + 1:]
         config[key] = value
     return config
 
