@@ -50,6 +50,12 @@ def pytest_addoption(parser):
         default=[],
         help="Additional repo URLs added to the yum config"
     )
+    parser.addoption(
+        "--second-network",
+        action="append",
+        default=None,
+        help="UUID of second network in the A pool, NOT the management network"
+    )
 
 def host_data(hostname_or_ip):
     # read from data.py
@@ -264,6 +270,10 @@ gpgcheck=0
         for host_ in host.pool.hosts:
             host_.ssh(['rm', '-f', repo_file])
 
+@pytest.fixture(scope='session')
+def second_network(request):
+    return request.param
+
 def pytest_generate_tests(metafunc):
     if "hosts" in metafunc.fixturenames:
         metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
@@ -292,3 +302,7 @@ def pytest_generate_tests(metafunc):
             # without error.
             repos = [None]
         metafunc.parametrize("additional_repos", repos, indirect=True, scope="session")
+    if "second_network" in metafunc.fixturenames:
+        second_network = metafunc.config.getoption("second_network")
+        if second_network is not None:
+            metafunc.parametrize("second_network", second_network, indirect=True, scope="session")
