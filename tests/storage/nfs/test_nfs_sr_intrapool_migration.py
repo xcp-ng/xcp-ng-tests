@@ -1,5 +1,8 @@
 import pytest
-from lib.common import cold_migration_then_come_back, live_storage_migration_then_come_back
+from lib.common import (
+    cold_migration_then_come_back,
+    live_storage_migration_then_come_back,
+)
 
 # Requirements:
 # From --hosts parameter:
@@ -8,13 +11,24 @@ from lib.common import cold_migration_then_come_back, live_storage_migration_the
 # From --vm parameter
 # - A VM to import to the NFS SR
 
+
 @pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2")
 class Test:
     def test_live_intrapool_shared_migration(self, host, hostA2, vm_on_nfs_sr, nfs_sr):
-        live_storage_migration_then_come_back(vm_on_nfs_sr, host, nfs_sr, hostA2, nfs_sr)
+        live_storage_migration_then_come_back(
+            vm_on_nfs_sr, host, nfs_sr, hostA2, nfs_sr
+        )
 
-    def test_cold_intrapool_migration(self, host, hostA2, vm_on_nfs_sr, nfs_sr, local_sr_on_hostA2):
-        cold_migration_then_come_back(vm_on_nfs_sr, host, nfs_sr, hostA2, local_sr_on_hostA2)
+    def test_cold_intrapool_migration(
+        self, host, hostA2, vm_on_nfs_sr, nfs_sr, local_sr_on_hostA2
+    ):
+        cold_migration_then_come_back(
+            vm_on_nfs_sr, host, nfs_sr, hostA2, local_sr_on_hostA2
+        )
 
-    def test_live_intrapool_migration(self, host, hostA2, vm_on_nfs_sr, nfs_sr, local_sr_on_hostA2):
-        live_storage_migration_then_come_back(vm_on_nfs_sr, host, nfs_sr, hostA2, local_sr_on_hostA2)
+    def test_live_intrapool_migration(
+        self, host, hostA2, vm_on_nfs_sr, nfs_sr, local_sr_on_hostA2
+    ):
+        live_storage_migration_then_come_back(
+            vm_on_nfs_sr, host, nfs_sr, hostA2, local_sr_on_hostA2
+        )

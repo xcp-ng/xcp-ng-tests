@@ -8,6 +8,7 @@ import subprocess
 # - remote cephfs mountpoint
 # - access to XCP-ng RPM repository from the host
 
+
 class TestCephFSSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,
@@ -17,11 +18,14 @@ class TestCephFSSRCreateDestroy:
 
     def test_create_cephfs_sr_without_ceph(self, host, cephfs_device_config):
         # This test must be the first in the series in this module
-        assert not host.file_exists('/usr/sbin/mount.ceph'), \
-            "mount.ceph must not be installed on the host at the beginning of the tests"
+        assert not host.file_exists(
+            "/usr/sbin/mount.ceph"
+        ), "mount.ceph must not be installed on the host at the beginning of the tests"
         sr = None
         try:
-            sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True)
+            sr = host.sr_create(
+                "cephfs", "CephFS-SR", cephfs_device_config, shared=True
+            )
         except Exception:
             print("SR creation failed, as expected.")
         if sr is not None:
@@ -30,10 +34,12 @@ class TestCephFSSRCreateDestroy:
 
     def test_create_and_destroy_sr(self, host, pool_with_ceph, cephfs_device_config):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True, verify=True)
+        sr = host.sr_create(
+            "cephfs", "CephFS-SR", cephfs_device_config, shared=True, verify=True
+        )
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
+        vm = host.import_vm(vm_image("mini-linux-x86_64-bios"), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
@@ -69,7 +75,7 @@ class TestCephFSSR:
         sr = cephfs_sr
         ceph_installed = True
         try:
-            host.yum_remove(['ceph-common'])
+            host.yum_remove(["ceph-common"])
             ceph_installed = False
             try:
                 sr.scan()
@@ -81,12 +87,12 @@ class TestCephFSSR:
             time.sleep(10)
             print("Assert PBD not attached")
             assert not sr.all_pbds_attached()
-            host.yum_install(['ceph-common'])
+            host.yum_install(["ceph-common"])
             ceph_installed = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not ceph_installed:
-                host.yum_install(['ceph-common'])
+                host.yum_install(["ceph-common"])
 
     # *** End of tests with reboots

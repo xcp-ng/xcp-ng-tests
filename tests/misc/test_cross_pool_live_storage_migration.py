@@ -1,7 +1,8 @@
 import pytest
 from lib.common import wait_for, wait_for_not
 
-pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
+pytestmark = pytest.mark.default_vm("mini-linux-x86_64-bios")
+
 
 def test_basic_vm_crosspool_migrate(hosts, vm_ref):
     host1 = hosts[0]

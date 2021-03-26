@@ -1,5 +1,6 @@
 import pytest
 import tempfile
+
 # import json
 from lib.common import wait_for, VM, Host, vm_image, is_uuid
 
@@ -11,12 +12,15 @@ def pytest_runtest_makereport(item, call):
             parent = item.parent
             parent._previousfailed = item
 
+
 def pytest_runtest_setup(item):
     previousfailed = getattr(item.parent, "_previousfailed", None)
     if previousfailed is not None:
         pytest.skip("previous test failed (%s)" % previousfailed.name)
 
+
 # *** End of: Support for incremental tests ***
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -42,29 +46,32 @@ def pytest_addoption(parser):
         action="append",
         default=[],
         help="device-config keys and values for a remote SR. "
-             "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
+        "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
     )
     parser.addoption(
         "--additional-repos",
         action="append",
         default=[],
-        help="Additional repo URLs added to the yum config"
+        help="Additional repo URLs added to the yum config",
     )
     parser.addoption(
         "--second-network",
         action="append",
         default=None,
-        help="UUID of second network in the A pool, NOT the management network"
+        help="UUID of second network in the A pool, NOT the management network",
     )
+
 
 def host_data(hostname_or_ip):
     # read from data.py
     from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS
+
     if hostname_or_ip in HOSTS:
         h_data = HOSTS[hostname_or_ip]
         return h_data
     else:
-        return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
+        return {"user": HOST_DEFAULT_USER, "password": HOST_DEFAULT_PASSWORD}
+
 
 def setup_host(hostname_or_ip):
     print(">>> Connect host %s" % hostname_or_ip)
@@ -73,18 +80,19 @@ def setup_host(hostname_or_ip):
     assert h.is_master(), "we connect only to master hosts during initial setup"
     # XO connection
     h_data = host_data(hostname_or_ip)
-    skip_xo_config = h_data.get('skip_xo_config', False)
+    skip_xo_config = h_data.get("skip_xo_config", False)
     if not skip_xo_config:
-        h.xo_server_add(h_data['user'], h_data['password'])
+        h.xo_server_add(h_data["user"], h_data["password"])
     else:
         h.xo_get_server_id(store=True)
     wait_for(h.xo_server_connected, timeout_secs=10)
     return h, skip_xo_config
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def hosts(request):
     # a list of master hosts, each from a different pool
-    hostname_list = request.param.split(',')
+    hostname_list = request.param.split(",")
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
     yield [tup[0] for tup in host_list]
     # teardown
@@ -93,17 +101,20 @@ def hosts(request):
             print("<<< Disconnect host %s" % h)
             h.xo_server_remove()
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def hostA1(hosts):
     """ Master of first pool (pool A) """
     yield hosts[0]
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def host(hostA1):
     """ Convenience fixture for hostA1 """
     yield hostA1
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def hostA2(hostA1):
     """ Second host of pool A """
     assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
@@ -111,7 +122,8 @@ def hostA2(hostA1):
     print(">>> hostA2 present: %s" % _hostA2)
     yield _hostA2
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def hostB1(hosts):
     """ Master of second pool (pool B) """
     assert len(hosts) > 1, "A second pool is required"
@@ -120,7 +132,8 @@ def hostB1(hosts):
     print(">>> hostB1 present: %s" % _hostB1)
     yield _hostB1
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def local_sr_on_hostA2(hostA2):
     """ a local SR on the pool's second host """
     srs = hostA2.local_vm_srs()
@@ -130,7 +143,8 @@ def local_sr_on_hostA2(hostA2):
     print(">> local SR on hostA2 present : %s" % sr.uuid)
     yield sr
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def local_sr_on_hostB1(hostB1):
     """ a local SR on the second pool's master """
     srs = hostB1.local_vm_srs()
@@ -140,7 +154,8 @@ def local_sr_on_hostB1(hostB1):
     print(">> local SR on hostB1 present : %s" % sr.uuid)
     yield sr
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def sr_disk(host):
     disks = host.disks()
     # there must be at least 2 disks
@@ -150,13 +165,15 @@ def sr_disk(host):
     print(">> a second disk for a local SR is present on hostA1: %s" % disk)
     yield disk
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def sr_disk_wiped(host, sr_disk):
     print(">> wipe disk %s" % sr_disk)
-    host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
+    host.ssh(["wipefs", "-a", "/dev/" + sr_disk])
     yield sr_disk
 
-@pytest.fixture(scope='module')
+
+@pytest.fixture(scope="module")
 def vm_ref(request):
     ref = request.param
 
@@ -169,15 +186,18 @@ def vm_ref(request):
             ref = default_vm
         else:
             # global default
-            print(">> No VM specified on CLI, and no default found in test definition. Using global default.")
-            ref = 'mini-linux-x86_64-bios'
+            print(
+                ">> No VM specified on CLI, and no default found in test definition. Using global default."
+            )
+            ref = "mini-linux-x86_64-bios"
 
     if is_uuid(ref):
         return ref
-    elif ref.startswith('http'):
+    elif ref.startswith("http"):
         return ref
     else:
         return vm_image(ref)
+
 
 @pytest.fixture
 def vm_refs(request):
@@ -188,13 +208,19 @@ def vm_refs(request):
         marker = request.node.get_closest_marker("default_vms")
         default_vms = marker.args[0] if marker is not None else None
         if default_vms is not None:
-            print(">> No VM list specified on CLI. Using default: %s." % " ".join(default_vms))
+            print(
+                ">> No VM list specified on CLI. Using default: %s."
+                % " ".join(default_vms)
+            )
             vm_list = default_vms
         else:
             # global default
-            print(">> No VM list specified on CLI, and no default found in test definition. Using global default.")
-            vm_list = ['mini-linux-x86_64-bios', 'mini-linux-x86_64-uefi']
+            print(
+                ">> No VM list specified on CLI, and no default found in test definition. Using global default."
+            )
+            vm_list = ["mini-linux-x86_64-bios", "mini-linux-x86_64-uefi"]
     # TODO: finish implementation using vm_image
+
 
 # TODO: make it a fixture factory?
 @pytest.fixture(scope="module")
@@ -203,13 +229,14 @@ def imported_vm(host, vm_ref):
         print(">> Reuse VM %s on host %s" % (vm_ref, host))
         vm = VM(vm_ref, host)
     else:
-        print(">> ", end='')
+        print(">> ", end="")
         vm = host.import_vm(vm_ref)
     yield vm
     # teardown
     if not is_uuid(vm_ref):
         print("<< Destroy VM")
         vm.destroy(verify=True)
+
 
 # TODO: make it a fixture factory?
 @pytest.fixture(scope="module")
@@ -218,15 +245,16 @@ def running_vm(imported_vm):
 
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
-        print("> ", end='')
+        print("> ", end="")
         vm.start()
-    wait_for(vm.is_running, '> Wait for VM running')
+    wait_for(vm.is_running, "> Wait for VM running")
     wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")
     wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
     # no teardown
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def sr_device_config(request):
     raw_config = request.param
 
@@ -235,29 +263,34 @@ def sr_device_config(request):
         return None
 
     config = {}
-    for key_val in raw_config.split(','):
-        key = key_val.split(':')[0]
-        value = key_val[key_val.index(':') + 1:]
+    for key_val in raw_config.split(","):
+        key = key_val.split(":")[0]
+        value = key_val[key_val.index(":") + 1 :]
         config[key] = value
     return config
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def additional_repos(request, hosts):
     if request.param is None:
         yield []
         return
 
-    repo_file = '/etc/yum.repos.d/xcp-ng-additional-tester.repo'
-    url_list = request.param.split(',')
+    repo_file = "/etc/yum.repos.d/xcp-ng-additional-tester.repo"
+    url_list = request.param.split(",")
 
-    with tempfile.NamedTemporaryFile('wt') as temp:
+    with tempfile.NamedTemporaryFile("wt") as temp:
         for id, url in enumerate(url_list):
-            temp.write("""[xcp-ng-tester-{}]
+            temp.write(
+                """[xcp-ng-tester-{}]
 name=XCP-ng Tester {}
 baseurl={}
 enabled=1
 gpgcheck=0
-""".format(id, id, url))
+""".format(
+                    id, id, url
+                )
+            )
         temp.flush()
 
         for host in hosts:
@@ -268,24 +301,32 @@ gpgcheck=0
 
     for host in hosts:
         for host_ in host.pool.hosts:
-            host_.ssh(['rm', '-f', repo_file])
+            host_.ssh(["rm", "-f", repo_file])
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def second_network(request):
     return request.param
 
+
 def pytest_generate_tests(metafunc):
     if "hosts" in metafunc.fixturenames:
-        metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
+        metafunc.parametrize(
+            "hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session"
+        )
     if "vm_ref" in metafunc.fixturenames:
         vms = metafunc.config.getoption("vm")
         if not vms:
-            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
+            vms = [
+                None
+            ]  # no --vm parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
     if "vm_refs" in metafunc.fixturenames:
         vm_lists = metafunc.config.getoption("vms")
         if not vm_lists:
-            vm_lists = [None] # no --vms parameter does not mean skip the test, for us, it means use the default
+            vm_lists = [
+                None
+            ]  # no --vms parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_refs", vm_lists, indirect=True, scope="module")
     if "sr_device_config" in metafunc.fixturenames:
         configs = metafunc.config.getoption("sr_device_config")
@@ -293,7 +334,9 @@ def pytest_generate_tests(metafunc):
             # No --sr-device-config parameter doesn't mean skip the test.
             # For us it means use the defaults.
             configs = [None]
-        metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
+        metafunc.parametrize(
+            "sr_device_config", configs, indirect=True, scope="session"
+        )
     if "additional_repos" in metafunc.fixturenames:
         repos = metafunc.config.getoption("additional_repos")
         if not repos:
@@ -305,4 +348,6 @@ def pytest_generate_tests(metafunc):
     if "second_network" in metafunc.fixturenames:
         second_network = metafunc.config.getoption("second_network")
         if second_network is not None:
-            metafunc.parametrize("second_network", second_network, indirect=True, scope="session")
+            metafunc.parametrize(
+                "second_network", second_network, indirect=True, scope="session"
+            )

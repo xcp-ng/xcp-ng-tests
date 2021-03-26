@@ -1,6 +1,7 @@
 import pytest
 from lib.common import wait_for
 
+
 def test(host):
     print("Check for updates")
     if not host.has_updates():

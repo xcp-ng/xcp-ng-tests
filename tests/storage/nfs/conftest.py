@@ -1,6 +1,7 @@
 import pytest
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def nfs_device_config(sr_device_config):
     if sr_device_config is not None:
         # SR device config from CLI param
@@ -14,20 +15,24 @@ def nfs_device_config(sr_device_config):
         if DEFAULT_NFS_DEVICE_CONFIG:
             config = DEFAULT_NFS_DEVICE_CONFIG
         else:
-            raise Exception("No default NFS device-config found, neither in CLI nor in data.py defaults")
+            raise Exception(
+                "No default NFS device-config found, neither in CLI nor in data.py defaults"
+            )
     return config
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def nfs_sr(host, nfs_device_config):
     """ a NFS SR on first host """
-    sr = host.sr_create('nfs', "NFS-SR", nfs_device_config, shared=True)
+    sr = host.sr_create("nfs", "NFS-SR", nfs_device_config, shared=True)
     yield sr
     # teardown
     sr.destroy()
 
-@pytest.fixture(scope='module')
+
+@pytest.fixture(scope="module")
 def vm_on_nfs_sr(host, nfs_sr, vm_ref):
-    print(">> ", end='')
+    print(">> ", end="")
     vm = host.import_vm(vm_ref, sr_uuid=nfs_sr.uuid)
     yield vm
     # teardown

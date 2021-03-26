@@ -9,6 +9,7 @@ import time
 # - access to XCP-ng RPM repository from the host
 # - a repo with the LINSTOR RPMs must be given using the command line param `--additional-repos`
 
+
 class TestLinstorSRCreateDestroy:
     vm = None
 
@@ -16,15 +17,21 @@ class TestLinstorSRCreateDestroy:
         master = hosts[0]
 
         # This test must be the first in the series in this module
-        assert not master.binary_exists('linstor'), \
-            "linstor must not be installed on the host at the beginning of the tests"
+        assert not master.binary_exists(
+            "linstor"
+        ), "linstor must not be installed on the host at the beginning of the tests"
         try:
-            sr = master.sr_create('linstor', 'LINSTOR-SR', {
-                'hosts': ','.join([host.hostname() for host in hosts]),
-                'group-name': GROUP_NAME,
-                'redundancy': len(hosts),
-                'provisioning': 'thick'
-            }, shared=True)
+            sr = master.sr_create(
+                "linstor",
+                "LINSTOR-SR",
+                {
+                    "hosts": ",".join([host.hostname() for host in hosts]),
+                    "group-name": GROUP_NAME,
+                    "redundancy": len(hosts),
+                    "provisioning": "thick",
+                },
+                shared=True,
+            )
             try:
                 sr.destroy()
             except Exception:
@@ -39,9 +46,10 @@ class TestLinstorSRCreateDestroy:
         sr = create_linstor_sr(hosts_with_linstor)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
-        vm = master.import_vm(vm_image('mini-linux-x86_64-bios'), sr.uuid)
+        vm = master.import_vm(vm_image("mini-linux-x86_64-bios"), sr.uuid)
         vm.destroy(verify=True)
         destroy_linstor_sr(hosts_with_linstor, sr)
+
 
 @pytest.mark.usefixtures("linstor_sr", "vm_on_linstor_sr")
 class TestLinstorSR:
@@ -71,7 +79,7 @@ class TestLinstorSR:
         vm.shutdown(verify=True)
 
     def test_linstor_missing(self, linstor_sr, host):
-        packages = ['python-linstor', 'linstor-client']
+        packages = ["python-linstor", "linstor-client"]
         sr = linstor_sr
         linstor_installed = True
         try:
