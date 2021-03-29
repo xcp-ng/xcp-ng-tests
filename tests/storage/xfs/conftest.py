@@ -11,7 +11,7 @@ def host_with_xfsprogs(host):
 
 @pytest.fixture(scope='session')
 def xfs_sr(host_with_xfsprogs, sr_disk):
-    """ a XFS SR on first host """
+    """ A XFS SR on first host. """
     sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown

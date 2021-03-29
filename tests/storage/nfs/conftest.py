@@ -19,7 +19,7 @@ def nfs_device_config(sr_device_config):
 
 @pytest.fixture(scope='session')
 def nfs_sr(host, nfs_device_config):
-    """ a NFS SR on first host """
+    """ A NFS SR on first host. """
     sr = host.sr_create('nfs', "NFS-SR", nfs_device_config, shared=True)
     yield sr
     # teardown

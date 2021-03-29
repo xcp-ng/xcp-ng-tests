@@ -95,17 +95,17 @@ def hosts(request):
 
 @pytest.fixture(scope='session')
 def hostA1(hosts):
-    """ Master of first pool (pool A) """
+    """ Master of first pool (pool A). """
     yield hosts[0]
 
 @pytest.fixture(scope='session')
 def host(hostA1):
-    """ Convenience fixture for hostA1 """
+    """ Convenience fixture for hostA1. """
     yield hostA1
 
 @pytest.fixture(scope='session')
 def hostA2(hostA1):
-    """ Second host of pool A """
+    """ Second host of pool A. """
     assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
     _hostA2 = hostA1.pool.hosts[1]
     print(">>> hostA2 present: %s" % _hostA2)
@@ -113,7 +113,7 @@ def hostA2(hostA1):
 
 @pytest.fixture(scope='session')
 def hostB1(hosts):
-    """ Master of second pool (pool B) """
+    """ Master of second pool (pool B). """
     assert len(hosts) > 1, "A second pool is required"
     assert hosts[0].pool.uuid != hosts[1].pool.uuid
     _hostB1 = hosts[1]
@@ -122,7 +122,7 @@ def hostB1(hosts):
 
 @pytest.fixture(scope='session')
 def local_sr_on_hostA2(hostA2):
-    """ a local SR on the pool's second host """
+    """ A local SR on the pool's second host. """
     srs = hostA2.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the pool's second host"
     # use the first local SR found
@@ -132,7 +132,7 @@ def local_sr_on_hostA2(hostA2):
 
 @pytest.fixture(scope='session')
 def local_sr_on_hostB1(hostB1):
-    """ a local SR on the second pool's master """
+    """ A local SR on the second pool's master. """
     srs = hostB1.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the second pool's master"
     # use the first local SR found
