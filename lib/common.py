@@ -2,8 +2,14 @@ import json
 import subprocess
 import tempfile
 import time
+from enum import Enum
 from subprocess import CalledProcessError
 from uuid import UUID
+
+class PackageManagerEnum(Enum):
+    UNKNOWN = 1
+    RPM = 2
+    APT_GET = 3
 
 # Common VM images used in tests
 def vm_image(vm_key):
@@ -728,17 +734,17 @@ class VM(BaseVM):
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
     def file_exists(self, filepath):
-        '''Test that the file at filepath exists.'''
+        """ Test that the file at filepath exists. """
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
     def detect_package_manager(self):
         """ Heuristic to determine the package manager on a unix distro """
         if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
-            return 'rpm'
+            return PackageManagerEnum.RPM
         elif self.file_exists('/usr/bin/apt-get'):
-            return 'apt-get'
+            return PackageManagerEnum.APT_GET
         else:
-            return 'unknown'
+            return PackageManagerEnum.UNKNOWN
 
     def mount_guest_tools_iso(self):
         self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': 'guest-tools.iso'})

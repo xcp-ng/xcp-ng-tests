@@ -1,5 +1,5 @@
 import pytest
-from lib.common import wait_for, wait_for_not
+from lib.common import wait_for, wait_for_not, PackageManagerEnum
 
 # Requirements:
 # - a two host XCP-ng pool >= 8.0 (the second host is only used for the migration test)
@@ -43,11 +43,11 @@ class TestGuestToolsUnix:
         # remove the installed tools
         print("Detect package manager and uninstall the guest tools")
         pkg_mgr = vm.detect_package_manager()
-        if pkg_mgr == 'rpm':
+        if pkg_mgr == PackageManagerEnum.RPM:
             # Our guest tools come in two packages for RPM distros: xe-guest-utilities and xe-guest-utilities-xenstore.
             # However, the following implementation will also work for a single xe-guest-utilities RPM.
             vm.execute_script('rpm -qa | grep xe-guest-utilities | xargs rpm -e')
-        elif pkg_mgr == 'apt-get':
+        elif pkg_mgr == PackageManagerEnum.APT_GET:
             vm.ssh(['apt-get', 'remove', '-y', 'xe-guest-utilities'])
         else:
             pytest.skip("Package manager '%s' not supported in this test" % pkg_mgr)
