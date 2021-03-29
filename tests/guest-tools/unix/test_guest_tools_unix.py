@@ -2,8 +2,11 @@ import pytest
 from lib.common import wait_for, wait_for_not, PackageManagerEnum
 
 # Requirements:
-# - a two host XCP-ng pool >= 8.0 (the second host is only used for the migration test)
-# - a unix VM supported by the Linux/install.sh script of the guest tools ISO
+# From --hosts parameter:
+# - host(A1): first XCP-ng host >= 8.0
+# - hostA2: Second member of the pool. Can have any local SR. No need to specify it on CLI.
+# From --vm parameter
+# - A VM to import, supported by the Linux/install.sh script of the guest tools ISO
 
 class State:
     def __init__(self):
