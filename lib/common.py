@@ -130,8 +130,10 @@ def to_xapi_bool(b):
     return 'true' if b else 'false'
 
 def parse_xe_dict(xe_dict):
-    """ Parses a xe param containing keys and values, e.g. "major: 7; minor: 20; micro: 0; build: 3"
-        Data type remains str for all values.
+    """
+    Parses a xe param containing keys and values, e.g. "major: 7; minor: 20; micro: 0; build: 3".
+
+    Data type remains str for all values.
     """
     res = {}
     for pair in xe_dict.split(';'):
@@ -226,9 +228,7 @@ class Host:
                     xo_cli('server.remove', {'id': server['id']})
 
     def xo_server_add(self, username, password, label=None, unregister_first=True):
-        """
-        Returns the server ID created by XO's server.add
-        """
+        """ Returns the server ID created by XO's `server.add`. """
         if unregister_first:
             self.xo_server_remove()
         if label is None:
@@ -320,15 +320,13 @@ class Host:
         Get the last transaction in yum history.
 
         The output looks like this:
-
-Loaded plugins: fastestmirror
-ID     | Command line             | Date and time    | Action(s)      | Altered
--------------------------------------------------------------------------------
-    37 | install -y --enablerepo= | 2021-03-08 15:27 | Install        |    1
-    36 | remove ceph-common       | 2021-03-08 15:26 | Erase          |    1
-    35 | install -y --enablerepo= | 2021-03-08 15:19 | Install        |    1
-    34 | remove -y ceph-common    | 2021-03-08 15:13 | Erase          |    1
-
+        Loaded plugins: fastestmirror
+        ID     | Command line             | Date and time    | Action(s)      | Altered
+        -------------------------------------------------------------------------------
+            37 | install -y --enablerepo= | 2021-03-08 15:27 | Install        |    1
+            36 | remove ceph-common       | 2021-03-08 15:26 | Erase          |    1
+            35 | install -y --enablerepo= | 2021-03-08 15:19 | Install        |    1
+            34 | remove -y ceph-common    | 2021-03-08 15:13 | Erase          |    1
         """
         history = self.ssh(['yum', 'history', 'list']).splitlines()
         return history[3].split()[0]
@@ -348,17 +346,17 @@ ID     | Command line             | Date and time    | Action(s)      | Altered
         return self.ssh(['yum', 'remove', '-y'] + packages)
 
     def packages(self):
-        """ returns the list of installed RPMs - with version, release, arch and epoch """
+        """ Returns the list of installed RPMs - with version, release, arch and epoch. """
         return sorted(
             self.ssh(['rpm', '-qa', '--qf', '%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\\\\n']).splitlines()
         )
 
     def check_packages_available(self, packages):
-        """ Check if a given package list is available in the YUM repositories """
+        """ Check if a given package list is available in the YUM repositories. """
         return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
 
     def yum_restore_saved_state(self):
-        """ Restore yum state to saved state """
+        """ Restore yum state to saved state. """
         assert self.saved_packages_list is not None, \
             "Can't restore previous state without a package list: no saved packages list"
         assert self.saved_rollback_id is not None, \
@@ -393,7 +391,7 @@ ID     | Command line             | Date and time    | Action(s)      | Altered
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
 
     def disks(self):
-        """ List of SCSI disks, e.g ['sda', 'sdb'] """
+        """ List of SCSI disks, e.g ['sda', 'sdb']. """
         disks = self.ssh(['lsblk', '-nd', '-I', '8', '--output', 'NAME']).splitlines()
         disks.sort()
         return disks
@@ -440,7 +438,8 @@ ID     | Command line             | Date and time    | Action(s)      | Altered
         return self.ssh(['hostname'])
 
 class BaseVM:
-    """ Base class for VM and Snapshot """
+    """ Base class for VM and Snapshot. """
+
     def __init__(self, uuid, host):
         self.uuid = uuid
         self.host = host
@@ -715,21 +714,25 @@ class VM(BaseVM):
                 self.ssh(['rm', '-f', f.name])
 
     def distro(self):
-        """ Returns the distro name as detected by the guest tools.
-            If the distro name was not detected, the result will be an empty string
+        """
+        Returns the distro name as detected by the guest tools.
+
+        If the distro name was not detected, the result will be an empty string.
         """
         script = "eval $(xe-linux-distribution)\n"
         script += "echo $os_distro\n"
         return self.execute_script(script)
 
     def tools_version_dict(self):
-        """ Returns the guest tools version as detected by the guest tools,
-            as a {major:, minor:, micro:, build:} dict. Values are strings.
+        """
+        Returns the guest tools version as detected by the guest tools, as a {major:, minor:, micro:, build:} dict.
+
+        Values are strings.
         """
         return parse_xe_dict(self.param_get('PV-drivers-version'))
 
     def tools_version(self):
-        """ Returns the tools version in the form major.minor.micro-build """
+        """ Returns the tools version in the form major.minor.micro-build. """
         version_dict = self.tools_version_dict()
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
@@ -738,7 +741,7 @@ class VM(BaseVM):
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
     def detect_package_manager(self):
-        """ Heuristic to determine the package manager on a unix distro """
+        """ Heuristic to determine the package manager on a unix distro. """
         if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
             return PackageManagerEnum.RPM
         elif self.file_exists('/usr/bin/apt-get'):
@@ -865,7 +868,7 @@ class SR:
 
 
 def cold_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
-    """ Storage migration of a shutdown VM, then migrate it back """
+    """ Storage migration of a shutdown VM, then migrate it back. """
     assert vm.is_halted()
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)

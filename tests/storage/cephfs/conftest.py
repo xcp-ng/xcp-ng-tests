@@ -35,7 +35,7 @@ def cephfs_device_config(sr_device_config):
 
 @pytest.fixture(scope='session')
 def cephfs_sr(host, cephfs_device_config, pool_with_ceph):
-    """ a CephFS SR on first host """
+    """ A CephFS SR on first host. """
     sr = host.sr_create('cephfs', "CephFS-SR", cephfs_device_config, shared=True)
     yield sr
     # teardown
