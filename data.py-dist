@@ -34,3 +34,9 @@ DEFAULT_CEPHFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
 }
+
+DEFAULT_MOOSEFS_DEVICE_CONFIG = {
+#    'masterhost': 'mfsmaster',
+#    'masterport': '9421',
+#    'rootpath': '/vms'
+}
