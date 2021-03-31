@@ -41,9 +41,8 @@ class TestGuestToolsUnix:
         if state.vm_distro == "alpine":
             pytest.skip('Alpine not supported by the guest tools installation script at the moment')
 
-        # Check that we are able to detect that xe-daemon is running
-        assert vm.ssh_with_result(['pgrep', '-x', 'xe-daemon']).returncode == 0, \
-            "xe-daemon must be running and detected by pgrep"
+        print("Check that we are able to detect that xe-daemon is running")
+        vm.ssh(['pgrep', '-f', 'xe-daemon'])
 
         # remove the installed tools
         logging.info("Detect package manager and uninstall the guest tools")
@@ -58,7 +57,7 @@ class TestGuestToolsUnix:
             pytest.skip("Package manager '%s' not supported in this test" % pkg_mgr)
 
         # check that xe-daemon is not running anymore
-        assert vm.ssh_with_result(['pgrep', '-x', 'xe-daemon']).returncode != 0, \
+        assert vm.ssh_with_result(['pgrep', '-f', 'xe-daemon']).returncode != 0, \
             "xe-daemon must not be running anymore"
 
         # mount ISO
@@ -84,7 +83,7 @@ class TestGuestToolsUnix:
         vm.unmount_guest_tools_iso()
 
         # check that xe-daemon is running
-        wait_for(lambda: vm.ssh_with_result(['pgrep', '-x', 'xe-daemon']).returncode == 0,
+        wait_for(lambda: vm.ssh_with_result(['pgrep', '-f', 'xe-daemon']).returncode == 0,
                  "Wait for xe-daemon running")
 
     def test_check_tools(self, running_vm, state):
