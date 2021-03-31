@@ -46,12 +46,12 @@ class TestMooseFSSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
-    #def test_snapshot(self, vm_on_moosefs_sr):
-    #    vm = vm_on_moosefs_sr
-    #    vm.start()
-    #    vm.wait_for_os_booted()
-    #    vm.test_snapshot_on_running_vm()
-    #    vm.shutdown(verify=True)
+    def test_snapshot(self, vm_on_moosefs_sr):
+        vm = vm_on_moosefs_sr
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.test_snapshot_on_running_vm()
+        vm.shutdown(verify=True)
 
     # *** tests with reboots (longer tests).
 
