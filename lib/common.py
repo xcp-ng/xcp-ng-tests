@@ -260,6 +260,9 @@ class Host:
         xo_cli('server.disable', {'id': self.xo_srv_id})
         xo_cli('server.enable', {'id': self.xo_srv_id})
         wait_for(self.xo_server_connected, timeout_secs=10)
+        # wait for XO to know about the host. Apparently a connected server status
+        # is not enough to guarantee that the host object exists yet.
+        wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about HOST %s" % self.uuid)
 
     def import_vm(self, uri, sr_uuid=None):
         params = {}
