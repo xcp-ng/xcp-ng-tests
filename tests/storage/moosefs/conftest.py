@@ -6,12 +6,13 @@ def host_with_moosefs(host):
         "mount.moosefs must not be installed on the host before all tests"
     host.ssh(['sh', '-c', '"curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
     host.ssh(['sh', '-c', '"curl http://ppa.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo"'])
-    host.yum_install(['fuse'])
+    host.yum_install(['fuse'], save_state=True)
     host.yum_install(['moosefs-client'])
     yield host
     # teardown
-    host.yum_remove(['moosefs-client'])
-    host.yum_remove(['fuse'])
+    host.yum_restore_saved_state()
+    host.ssh(['sh', '-c', '"rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
+    host.ssh(['sh', '-c', '"rm -f /etc/yum.repos.d/MooseFS.repo"'])
 
 @pytest.fixture(scope='session')
 def moosefs_device_config(sr_device_config):
