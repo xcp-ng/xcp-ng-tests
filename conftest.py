@@ -79,7 +79,6 @@ def setup_host(hostname_or_ip):
 def hosts(request):
     # a list of master hosts, each from a different pool
     hostname_list = request.param.split(',')
-    print(hostname_list)
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
     yield [tup[0] for tup in host_list]
     # teardown
