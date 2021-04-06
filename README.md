@@ -13,6 +13,18 @@ Note: this is a work in progress.
 
 On XCP-ng's test lab, the CI SSH private key allows to connect to any host installed for CI via PXE, and to any linux VM imported from pre-made images (OVA) and started.
 
+For Guest UEFI Secure Boot tests, the requirements are:
+* Test Runner
+    * `sbsign` or `pesign`
+    * If using `pesign`, `certutil` and `pk12util` must also be installed.
+      These should be included as package dependencies for your distro.
+    * `openssl`
+* VM
+    * `chattr`
+* XCP-ng Host (installed by default on XCP-ng 8.2+)
+    * `uefistored`
+    * `varstored-tools`
+
 ## Configuration
 The main configuration file is data.py. Copy data.py-dist to data.py and modify it if needed.
 

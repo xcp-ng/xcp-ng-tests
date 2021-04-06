@@ -1,10 +1,13 @@
 import json
+import os
 import subprocess
 import tempfile
 import time
 from enum import Enum
 from subprocess import CalledProcessError
 from uuid import UUID
+
+from lib.efi import EFIAuth, EFI_HEADER_MAGIC
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
@@ -195,7 +198,8 @@ class Host:
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         return scp(
-            self.hostname_or_ip, src, dest, check=check, suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
+            self.hostname_or_ip, src, dest, check=check,
+            suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
     def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
@@ -516,6 +520,7 @@ class VM(BaseVM):
         self.ip = None
         self.previous_host = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
+        self.is_uefi = self.param_get('HVM-boot-params', 'firmware') == 'uefi'
 
     def power_state(self):
         return self.param_get('power-state')
@@ -581,7 +586,8 @@ class VM(BaseVM):
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         return scp(
             self.ip, src, dest, check=check,
-            suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
+            suppress_fingerprint_warnings=suppress_fingerprint_warnings,
+            local_dest=local_dest
         )
 
     def is_ssh_up(self):
@@ -796,7 +802,7 @@ class VM(BaseVM):
             'params': 'uuid',
         }
 
-        lines = self.host.xe('message-list', args).strip().split('\n')
+        lines = self.host.xe('message-list', args).splitlines()
 
         # Extracts uuids from lines of: "uuid ( RO) : <uuid>"
         return [e.split(':')[1].strip() for e in lines if e]
@@ -806,6 +812,70 @@ class VM(BaseVM):
 
         for msg in msgs:
             self.host.xe('message-destroy', {'uuid': msg})
+
+    def sign_efi_bins(self, db: EFIAuth):
+        with tempfile.TemporaryDirectory() as directory:
+            for remote_bin in self.get_all_efi_bins():
+                local_bin = os.path.join(directory, os.path.basename(remote_bin))
+                self.scp(remote_bin, local_bin, local_dest=True)
+                signed = db.sign_image(local_bin)
+                self.scp(signed, remote_bin)
+
+    def set_efi_var(self, var: str, guid: str, attrs: bytes, data: bytes):
+        """Sets the data and attrs for an EFI variable and GUID."""
+        assert len(attrs) == 4
+
+        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+
+        if self.file_exists(efivarfs):
+            self.ssh(['chattr', '-i', efivarfs])
+
+        with tempfile.NamedTemporaryFile('wb') as f:
+            f.write(attrs)
+            f.write(data)
+            f.flush()
+            self.scp(f.name, efivarfs)
+
+    def get_efi_var(self, var, guid):
+        """Returns a 2-tuple of (attrs, data) for an EFI variable."""
+        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+
+        if not self.file_exists(efivarfs):
+            return 0, b''
+
+        data = self.ssh(['cat', efivarfs], simple_output=False).stdout
+
+        # The efivarfs file starts with the attributes, which are 4 bytes long
+        return data[:4], data[4:]
+
+    def file_exists(self, filepath):
+        """Returns True if the file exists, otherwise returns False."""
+        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+
+    def sign_bins(self):
+        for f in self.get_all_efi_bins():
+            self.sign(f)
+
+    def get_all_efi_bins(self):
+        magicsz = str(len(EFI_HEADER_MAGIC))
+        files = self.ssh(
+            [
+                'for', 'file', 'in', '$(find', '/boot', '-type', 'f);',
+                'do', 'echo', '$file', '$(head', '-c', magicsz, '$file);',
+                'done'
+            ],
+            simple_output=False).stdout.split(b'\n')
+
+        magic = EFI_HEADER_MAGIC.encode('ascii')
+        binaries = []
+        for f in files:
+            if magic in f:
+                # Avoid decoding an unsplit f, as some headers are not utf8
+                # decodable
+                fpath = f.split()[0].decode('ascii')
+                binaries.append(fpath)
+
+        return binaries
 
 class Snapshot(BaseVM):
     def _disk_list(self):
