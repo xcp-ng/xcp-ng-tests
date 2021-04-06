@@ -1,0 +1,3 @@
+# All requirements + those only used in development
+pycodestyle>=2.6.0
+-r base.txt

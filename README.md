@@ -7,6 +7,22 @@ Note: this is a work in progress.
 * pytest >= 5.4 (python3 version)
 * xo-cli installed, in the PATH, and registered to an instance of XO that will be used during the tests
 
+### Quick install (python requirements)
+
+Install the python requirements using pip:
+
+```
+$ pip install -r requirements/base.txt
+
+```
+
+Additionally, for dev dependencies (things like the linter / style checker):
+
+```
+$ pip install -r requirements/dev.txt
+
+```
+
 ## Other requirements
 * XCP-ng hosts that you can ssh to using a SSH key, non-interactively
 * VM images suited to what the tests want. Some tests want a linux VM with SSH, available to import as an OVA over HTTP, for example.
