@@ -6,7 +6,8 @@ def host_with_moosefs(host):
         "MooseFS client should not be installed on the host before all tests"
     host.ssh(['sh', '-c', '"curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
     host.ssh(['sh', '-c', '"curl http://ppa.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo"'])
-    host.yum_install(['fuse'], save_state=True)
+    host.yum_save_state()
+    host.yum_install(['fuse'])
     host.yum_install(['moosefs-client'])
     yield host
     # teardown

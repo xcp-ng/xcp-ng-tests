@@ -4,7 +4,8 @@ import pytest
 def host_with_xfsprogs(host):
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
         "xfsprogs must not be installed on the host at the beginning of the tests"
-    host.yum_install(['xfsprogs'], save_state=True)
+    host.yum_save_state()
+    host.yum_install(['xfsprogs'])
     yield host
     # teardown
     host.yum_restore_saved_state()

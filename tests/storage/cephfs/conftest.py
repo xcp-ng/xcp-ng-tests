@@ -3,7 +3,8 @@ import pytest
 def _setup_host_with_ceph(host):
     assert not host.file_exists('/usr/sbin/mount.ceph'), \
         "mount.ceph must not be installed on the host at the beginning of the tests"
-    host.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras", save_state=True)
+    host.yum_save_state()
+    host.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras")
     host.yum_install(['ceph-common'], enablerepo="base,extras")
 
 @pytest.fixture(scope='session')
