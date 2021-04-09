@@ -7,7 +7,8 @@ VOLUME_PATH = '/' + VOLUME_NAME
 def host_with_zfs(host):
     assert not host.file_exists('/usr/sbin/zpool'), \
         "zfs must not be installed on the host at the beginning of the tests"
-    host.yum_install(['zfs'], save_state=True)
+    host.yum_save_state()
+    host.yum_install(['zfs'])
     host.ssh(['modprobe', 'zfs'])
     yield host
     # teardown

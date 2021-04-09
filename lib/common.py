@@ -404,13 +404,8 @@ class Host:
         history = self.ssh(['yum', 'history', 'list']).splitlines()
         return history[3].split()[0]
 
-    def yum_install(self, packages, enablerepo=None, save_state=False):
+    def yum_install(self, packages, enablerepo=None):
         print('Install packages: %s on host %s' % (' '.join(packages), self))
-        if save_state:
-            # For now, that saved state feature does not support several saved states
-            assert self.saved_packages_list is None and self.saved_rollback_id is None
-            self.saved_packages_list = self.packages()
-            self.saved_rollback_id = self.get_last_yum_history_tid()
         enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
         return self.ssh(['yum', 'install', '-y'] + enablerepo_cmd + packages)
 
@@ -427,6 +422,12 @@ class Host:
     def check_packages_available(self, packages):
         """ Check if a given package list is available in the YUM repositories. """
         return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
+
+    def yum_save_state(self):
+        # For now, that saved state feature does not support several saved states
+        assert self.saved_packages_list is None, "There is already a saved package list set"
+        self.saved_packages_list = self.packages()
+        self.saved_rollback_id = self.get_last_yum_history_tid()
 
     def yum_restore_saved_state(self):
         """ Restore yum state to saved state. """
@@ -445,6 +446,9 @@ class Host:
             raise Exception(
                 "Yum state badly restored missing: [%s], extra: [%s]." % (' '.join(missing), ' '.join(extra))
             )
+        # We can resave a new state after that.
+        self.saved_packages_list = None
+        self.saved_rollback_id = None
 
     def reboot(self, verify=False, reconnect_xo=True):
         print("Reboot host %s" % self)

@@ -37,7 +37,8 @@ def hosts_with_linstor(host, additional_repos):
         check_linstor_packages(host)
 
     # Configure master host.
-    master.yum_install(LINSTOR_PACKAGES, save_state=True)
+    master.yum_save_state()
+    master.yum_install(LINSTOR_PACKAGES)
     master.ssh(['systemctl', 'restart', 'linstor-satellite'])
     master.ssh(['systemctl', 'restart', 'linstor-controller'])
 
@@ -50,7 +51,8 @@ def hosts_with_linstor(host, additional_repos):
 
     # Configure slaves.
     for host in hosts[1:]:
-        host.yum_install(LINSTOR_PACKAGES, save_state=True)
+        host.yum_save_state()
+        host.yum_install(LINSTOR_PACKAGES)
         host.ssh(['systemctl', 'restart', 'linstor-satellite'])
 
     yield hosts
