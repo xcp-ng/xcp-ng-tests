@@ -4,8 +4,8 @@ import time, subprocess
 
 # Requirements:
 # - one XCP-ng host >= 8.2
-# - remote moosefs mountpoint
-# - access to XCP-ng RPM repository from the host
+# - running MooseFS cluster
+# - access to MooseFS packages repository: ppa.moosefs.com
 
 class TestMooseFSSRCreateDestroy:
     """
@@ -17,10 +17,10 @@ class TestMooseFSSRCreateDestroy:
     def test_create_moosefs_sr_without_mfsmount(self, host, moosefs_device_config):
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mount.moosefs'), \
-            "mount.moosefs must not be installed on the host"
+            "MooseFS client shound not be installed on the host"
         sr = None
         try:
-            sr = host.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True)
+            sr = host.sr_create('moosefs', "MooseFS-SR-test1", moosefs_device_config, shared=True)
         except Exception:
             print("MooseFS SR creation failed, as expected.")
         if sr is not None:
@@ -30,8 +30,8 @@ class TestMooseFSSRCreateDestroy:
     def test_create_and_destroy_sr(self, host_with_moosefs, moosefs_device_config):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_moosefs
-        sr = host.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True, verify=True)
-        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
+        sr = host.sr_create('moosefs', "MooseFS-SR-test2", moosefs_device_config, shared=True, verify=True)
+        # import a VM in order to detect vm import issues here rather than in the vm_on_moosefs_sr used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
