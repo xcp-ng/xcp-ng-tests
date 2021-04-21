@@ -3,7 +3,7 @@ import pytest
 @pytest.fixture(scope='session')
 def host_with_moosefs(host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \
-        "mount.moosefs must not be installed on the host before all tests"
+        "MooseFS client should not be installed on the host before all tests"
     host.ssh(['sh', '-c', '"curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
     host.ssh(['sh', '-c', '"curl http://ppa.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo"'])
     host.yum_install(['fuse'], save_state=True)
@@ -47,3 +47,7 @@ def vm_on_moosefs_sr(host, moosefs_sr, vm_ref):
     # teardown
     print("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def pass_vm_ref(vm_ref):
+    return vm_ref
