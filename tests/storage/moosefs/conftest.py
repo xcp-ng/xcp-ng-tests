@@ -48,6 +48,3 @@ def vm_on_moosefs_sr(host, moosefs_sr, vm_ref):
     print("<< Destroy VM")
     vm.destroy(verify=True)
 
-@pytest.fixture(scope='module')
-def pass_vm_ref(vm_ref):
-    return vm_ref

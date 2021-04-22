@@ -1,5 +1,5 @@
 import pytest
-from lib.common import wait_for
+from lib.common import wait_for, vm_image
 import time, subprocess
 
 # Requirements:
@@ -7,7 +7,6 @@ import time, subprocess
 # - running MooseFS cluster
 # - access to MooseFS packages repository: ppa.moosefs.com
 
-@pytest.mark.usefixtures("pass_vm_ref")
 class TestMooseFSSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,
@@ -15,10 +14,10 @@ class TestMooseFSSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_moosefs_sr_without_mfsmount(self, host, moosefs_device_config, pass_vm_ref):
+    def test_create_moosefs_sr_without_mfsmount(self, host, moosefs_device_config):
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mount.moosefs'), \
-            "MooseFS client shound not be installed on the host"
+            "MooseFS client should not be installed on the host"
         sr = None
         try:
             sr = host.sr_create('moosefs', "MooseFS-SR-test1", moosefs_device_config, shared=True)
@@ -28,14 +27,13 @@ class TestMooseFSSRCreateDestroy:
             sr.destroy()
             assert False, "MooseFS SR creation should failed!"
 
-    def test_create_and_destroy_sr(self, host_with_moosefs, moosefs_device_config, pass_vm_ref):
+    def test_create_and_destroy_sr(self, host_with_moosefs, moosefs_device_config):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_moosefs
         sr = host.sr_create('moosefs', "MooseFS-SR-test2", moosefs_device_config, shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_moosefs_sr used in
         # the next tests, because errors in fixtures break teardown
-        #vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
-        vm = host.import_vm(pass_vm_ref, sr_uuid=sr.uuid)
+        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
