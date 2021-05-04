@@ -520,7 +520,7 @@ class VM(BaseVM):
         self.ip = None
         self.previous_host = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
-        self.is_uefi = self.param_get('HVM-boot-params', 'firmware') == 'uefi'
+        self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
 
     def power_state(self):
         return self.param_get('power-state')
