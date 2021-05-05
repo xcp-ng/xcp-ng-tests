@@ -521,6 +521,7 @@ class VM(BaseVM):
         self.previous_host = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
+        self.installed_bins = []
 
     def power_state(self):
         return self.param_get('power-state')
@@ -737,6 +738,13 @@ class VM(BaseVM):
                 return res
             finally:
                 self.ssh(['rm', '-f', f.name])
+
+    def execute_bin(self, binpath, args):
+        if binpath not in self.installed_bins:
+            self.ssh(['mkdir', '-p', os.path.split(binpath)[0]])
+            self.scp(binpath, binpath)
+            self.installed_bins.append(binpath)
+        self.ssh([binpath] + args)
 
     def distro(self):
         """
