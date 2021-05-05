@@ -24,6 +24,8 @@ EFI_HEADER_MAGIC = 'MZ'
 EFI_GLOBAL_VARIABLE_GUID_STR = '8be4df61-93ca-11d2-aa0d-00e098032b8c'
 EFI_IMAGE_SECURITY_DATABASE_GUID_STR = 'd719b2cb-3d3a-4596-a3bc-dad00e67656f'
 
+# Variable attributes for runtime nonvolatile attrs
+EFI_RT_ATTRS = 0x07
 # Variable attributes for time based authentication attrs
 EFI_AT_ATTRS = 0x27
 
@@ -60,6 +62,7 @@ def pack_guid(data1, data2, data3, data4):
     )
 
 
+EFI_RT_ATTRS_BYTES = efi_pack(u32, EFI_RT_ATTRS)
 EFI_AT_ATTRS_BYTES = efi_pack(u32, EFI_AT_ATTRS)
 
 EFI_CERT_PKCS7_GUID = pack_guid(
