@@ -7,6 +7,17 @@ Note: this is a work in progress.
 * pytest >= 5.4 (python3 version)
 * xo-cli installed, in the PATH, and registered to an instance of XO that will be used during the tests
 
+### Git Submodules
+
+Some tests (e.g., UEFI tests) require that you build and use the tools
+submodule. After cloning xcp-ng-tests, run:
+
+```bash
+git submodule init
+git submodule update --recursive
+make -C tools/
+```
+
 ### Quick install (python requirements)
 
 Install the python requirements using pip:
