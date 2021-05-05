@@ -830,11 +830,14 @@ class VM(BaseVM):
         if self.file_exists(efivarfs):
             self.ssh(['chattr', '-i', efivarfs])
 
+        self.create_file(efivarfs, attrs + data)
+
+    def create_file(self, name, data):
         with tempfile.NamedTemporaryFile('wb') as f:
-            f.write(attrs)
             f.write(data)
             f.flush()
-            self.scp(f.name, efivarfs)
+            self.scp(f.name, name)
+        return name
 
     def get_efi_var(self, var, guid):
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""
