@@ -33,7 +33,7 @@ def moosefs_device_config(sr_device_config):
 
 @pytest.fixture(scope='session')
 def moosefs_sr(moosefs_device_config, host_with_moosefs):
-    """ MooseFS SR on a specyfic host """
+    """ MooseFS SR on a specific host. """
     sr = host_with_moosefs.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True)
     yield sr
     # teardown
@@ -47,4 +47,3 @@ def vm_on_moosefs_sr(host, moosefs_sr, vm_ref):
     # teardown
     print("<< Destroy VM")
     vm.destroy(verify=True)
-
