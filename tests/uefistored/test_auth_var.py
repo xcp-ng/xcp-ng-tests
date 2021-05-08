@@ -3,11 +3,14 @@ import pytest
 from subprocess import CalledProcessError
 from lib.efi import (
     Certificate,
+    EFIAuth,
     EFI_GLOBAL_VARIABLE_GUID,
     EFI_GLOBAL_VARIABLE_GUID_STR,
     EFI_AT_ATTRS_BYTES,
+    EFI_AT_ATTRS,
+    EFI_GUIDS,
+    EFI_GUID_STRS,
 )
-
 
 def set_and_assert_var(vm, cert, new, should_pass):
     var = 'myvariable'
@@ -55,3 +58,53 @@ def test_auth_variable(imported_vm):
 
     # Set the variable with new data, signed by the same cert
     set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
+
+
+def set_auth(vm, auth):
+    vm.host.scp(auth.auth, '/tmp/%s.auth' % auth.name)
+    vm.host.ssh([
+        'varstore-set', vm.uuid, EFI_GUID_STRS[auth.name], auth.name,
+        str(EFI_AT_ATTRS), '/tmp/%s.auth' % auth.name
+    ])
+
+
+def test_db_append(imported_vm):
+    """Test append of UEFI variable db."""
+    vm = imported_vm
+    if vm.is_windows:
+        pytest.skip('not valid test for Windows VMs')
+
+    # Create and install certs
+    PK = EFIAuth('PK')
+    KEK = EFIAuth('KEK')
+    db1 = EFIAuth('db')
+
+    db2 = EFIAuth('db')
+    PK.sign_auth(PK)
+    PK.sign_auth(KEK)
+    KEK.sign_auth(db1)
+    KEK.sign_auth(db2)
+
+    set_auth(vm, db1)
+    set_auth(vm, KEK)
+    set_auth(vm, PK)
+
+    if not vm.is_running():
+        vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+
+    guid = EFI_GUID_STRS['db']
+    old_attrs, old_data = vm.get_efi_var('db', guid)
+
+    vm.scp(db2.auth, '/tmp/db.auth')
+    name = guid + '-db'
+    vm.execute_bin('tools/efivar-static',
+                   ['-n', name, '--append', '-f', '/tmp/db.auth',
+                    '--attributes=' + hex(EFI_AT_ATTRS)]
+                   )
+
+    new_attrs, new_data = vm.get_efi_var('db', guid)
+
+    assert old_attrs == new_attrs
+    assert len(old_data) < len(new_data)
+    assert old_data in new_data
