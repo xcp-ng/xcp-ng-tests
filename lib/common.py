@@ -9,6 +9,9 @@ from uuid import UUID
 
 from lib.efi import EFIAuth, EFI_HEADER_MAGIC
 
+def efivarfs_path(var, guid):
+    return '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
     RPM = 2
@@ -833,7 +836,12 @@ class VM(BaseVM):
         """Sets the data and attrs for an EFI variable and GUID."""
         assert len(attrs) == 4
 
-        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+        self.set_efi_var_mutable(var, guid)
+        efivarfs = efivarfs_path(var, guid)
+        self.create_file(efivarfs, attrs + data)
+
+    def set_efi_var_mutable(self, var, guid):
+        efivarfs = efivarfs_path(var, guid)
 
         if self.file_exists(efivarfs):
             self.ssh(['chattr', '-i', efivarfs])
@@ -849,7 +857,7 @@ class VM(BaseVM):
 
     def get_efi_var(self, var, guid):
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""
-        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+        efivarfs = efivarfs_path(var, guid)
 
         if not self.file_exists(efivarfs):
             return 0, b''

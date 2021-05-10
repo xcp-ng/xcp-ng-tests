@@ -40,6 +40,7 @@ class TestGuestLinuxUEFIVariable:
             EFI_RT_ATTRS_BYTES,
             b'hank'
         )
+        vm.set_efi_var_mutable('KingOfTheHill', TEST_GUID)
 
         # Use efivar to append 'hill' to variable KingOfTheHill
         vm.create_file('/tmp/hill.data', b'hill')
