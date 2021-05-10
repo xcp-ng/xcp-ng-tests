@@ -525,6 +525,7 @@ class VM(BaseVM):
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
         self.installed_bins = []
+        self.__tempfiles = []
 
     def power_state(self):
         return self.param_get('power-state')
@@ -551,6 +552,7 @@ class VM(BaseVM):
 
     def shutdown(self, force=False, verify=False):
         print("Shutdown VM")
+        self.rm_tempfiles()
         ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
         if verify:
             wait_for(self.is_halted, "Wait for VM halted")
@@ -558,6 +560,7 @@ class VM(BaseVM):
 
     def reboot(self, force=False, verify=False):
         print("Reboot VM")
+        self.rm_tempfiles()
         ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
         if verify:
             # No need to verify that the reboot actually happened because the xe command
@@ -846,14 +849,19 @@ class VM(BaseVM):
         if self.file_exists(efivarfs):
             self.ssh(['chattr', '-i', efivarfs])
 
-        self.create_file(efivarfs, attrs + data)
-
-    def create_file(self, name, data):
+    def create_file(self, name, data, is_temp=False):
         with tempfile.NamedTemporaryFile('wb') as f:
             f.write(data)
             f.flush()
             self.scp(f.name, name)
+
+        if is_temp:
+            self.__tempfiles.append(name)
         return name
+
+    def rm_tempfiles(self):
+        if self.__tempfiles:
+            self.ssh(['rm', '-f'] + self.__tempfiles)
 
     def get_efi_var(self, var, guid):
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""

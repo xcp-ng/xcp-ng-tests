@@ -43,7 +43,7 @@ class TestGuestLinuxUEFIVariable:
         vm.set_efi_var_mutable('KingOfTheHill', TEST_GUID)
 
         # Use efivar to append 'hill' to variable KingOfTheHill
-        vm.create_file('/tmp/hill.data', b'hill')
+        vm.create_file('/tmp/hill.data', b'hill', is_temp=True)
         name = '%s-%s' % (TEST_GUID, 'KingOfTheHill')
         vm.execute_bin('tools/efivar-static',
                        ['-n', name, '--append', '-f', '/tmp/hill.data'])
