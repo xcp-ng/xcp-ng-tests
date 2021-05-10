@@ -39,25 +39,29 @@ def test_auth_variable(imported_vm):
     if vm.is_windows:
         pytest.skip('not valid test for Windows VMs')
 
-    vm.start()
-    vm.wait_for_vm_running_and_ssh_up()
+    try:
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
 
-    cert = Certificate()
+        cert = Certificate()
 
-    # Set the variable
-    set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
+        # Set the variable
+        set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
 
-    # Set the variable with new data, signed by the same cert
-    set_and_assert_var(vm, cert, b'I am new news', should_pass=True)
+        # Set the variable with new data, signed by the same cert
+        set_and_assert_var(vm, cert, b'I am new news', should_pass=True)
 
-    # Remove var
-    set_and_assert_var(vm, cert, b'', should_pass=True)
+        # Remove var
+        set_and_assert_var(vm, cert, b'', should_pass=True)
 
-    # Set the variable with new data, signed by the same cert
-    set_and_assert_var(vm, cert, b'new data', should_pass=True)
+        # Set the variable with new data, signed by the same cert
+        set_and_assert_var(vm, cert, b'new data', should_pass=True)
 
-    # Set the variable with new data, signed by the same cert
-    set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
+        # Set the variable with new data, signed by the same cert
+        set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
+    finally:
+        if vm.is_running():
+            vm.shutdown()
 
 
 def set_auth(vm, auth):
@@ -74,37 +78,45 @@ def test_db_append(imported_vm):
     if vm.is_windows:
         pytest.skip('not valid test for Windows VMs')
 
-    # Create and install certs
-    PK = EFIAuth('PK')
-    KEK = EFIAuth('KEK')
-    db1 = EFIAuth('db')
+    try:
+        # Clear any SB certs
+        vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])
 
-    db2 = EFIAuth('db')
-    PK.sign_auth(PK)
-    PK.sign_auth(KEK)
-    KEK.sign_auth(db1)
-    KEK.sign_auth(db2)
+        # Create and install certs
+        PK = EFIAuth('PK')
+        KEK = EFIAuth('KEK')
+        db1 = EFIAuth('db')
 
-    set_auth(vm, db1)
-    set_auth(vm, KEK)
-    set_auth(vm, PK)
+        db2 = EFIAuth('db')
+        PK.sign_auth(PK)
+        PK.sign_auth(KEK)
+        KEK.sign_auth(db1)
+        KEK.sign_auth(db2)
 
-    if not vm.is_running():
-        vm.start()
-    vm.wait_for_vm_running_and_ssh_up()
+        set_auth(vm, db1)
+        set_auth(vm, KEK)
+        set_auth(vm, PK)
 
-    guid = EFI_GUID_STRS['db']
-    old_attrs, old_data = vm.get_efi_var('db', guid)
+        if not vm.is_running():
+            vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
 
-    vm.scp(db2.auth, '/tmp/db.auth')
-    name = guid + '-db'
-    vm.execute_bin('tools/efivar-static',
-                   ['-n', name, '--append', '-f', '/tmp/db.auth',
-                    '--attributes=' + hex(EFI_AT_ATTRS)]
-                   )
+        guid = EFI_GUID_STRS['db']
+        old_attrs, old_data = vm.get_efi_var('db', guid)
 
-    new_attrs, new_data = vm.get_efi_var('db', guid)
+        vm.scp(db2.auth, '/tmp/db.auth')
+        name = guid + '-db'
+        vm.execute_bin('tools/efivar-static',
+                       ['-n', name, '--append', '-f', '/tmp/db.auth',
+                        '--attributes=' + hex(EFI_AT_ATTRS)]
+                       )
 
-    assert old_attrs == new_attrs
-    assert len(old_data) < len(new_data)
-    assert old_data in new_data
+        new_attrs, new_data = vm.get_efi_var('db', guid)
+
+        assert old_attrs == new_attrs
+        assert len(old_data) < len(new_data)
+        assert old_data in new_data
+    finally:
+        if vm.is_running():
+            vm.shutdown()
+        vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])
