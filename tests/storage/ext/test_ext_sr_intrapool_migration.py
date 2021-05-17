@@ -1,5 +1,5 @@
 import pytest
-from lib.common import cold_migration_then_come_back, live_storage_migration_then_come_back
+from tests.storage import cold_migration_then_come_back, live_storage_migration_then_come_back
 
 # Requirements:
 # From --hosts parameter:

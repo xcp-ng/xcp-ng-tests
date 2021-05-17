@@ -1,6 +1,7 @@
 import pytest
 import subprocess
 from lib.common import wait_for, vm_image
+from tests.storage import try_to_create_sr_with_missing_device
 
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
@@ -12,16 +13,8 @@ class TestLVMSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_with_device_missing(self, host):
-        try:
-            sr = host.sr_create('ext', 'LVM-local-SR', {}, verify=True)
-        except subprocess.CalledProcessError as e:
-            assert e.stdout == (
-                b'Error code: SR_BACKEND_FAILURE_90\nError parameters: , '
-                b'The request is missing the device parameter, \n'
-            ), 'Bad error, current: {}'.format(e.stdout)
-            return
-        assert False, 'SR creation should not have succeeded!'
+    def test_create_sr_with_missing_device(self, host):
+        try_to_create_sr_with_missing_device('lvm', 'LVM-local-SR', host)
 
     def test_create_and_destroy_sr(self, host, sr_disk):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
