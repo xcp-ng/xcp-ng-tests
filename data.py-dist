@@ -40,3 +40,10 @@ DEFAULT_MOOSEFS_DEVICE_CONFIG = {
 #    'masterport': '9421',
 #    'rootpath': '/vms'
 }
+
+DEFAULT_LVMOISCSI_DEVICE_CONFIG = {
+#    'target': '192.168.1.1',
+#    'port': '3260',
+#    'targetIQN': 'target.example',
+#    'SCSIid': 'id'
+}
