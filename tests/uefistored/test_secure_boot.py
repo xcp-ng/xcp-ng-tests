@@ -87,7 +87,7 @@ class TestGuestLinuxUEFISecureBoot:
             pytest.skip('only valid for Linux VMs')
 
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
-        vm.param_set('platform', 'secureboot', 'false')
+        vm.param_set('platform', 'secureboot', False)
         snapshot = vm.snapshot()
         yield
 
@@ -104,53 +104,53 @@ class TestGuestLinuxUEFISecureBoot:
     def test_boot_succeeds_when_PK_set_and_sb_disabled(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK])
-        vm.param_set('platform', 'secureboot', 'false')
+        vm.param_set('platform', 'secureboot', False)
         check_sb_succeeded(vm)
 
     def test_boot_succeeds_when_PK_set_and_sb_disabled_xapi(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK], use_xapi=True)
-        vm.param_set('platform', 'secureboot', 'false')
+        vm.param_set('platform', 'secureboot', False)
         check_sb_succeeded(vm)
 
     def test_boot_fails_when_db_set_and_images_unsigned(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_failed(vm)
 
     def test_boot_fails_when_db_set_and_images_unsigned_xapi(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK, self.KEK, self.db], use_xapi=True)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_failed(vm)
 
     def test_boot_success_when_launching_db_signed_images(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK, self.KEK, self.db])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_succeeded(vm)
 
     def test_boot_success_when_launching_db_signed_images_xapi(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK, self.KEK, self.db], use_xapi=True)
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_succeeded(vm)
 
     def test_boot_fails_when_launching_dbx_signed_images(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK, self.KEK, self.db, self.dbx])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_failed(vm)
 
     def test_boot_fails_when_launching_dbx_signed_images_xapi(self, imported_sb_vm):
         vm = imported_sb_vm
         install_auths(vm, [self.PK, self.KEK, self.db, self.dbx], use_xapi=True)
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_failed(vm)
 
     def test_boot_success_when_initial_keys_not_signed_by_parent(self, imported_sb_vm):
@@ -158,7 +158,7 @@ class TestGuestLinuxUEFISecureBoot:
         PK, KEK, db, _ = generate_keys(self_signed=True)
         install_auths(vm, [PK, KEK, db])
         sign_efi_bins(vm, db)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_succeeded(vm)
 
     def test_boot_success_when_initial_keys_not_signed_by_parent_xapi(self, imported_sb_vm):
@@ -166,7 +166,7 @@ class TestGuestLinuxUEFISecureBoot:
         PK, KEK, db, _ = generate_keys(self_signed=True)
         install_auths(vm, [PK, KEK, db], use_xapi=True)
         sign_efi_bins(vm, db)
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_succeeded(vm)
 
 
@@ -178,7 +178,7 @@ class TestGuestWindowsUEFISecureBoot:
             pytest.skip('only valid for Windows VMs')
 
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
-        vm.param_set('platform', 'secureboot', 'false')
+        vm.param_set('platform', 'secureboot', False)
         snapshot = vm.snapshot()
         yield
 
@@ -196,14 +196,14 @@ class TestGuestWindowsUEFISecureBoot:
         vm = imported_sb_vm
         PK, KEK, db, _ = generate_keys(self_signed=True)
         install_auths(vm, [PK, KEK, db])
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         check_sb_failed(vm)
 
     def test_windows_succeeds(self, imported_sb_vm):
         vm = imported_sb_vm
         PK, _, _, _ = generate_keys(self_signed=True)
         install_auths(vm, [PK])
-        vm.param_set('platform', 'secureboot', 'true')
+        vm.param_set('platform', 'secureboot', True)
         vm.host.ssh(['secureboot-certs'])
         check_sb_succeeded(vm)
 
@@ -253,7 +253,7 @@ class TestUEFIKeyExchange:
         # Start with only PK, we will test adding the rest of the keys
         vm.host.ssh(['rm', '/usr/share/uefistored/*'], check=False)
         vm.host.scp(PK.auth, '/usr/share/uefistored/PK.auth')
-        vm.param_set('platform', 'secureboot', 'false')
+        vm.param_set('platform', 'secureboot', False)
 
         if not vm.is_running():
             vm.start()

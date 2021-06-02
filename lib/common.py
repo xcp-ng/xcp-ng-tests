@@ -204,11 +204,23 @@ class Host:
 
     def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
         maybe_param_minimal = ['--minimal'] if minimal else []
-        return self.ssh(
-            ['xe', action] + maybe_param_minimal + ["%s=%s" % (key, value) for key, value in args.items()],
+
+        def stringify(key, value):
+            if type(value) == bool:
+                return "{}={}".format(key, to_xapi_bool(value))
+            return "{}={}".format(key, value)
+
+        result = self.ssh(
+            ['xe', action] + maybe_param_minimal + [stringify(key, value) for key, value in args.items()],
             check=check,
             simple_output=simple_output
         )
+
+        if result == 'true':
+            return True
+        if result == 'false':
+            return False
+        return result
 
     def _get_xensource_inventory(self):
         output = self.ssh(['cat', '/etc/xensource-inventory'])
@@ -310,7 +322,7 @@ class Host:
 
     def is_enabled(self):
         try:
-            return self.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}) == 'true'
+            return self.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'})
         except subprocess.CalledProcessError:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
@@ -505,7 +517,7 @@ class BaseVM:
                 return False
         return True
 
-    def export(self, filepath, compress="false"):
+    def export(self, filepath, compress='none'):
         print("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
         params = {
             'uuid': self.uuid,
@@ -547,14 +559,14 @@ class VM(BaseVM):
 
     def shutdown(self, force=False, verify=False):
         print("Shutdown VM")
-        ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
+        ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': force})
         if verify:
             wait_for(self.is_halted, "Wait for VM halted")
         return ret
 
     def reboot(self, force=False, verify=False):
         print("Reboot VM")
-        ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': to_xapi_bool(force)})
+        ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': force})
         if verify:
             # No need to verify that the reboot actually happened because the xe command
             # does that for us already (it only finishes once the reboot started).
@@ -884,7 +896,7 @@ class Snapshot(BaseVM):
     def destroy(self, verify=False):
         print("Delete snapshot " + self.uuid)
         # that uninstall command apparently works better for snapshots than for VMs apparently
-        self.host.xe('snapshot-uninstall', {'uuid': self.uuid, 'force': 'true'})
+        self.host.xe('snapshot-uninstall', {'uuid': self.uuid, 'force': True})
         if verify:
             print("Check snapshot doesn't exist anymore")
             assert not self.exists()
@@ -931,7 +943,7 @@ class SR:
         all_attached = True
         for pbd_uuid in self.pbd_uuids():
             all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid,
-                                                                'param-name': 'currently-attached'}) == 'true'
+                                                                'param-name': 'currently-attached'})
         return all_attached
 
     def plug_pbds(self, verify=True):
@@ -970,4 +982,4 @@ class SR:
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
 
     def is_shared(self):
-        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'}) == 'true'
+        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'})
