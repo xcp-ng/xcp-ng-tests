@@ -5,7 +5,7 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 # What can be improved: control over where the exported files get written
 # and over the destination SR for VM import.
 
-def export_test(host, vm, filepath, compress="false"):
+def export_test(host, vm, filepath, compress='none'):
     vm.export(filepath, compress)
     assert host.file_exists(filepath)
     vm2 = None
@@ -24,7 +24,7 @@ def test_export_zstd(host, imported_vm):
     export_test(host, imported_vm, '/root/test-export-zstd.xva', 'zstd')
 
 def test_export_gzip(host, imported_vm):
-    export_test(host, imported_vm, '/root/test-export-gzip.xva', 'true')
+    export_test(host, imported_vm, '/root/test-export-gzip.xva', 'gzip')
 
 def test_export_uncompressed(host, imported_vm):
-    export_test(host, imported_vm, '/root/test-export-uncompressed.xva', 'false')
+    export_test(host, imported_vm, '/root/test-export-uncompressed.xva', 'none')
