@@ -200,8 +200,9 @@ def vm_refs(request):
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
     if is_uuid(vm_ref):
-        print(">> Reuse VM %s on host %s" % (vm_ref, host))
         vm = VM(vm_ref, host)
+        name = vm.name()
+        print(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
         print(">> ", end='')
         vm = host.import_vm(vm_ref)
