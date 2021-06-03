@@ -167,6 +167,18 @@ class Pool:
     def host_ip(self, host_uuid):
         return self.master.xe('host-param-get', {'uuid': host_uuid, 'param-name': 'address'})
 
+    def first_host_that_isnt(self, host):
+        for h in self.hosts:
+            if h != host:
+                return h
+        return None
+
+    def first_shared_sr(self):
+        uuids = self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True).split(',')
+        if len(uuids) > 0:
+            return SR(uuids[0], self)
+        return None
+
 class Host:
     def __init__(self, hostname_or_ip):
         self.hostname_or_ip = hostname_or_ip
@@ -496,6 +508,9 @@ class BaseVM:
 
         return self.host.xe('vm-param-set', args)
 
+    def name(self):
+        return self.param_get('name-label')
+
     def vdi_uuids(self):
         output = self._disk_list()
         vdis = []
@@ -521,6 +536,14 @@ class BaseVM:
             if not sr.attached_to_host(host):
                 return False
         return True
+
+    def get_sr(self):
+        # in this method we assume the SR of the first VDI is the VM SR
+        vdis = self.vdi_uuids()
+        assert len(vdis) > 0, "Don't ask for the SR of a VM without VDIs!"
+        sr = SR(self.get_vdi_sr_uuid(vdis[0]), self.host.pool)
+        assert sr.attached_to_host(self.host)
+        return sr
 
     def export(self, filepath, compress='none'):
         print("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
@@ -893,6 +916,13 @@ class VM(BaseVM):
                 binaries.append(fpath)
 
         return binaries
+
+    def clone(self):
+        name = self.name() + '_clone_for_tests'
+        print("Clone VM")
+        uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
+        print("New VM: %s (%s)" % (uuid, name))
+        return VM(uuid, self.host)
 
 class Snapshot(BaseVM):
     def _disk_list(self):
