@@ -8,6 +8,19 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 def export_test(host, vm, filepath, compress='none'):
     vm.export(filepath, compress)
     assert host.file_exists(filepath)
+
+    def check_file_type(expected):
+        assert host.ssh(['file', '--mime-type', '-b', filepath]) == expected
+
+    if compress == 'none':
+        check_file_type('application/x-tar')
+    elif compress == 'gzip':
+        check_file_type('application/x-gzip')
+    elif compress == 'zstd':
+        check_file_type('application/octet-stream')
+    else:
+        assert False, 'Unsupported compress mode'
+
     vm2 = None
     try:
         vm2 = host.import_vm(filepath)
