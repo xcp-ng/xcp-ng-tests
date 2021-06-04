@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import subprocess
 import tempfile
 import time
@@ -208,10 +209,14 @@ class Host:
         def stringify(key, value):
             if type(value) == bool:
                 return "{}={}".format(key, to_xapi_bool(value))
-            return "{}={}".format(key, value)
+            return "{}={}".format(key, shlex.quote(value))
+
+        command = shlex.quote(' '.join(
+            ['xe', action] + maybe_param_minimal + [stringify(key, value) for key, value in args.items()]
+        ))
 
         result = self.ssh(
-            ['xe', action] + maybe_param_minimal + [stringify(key, value) for key, value in args.items()],
+            [command],
             check=check,
             simple_output=simple_output
         )
@@ -700,13 +705,13 @@ class VM(BaseVM):
     def snapshot(self):
         print("Snapshot VM")
         return Snapshot(self.host.xe('vm-snapshot', {'uuid': self.uuid,
-                                                     'new-name-label': '"Snapshot of %s"' % self.uuid}),
+                                                     'new-name-label': 'Snapshot of %s' % self.uuid}),
                         self.host)
 
     def checkpoint(self):
         print("Checkpoint VM")
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
-                                                       'new-name-label': '"Checkpoint of %s"' % self.uuid}),
+                                                       'new-name-label': 'Checkpoint of %s' % self.uuid}),
                         self.host)
 
     def vifs(self):
