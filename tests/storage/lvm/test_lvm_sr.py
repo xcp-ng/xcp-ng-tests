@@ -1,5 +1,4 @@
 import pytest
-import subprocess
 from lib.common import wait_for, vm_image
 from tests.storage import try_to_create_sr_with_missing_device
 

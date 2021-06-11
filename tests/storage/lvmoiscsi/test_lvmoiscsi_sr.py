@@ -1,5 +1,4 @@
 import pytest
-import subprocess
 from lib.common import wait_for, vm_image
 
 # Requirements:
