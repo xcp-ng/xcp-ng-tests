@@ -1,6 +1,7 @@
 import pytest
 import tempfile
 # import json
+import lib.config as global_config
 from lib.common import wait_for, VM, Host, vm_image, is_uuid
 
 # *** Support for incremental tests in test classes ***
@@ -56,6 +57,15 @@ def pytest_addoption(parser):
         default=None,
         help="UUID of second network in the A pool, NOT the management network"
     )
+    parser.addoption(
+        "--ignore-ssh-banner",
+        action="store_true",
+        default=False,
+        help="Ignore SSH banners when SSH commands are executed"
+    )
+
+def pytest_configure(config):
+    global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
 
 def host_data(hostname_or_ip):
     # read from data.py

@@ -7,6 +7,7 @@ import time
 from enum import Enum
 from uuid import UUID
 
+import lib.config as config
 from lib.efi import EFIAuth, EFI_HEADER_MAGIC
 
 class PackageManagerEnum(Enum):
@@ -112,13 +113,14 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         # Common case
 
         # Fetch banner and remove it to avoid stdout/stderr pollution.
-        banner_res = subprocess.run(
-            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), '\n'),
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False
-        )
+        if config.ignore_ssh_banner:
+            banner_res = subprocess.run(
+                "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), '\n'),
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False
+            )
         res = subprocess.run(
             "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command),
             shell=True,
@@ -130,10 +132,13 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         # Even if check is False, we still raise in case of return code 255, which means a SSH error.
         if res.returncode == 255:
             raise SSHCommandFailed(255, "SSH Error: %s" % res.stdout.decode(), command)
-        if banner_res.returncode == 255:
-            raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(), command)
+        stdout = res.stdout.decode()
 
-        stdout = res.stdout.decode()[len(banner_res.stdout.decode()):]
+        if config.ignore_ssh_banner:
+            if banner_res.returncode == 255:
+                raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(), command)
+            stdout = stdout[len(banner_res.stdout.decode()):]
+
         if check and res.returncode:
             raise SSHCommandFailed(res.returncode, stdout, command)
 
