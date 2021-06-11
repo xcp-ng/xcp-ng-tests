@@ -1,6 +1,5 @@
 from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
-from lib.common import wait_for, vm_image
-from subprocess import CalledProcessError
+from lib.common import SSHCommandFailed, wait_for, vm_image
 import pytest
 import time
 
@@ -30,7 +29,7 @@ class TestLinstorSRCreateDestroy:
             except Exception:
                 pass
             assert False, "SR creation should not have succeeded!"
-        except CalledProcessError as e:
+        except SSHCommandFailed as e:
             print("SR creation failed, as expected: {}".format(e))
 
     def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks):
@@ -80,7 +79,7 @@ class TestLinstorSR:
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
-            except CalledProcessError:
+            except SSHCommandFailed:
                 print("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR

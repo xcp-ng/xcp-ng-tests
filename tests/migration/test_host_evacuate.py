@@ -1,7 +1,6 @@
 import pytest
 
-from subprocess import CalledProcessError
-from lib.common import wait_for, wait_for_not
+from lib.common import SSHCommandFailed, wait_for, wait_for_not
 # The pool needs a shared SR to use `host.evacuate`
 from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
 
@@ -30,8 +29,8 @@ def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=F
         wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
         vm.wait_for_os_booted()
         assert not expect_error, "host-evacuate should have raised: %s" % error
-    except CalledProcessError as e:
-        if not (expect_error and e.output.find(error) > -1):
+    except SSHCommandFailed as e:
+        if not (expect_error and e.stdout.find(error) > -1):
             raise
     finally:
         vm.shutdown(verify=True)

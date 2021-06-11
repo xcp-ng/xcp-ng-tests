@@ -1,7 +1,6 @@
 import os
 import pytest
-import subprocess
-from lib.common import wait_for
+from lib.common import SSHCommandFailed, wait_for
 from lib.efi import EFIAuth, EFI_AT_ATTRS, EFI_AT_ATTRS_BYTES, EFI_GUID_STRS
 
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
@@ -93,7 +92,7 @@ class TestGuestLinuxUEFISecureBoot:
 
         try:
             snapshot.revert()
-        except subprocess.CalledProcessError:
+        except SSHCommandFailed:
             raise
         finally:
             # Messages may be populated from previous tests and may
@@ -184,7 +183,7 @@ class TestGuestWindowsUEFISecureBoot:
 
         try:
             snapshot.revert()
-        except subprocess.CalledProcessError:
+        except SSHCommandFailed:
             raise
         finally:
             # Messages may be populated from previous tests and may
@@ -289,7 +288,7 @@ class TestUEFIKeyExchange:
             try:
                 vm.set_efi_var(auth.name, EFI_GUID_STRS[auth.name],
                                EFI_AT_ATTRS_BYTES, auth.auth_data)
-            except subprocess.CalledProcessError:
+            except SSHCommandFailed:
                 ok = False
 
             if (should_succeed and not ok) or (ok and not should_succeed):

@@ -1,6 +1,5 @@
 import pytest
-from lib.common import wait_for, vm_image
-import subprocess
+from lib.common import SSHCommandFailed, wait_for, vm_image
 import time
 
 # Requirements:
@@ -75,7 +74,7 @@ class TestMooseFSSR:
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
-            except subprocess.CalledProcessError:
+            except SSHCommandFailed:
                 print("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR

@@ -9,8 +9,6 @@ import os
 import shlex
 import shutil
 import struct
-import subprocess
-import uuid
 from datetime import datetime, timedelta
 from subprocess import check_call
 from tempfile import TemporaryDirectory

@@ -1,8 +1,7 @@
 import pytest
 from conftest import VOLUME_PATH, VOLUME_NAME
-from lib.common import wait_for, vm_image
+from lib.common import SSHCommandFailed, wait_for, vm_image
 import time
-import subprocess
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -75,7 +74,7 @@ class TestZFSSR:
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
-            except subprocess.CalledProcessError:
+            except SSHCommandFailed:
                 print("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR
@@ -103,7 +102,7 @@ class TestZFSSR:
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
-            except subprocess.CalledProcessError:
+            except SSHCommandFailed:
                 print("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR
