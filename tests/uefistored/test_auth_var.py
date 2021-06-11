@@ -1,6 +1,6 @@
 import pytest
 
-from subprocess import CalledProcessError
+from lib.common import SSHCommandFailed
 from lib.efi import (
     Certificate,
     EFI_GLOBAL_VARIABLE_GUID,
@@ -19,7 +19,7 @@ def set_and_assert_var(vm, cert, new, should_pass):
     ok = True
     try:
         vm.set_efi_var(var, EFI_GLOBAL_VARIABLE_GUID_STR, EFI_AT_ATTRS_BYTES, signed)
-    except CalledProcessError:
+    except SSHCommandFailed:
         ok = False
 
     _, ret = vm.get_efi_var(var, EFI_GLOBAL_VARIABLE_GUID_STR)

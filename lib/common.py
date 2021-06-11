@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 import time
 from enum import Enum
-from subprocess import CalledProcessError
 from uuid import UUID
 
 from lib.efi import EFIAuth, EFI_HEADER_MAGIC
@@ -65,8 +64,23 @@ def xo_object_exists(uuid):
     lst = json.loads(xo_cli('--list-objects', {'uuid': uuid}))
     return len(lst) > 0
 
-class SSHException(Exception):
-    pass
+class SSHCommandFailed(Exception):
+    __slots__ = 'returncode', 'stdout', 'cmd'
+
+    def __init__(self, returncode, stdout, cmd):
+        super(SSHCommandFailed, self).__init__(
+            'SSH command ({}) failed with return code {}: {}'.format(cmd, returncode, stdout)
+        )
+        self.returncode = returncode
+        self.stdout = stdout
+        self.cmd = cmd
+
+class SSHResult:
+    __slots__ = 'returncode', 'stdout'
+
+    def __init__(self, returncode, stdout):
+        self.returncode = returncode
+        self.stdout = stdout
 
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
         background=False, target_os='linux'):
@@ -96,22 +110,36 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         )
     else:
         # Common case
+
+        # Fetch banner and remove it to avoid stdout/stderr pollution.
+        banner_res = subprocess.run(
+            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), '\n'),
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False
+        )
         res = subprocess.run(
             "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            check=check
+            check=False
         )
 
         # Even if check is False, we still raise in case of return code 255, which means a SSH error.
         if res.returncode == 255:
-            raise SSHException("SSH Error: %s" % res.stdout.decode())
+            raise SSHCommandFailed(255, "SSH Error: %s" % res.stdout.decode(), command)
+        if banner_res.returncode == 255:
+            raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(), command)
+
+        stdout = res.stdout.decode()[len(banner_res.stdout.decode()):]
+        if check and res.returncode:
+            raise SSHCommandFailed(res.returncode, stdout, command)
 
         if simple_output:
-            return res.stdout.decode().strip()
-        else:
-            return res
+            return stdout.strip()
+        return SSHResult(res.returncode, stdout)
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
     options = ""
@@ -126,13 +154,17 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
     else:
         dest = 'root@{}:{}'.format(hostname_or_ip, dest)
 
+    command = "scp {} {} {}".format(options, src, dest)
     res = subprocess.run(
-        "scp {} {} {}".format(options, src, dest),
+        command,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        check=check
+        check=False
     )
+    if check and res.returncode:
+        raise SSHCommandFailed(res.returncode, res.stdout.decode(), command)
+
     return res
 
 def to_xapi_bool(b):
@@ -340,7 +372,7 @@ class Host:
     def is_enabled(self):
         try:
             return self.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'})
-        except subprocess.CalledProcessError:
+        except SSHCommandFailed:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
@@ -348,9 +380,9 @@ class Host:
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
             self.ssh(['yum', 'check-update'])
-            # returned 0, else there would have been a CalledProcessError
+            # returned 0, else there would have been a SSHCommandFailed
             return False
-        except CalledProcessError as e:
+        except SSHCommandFailed as e:
             if e.returncode == 100:
                 return True
             else:
@@ -418,10 +450,10 @@ class Host:
         print("Reboot host %s" % self)
         try:
             self.ssh(['reboot'])
-        except subprocess.CalledProcessError as e:
+        except SSHCommandFailed as e:
             # ssh connection may get killed by the reboot and terminate with an error code
-            if "closed by remote host" in e.stdout.decode().strip():
-                pass
+            if "closed by remote host" not in e.stdout:
+                raise
         if verify or reconnect_xo:
             wait_for_not(self.is_enabled, "Wait for host down")
             wait_for(self.is_enabled, "Wait for host up", timeout_secs=600)
@@ -491,8 +523,8 @@ class BaseVM:
             args['param-key'] = key
         try:
             value = self.host.xe('vm-param-get', args)
-        except subprocess.CalledProcessError as e:
-            if key and accept_unknown_key and e.stdout.decode().strip() == "Error: Key %s not found in map" % key:
+        except SSHCommandFailed as e:
+            if key and accept_unknown_key and e.stdout.strip() == "Error: Key %s not found in map" % key:
                 value = None
             else:
                 raise
@@ -633,7 +665,7 @@ class VM(BaseVM):
     def is_ssh_up(self):
         try:
             return self.ssh_with_result(['true']).returncode == 0
-        except SSHException:
+        except SSHCommandFailed:
             # probably not up yet
             return False
 
@@ -967,7 +999,7 @@ class SR:
         for pbd_uuid in self.pbd_uuids():
             try:
                 self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
-            except subprocess.CalledProcessError as e:
+            except SSHCommandFailed as e:
                 # We must be sure to execute correctly "unplug" on unplugged VDIs without error
                 # if force is set.
                 if not force:
