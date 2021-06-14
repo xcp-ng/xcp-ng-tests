@@ -26,7 +26,7 @@ def existing_shared_sr(host):
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 
 @pytest.mark.incremental
-class TestGuestToolsUnix:
+class TestBasicNoSSH:
     def test_start(self, imported_vm):
         vm = imported_vm
         # if VM already running, stop it
