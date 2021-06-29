@@ -10,7 +10,7 @@ def _setup_host_with_glusterfs(host):
     assert not host.file_exists('/usr/sbin/glusterd'), \
         "glusterfs-server must not be installed on the host at the beginning of the tests"
     host.yum_save_state()
-    host.yum_install(['glusterfs-server'])
+    host.yum_install(['glusterfs-server', 'xfsprogs'])
     host.ssh(['systemctl', 'enable', '--now', 'glusterd.service'])
 
     for h in host.pool.hosts:
@@ -86,11 +86,11 @@ def gluster_disk(host, sr_disk_for_all_hosts):
     hosts = host.pool.hosts
     for h in hosts:
         print(">> Format sr_disk %s and mount it on host %s" % (sr_disk, h))
-        h.ssh(['mkfs.ext4', '-F', device])
+        h.ssh(['mkfs.xfs', '-f', device])
         h.ssh(['rm', '-rf', '/mnt/sr_disk']) # Remove any existing leftover to ensure rmdir will not fail in teardown
         h.ssh(['mkdir', '-p', '/mnt/sr_disk'])
         h.ssh(['cp', '-f', '/etc/fstab', '/etc/fstab.orig'])
-        h.ssh(['echo', '%s /mnt/sr_disk ext4 defaults 0 0' % device, '>>/etc/fstab'])
+        h.ssh(['echo', '%s /mnt/sr_disk xfs defaults 0 0' % device, '>>/etc/fstab'])
         h.ssh(['mount', '/mnt/sr_disk'])
     yield
     for h in hosts:
@@ -155,6 +155,10 @@ def gluster_volume_started(host, hostA2, gluster_disk):
 
     gluster_cmd.append('force')
     host.ssh(gluster_cmd)
+    host.ssh(['gluster', 'volume', 'set', 'vol0', 'group', 'virt'])
+    host.ssh(['gluster', 'volume', 'set', 'vol0', 'cluster.granular-entry-heal', 'enable'])
+    host.ssh(['gluster', 'volume', 'set', 'vol0', 'features.shard-block-size', '512MB'])
+    host.ssh(['gluster', 'volume', 'set', 'vol0', 'network.ping-timeout', '5'])
 
     host.ssh(['gluster', 'volume', 'start', 'vol0'])
     yield
