@@ -1,3 +1,4 @@
+import logging
 import pytest
 import tempfile
 # import json
@@ -63,9 +64,16 @@ def pytest_addoption(parser):
         default=False,
         help="Ignore SSH banners when SSH commands are executed"
     )
+    parser.addoption(
+        "--ssh-debug-output-max-lines",
+        action="store",
+        default=20,
+        help="Max lines to output in a debug log (0 if no limit)"
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
+    global_config.max_log_lines = int(config.getoption('--ssh-debug-output-max-lines'))
 
 def host_data(hostname_or_ip):
     # read from data.py
@@ -77,7 +85,7 @@ def host_data(hostname_or_ip):
         return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
 
 def setup_host(hostname_or_ip):
-    print(">>> Connect host %s" % hostname_or_ip)
+    logging.info(">>> Connect host %s" % hostname_or_ip)
     h = Host(hostname_or_ip)
     h.initialize()
     assert h.is_master(), "we connect only to master hosts during initial setup"
@@ -100,7 +108,7 @@ def hosts(request):
     # teardown
     for h, skip_xo_config in host_list:
         if not skip_xo_config:
-            print("<<< Disconnect host %s" % h)
+            logging.info("<<< Disconnect host %s" % h)
             h.xo_server_remove()
 
 @pytest.fixture(scope='session')
@@ -118,7 +126,7 @@ def hostA2(hostA1):
     """ Second host of pool A. """
     assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
     _hostA2 = hostA1.pool.hosts[1]
-    print(">>> hostA2 present: %s" % _hostA2)
+    logging.info(">>> hostA2 present: %s" % _hostA2)
     yield _hostA2
 
 @pytest.fixture(scope='session')
@@ -127,7 +135,7 @@ def hostB1(hosts):
     assert len(hosts) > 1, "A second pool is required"
     assert hosts[0].pool.uuid != hosts[1].pool.uuid
     _hostB1 = hosts[1]
-    print(">>> hostB1 present: %s" % _hostB1)
+    logging.info(">>> hostB1 present: %s" % _hostB1)
     yield _hostB1
 
 @pytest.fixture(scope='session')
@@ -137,7 +145,7 @@ def local_sr_on_hostA2(hostA2):
     assert len(srs) > 0, "a local SR is required on the pool's second host"
     # use the first local SR found
     sr = srs[0]
-    print(">> local SR on hostA2 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostA2 present : %s" % sr.uuid)
     yield sr
 
 @pytest.fixture(scope='session')
@@ -147,7 +155,7 @@ def local_sr_on_hostB1(hostB1):
     assert len(srs) > 0, "a local SR is required on the second pool's master"
     # use the first local SR found
     sr = srs[0]
-    print(">> local SR on hostB1 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostB1 present : %s" % sr.uuid)
     yield sr
 
 @pytest.fixture(scope='session')
@@ -157,12 +165,12 @@ def sr_disk(host):
     assert len(disks) > 1, "at least two disks are required on the first host"
     # Using the second disk for SR
     disk = disks[1]
-    print(">> a second disk for a local SR is present on hostA1: %s" % disk)
+    logging.info(">> a second disk for a local SR is present on hostA1: %s" % disk)
     yield disk
 
 @pytest.fixture(scope='session')
 def sr_disk_wiped(host, sr_disk):
-    print(">> wipe disk %s" % sr_disk)
+    logging.info(">> wipe disk %s" % sr_disk)
     host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
     yield sr_disk
 
@@ -174,7 +182,7 @@ def sr_disk_for_all_hosts(host, sr_disk):
         assert len(disks) > 1, "at least two disks are required on all pool's hosts, missing on host: %s" % h
         # Using the second disk for SR
         disk = next(d for d in disks if d == sr_disk)
-        print(">> a second disk for a local SR is present on host %s: %s" % (h, disk))
+        logging.info(">> a second disk for a local SR is present on host %s: %s" % (h, disk))
     yield sr_disk
 
 @pytest.fixture(scope='module')
@@ -186,11 +194,11 @@ def vm_ref(request):
         marker = request.node.get_closest_marker("default_vm")
         default_vm = marker.args[0] if marker is not None else None
         if default_vm is not None:
-            print(">> No VM specified on CLI. Using default: %s." % default_vm)
+            logging.info(">> No VM specified on CLI. Using default: %s." % default_vm)
             ref = default_vm
         else:
             # global default
-            print(">> No VM specified on CLI, and no default found in test definition. Using global default.")
+            logging.info(">> No VM specified on CLI, and no default found in test definition. Using global default.")
             ref = 'mini-linux-x86_64-bios'
 
     if is_uuid(ref):
@@ -209,11 +217,13 @@ def vm_refs(request):
         marker = request.node.get_closest_marker("default_vms")
         default_vms = marker.args[0] if marker is not None else None
         if default_vms is not None:
-            print(">> No VM list specified on CLI. Using default: %s." % " ".join(default_vms))
+            logging.info(">> No VM list specified on CLI. Using default: %s." % " ".join(default_vms))
             vm_list = default_vms
         else:
             # global default
-            print(">> No VM list specified on CLI, and no default found in test definition. Using global default.")
+            logging.info(
+                ">> No VM list specified on CLI, and no default found in test definition. Using global default."
+            )
             vm_list = ['mini-linux-x86_64-bios', 'mini-linux-x86_64-uefi']
     # TODO: finish implementation using vm_image
 
@@ -223,14 +233,13 @@ def imported_vm(host, vm_ref):
     if is_uuid(vm_ref):
         vm = VM(vm_ref, host)
         name = vm.name()
-        print(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
+        logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
-        print(">> ", end='')
         vm = host.import_vm(vm_ref)
     yield vm
     # teardown
     if not is_uuid(vm_ref):
-        print("<< Destroy VM")
+        logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
 # TODO: make it a fixture factory?
@@ -240,7 +249,6 @@ def running_vm(imported_vm):
 
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
-        print("> ", end='')
         vm.start()
     wait_for(vm.is_running, '> Wait for VM running')
     wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")

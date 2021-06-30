@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 @pytest.fixture(scope='session')
@@ -10,9 +11,8 @@ def lvm_sr(host, sr_disk):
 
 @pytest.fixture(scope='module')
 def vm_on_lvm_sr(host, lvm_sr, vm_ref):
-    print(">> ", end='')
     vm = host.import_vm(vm_ref, sr_uuid=lvm_sr.uuid)
     yield vm
     # teardown
-    print("<< Destroy VM")
+    logging.info("<< Destroy VM")
     vm.destroy(verify=True)

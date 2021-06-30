@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
 
@@ -28,7 +30,7 @@ def export_test(host, vm, filepath, compress='none'):
         vm2.wait_for_os_booted()
         vm2.shutdown(verify=True)
     finally:
-        print("Delete %s" % filepath)
+        logging.info("Delete %s" % filepath)
         host.ssh(['rm', '-f', filepath], check=False)
         if vm2 is not None:
             vm2.destroy()

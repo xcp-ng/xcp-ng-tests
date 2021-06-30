@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 from lib.common import wait_for
 
 # These tests are basic tests meant to be run to check that a VM performs
@@ -31,7 +33,7 @@ class TestBasicNoSSH:
         vm = imported_vm
         # if VM already running, stop it
         if (vm.is_running()):
-            print("VM already running, shutting it down first")
+            logging.info("VM already running, shutting it down first")
             vm.shutdown(verify=True)
         vm.start()
         # this also tests the guest tools at the same time since they are used
@@ -87,19 +89,19 @@ class TestBasicNoSSH:
         host2 = host1.pool.first_host_that_isnt(host1)
         # migrate to host 2
         if initial_sr_shared:
-            print("* VM on shared SR: preparing for live migration without storage motion *")
+            logging.info("* VM on shared SR: preparing for live migration without storage motion *")
             live_migrate(vm, host2, initial_sr)
         else:
-            print("* VM on local SR: preparing for live migration with storage towards a shared SR *")
+            logging.info("* VM on local SR: preparing for live migration with storage towards a shared SR *")
             live_migrate(vm, host2, existing_shared_sr, check_vdis=True)
         # migrate back to host 1, using the other migration method
         if initial_sr_shared:
-            print("* Preparing for live migration with storage, towards the other host's local storage *")
+            logging.info("* Preparing for live migration with storage, towards the other host's local storage *")
             host1_local_srs = host1.local_vm_srs()
             assert len(host1_local_srs) > 0, "Host must have at least one local SR"
             live_migrate(vm, host1, host1_local_srs[0], check_vdis=True)
         else:
-            print("* Preparing for live migration without storage motion *")
+            logging.info("* Preparing for live migration without storage motion *")
             live_migrate(vm, host1, existing_shared_sr)
 
     def test_shutdown(self, imported_vm):

@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 from lib.common import SSHCommandFailed
 
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
@@ -27,7 +29,7 @@ def _teardown_host_with_glusterfs(host):
     try:
         host.ssh(['systemctl', 'disable', '--now', 'glusterd.service'])
     except SSHCommandFailed as e:
-        print("WARNING: %s" % e)
+        logging.warning("%s" % e)
         errors.append(e)
     host.yum_restore_saved_state()
 
@@ -35,7 +37,7 @@ def _teardown_host_with_glusterfs(host):
     try:
         host.ssh(['rm', '-rf', '/var/lib/glusterd'])
     except SSHCommandFailed as e:
-        print("WARNING: %s" % e)
+        logging.warning("%s" % e)
         errors.append(e)
 
     for h in host.pool.hosts:
@@ -46,14 +48,14 @@ def _teardown_host_with_glusterfs(host):
                     host.ssh(
                         ['iptables', '-D', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT'])
                 except SSHCommandFailed as e:
-                    print("WARNING: %s" % e)
+                    logging.warning("%s" % e)
                     errors.append(e)
 
     for service in ['iptables', 'ip6tables']:
         try:
             host.ssh(['mv', '/etc/sysconfig/%s.orig' % service, '/etc/sysconfig/%s' % service])
         except SSHCommandFailed as e:
-            print("WARNING: %s" % e)
+            logging.warning("%s" % e)
             errors.append(e)
 
     if len(errors) > 0:
@@ -66,7 +68,7 @@ def pool_with_glusterfs(host):
         try:
             _setup_host_with_glusterfs(h)
         except Exception as e:
-            print("WARNING: %s" % e)
+            logging.warning("%s" % e)
             setup_errors.append(e)
             pass
     if len(setup_errors) > 0:
@@ -89,7 +91,7 @@ def gluster_disk(host, sr_disk_for_all_hosts):
     device = '/dev/' + sr_disk
     hosts = host.pool.hosts
     for h in hosts:
-        print(">> Format sr_disk %s and mount it on host %s" % (sr_disk, h))
+        logging.info(">> Format sr_disk %s and mount it on host %s" % (sr_disk, h))
         h.ssh(['mkfs.xfs', '-f', device])
         h.ssh(['rm', '-rf', '/mnt/sr_disk']) # Remove any existing leftover to ensure rmdir will not fail in teardown
         h.ssh(['mkdir', '-p', '/mnt/sr_disk'])
@@ -98,7 +100,7 @@ def gluster_disk(host, sr_disk_for_all_hosts):
         h.ssh(['mount', '/mnt/sr_disk'])
     yield
     for h in hosts:
-        print("<< Restore fstab and unmount /mnt/sr_disk on host %s" % h)
+        logging.info("<< Restore fstab and unmount /mnt/sr_disk on host %s" % h)
         h.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
         h.ssh(['umount', '/mnt/sr_disk'])
         h.ssh(['rmdir', '/mnt/sr_disk'])
@@ -107,7 +109,7 @@ def _fallback_gluster_teardown(host):
     # See: https://microdevsys.com/wp/volume-delete-volume-failed-some-of-the-peers-are-down/
     # Remove all peers and bricks from the hosts volume and then stop and destroy volume.
     def teardown_for_host(h):
-        print("< Fallback teardown on host: %s" % h)
+        logging.info("< Fallback teardown on host: %s" % h)
         hosts = h.pool.hosts
 
         h.ssh(['systemctl', 'restart', 'glusterd'])
@@ -134,12 +136,12 @@ def _fallback_gluster_teardown(host):
     try:
         teardown_for_host(host)
     except Exception as e:
-        print("< Fallback teardown failed on master: %s, attempting to teardown other hosts" % e)
+        logging.error("< Fallback teardown failed on master: %s, attempting to teardown other hosts" % e)
         for h in host.pool.hosts[1:]:
             try:
                 teardown_for_host(h)
             except Exception as e:
-                print("< Fallback teardown failed on host: %s with error: %s" % (h, e))
+                logging.error("< Fallback teardown failed on host: %s with error: %s" % (h, e))
                 pass
 
 @pytest.fixture(scope='session')
@@ -152,7 +154,7 @@ def gluster_volume_started(host, hostA2, gluster_disk):
         h.ssh(['mkdir', '-p', '/mnt/sr_disk/vol0/brick0'])
         host.ssh(['gluster', 'peer', 'probe', h.hostname_or_ip])
 
-    print(">> create and start gluster volume vol0")
+    logging.info(">> create and start gluster volume vol0")
     gluster_cmd = ['gluster', 'volume', 'create', 'vol0', 'replica', str(len(hosts))]
     for h in hosts:
         gluster_cmd.append('%s:/mnt/sr_disk/vol0/brick0' % h.hostname_or_ip)
@@ -166,14 +168,14 @@ def gluster_volume_started(host, hostA2, gluster_disk):
 
     host.ssh(['gluster', 'volume', 'start', 'vol0'])
     yield
-    print("<< stop and delete gluster volume vol0")
+    logging.info("<< stop and delete gluster volume vol0")
     try:
         host.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
         host.ssh(['gluster', '--mode=script', 'volume', 'delete', 'vol0'])
         for h in hosts[1:]:
             host.ssh(['gluster', '--mode=script', 'peer', 'detach', h.hostname_or_ip])
     except Exception as e:
-        print("<< Exception '%s' while tearing down gluster volume, attempting fallback teardown" % e)
+        logging.warning("<< Exception '%s' while tearing down gluster volume, attempting fallback teardown" % e)
         _fallback_gluster_teardown(host)
 
     for h in hosts:
@@ -202,9 +204,8 @@ def glusterfs_sr(host, pool_with_glusterfs, gluster_volume_started, glusterfs_de
 
 @pytest.fixture(scope='module')
 def vm_on_glusterfs_sr(host, glusterfs_sr, vm_ref):
-    print(">> ", end='')
     vm = host.import_vm(vm_ref, sr_uuid=glusterfs_sr.uuid)
     yield vm
     # teardown
-    print("<< Destroy VM")
+    logging.info("<< Destroy VM")
     vm.destroy(verify=True)

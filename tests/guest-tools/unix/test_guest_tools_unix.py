@@ -1,3 +1,4 @@
+import logging
 import pytest
 import time
 from lib.common import wait_for, wait_for_not, PackageManagerEnum
@@ -21,12 +22,12 @@ class TestGuestToolsUnix:
         return State()
 
     def _check_tools_version(self, vm, tools_version):
-        print("Check that the detected tools version is '%s'" % tools_version)
+        logging.info("Check that the detected tools version is '%s'" % tools_version)
         detected_version = vm.tools_version()
         assert detected_version == tools_version
 
     def _check_os_info(self, vm, vm_distro):
-        print("Check that the detected distro is '%s'" % vm_distro)
+        logging.info("Check that the detected distro is '%s'" % vm_distro)
         detected_distro = vm.distro()
         assert detected_distro == vm_distro
 
@@ -45,7 +46,7 @@ class TestGuestToolsUnix:
             "xe-daemon must be running and detected by pgrep"
 
         # remove the installed tools
-        print("Detect package manager and uninstall the guest tools")
+        logging.info("Detect package manager and uninstall the guest tools")
         pkg_mgr = vm.detect_package_manager()
         if pkg_mgr == PackageManagerEnum.RPM:
             # Our guest tools come in two packages for RPM distros: xe-guest-utilities and xe-guest-utilities-xenstore.
@@ -61,7 +62,7 @@ class TestGuestToolsUnix:
             "xe-daemon must not be running anymore"
 
         # mount ISO
-        print("Mount guest tools ISO")
+        logging.info("Mount guest tools ISO")
         vm.mount_guest_tools_iso()
         tmp_mnt = vm.ssh(['mktemp', '-d'])
         time.sleep(1) # wait a small amount of time just to ensure the device is available
@@ -74,11 +75,11 @@ class TestGuestToolsUnix:
         state.tools_version = tgz_filename.split('/')[-1][len(prefix):-len(suffix)]
 
         # install tools
-        print("Install tools %s using install.sh" % state.tools_version)
+        logging.info("Install tools %s using install.sh" % state.tools_version)
         vm.ssh([tmp_mnt + '/Linux/install.sh', '-n'])
 
         # unmount ISO
-        print("Unmount guest tools ISO")
+        logging.info("Unmount guest tools ISO")
         vm.ssh(['umount', tmp_mnt])
         vm.unmount_guest_tools_iso()
 
@@ -98,7 +99,7 @@ class TestGuestToolsUnix:
         self._check_os_info(vm, state.vm_distro)
 
     def test_xenstore(self, running_vm):
-        print("Testing various xenstore commands from the guest")
+        logging.info("Testing various xenstore commands from the guest")
         vm = running_vm
         vm.ssh(['xenstore-ls'])
         vm.ssh(['xenstore-exists', 'vm'])

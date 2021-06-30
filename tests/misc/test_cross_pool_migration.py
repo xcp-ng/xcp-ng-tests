@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 from lib.common import wait_for, wait_for_not
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
@@ -16,5 +18,5 @@ def test_cross_pool_migration(host, hostB1, imported_vm):
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
     finally:
-        print("Destroy VM %s" % vm.uuid)
+        logging.info("Destroy VM %s" % vm.uuid)
         vm.destroy()

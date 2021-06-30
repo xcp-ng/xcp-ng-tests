@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 from lib.common import wait_for_not
 
 GROUP_NAME = 'linstor_group'
@@ -69,7 +71,7 @@ def delete_linstor_nodes(hosts_with_linstor):
         try:
             host.ssh(['linstor', control_arg, 'node', 'delete', '`uname -n`'])
         except Exception:
-            print('Failed to delete properly node on host {}'.format(host))
+            logging.error('Failed to delete properly node on host {}'.format(host))
             pass
 
 def create_linstor_sr(hosts_with_linstor):
@@ -108,9 +110,8 @@ def linstor_sr(hosts_with_linstor, lvm_disks):
 
 @pytest.fixture(scope='module')
 def vm_on_linstor_sr(host, linstor_sr, vm_ref):
-    print(">> ", end='')
     vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
     yield vm
     # teardown
-    print("<< Destroy VM")
+    logging.info("<< Destroy VM")
     vm.destroy(verify=True)

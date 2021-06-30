@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 from lib.common import wait_for_not
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
@@ -21,7 +23,7 @@ def test_snapshot(running_vm):
 
 def test_checkpoint(running_vm):
     vm = running_vm
-    print("Start a 'sleep' process on VM through SSH")
+    logging.info("Start a 'sleep' process on VM through SSH")
     pid = vm.start_background_process('sleep 10000')
     snapshot = vm.checkpoint()
     filepath = '/tmp/%s' % snapshot.uuid
@@ -29,11 +31,11 @@ def test_checkpoint(running_vm):
     snapshot.revert()
     vm.resume()
     vm.wait_for_vm_running_and_ssh_up()
-    print("Check file does not exist anymore")
+    logging.info("Check file does not exist anymore")
     vm.ssh(['test ! -f ' + filepath])
-    print("Check 'sleep' process is still running")
+    logging.info("Check 'sleep' process is still running")
     assert vm.pid_exists(pid)
-    print("Kill background process")
+    logging.info("Kill background process")
     vm.ssh(['kill ' + pid])
     wait_for_not(lambda: vm.pid_exists(pid), "Wait for process %s not running anymore" % pid)
     snapshot.destroy(verify=True)
