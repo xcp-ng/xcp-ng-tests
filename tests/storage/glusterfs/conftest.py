@@ -1,10 +1,7 @@
 import pytest
 from lib.common import SSHCommandFailed
 
-# See: https://gluster.readthedocs.io/en/release-3.7.0-1/Troubleshooting/troubleshootingFAQ/
-# ('49152', 'tcp') for brick0 and ('49153', 'tcp') for brick0 after `test_volume_stopped`
-# because the port number is increased
-GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152', 'tcp'), ('49153', 'tcp')]
+GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 
 def _setup_host_with_glusterfs(host):
     assert not host.file_exists('/usr/sbin/glusterd'), \
