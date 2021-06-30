@@ -34,6 +34,13 @@ def _teardown_host_with_glusterfs(host):
         errors.append(e)
     host.yum_restore_saved_state()
 
+    # Remove any remaining gluster-related data to avoid issues in future test runs
+    try:
+        host.ssh(['rm', '-rf', '/var/lib/glusterd'])
+    except SSHCommandFailed as e:
+        print("WARNING: %s" % e)
+        errors.append(e)
+
     for h in host.pool.hosts:
         hostname_or_ip = h.hostname_or_ip
         if hostname_or_ip != host.hostname_or_ip:
