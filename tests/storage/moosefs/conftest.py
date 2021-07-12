@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 @pytest.fixture(scope='session')
@@ -42,9 +43,8 @@ def moosefs_sr(moosefs_device_config, host_with_moosefs):
 
 @pytest.fixture(scope='module')
 def vm_on_moosefs_sr(host, moosefs_sr, vm_ref):
-    print(">> ", end='')
     vm = host.import_vm(vm_ref, sr_uuid=moosefs_sr.uuid)
     yield vm
     # teardown
-    print("<< Destroy VM")
+    logging.info("<< Destroy VM")
     vm.destroy(verify=True)

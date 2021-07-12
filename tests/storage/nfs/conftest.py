@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 @pytest.fixture(scope='session')
@@ -27,9 +28,8 @@ def nfs_sr(host, nfs_device_config):
 
 @pytest.fixture(scope='module')
 def vm_on_nfs_sr(host, nfs_sr, vm_ref):
-    print(">> ", end='')
     vm = host.import_vm(vm_ref, sr_uuid=nfs_sr.uuid)
     yield vm
     # teardown
-    print("<< Destroy VM")
+    logging.info("<< Destroy VM")
     vm.destroy(verify=True)

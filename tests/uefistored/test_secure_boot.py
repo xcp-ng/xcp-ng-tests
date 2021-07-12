@@ -1,5 +1,7 @@
+import logging
 import os
 import pytest
+
 from lib.common import SSHCommandFailed, wait_for
 from lib.efi import EFIAuth, EFI_AT_ATTRS, EFI_AT_ATTRS_BYTES, EFI_GUID_STRS
 
@@ -33,7 +35,7 @@ def sign_efi_bins(vm, db):
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
 
-    print('> Sign bootloader')
+    logging.info('> Sign bootloader')
     vm.sign_efi_bins(db)
 
     if shutdown:
@@ -42,7 +44,7 @@ def sign_efi_bins(vm, db):
 
 def install_auths(vm, auths, use_xapi=False):
     for auth in auths:
-        print('> Setting {}'.format(auth.name))
+        logging.info('> Setting {}'.format(auth.name))
 
         if auth.name == 'PK':
             dest = '/usr/share/uefistored/%s.auth' % auth.name
@@ -97,7 +99,7 @@ class TestGuestLinuxUEFISecureBoot:
         finally:
             # Messages may be populated from previous tests and may
             # interfere with future tests, so remove them
-            print('> remove guest SB messages')
+            logging.info('> remove guest SB messages')
             vm.rm_messages(VM_SECURE_BOOT_FAILED)
 
     def test_boot_succeeds_when_PK_set_and_sb_disabled(self, imported_sb_vm):
@@ -188,7 +190,7 @@ class TestGuestWindowsUEFISecureBoot:
         finally:
             # Messages may be populated from previous tests and may
             # interfere with future tests, so remove them
-            print('> remove guest SB messages')
+            logging.info('> remove guest SB messages')
             vm.rm_messages(VM_SECURE_BOOT_FAILED)
 
     def test_windows_fails(self, imported_sb_vm):
@@ -282,7 +284,7 @@ class TestUEFIKeyExchange:
         ]
 
         for i, (auth, should_succeed) in enumerate(tests):
-            print('> Testing {} ({})'.format(auth.name, i))
+            logging.info('> Testing {} ({})'.format(auth.name, i))
 
             ok = True
             try:

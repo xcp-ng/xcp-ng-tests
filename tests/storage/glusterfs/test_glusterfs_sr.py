@@ -1,4 +1,6 @@
+import logging
 import pytest
+
 from lib.common import SSHCommandFailed, wait_for, vm_image
 
 # Requirements:
@@ -20,7 +22,7 @@ class TestGlusterFSSRCreateDestroy:
         try:
             sr = host.sr_create('glusterfs', "GlusterFS-SR", glusterfs_device_config, shared=True)
         except Exception:
-            print("SR creation failed, as expected.")
+            logging.info("SR creation failed, as expected.")
         if sr is not None:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
@@ -71,7 +73,7 @@ class TestGlusterFSSR:
                 sr.scan()
                 assert False, "SR scan should have failed"
             except SSHCommandFailed:
-                print("SR scan failed as expected.")
+                logging.info("SR scan failed as expected.")
             host.ssh(['gluster', '--mode=script', 'volume', 'start', 'vol0'])
             volume_running = True
             sr.plug_pbds(verify=True)

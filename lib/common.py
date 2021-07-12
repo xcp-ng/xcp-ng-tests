@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shlex
 import subprocess
@@ -25,7 +26,7 @@ def vm_image(vm_key):
 
 def wait_for(fn, msg=None, timeout_secs=120, retry_delay_secs=2, invert=False):
     if msg is not None:
-        print(msg)
+        logging.info(msg)
     time_left = timeout_secs
     while True:
         ret = fn()
@@ -83,6 +84,19 @@ class SSHResult:
         self.returncode = returncode
         self.stdout = stdout
 
+def _ellide_log_lines(log):
+    if log == '':
+        return log
+
+    if config.ssh_output_max_lines < 1:
+        return "\n{}".format(log)
+
+    reduced_message = log.split("\n")
+    if len(reduced_message) > config.ssh_output_max_lines:
+        reduced_message = reduced_message[:config.ssh_output_max_lines - 1]
+        reduced_message.append("(...)")
+    return "\n{}".format("\n".join(reduced_message))
+
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
         background=False, target_os='linux'):
     options = []
@@ -139,11 +153,18 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
                 raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(), command)
             stdout = stdout[len(banner_res.stdout.decode()):]
 
-        if check and res.returncode:
-            raise SSHCommandFailed(res.returncode, stdout, command)
+        stripped_stdout = stdout.strip()
+        if res.returncode:
+            logging.debug("[{}] Got error code: {}, stdout: '{}' while running {}".format(
+                hostname_or_ip, res.returncode, stripped_stdout, command
+            ))
+            if check:
+                raise SSHCommandFailed(res.returncode, stdout, command)
+        else:
+            logging.debug("[{}] {}".format(hostname_or_ip, command) + _ellide_log_lines(stripped_stdout))
 
         if simple_output:
-            return stdout.strip()
+            return stripped_stdout
         return SSHResult(res.returncode, stdout)
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
@@ -331,7 +352,7 @@ class Host:
         return self.xo_server_status() == "connected"
 
     def xo_server_reconnect(self):
-        print("Reconnect XO to host %s" % self)
+        logging.info("Reconnect XO to host %s" % self)
         xo_cli('server.disable', {'id': self.xo_srv_id})
         xo_cli('server.enable', {'id': self.xo_srv_id})
         wait_for(self.xo_server_connected, timeout_secs=10)
@@ -349,9 +370,9 @@ class Host:
         if sr_uuid is not None:
             msg += " (SR: %s)" % sr_uuid
             params['sr-uuid'] = sr_uuid
-        print(msg)
+        logging.info(msg)
         vm_uuid = self.xe('vm-import', params)
-        print("VM UUID: %s" % vm_uuid)
+        logging.info("VM UUID: %s" % vm_uuid)
         vm = VM(vm_uuid, self)
         # Set VM VIF networks to the host's management network
         for vif in vm.vifs():
@@ -365,11 +386,11 @@ class Host:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
     def install_updates(self):
-        print("Install updates on host %s" % self)
+        logging.info("Install updates on host %s" % self)
         return self.ssh(['yum', 'update', '-y'])
 
     def restart_toolstack(self, verify=False):
-        print("Restart toolstack on host %s" % self)
+        logging.info("Restart toolstack on host %s" % self)
         return self.ssh(['xe-toolstack-restart'])
         if verify:
             wait_for(self.is_enabled, "Wait for host enabled")
@@ -410,12 +431,12 @@ class Host:
         return history[3].split()[0]
 
     def yum_install(self, packages, enablerepo=None):
-        print('Install packages: %s on host %s' % (' '.join(packages), self))
+        logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
         enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
         return self.ssh(['yum', 'install', '-y'] + enablerepo_cmd + packages)
 
     def yum_remove(self, packages):
-        print('Remove packages: %s from host %s' % (' '.join(packages), self))
+        logging.info('Remove packages: %s from host %s' % (' '.join(packages), self))
         return self.ssh(['yum', 'remove', '-y'] + packages)
 
     def packages(self):
@@ -456,7 +477,7 @@ class Host:
         self.saved_rollback_id = None
 
     def reboot(self, verify=False, reconnect_xo=True):
-        print("Reboot host %s" % self)
+        logging.info("Reboot host %s" % self)
         try:
             self.ssh(['reboot'])
         except SSHCommandFailed as e:
@@ -495,7 +516,7 @@ class Host:
         for key, value in device_config.items():
             params['device-config:{}'.format(key)] = value
 
-        print(
+        logging.info(
             "Create %s SR on host %s's %s device-config with label '%s'" %
             (sr_type, self, str(device_config), label)
         )
@@ -587,7 +608,7 @@ class BaseVM:
         return sr
 
     def export(self, filepath, compress='none'):
-        print("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
+        logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
         params = {
             'uuid': self.uuid,
             'compress': compress,
@@ -620,21 +641,21 @@ class VM(BaseVM):
 
     # By xe design on must be an host name-label
     def start(self, on=None):
-        print("Start VM")
+        logging.info("Start VM")
         args = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
         return self.host.xe('vm-start', args)
 
     def shutdown(self, force=False, verify=False):
-        print("Shutdown VM")
+        logging.info("Shutdown VM")
         ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': force})
         if verify:
             wait_for(self.is_halted, "Wait for VM halted")
         return ret
 
     def reboot(self, force=False, verify=False):
-        print("Reboot VM")
+        logging.info("Reboot VM")
         ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': force})
         if verify:
             # No need to verify that the reboot actually happened because the xe command
@@ -651,7 +672,7 @@ class VM(BaseVM):
         if not ip or ip.startswith('169.254.'):
             return False
         else:
-            print("VM IP: %s" % ip)
+            logging.info("VM IP: %s" % ip)
             self.ip = ip
             return True
 
@@ -695,29 +716,29 @@ class VM(BaseVM):
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
     def ssh_touch_file(self, filepath):
-        print("Create file on VM (%s)" % filepath)
+        logging.info("Create file on VM (%s)" % filepath)
         self.ssh(['touch', filepath])
-        print("Check file created")
+        logging.info("Check file created")
         self.ssh(['test -f ' + filepath])
 
     def suspend(self, verify=False):
-        print("Suspend VM")
+        logging.info("Suspend VM")
         self.host.xe('vm-suspend', {'uuid': self.uuid})
         if verify:
             wait_for(self.is_suspended, "Wait for VM suspended")
 
     def resume(self):
-        print("Resume VM")
+        logging.info("Resume VM")
         self.host.xe('vm-resume', {'uuid': self.uuid})
 
     def pause(self, verify=False):
-        print("Pause VM")
+        logging.info("Pause VM")
         self.host.xe('vm-pause', {'uuid': self.uuid})
         if verify:
             wait_for(self.is_paused, "Wait for VM paused")
 
     def unpause(self):
-        print("Unpause VM")
+        logging.info("Unpause VM")
         self.host.xe('vm-unpause', {'uuid': self.uuid})
 
     def _disk_list(self):
@@ -761,19 +782,19 @@ class VM(BaseVM):
         if sr is not None:
             msg += " (SR: %s)" % sr.uuid
             params['sr'] = sr.uuid
-        print(msg)
+        logging.info(msg)
         xo_cli('vm.migrate', params)
         self.previous_host = self.host
         self.host = target_host
 
     def snapshot(self):
-        print("Snapshot VM")
+        logging.info("Snapshot VM")
         return Snapshot(self.host.xe('vm-snapshot', {'uuid': self.uuid,
                                                      'new-name-label': 'Snapshot of %s' % self.uuid}),
                         self.host)
 
     def checkpoint(self):
-        print("Checkpoint VM")
+        logging.info("Checkpoint VM")
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
                                                        'new-name-label': 'Checkpoint of %s' % self.uuid}),
                         self.host)
@@ -871,7 +892,7 @@ class VM(BaseVM):
             snapshot.revert()
             self.start()
             self.wait_for_vm_running_and_ssh_up()
-            print("Check file does not exist anymore")
+            logging.info("Check file does not exist anymore")
             self.ssh(['test ! -f ' + filepath])
         finally:
             snapshot.destroy(verify=True)
@@ -960,9 +981,9 @@ class VM(BaseVM):
 
     def clone(self):
         name = self.name() + '_clone_for_tests'
-        print("Clone VM")
+        logging.info("Clone VM")
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
-        print("New VM: %s (%s)" % (uuid, name))
+        logging.info("New VM: %s (%s)" % (uuid, name))
         return VM(uuid, self.host)
 
 class Snapshot(BaseVM):
@@ -970,11 +991,11 @@ class Snapshot(BaseVM):
         return self.host.xe('snapshot-disk-list', {'uuid': self.uuid}, minimal=True)
 
     def destroy(self, verify=False):
-        print("Delete snapshot " + self.uuid)
+        logging.info("Delete snapshot " + self.uuid)
         # that uninstall command apparently works better for snapshots than for VMs apparently
         self.host.xe('snapshot-uninstall', {'uuid': self.uuid, 'force': True})
         if verify:
-            print("Check snapshot doesn't exist anymore")
+            logging.info("Check snapshot doesn't exist anymore")
             assert not self.exists()
 
 #     def _destroy(self):
@@ -984,7 +1005,7 @@ class Snapshot(BaseVM):
         return self.host.pool_has_vm(self.uuid, vm_type='snapshot')
 
     def revert(self):
-        print("Revert snapshot")
+        logging.info("Revert snapshot")
         self.host.xe('snapshot-revert', {'uuid': self.uuid})
 
 class VIF:
@@ -1004,7 +1025,7 @@ class SR:
         return self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True).split(',')
 
     def unplug_pbds(self, force=False):
-        print("Unplug PBDs")
+        logging.info("Unplug PBDs")
         for pbd_uuid in self.pbd_uuids():
             try:
                 self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
@@ -1013,7 +1034,7 @@ class SR:
                 # if force is set.
                 if not force:
                     raise
-                print('Ignore exception during PBD unplug: {}'.format(e))
+                logging.warning('Ignore exception during PBD unplug: {}'.format(e))
 
     def all_pbds_attached(self):
         all_attached = True
@@ -1023,7 +1044,7 @@ class SR:
         return all_attached
 
     def plug_pbds(self, verify=True):
-        print("Attach PBDs")
+        logging.info("Attach PBDs")
         for pbd_uuid in self.pbd_uuids():
             self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
         if verify:
@@ -1031,21 +1052,21 @@ class SR:
 
     def destroy(self, verify=False, force=False):
         self.unplug_pbds(force)
-        print("Destroy SR " + self.uuid)
+        logging.info("Destroy SR " + self.uuid)
         self.pool.master.xe('sr-destroy', {'uuid': self.uuid})
         if verify:
             wait_for_not(self.exists, "Wait for SR destroyed")
 
     def forget(self, force=False):
         self.unplug_pbds(force)
-        print("Forget SR " + self.uuid)
+        logging.info("Forget SR " + self.uuid)
         self.pool.master.xe('sr-forget', {'uuid': self.uuid})
 
     def exists(self):
         return self.pool.master.xe('sr-list', {'uuid': self.uuid}, minimal=True) == self.uuid
 
     def scan(self):
-        print("Scan SR " + self.uuid)
+        logging.info("Scan SR " + self.uuid)
         self.pool.master.xe('sr-scan', {'uuid': self.uuid})
 
     def hosts_uuids(self):

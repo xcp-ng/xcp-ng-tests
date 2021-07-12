@@ -1,6 +1,8 @@
-import pytest
-from lib.common import SSHCommandFailed, wait_for, vm_image
+import logging
 import time
+import pytest
+
+from lib.common import SSHCommandFailed, wait_for, vm_image
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -21,7 +23,7 @@ class TestXFSSRCreateDestroy:
         try:
             sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
         except Exception:
-            print("SR creation failed, as expected.")
+            logging.info("SR creation failed, as expected.")
         if sr is not None:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
@@ -73,11 +75,11 @@ class TestXFSSR:
                 sr.scan()
                 assert False, "SR scan should have failed"
             except SSHCommandFailed:
-                print("SR scan failed as expected.")
+                logging.info("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR
             time.sleep(10)
-            print("Assert PBD not attached")
+            logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['xfsprogs'])
             xfsprogs_installed = True

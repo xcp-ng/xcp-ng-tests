@@ -1,7 +1,9 @@
-from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
-from lib.common import SSHCommandFailed, wait_for, vm_image
+import logging
 import pytest
 import time
+
+from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
+from lib.common import SSHCommandFailed, wait_for, vm_image
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -30,7 +32,7 @@ class TestLinstorSRCreateDestroy:
                 pass
             assert False, "SR creation should not have succeeded!"
         except SSHCommandFailed as e:
-            print("SR creation failed, as expected: {}".format(e))
+            logging.info("SR creation failed, as expected: {}".format(e))
 
     def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
@@ -80,11 +82,11 @@ class TestLinstorSR:
                 sr.scan()
                 assert False, "SR scan should have failed"
             except SSHCommandFailed:
-                print("SR scan failed as expected.")
+                logging.info("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR
             time.sleep(10)
-            print("Assert PBD not attached")
+            logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(packages)
             linstor_installed = True

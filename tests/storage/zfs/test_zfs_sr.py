@@ -1,7 +1,9 @@
+import logging
+import time
 import pytest
+
 from conftest import VOLUME_PATH, VOLUME_NAME
 from lib.common import SSHCommandFailed, wait_for, vm_image
-import time
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -23,7 +25,7 @@ class TestZFSSRCreateDestroy:
         try:
             sr = host.sr_create('zfs', "ZFS-local-SR", {'location': VOLUME_PATH})
         except Exception:
-            print("SR creation failed, as expected.")
+            logging.info("SR creation failed, as expected.")
         if sr is not None:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
@@ -75,11 +77,11 @@ class TestZFSSR:
                 sr.scan()
                 assert False, "SR scan should have failed"
             except SSHCommandFailed:
-                print("SR scan failed as expected.")
+                logging.info("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR
             time.sleep(10)
-            print("Assert PBD not attached")
+            logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['zfs'])
             host.ssh(['modprobe', 'zfs'])
@@ -103,11 +105,11 @@ class TestZFSSR:
                 sr.scan()
                 assert False, "SR scan should have failed"
             except SSHCommandFailed:
-                print("SR scan failed as expected.")
+                logging.info("SR scan failed as expected.")
             host.reboot(verify=True)
             # give the host some time to try to attach the SR
             time.sleep(10)
-            print("Assert PBD not attached")
+            logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.ssh(['zpool', 'import', VOLUME_NAME])
             zpool_imported = True

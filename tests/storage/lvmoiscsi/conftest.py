@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 @pytest.fixture(scope='session')
@@ -27,9 +28,8 @@ def lvmoiscsi_sr(host, lvmoiscsi_device_config):
 
 @pytest.fixture(scope='module')
 def vm_on_lvmoiscsi_sr(host, lvmoiscsi_sr, vm_ref):
-    print(">> ", end='')
     vm = host.import_vm(vm_ref, sr_uuid=lvmoiscsi_sr.uuid)
     yield vm
     # teardown
-    print("<< Destroy VM")
+    logging.info("<< Destroy VM")
     vm.destroy(verify=True)
