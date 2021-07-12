@@ -65,15 +65,15 @@ def pytest_addoption(parser):
         help="Ignore SSH banners when SSH commands are executed"
     )
     parser.addoption(
-        "--ssh-debug-output-max-lines",
+        "--ssh-output-max-lines",
         action="store",
         default=20,
-        help="Max lines to output in a debug log (0 if no limit)"
+        help="Max lines to output in a ssh log (0 if no limit)"
     )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
-    global_config.max_log_lines = int(config.getoption('--ssh-debug-output-max-lines'))
+    global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
 def host_data(hostname_or_ip):
     # read from data.py

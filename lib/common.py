@@ -84,6 +84,19 @@ class SSHResult:
         self.returncode = returncode
         self.stdout = stdout
 
+def _ellide_log_lines(log):
+    if log == '':
+        return log
+
+    if config.ssh_output_max_lines < 1:
+        return "\n{}".format(log)
+
+    reduced_message = log.split("\n")
+    if len(reduced_message) > config.ssh_output_max_lines:
+        reduced_message = reduced_message[:config.ssh_output_max_lines - 1]
+        reduced_message.append("(...)")
+    return "\n{}".format("\n".join(reduced_message))
+
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
         background=False, target_os='linux'):
     options = []
@@ -148,17 +161,7 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
             if check:
                 raise SSHCommandFailed(res.returncode, stdout, command)
         else:
-            debug_msg = "[{}] {}".format(hostname_or_ip, command)
-            if stripped_stdout != '':
-                if config.max_log_lines > 0:
-                    reduced_message = stripped_stdout.split("\n")
-                    if len(reduced_message) > config.max_log_lines:
-                        reduced_message = reduced_message[:config.max_log_lines - 1]
-                        reduced_message.append("(...)")
-                    debug_msg += "\n{}".format("\n".join(reduced_message))
-                else:
-                    debug_msg += "\n{}".format(stripped_stdout)
-            logging.debug(debug_msg)
+            logging.debug("[{}] {}".format(hostname_or_ip, command) + _ellide_log_lines(stripped_stdout))
 
         if simple_output:
             return stripped_stdout
