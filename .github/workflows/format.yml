@@ -3,7 +3,7 @@ name: Check coding style
 on: [push]
 
 jobs:
-  build:
+  pycodestyle:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -12,11 +12,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pycodestyle pydocstyle
+        pip install pycodestyle
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: pycodestyle
       run: |
         pycodestyle
+
+  pydocstyle:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pydocstyle
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: pydocstyle
       run: |
         pydocstyle
