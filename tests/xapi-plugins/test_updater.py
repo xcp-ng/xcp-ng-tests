@@ -1,5 +1,11 @@
 import json
 
+# Requirements:
+# From --hosts parameter:
+# - host(A1): first XCP-ng host > 8.2.
+# And:
+# - access to XCP-ng RPM repository from hostA1
+
 class TestUpdate:
     def test_check_update(self, host):
         host.call_plugin('updater.py', 'check_update')
