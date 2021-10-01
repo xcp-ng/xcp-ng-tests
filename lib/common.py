@@ -540,6 +540,13 @@ class Host:
     def hostname(self):
         return self.ssh(['hostname'])
 
+    def call_plugin(self, plugin_name, function, args=None):
+        params = {'host-uuid': self.uuid, 'plugin': plugin_name, 'fn': function}
+        if args is not None:
+            for k, v in args.items():
+                params['args:%s' % k] = v
+        return self.xe('host-call-plugin', params)
+
 class BaseVM:
     """ Base class for VM and Snapshot. """
 
