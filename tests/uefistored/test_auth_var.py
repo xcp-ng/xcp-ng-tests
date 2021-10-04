@@ -53,5 +53,5 @@ def test_auth_variable(imported_vm):
     # Set the variable with new data, signed by the same cert
     set_and_assert_var(vm, cert, b'new data', should_pass=True)
 
-    # Set the variable with new data, signed by the same cert
+    # Set the variable with new data, signed by a different cert
     set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
