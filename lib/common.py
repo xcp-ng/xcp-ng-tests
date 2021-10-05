@@ -98,7 +98,7 @@ def _ellide_log_lines(log):
     return "\n{}".format("\n".join(reduced_message))
 
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-        background=False, target_os='linux'):
+        background=False, target_os='linux', decode=True):
     options = []
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
@@ -143,29 +143,34 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
             check=False
         )
 
+        # get a decoded version of the output in any case, replacing potential errors
+        output_for_logs = res.stdout.decode(errors='replace').strip()
+
         # Even if check is False, we still raise in case of return code 255, which means a SSH error.
         if res.returncode == 255:
-            raise SSHCommandFailed(255, "SSH Error: %s" % res.stdout.decode(), command)
-        stdout = res.stdout.decode()
+            raise SSHCommandFailed(255, "SSH Error: %s" % output_for_logs, command)
 
+        output = res.stdout
         if config.ignore_ssh_banner:
             if banner_res.returncode == 255:
-                raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(), command)
-            stdout = stdout[len(banner_res.stdout.decode()):]
+                raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
+            output = output[len(banner_res.stdout):]
 
-        stripped_stdout = stdout.strip()
+        if decode:
+            output = output.decode()
+
         if res.returncode:
-            logging.debug("[{}] Got error code: {}, stdout: '{}' while running {}".format(
-                hostname_or_ip, res.returncode, stripped_stdout, command
+            logging.debug("[{}] Got error code: {}, output: '{}' while running {}".format(
+                hostname_or_ip, res.returncode, output_for_logs, command
             ))
             if check:
-                raise SSHCommandFailed(res.returncode, stdout, command)
+                raise SSHCommandFailed(res.returncode, output_for_logs, command)
         else:
-            logging.debug("[{}] {}".format(hostname_or_ip, command) + _ellide_log_lines(stripped_stdout))
+            logging.debug("[{}] {}".format(hostname_or_ip, command) + _ellide_log_lines(output_for_logs))
 
         if simple_output:
-            return stripped_stdout
-        return SSHResult(res.returncode, stdout)
+            return output.strip()
+        return SSHResult(res.returncode, output)
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
     options = ""
@@ -259,9 +264,11 @@ class Host:
         else:
             self.pool = pool
 
-    def ssh(self, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True, background=False):
+    def ssh(self, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+            background=False, decode=True):
         return ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
-                   suppress_fingerprint_warnings=suppress_fingerprint_warnings, background=background)
+                   suppress_fingerprint_warnings=suppress_fingerprint_warnings, background=background,
+                   decode=decode)
 
     def ssh_with_result(self, cmd):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
@@ -683,10 +690,11 @@ class VM(BaseVM):
             self.ip = ip
             return True
 
-    def ssh(self, cmd, check=True, simple_output=True, background=False):
+    def ssh(self, cmd, check=True, simple_output=True, background=False, decode=True):
         # raises by default for any nonzero return code
         target_os = "windows" if self.is_windows else "linux"
-        return ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background, target_os=target_os)
+        return ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
+                   target_os=target_os, decode=decode)
 
     def ssh_with_result(self, cmd):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
@@ -973,7 +981,8 @@ class VM(BaseVM):
                 'do', 'echo', '$file', '$(head', '-c', magicsz, '$file);',
                 'done'
             ],
-            simple_output=False).stdout.split(b'\n')
+            simple_output=False,
+            decode=False).stdout.split(b'\n')
 
         magic = EFI_HEADER_MAGIC.encode('ascii')
         binaries = []
