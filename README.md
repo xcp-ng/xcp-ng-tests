@@ -66,6 +66,14 @@ Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those 
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
+### Test log level
+
+Using `pytest` you can choose to change the log level that appears in your console with the [`--log-cli-level` option](https://docs.pytest.org/en/latest/how-to/logging.html#live-logs).
+
+To log to a file you can use `--log-file` option and choose the level with `--log-file-level`.
+
+More info about pytest logging available here: https://docs.pytest.org/en/latest/how-to/logging.html.
+
 ## VM setup
 Many tests expect VMs with:
 * OpenSSH server installed and accepting pubkey authentication for the `root` user
