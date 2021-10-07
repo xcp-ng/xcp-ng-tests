@@ -8,6 +8,13 @@ from lib.efi import (
     EFI_AT_ATTRS_BYTES,
 )
 
+# Requirements:
+# On the test runner:
+# - See requirements documented in the project's README.md for Guest UEFI Secure Boot tests
+# From --hosts parameter:
+# - host: XCP-ng host >= 8.2 (+ updates)
+# From --vm parameter
+# - A UEFI VM to import
 
 def set_and_assert_var(vm, cert, new, should_pass):
     var = 'myvariable'

@@ -10,7 +10,7 @@ from uuid import UUID
 
 import lib.commands as commands
 import lib.config as config
-from lib.efi import EFIAuth, EFI_HEADER_MAGIC
+import lib.efi as efi
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
@@ -92,6 +92,7 @@ class Pool:
                 host.initialize(pool=self)
                 self.hosts.append(host)
         self.uuid = self.master.xe('pool-list', minimal=True)
+        self.saved_uefi_certs = None
 
     def hosts_uuids(self):
         return self.master.xe('host-list', {}, minimal=True).split(',')
@@ -110,6 +111,93 @@ class Pool:
         if len(uuids) > 0:
             return SR(uuids[0], self)
         return None
+
+    def save_uefi_certs(self):
+        logging.info('Saving pool UEFI certificates')
+        saved_certs = {
+            'PK': self.master.ssh(['mktemp']),
+            'KEK': self.master.ssh(['mktemp']),
+            'db': self.master.ssh(['mktemp']),
+            'dbx': self.master.ssh(['mktemp'])
+        }
+        # save the pool certs in temporary files on master host
+        for cert in list(saved_certs.keys()):
+            tmp_file = saved_certs[cert]
+            try:
+                self.master.ssh(['secureboot-certs', 'extract', cert, tmp_file])
+            except commands.SSHCommandFailed as e:
+                if "does not exist in XAPI pool DB" in e.stdout:
+                    # there's no cert to save
+                    self.master.ssh(['rm', '-f', tmp_file])
+                    del saved_certs[cert]
+        # Either there are no certs at all, or there must be at least PK, KEK and db,
+        # else we won't be able to restore the exact same state
+        if len(saved_certs) == 0 or ('PK' in saved_certs and 'KEK' in saved_certs and 'db' in saved_certs):
+            self.saved_uefi_certs = saved_certs
+            logging.info('Pool UEFI certificates state saved: %s'
+                         % (' '.join(saved_certs.keys()) if saved_certs else 'no certs'))
+        else:
+            for tmp_file in saved_certs.values():
+                self.master.ssh(['rm', '-f', tmp_file])
+            raise Exception(
+                (
+                    "Can't save pool UEFI certs. Only %s certs are defined, "
+                    "which wouldn't be restorable as is with secureboot-certs install"
+                )
+                % ' & '.join(saved_certs.keys())
+            )
+
+    def restore_uefi_certs(self):
+        assert self.saved_uefi_certs is not None
+        if len(self.saved_uefi_certs) == 0:
+            logging.info('We need to clear pool UEFI certificates to restore initial state')
+            self.clear_uefi_certs()
+        else:
+            assert 'PK' in self.saved_uefi_certs and 'KEK' in self.saved_uefi_certs and 'db' in self.saved_uefi_certs
+            logging.info('Restoring pool UEFI certificates: ' + ' '.join(self.saved_uefi_certs.keys()))
+            # restore certs
+            params = [self.saved_uefi_certs['PK'], self.saved_uefi_certs['KEK'], self.saved_uefi_certs['db']]
+            if 'dbx' in self.saved_uefi_certs:
+                params.append(self.saved_uefi_certs['dbx'])
+            else:
+                params.append('none')
+            self.master.ssh(['secureboot-certs', 'install'] + params)
+            # remove files from host
+            for tmp_file in self.saved_uefi_certs.values():
+                self.master.ssh(['rm', '-f', tmp_file])
+            self.saved_uefi_certs = None
+
+    def clear_uefi_certs(self):
+        logging.info('Clearing pool UEFI certificates in XAPI and on hosts disks')
+        self.master.ssh(['secureboot-certs', 'clear'])
+        # remove files on each host
+        for host in self.hosts:
+            host.ssh(['rm', '-f', '/var/lib/uefistored/*'])
+
+    def install_custom_uefi_certs(self, auths):
+        host = self.master
+        auths_dict = {}
+
+        try:
+            for auth in auths:
+                tmp_file_on_host = host.ssh(['mktemp'])
+                host.scp(auth.auth, tmp_file_on_host)
+                auths_dict[auth.name] = tmp_file_on_host
+
+            assert 'PK' in auths_dict
+            assert 'KEK' in auths_dict
+            assert 'db' in auths_dict
+
+            logging.info('Installing auths to pool: %s' % list(auths_dict.keys()))
+            params = [auths_dict['PK'], auths_dict['KEK'], auths_dict['db']]
+            if 'dbx' in auths_dict:
+                params.append(auths_dict['dbx'])
+            else:
+                params.append('none')
+
+            host.ssh(['secureboot-certs', 'install'] + params)
+        finally:
+            host.ssh(['rm', '-f'] + list(auths_dict.values()))
 
 class Host:
     def __init__(self, hostname_or_ip):
@@ -799,7 +887,7 @@ class VM(BaseVM):
         for msg in msgs:
             self.host.xe('message-destroy', {'uuid': msg})
 
-    def sign_efi_bins(self, db: EFIAuth):
+    def sign_efi_bins(self, db: efi.EFIAuth):
         with tempfile.TemporaryDirectory() as directory:
             for remote_bin in self.get_all_efi_bins():
                 local_bin = os.path.join(directory, os.path.basename(remote_bin))
@@ -843,7 +931,7 @@ class VM(BaseVM):
             self.sign(f)
 
     def get_all_efi_bins(self):
-        magicsz = str(len(EFI_HEADER_MAGIC))
+        magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
             [
                 'for', 'file', 'in', '$(find', '/boot', '-type', 'f);',
@@ -853,7 +941,7 @@ class VM(BaseVM):
             simple_output=False,
             decode=False).stdout.split(b'\n')
 
-        magic = EFI_HEADER_MAGIC.encode('ascii')
+        magic = efi.EFI_HEADER_MAGIC.encode('ascii')
         binaries = []
         for f in files:
             if magic in f:
@@ -870,6 +958,55 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         logging.info("New VM: %s (%s)" % (uuid, name))
         return VM(uuid, self.host)
+
+    def install_uefi_certs(self, auths):
+        """
+        Install UEFI certs to the VM's NVRAM store.
+
+        The auths parameter is a list of EFIAuth objects.
+        Their attributes are:
+        - name: 'PK', 'KEK', 'db' or 'dbx'
+        - auth: path to a local file on the tester's environment
+        """
+        for auth in auths:
+            assert auth.name in ['PK', 'KEK', 'db', 'dbx']
+        logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
+        for auth in auths:
+            dest = self.host.ssh(['mktemp'])
+            self.host.scp(auth.auth, dest)
+            self.host.ssh([
+                'varstore-set', self.uuid, efi.EFI_GUID_STRS[auth.name], auth.name,
+                str(efi.EFI_AT_ATTRS), dest
+            ])
+            self.host.ssh(['rm', '-f', dest])
+
+    def booted_with_secureboot(self):
+        """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
+        if not self.is_uefi:
+            return False
+        if self.is_windows:
+            output = self.ssh(['powershell.exe', 'Confirm-SecureBootUEFI'])
+            if output == 'True':
+                return True
+            if output == 'False':
+                return False
+            raise Exception(
+                "Output of powershell.exe Confirm-SecureBootUEFI should be either True or False. "
+                "Got: %s" % output
+            )
+        else:
+            last_byte = self.ssh(
+                ["tail", "-c1", "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"],
+                decode=False
+            )
+            if last_byte == b'\x01':
+                return True
+            if last_byte == b'\x00':
+                return False
+            raise Exception(
+                "SecureBoot's hexadecimal value should have been either b'\\x01' or b'\\x00'. "
+                "Got: %r" % last_byte
+            )
 
 class Snapshot(BaseVM):
     def _disk_list(self):
