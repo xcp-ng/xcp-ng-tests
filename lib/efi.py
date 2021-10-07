@@ -195,7 +195,7 @@ def sign_efi_sig_db(sig_db, var, key, cert, time=None, guid=None):
         0,
     )
 
-    logging.info(
+    logging.debug(
         'Timestamp is %d-%d-%d %02d:%02d:%02d'
         % (time.year, time.month, time.day, time.hour, time.minute, time.second)
     )
@@ -209,7 +209,7 @@ def sign_efi_sig_db(sig_db, var, key, cert, time=None, guid=None):
     payload = var_utf16 + bytes(guid) + attributes + timestamp + sig_db
 
     logging.debug('Signature DB Size: %d' % len(sig_db))
-    logging.info('Authentication Payload size %d' % len(payload))
+    logging.debug('Authentication Payload size %d' % len(payload))
 
     p7 = sign(payload, key, cert)
 
