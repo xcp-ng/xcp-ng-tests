@@ -1,6 +1,6 @@
 import pytest
 
-from lib.common import SSHCommandFailed
+from lib.commands import SSHCommandFailed
 from lib.efi import (
     Certificate,
     EFI_GLOBAL_VARIABLE_GUID,
