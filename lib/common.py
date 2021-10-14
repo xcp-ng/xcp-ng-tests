@@ -960,7 +960,7 @@ class VM(BaseVM):
         if not self.file_exists(efivarfs):
             return 0, b''
 
-        data = self.ssh(['cat', efivarfs], simple_output=False).stdout
+        data = self.ssh(['cat', efivarfs], simple_output=False, decode=False).stdout
 
         # The efivarfs file starts with the attributes, which are 4 bytes long
         return data[:4], data[4:]
