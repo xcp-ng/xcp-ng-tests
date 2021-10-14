@@ -2,7 +2,8 @@ import logging
 import os
 import pytest
 
-from lib.common import SSHCommandFailed, wait_for
+from lib.commands import SSHCommandFailed
+from lib.common import wait_for
 from lib.efi import EFIAuth, EFI_AT_ATTRS, EFI_AT_ATTRS_BYTES, EFI_GUID_STRS
 
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'

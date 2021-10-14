@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from lib.common import SSHCommandFailed
+from lib.commands import SSHCommandFailed
 
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 

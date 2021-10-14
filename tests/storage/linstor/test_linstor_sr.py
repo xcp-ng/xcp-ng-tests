@@ -3,7 +3,8 @@ import pytest
 import time
 
 from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
-from lib.common import SSHCommandFailed, wait_for, vm_image
+from lib.commands import SSHCommandFailed
+from lib.common import wait_for, vm_image
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR

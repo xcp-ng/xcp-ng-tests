@@ -1,6 +1,7 @@
 import pytest
 
-from lib.common import SSHCommandFailed, wait_for, wait_for_not
+from lib.commands import SSHCommandFailed
+from lib.common import wait_for, wait_for_not
 # The pool needs a shared SR to use `host.evacuate`
 from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
 

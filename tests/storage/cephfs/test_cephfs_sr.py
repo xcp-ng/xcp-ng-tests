@@ -2,7 +2,8 @@ import logging
 import pytest
 import time
 
-from lib.common import SSHCommandFailed, wait_for, vm_image
+from lib.commands import SSHCommandFailed
+from lib.common import wait_for, vm_image
 
 # Requirements:
 # - one XCP-ng host >= 8.2
