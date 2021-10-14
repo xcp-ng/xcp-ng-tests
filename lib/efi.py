@@ -10,12 +10,13 @@ import shlex
 import shutil
 import struct
 from datetime import datetime, timedelta
-from subprocess import check_call
 from tempfile import TemporaryDirectory
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
+
+import lib.commands as commands
 
 EFI_HEADER_MAGIC = 'MZ'
 
@@ -268,8 +269,8 @@ def pesign(key, cert, name, image):
         # Setup pesign cert dir. commands taken from:
         #     https://en.opensuse.org/openSUSE:UEFI_Image_File_Sign_Tools
         common_name = name + ' Owner'
-        check_call(['certutil', '-N', '-d', certdir, '--empty-password'])
-        check_call([
+        commands.local_cmd(['certutil', '-N', '-d', certdir, '--empty-password'])
+        commands.local_cmd([
             'certutil', '-A', '-n', common_name, '-d', certdir, '-t',
             'CT,CT,CT', '-i', cert
         ])
@@ -278,18 +279,18 @@ def pesign(key, cert, name, image):
 
         # Create a pk12 out of the cert and key
         password = 'root'
-        check_call([
+        commands.local_cmd([
             'openssl', 'pkcs12', '-export', '-out', pk12,
             '-in', cert, '-inkey', key,
             '-passin', 'pass:' + password, '-passout', 'pass:' + password,
         ])
 
         # Enroll the pk12 to the cert database for pesign to use
-        check_call(['pk12util', '-d', certdir, '-i', pk12, '-W', password])
+        commands.local_cmd(['pk12util', '-d', certdir, '-i', pk12, '-W', password])
         signed = get_signed_name(image)
 
         # Sign the image
-        check_call([
+        commands.local_cmd([
             'pesign', '-n', certdir, '-c', common_name, '-s', '-i', image,
             '-o', signed
         ])
@@ -340,7 +341,7 @@ class EFIAuth:
         """
         if shutil.which('sbsign'):
             signed = get_signed_name(image)
-            check_call([
+            commands.local_cmd([
                 'sbsign', '--key', self.cert.key, '--cert', self.cert.pub,
                 image, '--output', signed
             ])
@@ -400,7 +401,7 @@ class Certificate:
         self.pub = os.path.join(self.tempdir.name, 'tmp.crt')
 
         if init_keys:
-            check_call([
+            commands.local_cmd([
                 'openssl', 'req', '-new', '-x509', '-newkey', 'rsa:2048',
                 '-subj', '/CN=%s/' % self.common_name, '-nodes', '-keyout',
                 self.key, '-sha256', '-days', '3650', '-out', self.pub
