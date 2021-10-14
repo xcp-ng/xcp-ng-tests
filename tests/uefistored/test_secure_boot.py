@@ -167,6 +167,16 @@ class TestGuestLinuxUEFISecureBoot:
         vm.param_set('platform', 'secureboot', True)
         boot_and_check_sb_succeeded(vm)
 
+    def test_sb_off_really_means_off(self, uefi_vm):
+        vm = uefi_vm
+        vm.install_uefi_certs([self.PK, self.KEK, self.db])
+        sign_efi_bins(vm, self.db)
+        vm.param_set('platform', 'secureboot', False)
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check that SB is NOT enabled according to the OS.")
+        assert not vm.booted_with_secureboot()
+
 
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestGuestWindowsUEFISecureBoot:
@@ -195,6 +205,63 @@ class TestGuestWindowsUEFISecureBoot:
         vm.host.ssh(['secureboot-certs', 'install'])
         boot_and_check_sb_succeeded(vm)
 
+
+@pytest.mark.usefixtures("pool_without_uefi_certs")
+class TestCertsMissingAndSbOn:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
+        vm.param_set('platform', 'secureboot', True)
+        yield
+        revert_vm_state(vm, snapshot)
+        # clear pool certs for next test
+        vm.host.pool.clear_uefi_certs()
+
+    def check_vm_start_fails_and_uefistored_dies(self, vm):
+        with pytest.raises(SSHCommandFailed) as excinfo:
+            vm.start()
+        assert 'An emulator required to run this VM failed to start' in excinfo.value.stdout
+        logging.info('Verified that uefistored killed itself to prevent the VM start')
+        wait_for(
+            lambda: vm.get_messages(VM_SECURE_BOOT_FAILED),
+            'Wait for message %s' % VM_SECURE_BOOT_FAILED,
+        )
+        # Just in case it managed to start somehow, be it in UEFI shell only
+        assert vm.is_halted()
+
+    def test_no_certs_but_sb_on(self, uefi_vm):
+        vm = uefi_vm
+        self.check_vm_start_fails_and_uefistored_dies(vm)
+
+    def test_only_pk_present_but_sb_on(self, uefi_vm):
+        vm = uefi_vm
+        PK, _, _, _ = generate_keys()
+        vm.install_uefi_certs([PK])
+        self.check_vm_start_fails_and_uefistored_dies(vm)
+
+    def test_only_pk_and_kek_present_but_sb_on(self, uefi_vm):
+        vm = uefi_vm
+        PK, KEK, _, _ = generate_keys()
+        vm.install_uefi_certs([PK, KEK])
+        self.check_vm_start_fails_and_uefistored_dies(vm)
+
+    def test_only_kek_and_db_present_but_sb_on(self, uefi_vm):
+        vm = uefi_vm
+        _, KEK, db, _ = generate_keys()
+        vm.install_uefi_certs([KEK, db])
+        self.check_vm_start_fails_and_uefistored_dies(vm)
+
+    def test_only_pk_and_db_present_but_sb_on(self, uefi_vm):
+        vm = uefi_vm
+        PK, _, db, _ = generate_keys()
+        vm.install_uefi_certs([PK, db])
+        self.check_vm_start_fails_and_uefistored_dies(vm)
+
+    def test_only_db_present_but_sb_on(self, uefi_vm):
+        vm = uefi_vm
+        _, _, db, _ = generate_keys()
+        vm.install_uefi_certs([db])
+        self.check_vm_start_fails_and_uefistored_dies(vm)
 
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestUEFIKeyExchange:
