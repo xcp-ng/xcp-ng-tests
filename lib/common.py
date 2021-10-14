@@ -66,23 +66,43 @@ def xo_object_exists(uuid):
     lst = json.loads(xo_cli('--list-objects', {'uuid': uuid}))
     return len(lst) > 0
 
-class SSHCommandFailed(Exception):
+class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
 
-    def __init__(self, returncode, stdout, cmd):
-        super(SSHCommandFailed, self).__init__(
-            'SSH command ({}) failed with return code {}: {}'.format(cmd, returncode, stdout)
-        )
+    def __init__(self, returncode, stdout, cmd, exception_msg):
+        super(BaseCommandFailed, self).__init__(exception_msg)
         self.returncode = returncode
         self.stdout = stdout
         self.cmd = cmd
 
-class SSHResult:
+class SSHCommandFailed(BaseCommandFailed):
+    def __init__(self, returncode, stdout, cmd):
+        super(SSHCommandFailed, self).__init__(
+            returncode, stdout, cmd,
+            f'SSH command ({cmd}) failed with return code {returncode}: {stdout}'
+        )
+
+class LocalCommandFailed(BaseCommandFailed):
+    def __init__(self, returncode, stdout, cmd):
+        super(SSHCommandFailed, self).__init__(
+            returncode, stdout, cmd,
+            f'Local command ({cmd}) failed with return code {returncode}: {stdout}'
+        )
+
+class BaseCmdResult:
     __slots__ = 'returncode', 'stdout'
 
     def __init__(self, returncode, stdout):
         self.returncode = returncode
         self.stdout = stdout
+
+class SSHResult(BaseCmdResult):
+    def __init__(self, returncode, stdout):
+        super(SSHResult, self).__init__(returncode, stdout)
+
+class LocalCommandResult(BaseCmdResult):
+    def __init__(self, returncode, stdout):
+        super(LocalCommandResult, self).__init__(returncode, stdout)
 
 def _ellide_log_lines(log):
     if log == '':
@@ -194,6 +214,31 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
         raise SSHCommandFailed(res.returncode, res.stdout.decode(), command)
 
     return res
+
+def local_cmd(cmd, check=True, decode=True):
+    """ Run a command locally on tester end. """
+    res = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False
+    )
+
+    # get a decoded version of the output in any case, replacing potential errors
+    output_for_logs = res.stdout.decode(errors='replace').strip()
+
+    output = res.stdout
+    if decode:
+        output = output.decode()
+
+    errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
+    command = " ".join(cmd)
+    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+
+    if res.returncode and check:
+        raise LocalCommandFailed(res.returncode, output_for_logs, command)
+
+    return LocalCommandResult(res.returncode, output)
 
 def to_xapi_bool(b):
     return 'true' if b else 'false'
