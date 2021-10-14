@@ -159,14 +159,11 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         if decode:
             output = output.decode()
 
-        if res.returncode:
-            logging.debug("[{}] Got error code: {}, output: '{}' while running {}".format(
-                hostname_or_ip, res.returncode, output_for_logs, command
-            ))
-            if check:
-                raise SSHCommandFailed(res.returncode, output_for_logs, command)
-        else:
-            logging.debug("[{}] {}".format(hostname_or_ip, command) + _ellide_log_lines(output_for_logs))
+        errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
+        logging.debug(f"[{hostname_or_ip}] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+
+        if res.returncode and check:
+            raise SSHCommandFailed(res.returncode, output_for_logs, command)
 
         if simple_output:
             return output.strip()
