@@ -437,7 +437,7 @@ class BaseVM:
         try:
             value = self.host.xe('vm-param-get', args)
         except commands.SSHCommandFailed as e:
-            if key and accept_unknown_key and e.stdout.strip() == "Error: Key %s not found in map" % key:
+            if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
                 value = None
             else:
                 raise
