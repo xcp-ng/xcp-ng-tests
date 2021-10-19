@@ -38,7 +38,9 @@ def wait_for(fn, msg=None, timeout_secs=120, retry_delay_secs=2, invert=False):
         time_left -= retry_delay_secs
         if time_left <= 0:
             expected = 'True' if not invert else 'False'
-            raise Exception("Timeout reached while waiting for fn call to yield %s (%s)." % (expected, timeout_secs))
+            raise TimeoutError(
+                "Timeout reached while waiting for fn call to yield %s (%s)." % (expected, timeout_secs)
+            )
         time.sleep(retry_delay_secs)
 
 def wait_for_not(*args, **kwargs):
@@ -1007,6 +1009,46 @@ class VM(BaseVM):
                 "SecureBoot's hexadecimal value should have been either b'\\x01' or b'\\x00'. "
                 "Got: %r" % last_byte
             )
+
+    def is_in_uefi_shell(self):
+        """
+        Returns True if it can be established that the UEFI shell is currently running.
+
+        To achieve this, we exploit the pseudo-terminal associated with the VM's serial output, from dom0.
+        We connect to the "serial" pty of the VM, input "ver^M" and wait for an expected output.
+
+        The whole operation can take several seconds.
+        """
+        dom_id = self.param_get('dom-id')
+        pty = self.host.ssh(['xenstore-read', f'/local/domain/{dom_id}/serial/0/tty'])
+        tmp_file = self.host.ssh(['mktemp'])
+        session = f"detached-cat-{self.uuid}"
+        ret = False
+        try:
+            self.host.ssh(['screen', '-dmS', session])
+            # run `cat` on the pty in a background screen session and redirect to a tmp file.
+            # `cat` will run until we kill the session.
+            self.host.ssh(['screen', '-S', session, '-X', 'stuff', f'"cat {pty} > {tmp_file}^M"'])
+            # Send the `ver` command to the pty.
+            # The first \r is meant to give us access to the shell prompt in case we arrived
+            # before the end of the 5s countdown during the UEFI shell startup.
+            # The second \r submits the command to the UEFI shell.
+            self.host.ssh(['echo', '-e', r'"\rver\r"', '>', pty])
+            try:
+                wait_for(
+                    lambda: "UEFI Interactive Shell" in self.host.ssh(['cat', '-v', tmp_file]),
+                    "Wait for UEFI shell response in pty output",
+                    10
+                )
+                ret = True
+            except TimeoutError as e:
+                logging.debug(e)
+                pass
+        finally:
+            self.host.ssh(['screen', '-S', session, '-X', 'quit'], check=False)
+            self.host.ssh(['rm', '-f', tmp_file], check=False)
+        return ret
+
 
 class Snapshot(BaseVM):
     def _disk_list(self):
