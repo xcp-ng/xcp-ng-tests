@@ -28,8 +28,7 @@ def boot_and_check_sb_failed(vm):
 
     # If there is a VM_SECURE_BOOT_FAILED message and yet the OS still
     # successfully booted, this is a uefistored bug
-    # TODO: find a way to test that. Get the console contents and wait for UEFI shell?
-
+    assert vm.is_in_uefi_shell()
 
 def boot_and_check_no_sb_errors(vm):
     vm.start()
