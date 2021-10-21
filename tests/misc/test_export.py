@@ -2,8 +2,6 @@ import logging
 import pytest
 
 
-pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
-
 # What can be improved: control over where the exported files get written
 # and over the destination SR for VM import.
 

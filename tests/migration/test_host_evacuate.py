@@ -14,8 +14,6 @@ from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
 # From --second-network parameter
 # - second_network: A 2nd network of the pool, NOT the management interface, with PIF plugged on all hosts
 
-pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
-
 def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=False, error=""):
     source_name = source_host.xe('host-param-get', {'uuid': source_host.uuid, 'param-name': 'name-label'})
     vm.start(on=source_name)
