@@ -102,6 +102,12 @@ class Pool:
     def host_ip(self, host_uuid):
         return self.master.xe('host-param-get', {'uuid': host_uuid, 'param-name': 'address'})
 
+    def get_host_by_uuid(self, host_uuid):
+        for host in self.hosts:
+            if host.uuid == host_uuid:
+                return host
+        raise Exception(f"Host with uuid {host_uuid} not found in pool.")
+
     def first_host_that_isnt(self, host):
         for h in self.hosts:
             if h != host:
@@ -781,6 +787,11 @@ class VM(BaseVM):
 
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
+
+    def get_residence_host(self):
+        assert self.is_running()
+        host_uuid = self.param_get('resident-on')
+        return self.host.pool.get_host_by_uuid(host_uuid)
 
     def start_background_process(self, cmd):
         script = "/tmp/bg_process.sh"
