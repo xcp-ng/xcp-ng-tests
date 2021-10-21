@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import pytest
 
@@ -56,7 +57,7 @@ def sign_efi_bins(vm, db):
     if shutdown:
         vm.shutdown(verify=True)
 
-def generate_keys(self_signed=False):
+def generate_keys(self_signed=False, as_dict=False):
     logging.info('Generating keys' + (' (self signed)' if self_signed else ''))
     PK = EFIAuth('PK')
     KEK = EFIAuth('KEK')
@@ -74,7 +75,15 @@ def generate_keys(self_signed=False):
     # For our tests the dbx blacklists anything signed by the db
     dbx = EFIAuth.copy(db, name='dbx')
 
-    return PK, KEK, db, dbx
+    if as_dict:
+        return {
+            'PK': PK,
+            'KEK': KEK,
+            'db': db,
+            'dbx': dbx
+        }
+    else:
+        return PK, KEK, db, dbx
 
 def revert_vm_state(vm, snapshot):
     try:
@@ -345,3 +354,97 @@ class TestUEFIKeyExchange:
 
             if (should_succeed and not ok) or (ok and not should_succeed):
                 raise AssertionError('Failed to set {} {}'.format(i, auth.name))
+
+@pytest.mark.usefixtures("pool_without_uefi_certs")
+class TestPoolToDiskCertInheritance:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
+        yield
+        # Revert the VM, which has the interesting effect of also shutting it down instantly
+        revert_vm_state(vm, snapshot)
+        # clear pool certs for next test
+        vm.host.pool.clear_uefi_certs()
+
+    def install_certs_to_disks(self, pool, certs_dict, keys):
+        for host in pool.hosts:
+            for key in keys:
+                host.scp(certs_dict[key].auth, f'/var/lib/uefistored/{key}.auth')
+
+    def check_disk_cert_md5sum(self, host, key, reference_file):
+        auth_filepath_on_host = f'/var/lib/uefistored/{key}.auth'
+        assert host.file_exists(auth_filepath_on_host)
+        reference_md5 = hashlib.md5(open(reference_file, 'rb').read()).hexdigest()
+        host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
+        assert host_disk_md5 == reference_md5
+
+    def test_pool_certs_present_and_disk_certs_absent(self, uefi_vm):
+        vm = uefi_vm
+        # start with certs on pool and no certs on host disks
+        pool_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        # start a VM so that certs may be synced to disk if appropriate
+        vm.start()
+        residence_host = vm.get_residence_host()
+        logging.info('Check that the certs have been written on the disk of the host that started the VM.')
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+
+    def test_pool_certs_present_and_disk_certs_different(self, uefi_vm):
+        vm = uefi_vm
+        # start with different certs on pool and disks
+        pool_auths = generate_keys(as_dict=True)
+        disk_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        logging.info("Installing different certs to hosts disks")
+        self.install_certs_to_disks(vm.host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
+        # start a VM so that certs may be synced to disk if appropriate
+        vm.start()
+        residence_host = vm.get_residence_host()
+        logging.info('Check that the certs have been updated on the disk of the host that started the VM.')
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+
+    def test_pool_certs_absent_and_disk_certs_present(self, uefi_vm):
+        vm = uefi_vm
+        # start with no pool certs and with certs on disks
+        disk_auths = generate_keys(as_dict=True)
+        logging.info("Installing certs to hosts disks")
+        self.install_certs_to_disks(vm.host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
+        # start a VM so that certs may be synced to disk if appropriate
+        vm.start()
+        residence_host = vm.get_residence_host()
+        logging.info('Check that the certs on disk have not changed after the VM started.')
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_disk_cert_md5sum(residence_host, key, disk_auths[key].auth)
+
+    def test_pool_certs_present_and_some_different_disk_certs_present(self, uefi_vm):
+        vm = uefi_vm
+        # start with all certs on pool and just two certs on disks
+        pool_auths = generate_keys(as_dict=True)
+        disk_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        logging.info("Installing different certs to hosts disks")
+        self.install_certs_to_disks(vm.host.pool, disk_auths, ['KEK', 'dbx'])
+        # start a VM so that certs may be synced to disk if appropriate
+        vm.start()
+        residence_host = vm.get_residence_host()
+        logging.info('Check that the certs have been added or updated on the disk of the host that started the VM.')
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+
+    def test_pool_certs_present_except_dbx_and_disk_certs_different(self, uefi_vm):
+        vm = uefi_vm
+        # start with no dbx on pool and all, different, certs on disks
+        pool_auths = generate_keys(as_dict=True)
+        disk_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db']])
+        logging.info("Installing different certs to hosts disks, including a dbx")
+        self.install_certs_to_disks(vm.host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
+        # start a VM so that certs may be synced to disk if appropriate
+        vm.start()
+        residence_host = vm.get_residence_host()
+        logging.info('Check that the certs have been updated on the disk of the host that started the VM, except dbx.')
+        for key in ['PK', 'KEK', 'db']:
+            self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+        self.check_disk_cert_md5sum(residence_host, 'dbx', disk_auths[key].auth)
