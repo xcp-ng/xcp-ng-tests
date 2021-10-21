@@ -3,8 +3,6 @@ import pytest
 
 from lib.common import wait_for_not
 
-pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
-
 def test_pause(running_vm):
     vm = running_vm
     vm.pause(verify=True)

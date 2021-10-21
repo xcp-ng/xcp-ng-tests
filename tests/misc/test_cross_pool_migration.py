@@ -3,8 +3,6 @@ import pytest
 
 from lib.common import wait_for, wait_for_not
 
-pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
-
 def test_cross_pool_migration(host, hostB1, imported_vm):
     assert host.pool.uuid != hostB1.pool.uuid
 

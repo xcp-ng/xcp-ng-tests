@@ -25,8 +25,6 @@ def existing_shared_sr(host):
     assert sr is not None, "A shared SR on the pool is required"
     return sr
 
-pytestmark = pytest.mark.default_vm('mini-linux-x86_64-bios')
-
 @pytest.mark.incremental
 class TestBasicNoSSH:
     def test_start(self, imported_vm):
