@@ -4,7 +4,7 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
-from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES, EFI_GUID_STRS
+from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES, EFI_GUID_STRS, esl_from_auth_file
 
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 
@@ -448,3 +448,90 @@ class TestPoolToDiskCertInheritance:
         for key in ['PK', 'KEK', 'db']:
             self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
         self.check_disk_cert_md5sum(residence_host, 'dbx', disk_auths[key].auth)
+
+
+@pytest.mark.usefixtures("pool_without_uefi_certs")
+class TestPoolToVMCertInheritance:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
+        yield
+        # Revert the VM, which has the interesting effect of also shutting it down instantly
+        revert_vm_state(vm, snapshot)
+        # clear pool certs for next test
+        vm.host.pool.clear_uefi_certs()
+
+    def is_vm_cert_present(self, vm, key):
+        res = vm.host.ssh(['varstore-get', vm.uuid, EFI_GUID_STRS[key], key],
+                          check=False, simple_output=False, decode=False)
+        return res.returncode == 0
+
+    def get_md5sum_from_auth(self, auth):
+        return hashlib.md5(esl_from_auth_file(auth)).hexdigest()
+
+    def check_vm_cert_md5sum(self, vm, key, reference_file):
+        res = vm.host.ssh(['varstore-get', vm.uuid, EFI_GUID_STRS[key], key],
+                          check=False, simple_output=False, decode=False)
+        assert res.returncode == 0, f"Cert {key} must be present"
+        reference_md5 = self.get_md5sum_from_auth(reference_file)
+        assert hashlib.md5(res.stdout).hexdigest() == reference_md5
+
+    def test_pool_certs_absent_and_vm_certs_absent(self, uefi_vm):
+        vm = uefi_vm
+        # start with no certs on pool and no certs in the VM
+        # start the VM so that certs may be synced to it if appropriate
+        vm.start()
+        logging.info("Check that the VM still has no certs")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            assert not self.is_vm_cert_present(vm, key)
+
+    def test_pool_certs_present_and_vm_certs_absent(self, uefi_vm):
+        vm = uefi_vm
+        # start with certs on pool and no certs in the VM
+        pool_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        # start the VM so that certs may be synced to it if appropriate
+        vm.start()
+        logging.info("Check that the VM got the pool certs")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+
+    def test_pool_certs_present_and_vm_certs_present(self, uefi_vm):
+        vm = uefi_vm
+        # start with all certs on pool and in the VM
+        pool_auths = generate_keys(as_dict=True)
+        vm_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        # start the VM so that certs may be synced to it if appropriate
+        vm.start()
+        logging.info("Check that the VM certs are unchanged")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+
+    def test_pools_certs_absent_and_vm_certs_present(self, uefi_vm):
+        vm = uefi_vm
+        # start with no certs on pool and all certs in the VM
+        vm_auths = generate_keys(as_dict=True)
+        vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        # start the VM so that certs may be synced to it if appropriate
+        vm.start()
+        logging.info("Check that the VM certs are unchanged")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+
+    def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
+        vm = uefi_vm
+        # start with some certs on pool and some certs in the VM, partially overlaping
+        pool_auths = generate_keys(as_dict=True)
+        vm_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db']])
+        # don't ask why the VM only has db and dbx certs. It's for the test.
+        vm.install_uefi_certs([vm_auths[key] for key in ['db', 'dbx']])
+        # start the VM so that certs may be synced to it if appropriate
+        vm.start()
+        logging.info("Check that the VM db and dbx certs are unchanged and PK and KEK were updated")
+        for key in ['PK', 'KEK']:
+            self.check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+        for key in ['db', 'dbx']:
+            self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)

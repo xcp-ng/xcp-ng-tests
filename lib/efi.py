@@ -424,6 +424,30 @@ class Certificate:
         return obj
 
 
+def esl_from_auth_file(auth: str) -> bytes:
+    """
+    Return the ESL contained inside the EFI auth file.
+
+    Warning: This will break if used on any auth file containing an ESL of
+             certs of non-X509 GUID type. All of the certs used in Secure Boot are X509
+             GUID type.
+    """
+    data = b""
+    with open(auth, "rb") as f:
+        data = f.read()
+    return esl_from_auth_bytes(data)
+
+
+def esl_from_auth_bytes(auth: bytes) -> bytes:
+    """
+    Return the ESL contained inside the AUTH2 structure.
+
+    Warning: This will break if used on any ESL containing certs of non-X509 GUID type.
+             All of the certs used in Secure Boot are X509 GUID type.
+    """
+    return auth[auth.index(EFI_CERT_X509_GUID):]
+
+
 if __name__ == '__main__':
     import argparse
     import sys
