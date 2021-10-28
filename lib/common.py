@@ -122,6 +122,10 @@ class Pool:
 
     def save_uefi_certs(self):
         logging.info('Saving pool UEFI certificates')
+
+        if int(self.master.ssh(["secureboot-certs", "--version"]).split(".")[0]) < 1:
+            raise RuntimeError("The host must have secureboot-certs version >= 1.0.0")
+
         saved_certs = {
             'PK': self.master.ssh(['mktemp']),
             'KEK': self.master.ssh(['mktemp']),
