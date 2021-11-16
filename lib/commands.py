@@ -148,6 +148,10 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
         stderr=subprocess.STDOUT,
         check=False
     )
+
+    errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
+    logging.debug(f"[{hostname_or_ip}] scp: {src} => {dest}{errorcode_msg}")
+
     if check and res.returncode:
         raise SSHCommandFailed(res.returncode, res.stdout.decode(), command)
 
