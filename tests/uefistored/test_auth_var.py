@@ -12,6 +12,7 @@ from lib.efi import (
     EFI_GUID_STRS,
 )
 
+
 def set_and_assert_var(vm, cert, new, should_pass):
     var = 'myvariable'
 
@@ -34,34 +35,25 @@ def set_and_assert_var(vm, cert, new, should_pass):
         assert not ok, 'This var should not have successfully set'
 
 
-def test_auth_variable(imported_vm):
-    vm = imported_vm
-    if vm.is_windows:
-        pytest.skip('not valid test for Windows VMs')
+def test_auth_variable(running_linux_uefi_vm):
+    vm = running_linux_uefi_vm
 
-    try:
-        vm.start()
-        vm.wait_for_vm_running_and_ssh_up()
+    cert = Certificate()
 
-        cert = Certificate()
+    # Set the variable
+    set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
 
-        # Set the variable
-        set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
+    # Set the variable with new data, signed by the same cert
+    set_and_assert_var(vm, cert, b'I am new news', should_pass=True)
 
-        # Set the variable with new data, signed by the same cert
-        set_and_assert_var(vm, cert, b'I am new news', should_pass=True)
+    # Remove var
+    set_and_assert_var(vm, cert, b'', should_pass=True)
 
-        # Remove var
-        set_and_assert_var(vm, cert, b'', should_pass=True)
+    # Set the variable with new data, signed by the same cert
+    set_and_assert_var(vm, cert, b'new data', should_pass=True)
 
-        # Set the variable with new data, signed by the same cert
-        set_and_assert_var(vm, cert, b'new data', should_pass=True)
-
-        # Set the variable with new data, signed by the same cert
-        set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
-    finally:
-        if vm.is_running():
-            vm.shutdown()
+    # Set the variable with new data, signed by the same cert
+    set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
 
 
 def set_auth(vm, auth):
@@ -72,51 +64,53 @@ def set_auth(vm, auth):
     ])
 
 
+def efivar_static(vm, name, guid, file, append=False):
+    with open(file, "rb") as f:
+        fpath = vm.create_file('/tmp/%s.auth' % name, f.read(), is_temp=True)
+
+    cmd = ['-n', guid + "-" + name, '-f', fpath, '--attributes=' + hex(EFI_AT_ATTRS)]
+    if append:
+        cmd.append('--append')
+
+    vm.execute_bin('tools/efivar-static', cmd)
+
+
 def test_db_append(imported_vm):
     """Test append of UEFI variable db."""
     vm = imported_vm
-    if vm.is_windows:
-        pytest.skip('not valid test for Windows VMs')
 
-    try:
-        # Clear any SB certs
-        vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])
+    # Clear any SB certs
+    vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])
 
-        # Create and install certs
-        PK = EFIAuth('PK')
-        KEK = EFIAuth('KEK')
-        db1 = EFIAuth('db')
+    # Create and install certs
+    PK = EFIAuth('PK')
+    KEK = EFIAuth('KEK')
+    db1 = EFIAuth('db')
+    db2 = EFIAuth('db')
+    PK.sign_auth(PK)
+    PK.sign_auth(KEK)
+    KEK.sign_auth(db1)
+    KEK.sign_auth(db2)
 
-        db2 = EFIAuth('db')
-        PK.sign_auth(PK)
-        PK.sign_auth(KEK)
-        KEK.sign_auth(db1)
-        KEK.sign_auth(db2)
+    # Install normal set of certificates onto VM
+    efivar_static(vm, 'db', EFI_GUID_STRS['db'], db1.auth)
+    efivar_static(vm, 'KEK', EFI_GUID_STRS['KEK'], KEK.auth)
+    efivar_static(vm, 'PK', EFI_GUID_STRS['PK'], PK.auth)
 
-        set_auth(vm, db1)
-        set_auth(vm, KEK)
-        set_auth(vm, PK)
+    old_attrs, old_data = vm.get_efi_var('db', EFI_GUID_STRS['db'])
 
-        if not vm.is_running():
-            vm.start()
-        vm.wait_for_vm_running_and_ssh_up()
+    # Perform the append!
+    efivar_static(vm, 'db', EFI_GUID_STRS['db'], db2.auth, append=True)
 
-        guid = EFI_GUID_STRS['db']
-        old_attrs, old_data = vm.get_efi_var('db', guid)
 
-        vm.scp(db2.auth, '/tmp/db.auth')
-        name = guid + '-db'
-        vm.execute_bin('tools/efivar-static',
-                       ['-n', name, '--append', '-f', '/tmp/db.auth',
-                        '--attributes=' + hex(EFI_AT_ATTRS)]
-                       )
+    # Test that the db has been appended
+    new_attrs, new_data = vm.get_efi_var('db', EFI_GUID_STRS['db'])
 
-        new_attrs, new_data = vm.get_efi_var('db', guid)
+    # Attrs should not change
+    assert old_attrs == new_attrs
 
-        assert old_attrs == new_attrs
-        assert len(old_data) < len(new_data)
-        assert old_data in new_data
-    finally:
-        if vm.is_running():
-            vm.shutdown()
-        vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])
+    # Assert that the new data has actually been append (contains old, but also new)
+    assert len(old_data) < len(new_data)
+    assert old_data in new_data
+
+    vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])

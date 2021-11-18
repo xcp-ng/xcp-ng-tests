@@ -29,3 +29,25 @@ def imported_sb_vm(imported_vm):
     vm.host.ssh(['mv', tmp_kek, '/var/lib/uefistored/KEK.auth'], check=False)
     vm.host.ssh(['mv', tmp_db, '/var/lib/uefistored/db.auth'], check=False)
     vm.host.ssh(['mv', tmp_dbx, '/var/lib/uefistored/dbx.auth'], check=False)
+
+@pytest.fixture(scope='module')
+def running_linux_uefi_vm(imported_vm):
+    """
+    A fixture to provide a Linux UEFI VM.
+
+    The only reason that this fixture exists is that booting up a VM is a waste
+    of time if you are going to just skip a test because it is not UEFI or
+    Linux. For that reason, this fixture checks that the VM is UEFI and Linux
+    before it boots the VM.
+    """
+    vm = imported_vm
+
+    if not vm.is_uefi:
+        pytest.skip("must be a UEFI VM")
+    if vm.is_windows:
+        pytest.skip("must be a Linux VM")
+
+    vm.start()
+    vm.wait_for_os_booted()
+
+    yield vm
