@@ -1,0 +1,11 @@
+---
+- hosts: alpine_uefi_minimal_3.12.0.xva
+  remote_user: root
+  gather_facts: no
+  tasks:
+    - name: Install Python for Ansible
+      raw: test -f /usr/bin/python3 || apk add --update --no-cache python3
+
+    - name: Install util-linux and efitools
+      community.general.apk:
+        name: util-linux efitools
