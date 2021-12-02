@@ -3,6 +3,8 @@ import pytest
 from lib.commands import SSHCommandFailed
 from lib.efi import (
     Certificate,
+    EFIAuth,
+    EFI_GUID_STRS,
     EFI_GLOBAL_VARIABLE_GUID,
     EFI_GLOBAL_VARIABLE_GUID_STR,
     EFI_AT_ATTRS_BYTES,
@@ -14,7 +16,8 @@ from lib.efi import (
 # From --hosts parameter:
 # - host: XCP-ng host >= 8.2 (+ updates)
 # From --vm parameter
-# - A UEFI VM to import
+# - A Linux UEFI VM to import
+# - The UEFI VM must have efitools installed
 
 def set_and_assert_var(vm, cert, new, should_pass):
     var = 'myvariable'
@@ -38,11 +41,8 @@ def set_and_assert_var(vm, cert, new, should_pass):
         assert not ok, 'This var should not have successfully set'
 
 
-def test_auth_variable(imported_vm):
-    vm = imported_vm
-    if vm.is_windows:
-        pytest.skip('not valid test for Windows VMs')
-
+def test_auth_variable(linux_uefi_vm):
+    vm = linux_uefi_vm
     vm.start()
 
     try:
@@ -66,3 +66,42 @@ def test_auth_variable(imported_vm):
         set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
     finally:
         vm.shutdown(verify=True)
+
+
+def test_db_append(linux_uefi_vm):
+    """Pass if appending the DB succeeds. Otherwise, fail."""
+    vm = linux_uefi_vm
+
+    PK, KEK, db, db2 = EFIAuth("PK"), EFIAuth("KEK"), EFIAuth("db"), Certificate("db")
+    PK.sign_auth(PK)
+    PK.sign_auth(KEK)
+    KEK.sign_auth(db)
+
+    vm.install_uefi_certs([PK, KEK, db])
+    vm.start()
+    vm.wait_for_os_booted()
+
+    assert vm.ssh_with_result(["which", "efi-updatevar"]).returncode == 0, "This test requires efi-updatevar"
+
+    vm_kek_key = vm.ssh(['mktemp'])
+    vm.scp(KEK.cert.key, vm_kek_key)
+
+    vm_db_cert = vm.ssh(['mktemp'])
+    vm.scp(db2.pub, vm_db_cert)
+
+    _, old = vm.get_efi_var(db.name, db.guid)
+
+    vm.ssh([
+        "chattr",
+        "-i",
+        "/sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f"
+    ])
+
+    vm.ssh(["efi-updatevar", "-k", vm_kek_key, "-c", vm_db_cert, "-a", "db"])
+
+    _, new = vm.get_efi_var(db.name, EFI_GUID_STRS[db.name])
+
+    vm.shutdown(verify=True)
+
+    assert len(new) > len(old)
+    assert old in new

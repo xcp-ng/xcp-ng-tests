@@ -39,3 +39,11 @@ def uefi_vm_and_snapshot(imported_vm):
 def uefi_vm(uefi_vm_and_snapshot):
     vm, _ = uefi_vm_and_snapshot
     yield vm
+
+@pytest.fixture(scope='module')
+def linux_uefi_vm(uefi_vm):
+    vm = uefi_vm
+    if vm.is_windows:
+        pytest.skip("linux_uefi_vm can only be used on Linux VMs")
+
+    yield vm
