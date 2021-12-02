@@ -44,21 +44,25 @@ def test_auth_variable(imported_vm):
         pytest.skip('not valid test for Windows VMs')
 
     vm.start()
-    vm.wait_for_vm_running_and_ssh_up()
 
-    cert = Certificate()
+    try:
+        vm.wait_for_vm_running_and_ssh_up()
 
-    # Set the variable
-    set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
+        cert = Certificate()
 
-    # Set the variable with new data, signed by the same cert
-    set_and_assert_var(vm, cert, b'I am new news', should_pass=True)
+        # Set the variable
+        set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
 
-    # Remove var
-    set_and_assert_var(vm, cert, b'', should_pass=True)
+        # Set the variable with new data, signed by the same cert
+        set_and_assert_var(vm, cert, b'I am new news', should_pass=True)
 
-    # Set the variable with new data, signed by the same cert
-    set_and_assert_var(vm, cert, b'new data', should_pass=True)
+        # Remove var
+        set_and_assert_var(vm, cert, b'', should_pass=True)
 
-    # Set the variable with new data, signed by a different cert
-    set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
+        # Set the variable with new data, signed by the same cert
+        set_and_assert_var(vm, cert, b'new data', should_pass=True)
+
+        # Set the variable with new data, signed by a different cert
+        set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
+    finally:
+        vm.shutdown(verify=True)
