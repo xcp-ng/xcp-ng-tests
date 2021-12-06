@@ -139,6 +139,16 @@ def hostB1(hosts):
     yield _hostB1
 
 @pytest.fixture(scope='session')
+def local_sr_on_hostA1(hostA1):
+    """ A local SR on the pool's master. """
+    srs = hostA1.local_vm_srs()
+    assert len(srs) > 0, "a local SR is required on the pool's master"
+    # use the first local SR found
+    sr = srs[0]
+    logging.info(">> local SR on hostA1 present : %s" % sr.uuid)
+    yield sr
+
+@pytest.fixture(scope='session')
 def local_sr_on_hostA2(hostA2):
     """ A local SR on the pool's second host. """
     srs = hostA2.local_vm_srs()
