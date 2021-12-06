@@ -771,11 +771,12 @@ class VM(BaseVM):
         self.previous_host = self.host
         self.host = target_host
 
-    def snapshot(self):
+    def snapshot(self, ignore_vdis=None):
         logging.info("Snapshot VM")
-        return Snapshot(self.host.xe('vm-snapshot', {'uuid': self.uuid,
-                                                     'new-name-label': 'Snapshot of %s' % self.uuid}),
-                        self.host)
+        args = {'uuid': self.uuid, 'new-name-label': 'Snapshot of %s' % self.uuid}
+        if ignore_vdis:
+            args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
+        return Snapshot(self.host.xe('vm-snapshot', args), self.host)
 
     def checkpoint(self):
         logging.info("Checkpoint VM")
