@@ -933,12 +933,12 @@ class VM(BaseVM):
         efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
 
         if not self.file_exists(efivarfs):
-            return 0, b''
+            return b''
 
         data = self.ssh(['cat', efivarfs], simple_output=False, decode=False).stdout
 
         # The efivarfs file starts with the attributes, which are 4 bytes long
-        return data[:4], data[4:]
+        return data[4:]
 
     def file_exists(self, filepath):
         """Returns True if the file exists, otherwise returns False."""
