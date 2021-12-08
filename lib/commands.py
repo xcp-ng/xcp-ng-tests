@@ -55,6 +55,12 @@ def _ellide_log_lines(log):
         reduced_message.append("(...)")
     return "\n{}".format("\n".join(reduced_message))
 
+OUPUT_LOGGER = logging.getLogger('output')
+OUPUT_LOGGER.propagate = False
+OUTPUT_HANDLER = logging.StreamHandler()
+OUPUT_LOGGER.addHandler(OUTPUT_HANDLER)
+OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
+
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
         background=False, target_os='linux', decode=True):
     options = []
@@ -71,61 +77,61 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
         command = "nohup %s &>/dev/null &" % command
 
-    if background and target_os == "windows":
-        # Unfortunately the "nohup" solution doesn't always work well with windows+openssh+git-bash
-        # Sometimes commands that end in '&' are not executed at all
-        # So we spawn the ssh process in the background
-        return subprocess.Popen(
-            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command),
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT
-        )
-    else:
-        # Common case
+    ssh_cmd = "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command)
 
-        # Fetch banner and remove it to avoid stdout/stderr pollution.
-        if config.ignore_ssh_banner:
-            banner_res = subprocess.run(
-                "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), '\n'),
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=False
-            )
-        res = subprocess.run(
-            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command),
+    windows_background = background and target_os == "windows"
+    # Fetch banner and remove it to avoid stdout/stderr pollution.
+    if config.ignore_ssh_banner and not windows_background:
+        banner_res = subprocess.run(
+            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), '\n'),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False
         )
 
-        # get a decoded version of the output in any case, replacing potential errors
-        output_for_logs = res.stdout.decode(errors='replace').strip()
+    process = subprocess.Popen(
+        ssh_cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+    logging.debug(f"[{hostname_or_ip}] {command}")
+    if windows_background:
+        return process
 
-        # Even if check is False, we still raise in case of return code 255, which means a SSH error.
-        if res.returncode == 255:
-            raise SSHCommandFailed(255, "SSH Error: %s" % output_for_logs, command)
+    stdout = []
+    for line in iter(process.stdout.readline, b''):
+        readable_line = line.decode(errors='replace').strip()
+        if readable_line == '':
+            break
+        stdout.append(line)
+        OUPUT_LOGGER.debug(readable_line)
+    _, stderr = process.communicate()
+    res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
 
-        output = res.stdout
-        if config.ignore_ssh_banner:
-            if banner_res.returncode == 255:
-                raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
-            output = output[len(banner_res.stdout):]
+    # Get a decoded version of the output in any case, replacing potential errors
+    output_for_errors = res.stdout.decode(errors='replace').strip()
 
-        if decode:
-            output = output.decode()
+    # Even if check is False, we still raise in case of return code 255, which means a SSH error.
+    if res.returncode == 255:
+        raise SSHCommandFailed(255, "SSH Error: %s" % output_for_logs, command)
 
-        errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
-        logging.debug(f"[{hostname_or_ip}] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+    output = res.stdout
+    if config.ignore_ssh_banner:
+        if banner_res.returncode == 255:
+            raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
+        output = output[len(banner_res.stdout):]
 
-        if res.returncode and check:
-            raise SSHCommandFailed(res.returncode, output_for_logs, command)
+    if decode:
+        output = output.decode()
 
-        if simple_output:
-            return output.strip()
-        return SSHResult(res.returncode, output)
+    if res.returncode and check:
+        raise SSHCommandFailed(res.returncode, output_for_errors, command)
+
+    if simple_output:
+        return output.strip()
+    return SSHResult(res.returncode, output)
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
     options = ""
