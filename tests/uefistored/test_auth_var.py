@@ -4,9 +4,7 @@ from lib.commands import SSHCommandFailed
 from lib.efi import (
     Certificate,
     EFIAuth,
-    EFI_GUID_STRS,
-    EFI_GLOBAL_VARIABLE_GUID,
-    EFI_GLOBAL_VARIABLE_GUID_STR,
+    global_variable_guid,
     EFI_AT_ATTRS_BYTES,
 )
 
@@ -22,17 +20,17 @@ from lib.efi import (
 def set_and_assert_var(vm, cert, new, should_pass):
     var = 'myvariable'
 
-    _, old = vm.get_efi_var(var, EFI_GLOBAL_VARIABLE_GUID_STR)
+    old = vm.get_efi_var(var, global_variable_guid)
 
-    signed = cert.sign_data(var, new, EFI_GLOBAL_VARIABLE_GUID)
+    signed = cert.sign_data(var, new, global_variable_guid)
 
     ok = True
     try:
-        vm.set_efi_var(var, EFI_GLOBAL_VARIABLE_GUID_STR, EFI_AT_ATTRS_BYTES, signed)
+        vm.set_efi_var(var, global_variable_guid, EFI_AT_ATTRS_BYTES, signed)
     except SSHCommandFailed:
         ok = False
 
-    _, ret = vm.get_efi_var(var, EFI_GLOBAL_VARIABLE_GUID_STR)
+    ret = vm.get_efi_var(var, global_variable_guid)
 
     if should_pass:
         assert ret == new
@@ -83,13 +81,15 @@ def test_db_append(linux_uefi_vm):
 
     assert vm.ssh_with_result(["which", "efi-updatevar"]).returncode == 0, "This test requires efi-updatevar"
 
+    old = vm.get_efi_var(db.name, db.guid)
+
+    assert old != b"", "db failed to install"
+
     vm_kek_key = vm.ssh(['mktemp'])
     vm.scp(KEK.cert.key, vm_kek_key)
 
     vm_db_cert = vm.ssh(['mktemp'])
     vm.scp(db2.pub, vm_db_cert)
-
-    _, old = vm.get_efi_var(db.name, db.guid)
 
     vm.ssh([
         "chattr",
@@ -99,7 +99,7 @@ def test_db_append(linux_uefi_vm):
 
     vm.ssh(["efi-updatevar", "-k", vm_kek_key, "-c", vm_db_cert, "-a", "db"])
 
-    _, new = vm.get_efi_var(db.name, EFI_GUID_STRS[db.name])
+    new = vm.get_efi_var(db.name, db.guid)
 
     vm.shutdown(verify=True)
 

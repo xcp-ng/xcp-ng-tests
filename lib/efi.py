@@ -11,6 +11,7 @@ import shutil
 import struct
 from datetime import datetime, timedelta
 from tempfile import TemporaryDirectory
+from uuid import UUID
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -18,10 +19,19 @@ from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
 
 import lib.commands as commands
 
+
+class GUID(UUID):
+    def as_bytes(self):
+        return self.bytes_le
+
+    def as_str(self):
+        return str(self)
+
+
 EFI_HEADER_MAGIC = 'MZ'
 
-EFI_GLOBAL_VARIABLE_GUID_STR = '8be4df61-93ca-11d2-aa0d-00e098032b8c'
-EFI_IMAGE_SECURITY_DATABASE_GUID_STR = 'd719b2cb-3d3a-4596-a3bc-dad00e67656f'
+global_variable_guid = GUID('8be4df61-93ca-11d2-aa0d-00e098032b8c')
+image_security_database_guid = GUID('d719b2cb-3d3a-4596-a3bc-dad00e67656f')
 
 # Variable attributes for time based authentication attrs
 EFI_AT_ATTRS = 0x27
@@ -68,14 +78,6 @@ EFI_CERT_PKCS7_GUID = pack_guid(
     [0x8A, 0xA9, 0x34, 0x7D, 0x37, 0x56, 0x65, 0xA7],
 )
 
-EFI_GLOBAL_VARIABLE_GUID = pack_guid(
-    0x8BE4DF61, 0x93CA, 0x11D2, [0xAA, 0x0D, 0x00, 0xE0, 0x98, 0x03, 0x2B, 0x8C]
-)
-
-EFI_IMAGE_SECURITY_DATABASE_GUID = pack_guid(
-    0xD719B2CB, 0x3D3A, 0x4596, [0xA3, 0xBC, 0xDA, 0xD0, 0xE, 0x67, 0x65, 0x6F]
-)
-
 VATES_GUID = pack_guid(
     0xFDD69FA4, 0x3E66, 0x11EB, [0x8C, 0x1B, 0x98, 0x3B, 0x8F, 0xB6, 0xDA, 0xCD]
 )
@@ -111,19 +113,16 @@ EFI_SIGNATURE_LIST = ''.join([EFI_GUID, u32, u32, u32])
 EFI_SIGNATURE_LIST_size = struct.calcsize(EFI_SIGNATURE_LIST)
 EFI_SIGNATURE_DATA_offset = 16
 
-EFI_GUIDS = {
-    'PK': EFI_GLOBAL_VARIABLE_GUID,
-    'KEK': EFI_GLOBAL_VARIABLE_GUID,
-    'db': EFI_IMAGE_SECURITY_DATABASE_GUID,
-    'dbx': EFI_IMAGE_SECURITY_DATABASE_GUID,
-}
+SECURE_BOOT_VARIABLES = {"PK", "KEK", "db", "dbx"}
 
-EFI_GUID_STRS = {
-    'PK': EFI_GLOBAL_VARIABLE_GUID_STR,
-    'KEK': EFI_GLOBAL_VARIABLE_GUID_STR,
-    'db': EFI_IMAGE_SECURITY_DATABASE_GUID_STR,
-    'dbx': EFI_IMAGE_SECURITY_DATABASE_GUID_STR,
-}
+def get_secure_boot_guid(variable: str) -> GUID:
+    """Return the GUID for an EFI secure boot variable."""
+    return {
+        'PK': global_variable_guid,
+        'KEK': global_variable_guid,
+        'db': image_security_database_guid,
+        'dbx': image_security_database_guid,
+    }.get(variable)
 
 
 def cert_to_efi_sig_list(cert):
@@ -170,12 +169,7 @@ def sign_efi_sig_db(sig_db, var, key, cert, time=None, guid=None):
     global p7_out
 
     if guid is None:
-        if var == 'PK' or var == 'KEK':
-            guid = EFI_GLOBAL_VARIABLE_GUID
-        elif var == 'db' or var == 'dbx' or var == 'dbt':
-            guid = EFI_IMAGE_SECURITY_DATABASE_GUID
-        else:
-            raise RuntimeError('GUID could not be determined')
+        guid = get_secure_boot_guid(var)
 
     if time is None:
         time = datetime.now()
@@ -206,7 +200,7 @@ def sign_efi_sig_db(sig_db, var, key, cert, time=None, guid=None):
     # From UEFI spec (2.6):
     #    digest = hash (VariableName, VendorGuid, Attributes, TimeStamp,
     #                   DataNew_variable_content)
-    payload = var_utf16 + bytes(guid) + attributes + timestamp + sig_db
+    payload = var_utf16 + guid.as_bytes() + attributes + timestamp + sig_db
 
     logging.debug('Signature DB Size: %d' % len(sig_db))
     logging.debug('Authentication Payload size %d' % len(payload))
@@ -300,9 +294,11 @@ def pesign(key, cert, name, image):
 
 class EFIAuth:
     def __init__(self, name, is_null=False):
+        if name not in SECURE_BOOT_VARIABLES:
+            raise RuntimeError(f"{name} is not a secure boot variable")
         self.name = name
         self.is_null = is_null
-        self.guid = EFI_GUIDS[self.name]
+        self.guid = get_secure_boot_guid(self.name)
         self.key = ''
         self.cert = Certificate()
         self.tempdir = TemporaryDirectory(prefix=name + '_')
