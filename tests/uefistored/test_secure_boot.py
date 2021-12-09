@@ -4,7 +4,7 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
-from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES, EFI_GUID_STRS, esl_from_auth_file
+from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES, get_secure_boot_guid, esl_from_auth_file
 
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 
@@ -347,7 +347,7 @@ class TestUEFIKeyExchange:
             ok = True
             saved_exception = None
             try:
-                vm.set_efi_var(auth.name, EFI_GUID_STRS[auth.name],
+                vm.set_efi_var(auth.name, auth.guid,
                                EFI_AT_ATTRS_BYTES, auth.auth_data)
             except SSHCommandFailed:
                 ok = False
@@ -462,7 +462,7 @@ class TestPoolToVMCertInheritance:
         vm.host.pool.clear_uefi_certs()
 
     def is_vm_cert_present(self, vm, key):
-        res = vm.host.ssh(['varstore-get', vm.uuid, EFI_GUID_STRS[key], key],
+        res = vm.host.ssh(['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
                           check=False, simple_output=False, decode=False)
         return res.returncode == 0
 
@@ -470,7 +470,7 @@ class TestPoolToVMCertInheritance:
         return hashlib.md5(esl_from_auth_file(auth)).hexdigest()
 
     def check_vm_cert_md5sum(self, vm, key, reference_file):
-        res = vm.host.ssh(['varstore-get', vm.uuid, EFI_GUID_STRS[key], key],
+        res = vm.host.ssh(['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
                           check=False, simple_output=False, decode=False)
         assert res.returncode == 0, f"Cert {key} must be present"
         reference_md5 = self.get_md5sum_from_auth(reference_file)

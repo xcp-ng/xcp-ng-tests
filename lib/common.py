@@ -917,7 +917,7 @@ class VM(BaseVM):
         """Sets the data and attrs for an EFI variable and GUID."""
         assert len(attrs) == 4
 
-        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid.as_str())
 
         if self.file_exists(efivarfs):
             self.ssh(['chattr', '-i', efivarfs])
@@ -930,7 +930,7 @@ class VM(BaseVM):
 
     def get_efi_var(self, var, guid):
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""
-        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid.as_str())
 
         if not self.file_exists(efivarfs):
             return b''
@@ -993,7 +993,7 @@ class VM(BaseVM):
             dest = self.host.ssh(['mktemp'])
             self.host.scp(auth.auth, dest)
             self.host.ssh([
-                'varstore-set', self.uuid, efi.EFI_GUID_STRS[auth.name], auth.name,
+                'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
                 str(efi.EFI_AT_ATTRS), dest
             ])
             self.host.ssh(['rm', '-f', dest])
