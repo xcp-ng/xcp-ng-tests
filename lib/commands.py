@@ -115,7 +115,7 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
 
     # Even if check is False, we still raise in case of return code 255, which means a SSH error.
     if res.returncode == 255:
-        raise SSHCommandFailed(255, "SSH Error: %s" % output_for_logs, command)
+        raise SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
 
     output = res.stdout
     if config.ignore_ssh_banner:
