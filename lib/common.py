@@ -9,7 +9,6 @@ from enum import Enum
 from uuid import UUID
 
 import lib.commands as commands
-import lib.config as config
 import lib.efi as efi
 
 class PackageManagerEnum(Enum):

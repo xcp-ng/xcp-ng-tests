@@ -1,5 +1,4 @@
 import logging
-import pytest
 
 from lib.common import wait_for, wait_for_not
 

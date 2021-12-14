@@ -6,7 +6,6 @@ import atexit
 import copy
 import logging
 import os
-import shlex
 import shutil
 import struct
 from datetime import datetime, timedelta

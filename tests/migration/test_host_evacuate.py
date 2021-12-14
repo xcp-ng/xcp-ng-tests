@@ -1,5 +1,3 @@
-import pytest
-
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, wait_for_not
 # The pool needs a shared SR to use `host.evacuate`

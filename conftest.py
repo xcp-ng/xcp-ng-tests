@@ -1,7 +1,6 @@
 import logging
 import pytest
 import tempfile
-# import json
 import lib.config as global_config
 from lib.common import wait_for, VM, Host, vm_image, is_uuid
 
