@@ -103,10 +103,9 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
     stdout = []
     for line in iter(process.stdout.readline, b''):
         readable_line = line.decode(errors='replace').strip()
-        if readable_line == '':
-            break
-        stdout.append(line)
-        OUPUT_LOGGER.debug(readable_line)
+        if readable_line != '':
+            stdout.append(line)
+            OUPUT_LOGGER.debug(readable_line)
     _, stderr = process.communicate()
     res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
 
