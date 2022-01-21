@@ -15,7 +15,7 @@ from lib.efi import (
 # - host: XCP-ng host >= 8.2 (+ updates)
 # From --vm parameter
 # - A Linux UEFI VM to import
-# - The UEFI VM must have efitools installed
+# - The UEFI VM must have `efitools` installed (and `util-linux` for Alpine VM)
 
 def set_and_assert_var(vm, cert, new, should_pass):
     var = 'myvariable'
