@@ -37,6 +37,8 @@ For Guest UEFI Secure Boot tests, the requirements are:
     * `openssl`
 * VM
     * `chattr`
+    * `efitools` for uefistored auth var tests
+    * `util-linux` for uefistored auth var tests in Alpine VMs
 * XCP-ng Host (installed by default on XCP-ng 8.2+)
     * `uefistored`
     * `varstored-tools`
@@ -96,6 +98,12 @@ Special cases:
 * CentOS 6:
   * requires this: `restorecon -r /root/.ssh`
   * comment out HWADDR in `/etc/sysconfig/network-scripts/ifcfg-eth0` else any copy of this VM will refuse to start the network on eth0 because the MAC address changed
+* Alpine (for uefistored auth var tests):
+  * Install `util-linux`:
+    ```
+    apk update
+    apk add --upgrade util-linux
+    ```
 
 ### Windows 10
 
