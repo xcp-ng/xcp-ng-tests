@@ -200,6 +200,9 @@ class Pool:
             assert 'db' in auths_dict
 
             logging.info('Installing auths to pool: %s' % list(auths_dict.keys()))
+            for key in auths_dict.keys():
+                value = host.ssh([f'md5sum {auths_dict[key]} | cut -d " " -f 1'])
+                logging.debug('Key: %s, value: %s' % (key, value))
             params = [auths_dict['PK'], auths_dict['KEK'], auths_dict['db']]
             if 'dbx' in auths_dict:
                 params.append(auths_dict['dbx'])

@@ -368,14 +368,20 @@ class TestPoolToDiskCertInheritance:
 
     def install_certs_to_disks(self, pool, certs_dict, keys):
         for host in pool.hosts:
+            logging.debug('Installing to host %s:' % host.hostname_or_ip)
             for key in keys:
-                host.scp(certs_dict[key].auth, f'/var/lib/uefistored/{key}.auth')
+                value = certs_dict[key].auth
+                hash = hashlib.md5(open(value, 'rb').read()).hexdigest()
+                logging.debug('    - key: %s, value: %s' % (key, hash))
+                host.scp(value, f'/var/lib/uefistored/{key}.auth')
 
     def check_disk_cert_md5sum(self, host, key, reference_file):
         auth_filepath_on_host = f'/var/lib/uefistored/{key}.auth'
         assert host.file_exists(auth_filepath_on_host)
         reference_md5 = hashlib.md5(open(reference_file, 'rb').read()).hexdigest()
         host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
+        logging.debug('Reference MD5: %s' % reference_md5)
+        logging.debug('Host disk MD5: %s' % host_disk_md5)
         assert host_disk_md5 == reference_md5
 
     def test_pool_certs_present_and_disk_certs_absent(self, uefi_vm):
