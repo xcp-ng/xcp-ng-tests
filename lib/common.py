@@ -248,7 +248,7 @@ class Host:
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
-    def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
+    def xe(self, action, args={}, check=True, simple_output=True, minimal=False, use_scp=False):
         maybe_param_minimal = ['--minimal'] if minimal else []
 
         def stringify(key, value):
@@ -256,21 +256,34 @@ class Host:
                 return "{}={}".format(key, to_xapi_bool(value))
             return "{}={}".format(key, shlex.quote(value))
 
-        command = shlex.quote(' '.join(
-            ['xe', action] + maybe_param_minimal + [stringify(key, value) for key, value in args.items()]
-        ))
-
-        result = self.ssh(
-            [command],
-            check=check,
-            simple_output=simple_output
-        )
+        command = ['xe', action] + maybe_param_minimal + [stringify(key, value) for key, value in args.items()]
+        if use_scp:
+            result = self.execute_script(' '.join(command), 'sh', simple_output)
+        else:
+            result = self.ssh(
+                [shlex.quote(' '.join(command))],
+                check=check,
+                simple_output=simple_output
+            )
 
         if result == 'true':
             return True
         if result == 'false':
             return False
         return result
+
+    def execute_script(self, script_contents, shebang='sh', simple_output=True):
+        with tempfile.NamedTemporaryFile('w') as script:
+            os.chmod(script.name, 0o775)
+            script.write('#!/usr/bin/env ' + shebang + '\n')
+            script.write(script_contents)
+            script.flush()
+            self.scp(script.name, script.name)
+
+            try:
+                return self.ssh([script.name], simple_output=simple_output)
+            finally:
+                self.ssh(['rm', '-f', script.name])
 
     def _get_xensource_inventory(self):
         output = self.ssh(['cat', '/etc/xensource-inventory'])
@@ -515,12 +528,12 @@ class Host:
     def hostname(self):
         return self.ssh(['hostname'])
 
-    def call_plugin(self, plugin_name, function, args=None):
+    def call_plugin(self, plugin_name, function, args=None, use_scp=False):
         params = {'host-uuid': self.uuid, 'plugin': plugin_name, 'fn': function}
         if args is not None:
             for k, v in args.items():
                 params['args:%s' % k] = v
-        return self.xe('host-call-plugin', params)
+        return self.xe('host-call-plugin', params, use_scp=use_scp)
 
 class BaseVM:
     """ Base class for VM and Snapshot. """
