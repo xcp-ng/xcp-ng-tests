@@ -31,12 +31,13 @@ class TestProxies:
         set_proxies = '{ \
             "xcp-ng-base": "_none_", \
             "xcp-ng-updates": "_none_", \
-            "xcp-ng-testing": "_none_" \
+            "xcp-ng-testing": "_none_", \
+            "xcp-ng-staging": "_none_" \
         }'
-        host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies})
+        host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies}, use_scp=True)
 
         res = host.call_plugin('updater.py', 'get_proxies')
         assert json.loads(res) == json.loads(set_proxies)
 
-        host.call_plugin('updater.py', 'set_proxies', {"proxies": proxies})
+        host.call_plugin('updater.py', 'set_proxies', {"proxies": proxies}, use_scp=True)
         assert json.loads(res) == json.loads(proxies)
