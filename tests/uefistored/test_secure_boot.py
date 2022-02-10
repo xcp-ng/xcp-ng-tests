@@ -449,6 +449,18 @@ class TestPoolToDiskCertInheritance:
             self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
         self.check_disk_cert_md5sum(residence_host, 'dbx', disk_auths[key].auth)
 
+    def test_pool_certs_present_and_disk_certs_present_and_same(self, uefi_vm):
+        vm = uefi_vm
+        # start with certs on pool and no certs on host disks
+        pool_auths = generate_keys(as_dict=True)
+        vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
+        self.install_certs_to_disks(vm.host.pool, pool_auths, ['PK', 'KEK', 'db', 'dbx'])
+        # start a VM so that certs may be synced to disk if appropriate
+        vm.start()
+        residence_host = vm.get_residence_host()
+        logging.info('Check that the certs have been written on the disk of the host that started the VM.')
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            self.check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
 
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestPoolToVMCertInheritance:
