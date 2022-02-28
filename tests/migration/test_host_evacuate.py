@@ -10,7 +10,8 @@ from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
 # From --vm parameter
 # - A VM to import
 # From --second-network parameter
-# - second_network: A 2nd network of the pool, NOT the management interface, with PIF plugged on all hosts
+# - second_network: A 2nd physical network of the pool, NOT the management interface,
+# with PIF plugged and configured with an IP on all hosts
 
 def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=False, error=""):
     source_name = source_host.xe('host-param-get', {'uuid': source_host.uuid, 'param-name': 'name-label'})
@@ -41,7 +42,9 @@ def _save_ip_configuration_mode(host, pif_uuid):
         ('IP', 'IP'), ('DNS', 'DNS'), ('gateway', 'gateway'), ('netmask', 'netmask'), ('mode', 'IP-configuration-mode')
     ]
     for key, param in keys:
-        args[key] = host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': param})
+        res = host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': param})
+        if res != "":
+            args[key] = res
 
     return args
 
@@ -58,7 +61,7 @@ def test_host_evacuate_with_network_no_ip(host, hostA2, second_network, vm_on_nf
     args = _save_ip_configuration_mode(host, pif_uuid)
     host.xe(reconfigure_method, {'uuid': pif_uuid, 'mode': 'none'})
     try:
-        no_ip_error = b'The specified interface cannot be used because it has no IP address'
+        no_ip_error = 'The specified interface cannot be used because it has no IP address'
         _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, no_ip_error)
     finally:
         host.xe(reconfigure_method, args)
@@ -68,7 +71,7 @@ def test_host_evacuate_with_network_not_attached(host, hostA2, second_network, v
     host.xe('pif-unplug', {'uuid': pif_uuid})
     try:
         not_attached_error = \
-            b'The operation you requested cannot be performed because the specified PIF is currently unplugged'
+            'The operation you requested cannot be performed because the specified PIF is currently unplugged'
         _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, not_attached_error)
     finally:
         host.xe('pif-plug', {'uuid': pif_uuid})
@@ -80,7 +83,7 @@ def test_host_evacuate_with_network_not_present(host, hostA2, second_network, vm
     args = _save_ip_configuration_mode(host, pif_uuid)
     host.xe('pif-forget', {'uuid': pif_uuid})
     try:
-        not_present_error = b'This host has no PIF on the given network'
+        not_present_error = 'This host has no PIF on the given network'
         _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, not_present_error)
     finally:
         host.xe('pif-scan', {'host-uuid': host.uuid})
