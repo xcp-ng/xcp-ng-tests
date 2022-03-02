@@ -200,3 +200,22 @@ in data.py.
       community.general.apk:
         name: util-linux efitools
 ```
+
+# Bash scripts
+
+ * get_xva_bridge.sh: a script to get the XAPI bridge value from inside a xva file and the compression method used for this xva file.
+
+```
+$ /path/to/get_xva_bridge.sh alpine-minimal-3.12.0.xva
+ova.xml
+alpine-minimal-3.12.0.xva's bridge network is: xapi1 and its compression method is: tar.
+```
+
+ * set_xva_bridge.sh: a script to modify the XAPI bridge value inside a xva file and the compression method used for this xva file if wanted. The original xva file is saved before modification.
+
+```
+- Usage: /path/to/set_xva_bridge.sh [XVA_filename] compression[zstd|gzip] bridge_value[xenbr0|xapi[:9]|...]
+- All options are mandatory.
+
+$ /path/to/set_xva_bridge.sh alpine-minimal-3.12.0.xva zstd xenbr0
+```
