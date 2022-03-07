@@ -490,8 +490,9 @@ class Host:
         disks.sort()
         return disks
 
-    def file_exists(self, filepath):
-        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+    def file_exists(self, filepath, regular_file=True):
+        option = '-f' if regular_file else '-e'
+        return self.ssh_with_result(['test', option, filepath]).returncode == 0
 
     def binary_exists(self, binary):
         return self.ssh_with_result(['which', binary]).returncode == 0
