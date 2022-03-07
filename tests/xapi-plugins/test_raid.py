@@ -8,7 +8,7 @@ import pytest
 @pytest.fixture(scope='session')
 def host_with_raid(host):
     dummy_raid = False
-    if not host.file_exists('/dev/md127'):
+    if not host.file_exists('/dev/md127', regular_file=False):
         logging.info("> Host has no raids, creating one for tests")
         dummy_raid = True
         host.ssh(['dd', 'if=/dev/zero', 'of=raid-0', 'bs=1M', 'count=200'])
