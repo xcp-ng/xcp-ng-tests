@@ -2,7 +2,9 @@ import logging
 import pytest
 import tempfile
 import lib.config as global_config
-from lib.common import wait_for, VM, Host, vm_image, is_uuid
+from lib.common import wait_for, vm_image, is_uuid
+from lib.host import Host
+from lib.vm import VM
 
 # *** Support for incremental tests in test classes ***
 # From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
