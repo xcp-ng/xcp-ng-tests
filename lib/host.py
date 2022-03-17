@@ -12,7 +12,8 @@ from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
 class Host:
-    def __init__(self, hostname_or_ip):
+    def __init__(self, pool, hostname_or_ip):
+        self.pool = pool
         self.hostname_or_ip = hostname_or_ip
         self.inventory = None
         self.uuid = None
@@ -21,19 +22,11 @@ class Host:
         self.password = None
         self.saved_packages_list = None
         self.saved_rollback_id = None
+        self.inventory = self._get_xensource_inventory()
+        self.uuid = self.inventory['INSTALLATION_UUID']
 
     def __str__(self):
         return self.hostname_or_ip
-
-    def initialize(self, pool=None):
-        self.inventory = self._get_xensource_inventory()
-        self.uuid = self.inventory['INSTALLATION_UUID']
-        if self.is_master():
-            # FIXME: invert initialization order: pool first, then host.
-            from lib.pool import Pool
-            self.pool = Pool(self)
-        else:
-            self.pool = pool
 
     def ssh(self, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
             background=False, decode=True):
