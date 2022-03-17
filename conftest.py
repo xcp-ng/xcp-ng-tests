@@ -3,7 +3,7 @@ import pytest
 import tempfile
 import lib.config as global_config
 from lib.common import wait_for, vm_image, is_uuid
-from lib.host import Host
+from lib.pool import Pool
 from lib.vm import VM
 
 # *** Support for incremental tests in test classes ***
@@ -87,9 +87,8 @@ def host_data(hostname_or_ip):
 
 def setup_host(hostname_or_ip):
     logging.info(">>> Connect host %s" % hostname_or_ip)
-    h = Host(hostname_or_ip)
-    h.initialize()
-    assert h.is_master(), "we connect only to master hosts during initial setup"
+    pool = Pool(hostname_or_ip)
+    h = pool.master
     # XO connection
     h_data = host_data(hostname_or_ip)
     skip_xo_config = h_data.get('skip_xo_config', False)

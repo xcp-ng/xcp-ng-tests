@@ -6,13 +6,14 @@ from lib.host import Host
 from lib.sr import SR
 
 class Pool:
-    def __init__(self, master):
+    def __init__(self, master_hostname_or_ip):
+        master = Host(self, master_hostname_or_ip)
+        assert master.is_master(), f"Host {master_hostname_or_ip} is not a master host. Aborting."
         self.master = master
         self.hosts = [master]
         for host_uuid in self.hosts_uuids():
             if host_uuid != self.hosts[0].uuid:
-                host = Host(self.host_ip(host_uuid))
-                host.initialize(pool=self)
+                host = Host(self, self.host_ip(host_uuid))
                 self.hosts.append(host)
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs = None

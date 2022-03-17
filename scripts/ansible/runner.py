@@ -27,7 +27,8 @@ sys.path.append(root)
 
 import data  # noqa
 from lib.commands import ssh  # noqa
-from lib.common import VM, Host  # noqa
+from lib.pool import Pool # noqa
+from lib.vm import VM # noqa
 
 user = getattr(data, "HOST_DEFAULT_USER", "root")
 
@@ -194,8 +195,9 @@ if __name__ == "__main__":
     ansible_hosts = get_ansible_hosts(args.playbook)
 
     # Initialize the hosts and gather the urls for the VM images to update
-    host = args.host if args.host else list(data.HOSTS.keys())[0]
-    host = Host(host)
+    host_ip_or_name = args.host if args.host else list(data.HOSTS.keys())[0]
+    pool = Pool(host)
+    host = pool.master
     host.initialize()
 
     # Create an inventory (i.e., hosts file) for Ansible. The host name is the image name.
