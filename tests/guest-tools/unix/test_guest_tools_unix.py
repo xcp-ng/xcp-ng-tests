@@ -1,7 +1,7 @@
 import logging
 import pytest
 import time
-from lib.common import wait_for, wait_for_not, PackageManagerEnum
+from lib.common import wait_for, PackageManagerEnum
 
 # Requirements:
 # From --hosts parameter:
