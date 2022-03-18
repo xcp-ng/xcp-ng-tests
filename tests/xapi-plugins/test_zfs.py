@@ -1,4 +1,5 @@
 import json
+import logging
 
 from tests.storage.zfs.conftest import zpool_vol0, host_with_zfs
 
@@ -9,5 +10,6 @@ from tests.storage.zfs.conftest import zpool_vol0, host_with_zfs
 # - access to XCP-ng RPM repository from hostA1
 
 def test_list_zfs_pools(host, zpool_vol0):
+    logging.info("List ZFS pools on host")
     res = host.call_plugin('zfs.py', 'list_zfs_pools')
     assert json.loads(res).get("vol0") is not None
