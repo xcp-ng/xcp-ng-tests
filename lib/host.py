@@ -283,6 +283,18 @@ class Host:
         disks.sort()
         return disks
 
+    def disk_is_available(self, disk):
+        return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
+
+    def available_disks(self):
+        """
+        Return a list of available disks for formatting, creating SRs or such.
+
+        Returns a list of disk names (eg.: ['sdb', 'sdc']) that don't have any mountpoint in
+        the output of lsblk (including their children such as partitions or md RAID devices)
+        """
+        return [disk for disk in self.disks() if self.disk_is_available(disk)]
+
     def file_exists(self, filepath, regular_file=True):
         option = '-f' if regular_file else '-e'
         return self.ssh_with_result(['test', option, filepath]).returncode == 0
