@@ -16,7 +16,7 @@ def host_with_zfs(host):
     host.yum_restore_saved_state()
 
 @pytest.fixture(scope='session')
-def zpool_vol0(host_with_zfs, sr_disk_wiped):
+def zpool_vol0(sr_disk_wiped, host_with_zfs):
     host_with_zfs.ssh(['zpool', 'create', '-f', VOLUME_NAME, '/dev/' + sr_disk_wiped])
     yield
     # teardown

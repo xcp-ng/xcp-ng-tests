@@ -29,7 +29,7 @@ class TestXFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host_with_xfsprogs, sr_disk):
+    def test_create_and_destroy_sr(self, sr_disk, host_with_xfsprogs):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_xfsprogs
         sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk}, verify=True)
