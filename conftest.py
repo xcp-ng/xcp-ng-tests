@@ -170,12 +170,11 @@ def local_sr_on_hostB1(hostB1):
 
 @pytest.fixture(scope='session')
 def sr_disk(host):
-    disks = host.disks()
-    # there must be at least 2 disks
-    assert len(disks) > 1, "at least two disks are required on the first host"
-    # Using the second disk for SR
-    disk = disks[1]
-    logging.info(">> a second disk for a local SR is present on hostA1: %s" % disk)
+    logging.info(">> Check for the presence of a free disk device on the master host")
+    disks = host.available_disks()
+    assert len(disks) > 0, "a free disk device is required on the master host"
+    disk = disks[0]
+    logging.info(f">> Found free disk device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
     yield disk
 
 @pytest.fixture(scope='session')
@@ -185,15 +184,22 @@ def sr_disk_wiped(host, sr_disk):
     yield sr_disk
 
 @pytest.fixture(scope='session')
-def sr_disk_for_all_hosts(host, sr_disk):
+def sr_disk_for_all_hosts(host):
+    master_disks = host.available_disks()
+    assert len(master_disks) > 0, "a free disk device is required on the master host"
+
+    candidates = list(master_disks)
     for h in host.pool.hosts[1:]:
-        disks = h.disks()
-        # there must be at least 2 disks
-        assert len(disks) > 1, "at least two disks are required on all pool's hosts, missing on host: %s" % h
-        # Using the second disk for SR
-        disk = next(d for d in disks if d == sr_disk)
-        logging.info(">> a second disk for a local SR is present on host %s: %s" % (h, disk))
-    yield sr_disk
+        other_disks = h.available_disks()
+        for disk in master_disks:
+            if disk not in other_disks:
+                candidates.remove(disk)
+                continue
+
+    assert len(candidates) > 0, \
+        f"a free disk device is required on all pool members. Pool master has: {' '.join(master_disks)}."
+    logging.info(f">> Found free disk device(s) on all pool members: {' '.join(candidates)}. Using {candidates[0]}.")
+    yield candidates[0]
 
 @pytest.fixture(scope='module')
 def vm_ref(request):
