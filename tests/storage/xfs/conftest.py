@@ -12,7 +12,7 @@ def host_with_xfsprogs(host):
     host.yum_restore_saved_state()
 
 @pytest.fixture(scope='session')
-def xfs_sr(host_with_xfsprogs, sr_disk):
+def xfs_sr(sr_disk, host_with_xfsprogs):
     """ A XFS SR on first host. """
     sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
     yield sr
