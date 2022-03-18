@@ -65,8 +65,8 @@ class TestGuestToolsUnix:
         logging.info("Mount guest tools ISO")
         vm.mount_guest_tools_iso()
         tmp_mnt = vm.ssh(['mktemp', '-d'])
-        time.sleep(1) # wait a small amount of time just to ensure the device is available
-        vm.ssh(['mount', '/dev/cdrom', tmp_mnt])
+        time.sleep(2) # wait a small amount of time just to ensure the device is available
+        vm.ssh(['mount', '-t', 'iso9660', '/dev/cdrom', tmp_mnt])
 
         # get tools version number for future checks
         prefix = 'xe-guest-utilities_'
