@@ -35,12 +35,6 @@ def pytest_addoption(parser):
         help="VM key or OVA URL for tests that require only one VM",
     )
     parser.addoption(
-        "--vms",
-        action="append",
-        default=[],
-        help="VM keys or OVA URLs for tests that require several VMs",
-    )
-    parser.addoption(
         "--sr-device-config",
         action="append",
         default=[],
@@ -224,26 +218,6 @@ def vm_ref(request):
     else:
         return vm_image(ref)
 
-@pytest.fixture
-def vm_refs(request):
-    vm_list = request.param
-
-    if vm_list is None:
-        # get default list of VMs from test if there's one
-        marker = request.node.get_closest_marker("default_vms")
-        default_vms = marker.args[0] if marker is not None else None
-        if default_vms is not None:
-            logging.info(">> No VM list specified on CLI. Using default: %s." % " ".join(default_vms))
-            vm_list = default_vms
-        else:
-            # global default
-            logging.info(
-                ">> No VM list specified on CLI, and no default found in test definition. Using global default."
-            )
-            vm_list = ['mini-linux-x86_64-bios', 'mini-linux-x86_64-uefi']
-    # TODO: finish implementation using vm_image
-
-# TODO: make it a fixture factory?
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
     if is_uuid(vm_ref):
@@ -258,7 +232,6 @@ def imported_vm(host, vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
-# TODO: make it a fixture factory?
 @pytest.fixture(scope="module")
 def running_vm(imported_vm):
     vm = imported_vm
@@ -328,11 +301,6 @@ def pytest_generate_tests(metafunc):
         if not vms:
             vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
-    if "vm_refs" in metafunc.fixturenames:
-        vm_lists = metafunc.config.getoption("vms")
-        if not vm_lists:
-            vm_lists = [None] # no --vms parameter does not mean skip the test, for us, it means use the default
-        metafunc.parametrize("vm_refs", vm_lists, indirect=True, scope="module")
     if "sr_device_config" in metafunc.fixturenames:
         configs = metafunc.config.getoption("sr_device_config")
         if not configs:
