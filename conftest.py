@@ -71,6 +71,13 @@ def pytest_addoption(parser):
         default=20,
         help="Max lines to output in a ssh log (0 if no limit)"
     )
+    parser.addoption(
+        "--sr-disk",
+        action="append",
+        default=[],
+        help="Name of an available disk (sdb) or partition device (sdb2) to be formatted and used in storage tests. "
+             "Set it to 'auto' to let the fixtures auto-detect available disks."
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -169,12 +176,18 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def sr_disk(host):
-    logging.info(">> Check for the presence of a free disk device on the master host")
-    disks = host.available_disks()
-    assert len(disks) > 0, "a free disk device is required on the master host"
-    disk = disks[0]
-    logging.info(f">> Found free disk device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
+def sr_disk(request, host):
+    disk = request.param
+    if disk == "auto":
+        logging.info(">> Check for the presence of a free disk device on the master host")
+        disks = host.available_disks()
+        assert len(disks) > 0, "a free disk device is required on the master host"
+        disk = disks[0]
+        logging.info(f">> Found free disk device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
+    else:
+        logging.info(f">> Check that disk or block device {disk} is available on the master host")
+        assert disk in host.available_disks(), \
+            f"disk or block device {disk} is either not present or already used on master host"
     yield disk
 
 @pytest.fixture(scope='session')
@@ -184,21 +197,32 @@ def sr_disk_wiped(host, sr_disk):
     yield sr_disk
 
 @pytest.fixture(scope='session')
-def sr_disk_for_all_hosts(host):
+def sr_disk_for_all_hosts(request, host):
+    disk = request.param
     master_disks = host.available_disks()
     assert len(master_disks) > 0, "a free disk device is required on the master host"
+
+    if disk != "auto":
+        assert disk in master_disks, \
+            f"disk or block device {disk} is either not present or already used on master host"
+        master_disks = [disk]
 
     candidates = list(master_disks)
     for h in host.pool.hosts[1:]:
         other_disks = h.available_disks()
-        for disk in master_disks:
-            if disk not in other_disks:
-                candidates.remove(disk)
+        for d in master_disks:
+            if d not in other_disks:
+                candidates.remove(d)
                 continue
 
-    assert len(candidates) > 0, \
-        f"a free disk device is required on all pool members. Pool master has: {' '.join(master_disks)}."
-    logging.info(f">> Found free disk device(s) on all pool members: {' '.join(candidates)}. Using {candidates[0]}.")
+    if disk == "auto":
+        assert len(candidates) > 0, \
+            f"a free disk device is required on all pool members. Pool master has: {' '.join(master_disks)}."
+        logging.info(f">> Found free disk device(s) on all pool hosts: {' '.join(candidates)}. Using {candidates[0]}.")
+    else:
+        assert len(candidates) > 0, \
+            f"disk or block device {disk} was not found to be present and free on all hosts"
+        logging.info(f">> Disk or block device {disk} is present and free on all pool members")
     yield candidates[0]
 
 @pytest.fixture(scope='module')
@@ -352,3 +376,9 @@ def pytest_generate_tests(metafunc):
         second_network = metafunc.config.getoption("second_network")
         if second_network is not None:
             metafunc.parametrize("second_network", second_network, indirect=True, scope="session")
+    if "sr_disk" in metafunc.fixturenames:
+        disk = metafunc.config.getoption("sr_disk")
+        metafunc.parametrize("sr_disk", disk, indirect=True, scope="session")
+    if "sr_disk_for_all_hosts" in metafunc.fixturenames:
+        disk = metafunc.config.getoption("sr_disk")
+        metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
