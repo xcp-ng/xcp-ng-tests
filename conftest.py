@@ -3,6 +3,7 @@ import pytest
 import tempfile
 import lib.config as global_config
 from lib.common import wait_for, vm_image, is_uuid
+from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.pool import Pool
 from lib.vm import VM
 
@@ -258,8 +259,6 @@ def imported_vm(host, vm_ref):
 
 @pytest.fixture(scope="module")
 def running_vm(imported_vm):
-    vm = imported_vm
-
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
         vm.start()
@@ -267,6 +266,18 @@ def running_vm(imported_vm):
     wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")
     wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
+    # no teardown
+
+@pytest.fixture(scope='module')
+def unix_vm(imported_vm):
+    vm = imported_vm
+    if vm.is_windows:
+        pytest.skip("This test is not compatible with Windows VMs.")
+    yield vm
+
+@pytest.fixture(scope="module")
+def running_unix_vm(unix_vm, running_vm):
+    return running_vm
     # no teardown
 
 @pytest.fixture(scope='session')
@@ -360,3 +371,10 @@ def pytest_generate_tests(metafunc):
     if "sr_disk_for_all_hosts" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
+
+@pytest.fixture(scope='session')
+def formatted_and_mounted_ext4_disk(host, sr_disk):
+    mountpoint = '/var/tmp/sr_disk_mountpoint'
+    setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
+    yield mountpoint
+    teardown_formatted_and_mounted_disk(host, mountpoint)

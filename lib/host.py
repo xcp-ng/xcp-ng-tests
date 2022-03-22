@@ -305,7 +305,7 @@ class Host:
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': label,
-            'content-type': 'user',
+            'content-type': 'iso' if sr_type == 'iso' else 'user',
             'shared': shared
         }
         for key, value in device_config.items():

@@ -62,3 +62,30 @@ def parse_xe_dict(xe_dict):
 def safe_split(text, sep=','):
     """ A split function that returns an empty list if the input string is empty. """
     return text.split(sep) if len(text) > 0 else []
+
+def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
+    if fs_type == 'ext4':
+        option_force = '-F'
+    elif fs_type == 'xfs':
+        option_force = '-f'
+    else:
+        raise Exception(f"Unsupported fs_type '{fs_type}' in this function")
+    device = '/dev/' + sr_disk
+    logging.info(f">> Format sr_disk {sr_disk} and mount it on host {host}")
+    host.ssh(['mkfs.' + fs_type, option_force, device])
+    host.ssh(['rm', '-rf', mountpoint]) # Remove any existing leftover to ensure rmdir will not fail in teardown
+    host.ssh(['mkdir', '-p', mountpoint])
+    host.ssh(['cp', '-f', '/etc/fstab', '/etc/fstab.orig'])
+    host.ssh(['echo', f'{device} {mountpoint} {fs_type} defaults 0 0', '>>/etc/fstab'])
+    try:
+        host.ssh(['mount', mountpoint])
+    except Exception:
+        # restore fstab then re-raise
+        host.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
+        raise
+
+def teardown_formatted_and_mounted_disk(host, mountpoint):
+    logging.info(f"<< Restore fstab and unmount {mountpoint} on host {host}")
+    host.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
+    host.ssh(['umount', mountpoint])
+    host.ssh(['rmdir', mountpoint])

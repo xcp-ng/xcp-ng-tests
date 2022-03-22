@@ -30,6 +30,20 @@ DEFAULT_NFS_DEVICE_CONFIG = {
 #    'serverpath': '/path/to/shared/mount' # Path to shared mountpoint
 }
 
+# Default NFS ISO device config:
+DEFAULT_NFS_ISO_DEVICE_CONFIG = {
+#    'location': '10.0.0.2:/path/to/shared/mount' # URL/Hostname of NFS server and path to shared mountpoint
+}
+
+# Default CIFS ISO device config:
+DEFAULT_CIFS_ISO_DEVICE_CONFIG = {
+#    'location': r'\\10.0.0.2\<shared folder name>',
+#    'username': '<user>',
+#    'cifspassword': '<password>',
+#    'type': 'cifs',
+#    'vers': '<1.0> or <3.0>'
+}
+
 DEFAULT_CEPHFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
