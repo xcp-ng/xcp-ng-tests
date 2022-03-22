@@ -63,8 +63,18 @@ class SR:
     def attached_to_host(self, host):
         return host.uuid in self.hosts_uuids()
 
+    def main_host(self):
+        """ Returns the host in case of a local SR, the master host in case of a shared SR. """
+        if self.is_shared():
+            return self.pool.master
+        else:
+            return self.pool.get_host_by_uuid(self.hosts_uuids()[0])
+
     def content_type(self):
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
 
     def is_shared(self):
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'})
+
+    def force_gc(self):
+        self.main_host().ssh(['/opt/xensource/sm/cleanup.py', '-u', self.uuid, '-G'])
