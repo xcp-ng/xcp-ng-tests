@@ -57,7 +57,7 @@ class Host:
             result = self.execute_script(' '.join(command), 'sh', simple_output)
         else:
             result = self.ssh(
-                [shlex.quote(' '.join(command))],
+                command,
                 check=check,
                 simple_output=simple_output
             )

@@ -1,4 +1,5 @@
 import logging
+import shlex
 import subprocess
 
 import lib.config as config
@@ -77,7 +78,7 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
         # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
         command = "nohup %s &>/dev/null &" % command
 
-    ssh_cmd = "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), command)
+    ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(options)} {shlex.quote(command)}"
 
     windows_background = background and target_os == "windows"
     # Fetch banner and remove it to avoid stdout/stderr pollution.
