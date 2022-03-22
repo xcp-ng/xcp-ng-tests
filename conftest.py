@@ -3,6 +3,7 @@ import pytest
 import tempfile
 import lib.config as global_config
 from lib.common import wait_for, vm_image, is_uuid
+from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.pool import Pool
 from lib.vm import VM
 
@@ -360,3 +361,10 @@ def pytest_generate_tests(metafunc):
     if "sr_disk_for_all_hosts" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
+
+@pytest.fixture(scope='session')
+def formatted_and_mounted_ext4_disk(host, sr_disk):
+    mountpoint = '/var/tmp/sr_disk_mountpoint'
+    setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
+    yield mountpoint
+    teardown_formatted_and_mounted_disk(host, mountpoint)
