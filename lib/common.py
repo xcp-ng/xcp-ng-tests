@@ -58,3 +58,7 @@ def parse_xe_dict(xe_dict):
         key, value = pair.split(':')
         res[key.strip()] = value.strip()
     return res
+
+def safe_split(text, sep=','):
+    """ A split function that returns an empty list if the input string is empty. """
+    return text.split(sep) if len(text) > 0 else []
