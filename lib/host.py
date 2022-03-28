@@ -6,7 +6,7 @@ import tempfile
 
 import lib.commands as commands
 
-from lib.common import to_xapi_bool, wait_for, wait_for_not
+from lib.common import safe_split, to_xapi_bool, wait_for, wait_for_not
 from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
@@ -328,7 +328,8 @@ class Host:
 
     def local_vm_srs(self):
         srs = []
-        for sr_uuid in self.xe('pbd-list', {'host-uuid': self.uuid, 'params': 'sr-uuid'}, minimal=True).split(','):
+        sr_uuids = safe_split(self.xe('pbd-list', {'host-uuid': self.uuid, 'params': 'sr-uuid'}, minimal=True))
+        for sr_uuid in sr_uuids:
             sr = SR(sr_uuid, self.pool)
             if sr.content_type() == 'user' and not sr.is_shared():
                 srs.append(sr)

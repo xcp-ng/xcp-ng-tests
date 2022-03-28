@@ -2,6 +2,7 @@ import logging
 
 import lib.commands as commands
 
+from lib.common import safe_split
 from lib.host import Host
 from lib.sr import SR
 
@@ -19,7 +20,7 @@ class Pool:
         self.saved_uefi_certs = None
 
     def hosts_uuids(self):
-        return self.master.xe('host-list', {}, minimal=True).split(',')
+        return safe_split(self.master.xe('host-list', {}, minimal=True))
 
     def host_ip(self, host_uuid):
         return self.master.xe('host-param-get', {'uuid': host_uuid, 'param-name': 'address'})
@@ -37,7 +38,7 @@ class Pool:
         return None
 
     def first_shared_sr(self):
-        uuids = self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True).split(',')
+        uuids = safe_split(self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True))
         if len(uuids) > 0:
             return SR(uuids[0], self)
         return None
