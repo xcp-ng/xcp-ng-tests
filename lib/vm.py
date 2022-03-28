@@ -6,7 +6,7 @@ import lib.commands as commands
 import lib.efi as efi
 
 from lib.basevm import BaseVM
-from lib.common import PackageManagerEnum, parse_xe_dict, wait_for, wait_for_not
+from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, wait_for, wait_for_not
 from lib.snapshot import Snapshot
 from lib.vif import VIF
 from lib.xo import xo_object_exists, xo_cli
@@ -198,7 +198,7 @@ class VM(BaseVM):
 
     def vifs(self):
         _vifs = []
-        for vif_uuid in self.host.xe('vif-list', {'vm-uuid': self.uuid}, minimal=True).split(','):
+        for vif_uuid in safe_split(self.host.xe('vif-list', {'vm-uuid': self.uuid}, minimal=True)):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 

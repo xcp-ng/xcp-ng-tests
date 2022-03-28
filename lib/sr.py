@@ -12,7 +12,7 @@ class SR:
         self._main_host = None # cached value for main_host()
 
     def pbd_uuids(self):
-        return self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True).split(',')
+        return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
 
     def unplug_pbds(self, force=False):
         logging.info(f"Unplug PBDs for SR {self.uuid}")
@@ -96,7 +96,7 @@ class SR:
         self.pool.master.xe('sr-scan', {'uuid': self.uuid})
 
     def hosts_uuids(self):
-        return self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid, 'params': 'host-uuid'}, minimal=True).split(',')
+        return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid, 'params': 'host-uuid'}, minimal=True))
 
     def attached_to_host(self, host):
         return host.uuid in self.hosts_uuids()
