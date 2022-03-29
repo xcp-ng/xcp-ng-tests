@@ -62,8 +62,8 @@ OUTPUT_HANDLER = logging.StreamHandler()
 OUPUT_LOGGER.addHandler(OUTPUT_HANDLER)
 OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
 
-def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-        background=False, target_os='linux', decode=True):
+def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+         background=False, target_os='linux', decode=True):
     options = []
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
@@ -99,7 +99,7 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
     )
     logging.debug(f"[{hostname_or_ip}] {command}")
     if windows_background:
-        return process
+        return True, process
 
     stdout = []
     for line in iter(process.stdout.readline, b''):
@@ -115,23 +115,34 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
 
     # Even if check is False, we still raise in case of return code 255, which means a SSH error.
     if res.returncode == 255:
-        raise SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
+        return False, SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
 
     output = res.stdout
     if config.ignore_ssh_banner:
         if banner_res.returncode == 255:
-            raise SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
+            return False, SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
         output = output[len(banner_res.stdout):]
 
     if decode:
         output = output.decode()
 
     if res.returncode and check:
-        raise SSHCommandFailed(res.returncode, output_for_errors, command)
+        return False, SSHCommandFailed(res.returncode, output_for_errors, command)
 
     if simple_output:
-        return output.strip()
-    return SSHResult(res.returncode, output)
+        return True, output.strip()
+    return True, SSHResult(res.returncode, output)
+
+# The actual code is in _ssh().
+# This function is kept short for shorter pytest traces upon SSH failures, which are common,
+# as pytest prints the whole function definition that raised the SSHCommandFailed exception
+def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+        background=False, target_os='linux', decode=True):
+    success, result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
+                                  background, target_os, decode)
+    if not success:
+        raise result_or_exc
+    return result_or_exc
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
     options = ""
