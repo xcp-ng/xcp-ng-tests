@@ -27,6 +27,11 @@ def four_vms(imported_vm):
 
 
 class TestIrqBalance:
+    """
+    In the past, a security fix broke IRQ balancing for VIFs.
+    We want to avoid this to happen again, so this testcase runs several VMs
+    and verifies that the IRQs are balanced on more than one CPU.
+    """
     def test_start_four_vms(self, four_vms):
         for vm in four_vms:
             vm.start()
@@ -47,11 +52,16 @@ class TestIrqBalance:
             # List the CPU(s) that handled IRQs for the VM's vifs
             for vif in vm.vifs():
                 device_id = vif.device_id()
-                output = vm.host.ssh([rf'grep /proc/interrupts -e "xen-dyn\\s\+-event\\s\+{device_id}-"'])
+                # depending on kernel patches, we're looking either for xen-dyn or xen-dyn-lateeoi
+                output = vm.host.ssh([rf'grep /proc/interrupts -e "xen-dyn\(-lateeoi\)\?\\s\+-event\\s\+{device_id}-"'])
                 assert len(output) > 0
                 for line in output.splitlines():
                     fields = line.split()
-                    irqs_per_cpu = fields[1:fields.index('xen-dyn')]
+                    try:
+                        xen_dyn_index = fields.index('xen-dyn')
+                    except ValueError:
+                        xen_dyn_index = fields.index('xen-dyn-lateeoi')
+                    irqs_per_cpu = fields[1:xen_dyn_index]
                     for i, val in enumerate(irqs_per_cpu):
                         if int(val) > 0:
                             logging.info(f"VIF {device_id}: {val} IRQs for CPU {i}")
