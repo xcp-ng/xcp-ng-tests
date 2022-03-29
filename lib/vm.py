@@ -425,8 +425,11 @@ class VM(BaseVM):
                 "Got: %s" % output
             )
         else:
+            # Previously, we would call tail -c1 directly, and it worked in almost all our test VMs,
+            # but it turns out CentOS 7 can't handle tail -c1 on that special file (can't "seek").
+            # So we need to cat then pipe into tail.
             last_byte = self.ssh(
-                ["tail", "-c1", "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"],
+                ["cat /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c | tail -c1"],
                 decode=False
             )
             if last_byte == b'\x01':
