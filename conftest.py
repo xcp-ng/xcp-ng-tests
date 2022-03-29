@@ -49,7 +49,7 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--second-network",
-        action="append",
+        action="store",
         default=None,
         help="UUID of second network in the A pool, NOT the management network"
     )
@@ -314,8 +314,19 @@ gpgcheck=0
             host_.ssh(['rm', '-f', repo_file])
 
 @pytest.fixture(scope='session')
-def second_network(request):
-    return request.param
+def second_network(request, host):
+    if request.param is None:
+        pytest.fail("This test requires the --second-network parameter!")
+    network_uuid = request.param
+    pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': network_uuid}, minimal=True)
+    if pif_uuid == "":
+        pytest.fail("The provided --second-network UUID doesn't exist or doesn't have a PIF on master host")
+    ip = host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'IP'})
+    if ip == "":
+        pytest.fail("The provided --second-network has a PIF but no IP")
+    if network_uuid == host.management_network():
+        pytest.fail("--second-network must NOT be the management network")
+    return network_uuid
 
 def pytest_generate_tests(metafunc):
     if "hosts" in metafunc.fixturenames:
@@ -342,8 +353,7 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("additional_repos", repos, indirect=True, scope="session")
     if "second_network" in metafunc.fixturenames:
         second_network = metafunc.config.getoption("second_network")
-        if second_network is not None:
-            metafunc.parametrize("second_network", second_network, indirect=True, scope="session")
+        metafunc.parametrize("second_network", [second_network], indirect=True, scope="session")
     if "sr_disk" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk", disk, indirect=True, scope="session")
