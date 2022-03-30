@@ -1,5 +1,3 @@
-import pytest
-
 from lib.commands import SSHCommandFailed
 from lib.efi import (
     Certificate,
