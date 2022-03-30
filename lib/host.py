@@ -74,6 +74,7 @@ class Host:
             self.scp(script.name, script.name)
 
             try:
+                logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
                 return self.ssh([script.name], simple_output=simple_output)
             finally:
                 self.ssh(['rm', '-f', script.name])
