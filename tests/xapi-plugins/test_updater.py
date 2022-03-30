@@ -28,12 +28,12 @@ class TestProxies:
     def test_set_proxies(self, host):
         proxies = host.call_plugin('updater.py', 'get_proxies')
 
-        set_proxies = '{ \
-            "xcp-ng-base": "_none_", \
-            "xcp-ng-updates": "_none_", \
-            "xcp-ng-testing": "_none_", \
-            "xcp-ng-staging": "_none_" \
-        }'
+        set_proxies = '{' \
+            '"xcp-ng-base": "_none_", ' \
+            '"xcp-ng-updates": "_none_", ' \
+            '"xcp-ng-testing": "_none_", ' \
+            '"xcp-ng-staging": "_none_"' \
+            '}'
         host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies})
 
         res = host.call_plugin('updater.py', 'get_proxies')
