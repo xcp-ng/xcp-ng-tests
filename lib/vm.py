@@ -238,6 +238,7 @@ class VM(BaseVM):
             f.flush()
             self.scp(f.name, f.name)
             try:
+                logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
                 res = self.ssh(['sh', f.name], simple_output=simple_output)
                 return res
             finally:
