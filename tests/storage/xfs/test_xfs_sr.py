@@ -22,7 +22,7 @@ class TestXFSSRCreateDestroy:
             "xfsprogs must not be installed on the host at the beginning of the tests"
         sr = None
         try:
-            sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk})
+            sr = host.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:
@@ -32,7 +32,7 @@ class TestXFSSRCreateDestroy:
     def test_create_and_destroy_sr(self, sr_disk, host_with_xfsprogs):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_xfsprogs
-        sr = host.sr_create('xfs', "XFS-local-SR", {'device': '/dev/' + sr_disk}, verify=True)
+        sr = host.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)

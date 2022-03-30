@@ -197,7 +197,7 @@ def glusterfs_device_config(host):
 def glusterfs_sr(host, pool_with_glusterfs, gluster_volume_started, glusterfs_device_config):
     """ A GlusterFS SR on first host. """
     # Create the SR
-    sr = host.sr_create('glusterfs', "GlusterFS-SR", glusterfs_device_config, shared=True)
+    sr = host.sr_create('glusterfs', "GlusterFS-SR-test", glusterfs_device_config, shared=True)
     yield sr
     # teardown
     sr.destroy()

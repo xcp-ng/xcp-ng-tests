@@ -4,7 +4,7 @@ import pytest
 @pytest.fixture(scope='session')
 def ext_sr(host, sr_disk):
     """ An EXT SR on first host. """
-    sr = host.sr_create('ext', "EXT-local-SR", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
     sr.destroy()

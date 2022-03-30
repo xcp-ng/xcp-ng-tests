@@ -88,7 +88,7 @@ def create_linstor_sr(hosts_with_linstor):
     master.ssh(['linstor', 'node', 'create', '`uname -n`', master_ip, '--node-type', 'Combined'])
 
     try:
-        return master.sr_create('linstor', 'LINSTOR-SR', {
+        return master.sr_create('linstor', 'LINSTOR-SR-test', {
             'hosts': ','.join([host.hostname() for host in hosts_with_linstor]),
             'group-name': GROUP_NAME,
             'redundancy': len(hosts_with_linstor),
