@@ -34,10 +34,10 @@ class TestProxies:
             "xcp-ng-testing": "_none_", \
             "xcp-ng-staging": "_none_" \
         }'
-        host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies}, use_scp=True)
+        host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies})
 
         res = host.call_plugin('updater.py', 'get_proxies')
         assert json.loads(res) == json.loads(set_proxies)
 
-        host.call_plugin('updater.py', 'set_proxies', {"proxies": proxies}, use_scp=True)
+        host.call_plugin('updater.py', 'set_proxies', {"proxies": proxies})
         assert json.loads(res) == json.loads(proxies)
