@@ -36,7 +36,7 @@ class VM(BaseVM):
 
     # By xe design on must be an host name-label
     def start(self, on=None):
-        msg_starts_on = f" (on host {on})" if on is not None else None
+        msg_starts_on = f" (on host {on})" if on else None
         logging.info("Start VM" + msg_starts_on)
         args = {'uuid': self.uuid}
         if on is not None:
