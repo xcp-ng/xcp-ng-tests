@@ -1,7 +1,12 @@
 import logging
 
-# What can be improved: control over where the exported files get written
-# and over the destination SR for VM import.
+# Requirements:
+# From --hosts parameter:
+# - host: a XCP-ng host
+# From --sr-disk parameter:
+# - an additional unused disk to store the exported VM
+# From --vm parameter:
+# - A VM to import and export
 
 def export_test(host, vm, filepath, compress='none'):
     vm.export(filepath, compress)
@@ -31,11 +36,14 @@ def export_test(host, vm, filepath, compress='none'):
         if vm2 is not None:
             vm2.destroy()
 
-def test_export_zstd(host, imported_vm):
-    export_test(host, imported_vm, '/root/test-export-zstd.xva', 'zstd')
+def test_export_zstd(host, formatted_and_mounted_ext4_disk, imported_vm):
+    filepath = formatted_and_mounted_ext4_disk + '/test-export-zstd.xva'
+    export_test(host, imported_vm, filepath, 'zstd')
 
-def test_export_gzip(host, imported_vm):
-    export_test(host, imported_vm, '/root/test-export-gzip.xva', 'gzip')
+def test_export_gzip(host, formatted_and_mounted_ext4_disk, imported_vm):
+    filepath = formatted_and_mounted_ext4_disk + '/test-export-gzip.xva'
+    export_test(host, imported_vm, filepath, 'gzip')
 
-def test_export_uncompressed(host, imported_vm):
-    export_test(host, imported_vm, '/root/test-export-uncompressed.xva', 'none')
+def test_export_uncompressed(host, formatted_and_mounted_ext4_disk, imported_vm):
+    filepath = formatted_and_mounted_ext4_disk + '/test-export-uncompressed.xva'
+    export_test(host, imported_vm, filepath, 'none')
