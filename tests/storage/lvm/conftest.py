@@ -4,7 +4,7 @@ import pytest
 @pytest.fixture(scope='session')
 def lvm_sr(host, sr_disk):
     """ An LVM SR on first host. """
-    sr = host.sr_create('lvm', "LVM-local-SR", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('lvm', "LVM-local-SR-test", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
     sr.destroy()

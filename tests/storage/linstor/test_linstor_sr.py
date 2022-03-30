@@ -21,7 +21,7 @@ class TestLinstorSRCreateDestroy:
         assert not master.binary_exists('linstor'), \
             "linstor must not be installed on the host at the beginning of the tests"
         try:
-            sr = master.sr_create('linstor', 'LINSTOR-SR', {
+            sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
                 'hosts': ','.join([host.hostname() for host in hosts]),
                 'group-name': GROUP_NAME,
                 'redundancy': len(hosts),

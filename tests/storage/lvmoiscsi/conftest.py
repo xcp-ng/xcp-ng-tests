@@ -21,7 +21,7 @@ def lvmoiscsi_device_config(sr_device_config):
 @pytest.fixture(scope='session')
 def lvmoiscsi_sr(host, lvmoiscsi_device_config):
     """ A lvmoiscsi SR on first host. """
-    sr = host.sr_create('lvmoiscsi', "lvmoiscsi-SR", lvmoiscsi_device_config, shared=True)
+    sr = host.sr_create('lvmoiscsi', "lvmoiscsi-SR-test", lvmoiscsi_device_config, shared=True)
     yield sr
     # teardown
     sr.destroy()
