@@ -257,10 +257,7 @@ def imported_vm(host, vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
-@pytest.fixture(scope="module")
-def running_vm(imported_vm):
-    vm = imported_vm
-
+def setup_running_vm(vm):
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
         vm.start()
@@ -268,6 +265,22 @@ def running_vm(imported_vm):
     wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")
     wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
+
+@pytest.fixture(scope="module")
+def running_vm(imported_vm):
+    return setup_running_vm(imported_vm)
+    # no teardown
+
+@pytest.fixture(scope='module')
+def unix_vm(imported_vm):
+    vm = imported_vm
+    if vm.is_windows:
+        pytest.skip("This test is not compatible with Windows VMs.")
+    yield vm
+
+@pytest.fixture(scope="module")
+def running_unix_vm(unix_vm):
+    return setup_running_vm(unix_vm)
     # no teardown
 
 @pytest.fixture(scope='session')

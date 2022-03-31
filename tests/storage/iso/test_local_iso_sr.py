@@ -40,11 +40,11 @@ class TestLocalISOSRCreateDestroy:
 @pytest.mark.usefixtures("local_iso_sr")
 class TestLocalISOSR:
 
-    def test_iso_mount_and_read(self, host, local_iso_sr, running_vm):
+    def test_iso_mount_and_read(self, host, local_iso_sr, running_unix_vm):
         sr, location = local_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr, location)
         try:
-            check_iso_mount_and_read_from_vm(host, os.path.basename(iso_path), running_vm)
+            check_iso_mount_and_read_from_vm(host, os.path.basename(iso_path), running_unix_vm)
         finally:
             # SR cleaning
             remove_iso_from_sr(host, sr, iso_path)
