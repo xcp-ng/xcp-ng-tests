@@ -5,7 +5,7 @@ from conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm,
 
 # Requirements:
 # From --hosts parameter:
-# - host: a XCP-ng host 
+# - host: a XCP-ng host
 # From --sr-disk parameter:
 # - an additional unused disk for the SR
 # From --vm parameter:
