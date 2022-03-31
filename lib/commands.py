@@ -76,7 +76,9 @@ def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerpri
     command = " ".join(cmd)
     if background and target_os != "windows":
         # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
-        command = "nohup %s &>/dev/null &" % command
+        # ... and run the command through a bash shell so that output redirection both works on Linux and FreeBSD.
+        # Bash being available on VMs is a documented requirement.
+        command = "nohup bash -c \"%s &>/dev/null &\"" % command
 
     ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(options)} {shlex.quote(command)}"
 

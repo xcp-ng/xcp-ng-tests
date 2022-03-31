@@ -83,11 +83,12 @@ Many tests expect VMs with:
 
 Here are instructions that should help creating such VMs.
 
-### Linux
+### Linux and other unixes
 
 * Eject installation ISO
 * Setup network
 * Install openssh-server and enable it
+* Install bash in order to ensure a common shell is available in all test VMs
 * Install guest tools, then eject guest tools ISO
 * Add XCP-ng's CI public key in /root/.ssh/authorized_keys (mode 0600)
 * Test you can ssh to it

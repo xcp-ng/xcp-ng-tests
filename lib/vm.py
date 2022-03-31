@@ -221,7 +221,9 @@ class VM(BaseVM):
             ])
             f.flush()
             self.scp(f.name, script)
-            self.ssh(['sh', script], background=True)
+            # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
+            # It is a documented requirement that bash is present on all test VMs.
+            self.ssh(['bash', script], background=True)
             wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]),
                      "wait for pid file %s to exist" % pidfile)
             pid = self.ssh(['cat', pidfile])
@@ -230,7 +232,7 @@ class VM(BaseVM):
             return pid
 
     def pid_exists(self, pid):
-        return self.ssh_with_result(['test', '-d', '/proc/%s' % pid]).returncode == 0
+        return self.ssh_with_result(['kill', '-s', '0', pid]).returncode == 0
 
     def execute_script(self, script_contents, simple_output=True):
         with tempfile.NamedTemporaryFile('w') as f:
@@ -239,7 +241,9 @@ class VM(BaseVM):
             self.scp(f.name, f.name)
             try:
                 logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
-                res = self.ssh(['sh', f.name], simple_output=simple_output)
+                # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
+                # It is a documented requirement that bash is present on all test VMs.
+                res = self.ssh(['bash', f.name], simple_output=simple_output)
                 return res
             finally:
                 self.ssh(['rm', '-f', f.name])
