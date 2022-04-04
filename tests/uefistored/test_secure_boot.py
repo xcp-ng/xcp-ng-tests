@@ -98,10 +98,8 @@ def revert_vm_state(vm, snapshot):
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestGuestLinuxUEFISecureBoot:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
-        vm, snapshot = uefi_vm_and_snapshot
-        if vm.is_windows:
-            pytest.skip('only valid for Linux VMs')
+    def setup_and_cleanup(self, unix_uefi_vm_and_snapshot):
+        vm, snapshot = unix_uefi_vm_and_snapshot
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
         yield
         revert_vm_state(vm, snapshot)
@@ -275,10 +273,8 @@ class TestCertsMissingAndSbOn:
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestUEFIKeyExchange:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
-        vm, snapshot = uefi_vm_and_snapshot
-        if vm.is_windows:
-            pytest.skip('only valid for Linux VMs')
+    def setup_and_cleanup(self, unix_uefi_vm_and_snapshot):
+        vm, snapshot = unix_uefi_vm_and_snapshot
         yield
         revert_vm_state(vm, snapshot)
 

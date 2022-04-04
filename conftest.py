@@ -282,6 +282,14 @@ def running_unix_vm(unix_vm, running_vm):
     return running_vm
     # no teardown
 
+@pytest.fixture(scope='module')
+def uefi_vm(imported_vm):
+    vm = imported_vm
+    if not vm.is_uefi:
+        pytest.skip('This test requires an UEFI VM')
+
+    yield vm
+
 @pytest.fixture(scope='session')
 def sr_device_config(request):
     raw_config = request.param

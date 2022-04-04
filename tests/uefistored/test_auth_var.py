@@ -37,8 +37,8 @@ def set_and_assert_var(vm, cert, new, should_pass):
         assert not ok, 'This var should not have successfully set'
 
 
-def test_auth_variable(linux_uefi_vm):
-    vm = linux_uefi_vm
+def test_auth_variable(unix_uefi_vm):
+    vm = unix_uefi_vm
     vm.start()
 
     try:
@@ -64,9 +64,9 @@ def test_auth_variable(linux_uefi_vm):
         vm.shutdown(verify=True)
 
 
-def test_db_append(linux_uefi_vm):
+def test_db_append(unix_uefi_vm):
     """Pass if appending the DB succeeds. Otherwise, fail."""
-    vm = linux_uefi_vm
+    vm = unix_uefi_vm
 
     PK, KEK, db, db2 = EFIAuth("PK"), EFIAuth("KEK"), EFIAuth("db"), Certificate("db")
     PK.sign_auth(PK)
