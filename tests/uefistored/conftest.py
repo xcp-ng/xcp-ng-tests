@@ -18,10 +18,8 @@ def pool_without_uefi_certs(host):
     pool.restore_uefi_certs()
 
 @pytest.fixture(scope='module')
-def uefi_vm_and_snapshot(imported_vm):
-    vm = imported_vm
-    if not vm.is_uefi:
-        pytest.skip('imported_sb_vm can only be used on UEFI VMs')
+def uefi_vm_and_snapshot(uefi_vm):
+    vm = uefi_vm
 
     # Any VM that has been booted at least once comes with some
     # UEFI variable state, so simply clear the state of
@@ -31,19 +29,14 @@ def uefi_vm_and_snapshot(imported_vm):
     vm.param_set('platform', 'secureboot', False)
     snapshot = vm.snapshot()
 
-    yield (vm, snapshot)
+    yield vm, snapshot
 
     snapshot.destroy()
 
 @pytest.fixture(scope='module')
-def uefi_vm(uefi_vm_and_snapshot):
-    vm, _ = uefi_vm_and_snapshot
-    yield vm
+def unix_uefi_vm(unix_vm, uefi_vm):
+    return uefi_vm
 
 @pytest.fixture(scope='module')
-def linux_uefi_vm(uefi_vm):
-    vm = uefi_vm
-    if vm.is_windows:
-        pytest.skip("linux_uefi_vm can only be used on Linux VMs")
-
-    yield vm
+def unix_uefi_vm_and_snapshot(unix_vm, uefi_vm_and_snapshot):
+    yield uefi_vm_and_snapshot
