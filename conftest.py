@@ -1,7 +1,11 @@
 import logging
 import pytest
 import tempfile
+
+from packaging import version
+
 import lib.config as global_config
+
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.pool import Pool
@@ -139,6 +143,18 @@ def hostB1(hosts):
     _hostB1 = hosts[1]
     logging.info(">>> hostB1 present: %s" % _hostB1)
     yield _hostB1
+
+@pytest.fixture(scope='session')
+def host_at_least_8_3(host):
+    version_str = "8.3"
+    if not host.xcp_version >= version.parse(version_str):
+        pytest.skip(f"This test requires an XCP-ng >= {version_str} host")
+
+@pytest.fixture(scope='session')
+def host_less_than_8_3(host):
+    version_str = "8.3"
+    if not host.xcp_version < version.parse(version_str):
+        pytest.skip(f"This test requires an XCP-ng < {version_str} host")
 
 @pytest.fixture(scope='session')
 def local_sr_on_hostA1(hostA1):

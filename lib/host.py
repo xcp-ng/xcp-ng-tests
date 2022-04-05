@@ -4,6 +4,8 @@ import os
 import shlex
 import tempfile
 
+from packaging import version
+
 import lib.commands as commands
 
 from lib.common import safe_split, to_xapi_bool, wait_for, wait_for_not
@@ -24,6 +26,7 @@ class Host:
         self.saved_rollback_id = None
         self.inventory = self._get_xensource_inventory()
         self.uuid = self.inventory['INSTALLATION_UUID']
+        self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
 
     def __str__(self):
         return self.hostname_or_ip
@@ -173,7 +176,7 @@ class Host:
 
     def restart_toolstack(self, verify=False):
         logging.info("Restart toolstack on host %s" % self)
-        return self.ssh(['xe-toolstack-restart'])
+        self.ssh(['xe-toolstack-restart'])
         if verify:
             wait_for(self.is_enabled, "Wait for host enabled")
 
