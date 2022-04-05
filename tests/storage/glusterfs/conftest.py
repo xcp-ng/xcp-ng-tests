@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from lib.commands import SSHCommandFailed
+from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 
@@ -88,22 +89,13 @@ def pool_with_glusterfs(host):
 @pytest.fixture(scope='session')
 def gluster_disk(host, sr_disk_for_all_hosts):
     sr_disk = sr_disk_for_all_hosts
-    device = '/dev/' + sr_disk
     hosts = host.pool.hosts
+    mountpoint = '/mnt/sr_disk'
     for h in hosts:
-        logging.info(">> Format sr_disk %s and mount it on host %s" % (sr_disk, h))
-        h.ssh(['mkfs.xfs', '-f', device])
-        h.ssh(['rm', '-rf', '/mnt/sr_disk']) # Remove any existing leftover to ensure rmdir will not fail in teardown
-        h.ssh(['mkdir', '-p', '/mnt/sr_disk'])
-        h.ssh(['cp', '-f', '/etc/fstab', '/etc/fstab.orig'])
-        h.ssh(['echo', '%s /mnt/sr_disk xfs defaults 0 0' % device, '>>/etc/fstab'])
-        h.ssh(['mount', '/mnt/sr_disk'])
+        setup_formatted_and_mounted_disk(h, sr_disk, 'xfs', mountpoint)
     yield
     for h in hosts:
-        logging.info("<< Restore fstab and unmount /mnt/sr_disk on host %s" % h)
-        h.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
-        h.ssh(['umount', '/mnt/sr_disk'])
-        h.ssh(['rmdir', '/mnt/sr_disk'])
+        teardown_formatted_and_mounted_disk(h, mountpoint)
 
 def _fallback_gluster_teardown(host):
     # See: https://microdevsys.com/wp/volume-delete-volume-failed-some-of-the-peers-are-down/
