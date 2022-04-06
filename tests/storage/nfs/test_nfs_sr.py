@@ -5,7 +5,7 @@ from lib.common import wait_for, vm_image
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
 
 class TestNFSSRCreateDestroy:
-    def test_create_and_destroy_sr(self, host, sr_disk, nfs_device_config):
+    def test_create_and_destroy_sr(self, host, nfs_device_config):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('nfs', "NFS-SR-test", nfs_device_config, shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_nfs fixture used in
