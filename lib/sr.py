@@ -40,8 +40,14 @@ class SR:
         if verify:
             wait_for(self.all_pbds_attached, "Wait for PDBs attached")
 
-    def vdi_uuids(self, managed=False):
-        return safe_split(self.pool.master.xe('vdi-list', {'sr-uuid': self.uuid, 'managed': managed}, minimal=True))
+    def vdi_uuids(self, managed=False, name_label=None):
+        args = {
+            'sr-uuid': self.uuid,
+            'managed': managed
+        }
+        if name_label is not None:
+            args['name-label'] = name_label
+        return safe_split(self.pool.master.xe('vdi-list', args, minimal=True))
 
     def destroy(self, verify=False, force=False):
         # Rescan SR to improve the chances of the forced GC run triggered by sr-destroy
