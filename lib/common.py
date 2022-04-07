@@ -1,5 +1,6 @@
 import logging
 import time
+import getpass
 from enum import Enum
 from uuid import UUID
 
@@ -15,6 +16,14 @@ def vm_image(vm_key):
     if not url.startswith('http'):
         url = DEF_VM_URL + url
     return url
+
+def prefix_object_name(label):
+    try:
+        from data import OBJECTS_NAME_PREFIX
+        name_prefix = OBJECTS_NAME_PREFIX
+    except ImportError:
+        name_prefix = f"[{getpass.getuser()}]"
+    return f"{name_prefix} {label}"
 
 def wait_for(fn, msg=None, timeout_secs=120, retry_delay_secs=2, invert=False):
     if msg is not None:
