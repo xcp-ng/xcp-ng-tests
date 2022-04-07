@@ -7,6 +7,7 @@ import tempfile
 import lib.commands as commands
 
 from lib.common import safe_split, to_xapi_bool, wait_for, wait_for_not
+from lib.common import objects_name_prefix
 from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
@@ -155,6 +156,8 @@ class Host:
         logging.info(msg)
         vm_uuid = self.xe('vm-import', params)
         logging.info("VM UUID: %s" % vm_uuid)
+        vm_name = f"{objects_name_prefix()} " + self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'})
+        self.xe('vm-param-set', {'uuid': vm_uuid, 'name-label': vm_name})
         vm = VM(vm_uuid, self)
         # Set VM VIF networks to the host's management network
         for vif in vm.vifs():

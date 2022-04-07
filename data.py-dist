@@ -6,6 +6,9 @@
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
 
+# A prefix name to identify the imported VM
+OBJECTS_NAME_PREFIX = "TEST"
+
 # Override settings for specific hosts
 # skip_xo_config allows to not touch XO's configuration regarding the host
 # Else the default behaviour is to add the host to XO servers at the beginning

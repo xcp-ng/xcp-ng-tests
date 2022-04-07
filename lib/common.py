@@ -16,6 +16,15 @@ def vm_image(vm_key):
         url = DEF_VM_URL + url
     return url
 
+def objects_name_prefix():
+    try:
+        from data import OBJECTS_NAME_PREFIX
+        name_prefix = OBJECTS_NAME_PREFIX
+    except ImportError:
+        name_prefix = 'TEST'
+    finally:
+        return name_prefix
+
 def wait_for(fn, msg=None, timeout_secs=120, retry_delay_secs=2, invert=False):
     if msg is not None:
         logging.info(msg)
