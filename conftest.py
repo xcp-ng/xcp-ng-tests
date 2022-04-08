@@ -82,38 +82,27 @@ def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
-def host_data(hostname_or_ip):
-    # read from data.py
-    from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS
-    if hostname_or_ip in HOSTS:
-        h_data = HOSTS[hostname_or_ip]
-        return h_data
-    else:
-        return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
-
 def setup_host(hostname_or_ip):
     logging.info(">>> Connect host %s" % hostname_or_ip)
     pool = Pool(hostname_or_ip)
     h = pool.master
     # XO connection
-    h_data = host_data(hostname_or_ip)
-    skip_xo_config = h_data.get('skip_xo_config', False)
-    if not skip_xo_config:
-        h.xo_server_add(h_data['user'], h_data['password'])
+    if not h.skip_xo_config:
+        h.xo_server_add(h.user, h.password)
     else:
         h.xo_get_server_id(store=True)
     wait_for(h.xo_server_connected, timeout_secs=10)
-    return h, skip_xo_config
+    return h
 
 @pytest.fixture(scope='session')
 def hosts(request):
     # a list of master hosts, each from a different pool
     hostname_list = request.param.split(',')
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
-    yield [tup[0] for tup in host_list]
+    yield host_list
     # teardown
-    for h, skip_xo_config in host_list:
-        if not skip_xo_config:
+    for h in host_list:
+        if not h.skip_xo_config:
             logging.info("<<< Disconnect host %s" % h)
             h.xo_server_remove()
 
