@@ -6,6 +6,16 @@ from lib.efi import get_secure_boot_guid, esl_from_auth_file
 
 from utils import generate_keys, revert_vm_state
 
+# Requirements:
+# On the test runner:
+# - See requirements documented in the project's README.md for Guest UEFI Secure Boot tests
+# From --hosts parameter:
+# - host(A1): XCP-ng host >= 8.2 (+ updates) (or >= 8.3 for other tests)
+#   with UEFI certs either absent, or present and consistent (state will be saved and restored)
+#   Master of a, at least, 2 hosts pool
+
+CERT_DIR = "/var/lib/uefistored"
+
 def install_certs_to_disks(pool, certs_dict, keys):
     for host in pool.hosts:
         logging.debug('Installing to host %s:' % host.hostname_or_ip)
@@ -13,10 +23,10 @@ def install_certs_to_disks(pool, certs_dict, keys):
             value = certs_dict[key].auth
             hash = hashlib.md5(open(value, 'rb').read()).hexdigest()
             logging.debug('    - key: %s, value: %s' % (key, hash))
-            host.scp(value, f'/var/lib/uefistored/{key}.auth')
+            host.scp(value, f'{CERT_DIR}/{key}.auth')
 
 def check_disk_cert_md5sum(host, key, reference_file):
-    auth_filepath_on_host = f'/var/lib/uefistored/{key}.auth'
+    auth_filepath_on_host = f'{CERT_DIR}/{key}.auth'
     assert host.file_exists(auth_filepath_on_host)
     reference_md5 = hashlib.md5(open(reference_file, 'rb').read()).hexdigest()
     host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
@@ -157,7 +167,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         host.restart_toolstack(verify=True)
         logging.info('Check that the certs on disk have been erased since there is none in the pool.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not host.file_exists(f'/var/lib/uefistored/{key}.auth')
+            assert not host.file_exists(f'{CERT_DIR}/{key}.auth')
 
     def test_pool_certs_present_and_some_different_disk_certs_present(self, host):
         # start with all certs on pool and just two certs on disks
@@ -185,7 +195,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
-        assert not host.file_exists('/var/lib/uefistored/dbx.auth')
+        assert not host.file_exists('{CERT_DIR}/dbx.auth')
 
     def test_pool_certs_present_and_disk_certs_present_and_same(self, host):
         # start with certs on pool and no certs on host disks
@@ -283,3 +293,40 @@ class TestPoolToVMCertInheritance:
             self.check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
         for key in ['db', 'dbx']:
             self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+
+@pytest.mark.usefixtures("host_at_least_8_3", "hostA2", "pool_without_uefi_certs")
+class TestPoolToDiskCertInheritance:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, host):
+        yield
+        host.pool.clear_uefi_certs()
+
+    def test_set_pool_certificates(self, host):
+        keys = ['PK', 'KEK', 'db', 'dbx']
+        pool_auths = generate_keys(as_dict=True)
+        host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
+        for h in host.pool.hosts:
+            logging.info(f"Check Pool.set_uefi_certificates update host {h} certificate on disk.")
+            for key in keys:
+                check_disk_cert_md5sum(h, key, pool_auths[key].auth)
+
+    def test_set_pool_certificates_partial(self, host):
+        keys = ['PK', 'KEK', 'db']
+        missing_key = 'dbx'
+        pool_auths = generate_keys(as_dict=True)
+        host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
+        for h in host.pool.hosts:
+            logging.info(f"Check Pool.set_uefi_certificates update host {h} certificate on disk.")
+            for key in keys:
+                check_disk_cert_md5sum(h, key, pool_auths[key].auth)
+            assert not h.file_exists(f'{CERT_DIR}/{missing_key}.auth')
+
+    def test_clear_certificates_from_pool(self, host):
+        keys = ['PK', 'KEK', 'db', 'dbx']
+        pool_auths = generate_keys(as_dict=True)
+        host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
+        host.pool.clear_uefi_certs()
+        for h in host.pool.hosts:
+            logging.info(f"Check host {h} has no certificate on disk.")
+            for key in keys:
+                assert not h.file_exists(f'{CERT_DIR}/{key}.auth')
