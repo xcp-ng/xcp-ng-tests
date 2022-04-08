@@ -14,6 +14,15 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
+def host_data(hostname_or_ip):
+    # read from data.py
+    from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS
+    if hostname_or_ip in HOSTS:
+        h_data = HOSTS[hostname_or_ip]
+        return h_data
+    else:
+        return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
+
 class Host:
     def __init__(self, pool, hostname_or_ip):
         self.pool = pool
@@ -21,8 +30,12 @@ class Host:
         self.inventory = None
         self.uuid = None
         self.xo_srv_id = None
-        self.user = None
-        self.password = None
+
+        h_data = host_data(self.hostname_or_ip)
+        self.user = h_data['user']
+        self.password = h_data['password']
+        self.skip_xo_config = h_data.get('skip_xo_config', False)
+
         self.saved_packages_list = None
         self.saved_rollback_id = None
         self.inventory = self._get_xensource_inventory()
@@ -348,3 +361,21 @@ class Host:
             for k, v in args.items():
                 params['args:%s' % k] = v
         return self.xe('host-call-plugin', params)
+
+    def join_pool(self, pool):
+        master = pool.master
+        self.xe('pool-join', {
+            'master-address': master.hostname_or_ip,
+            'master-username': master.user,
+            'master-password': master.password
+        })
+        wait_for(
+            lambda: self.uuid in pool.hosts_uuids(),
+            f"Wait for joining host {self} to appear in joined pool {master}."
+        )
+        pool.hosts.append(Host(pool, pool.host_ip(self.uuid)))
+        # Do not use `self.is_enabled` since it'd ask the XAPi of hostB1 before the join...
+        wait_for(
+            lambda: master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}),
+            f"Wait for pool {master} to see joined host {self} as enabled."
+        )

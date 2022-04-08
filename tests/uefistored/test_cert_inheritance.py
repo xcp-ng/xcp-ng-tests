@@ -13,6 +13,8 @@ from utils import generate_keys, revert_vm_state
 # - host(A1): XCP-ng host >= 8.2 (+ updates) (or >= 8.3 for other tests)
 #   with UEFI certs either absent, or present and consistent (state will be saved and restored)
 #   Master of a, at least, 2 hosts pool
+# - hostB1: XCP-ng host >= 8.3
+#   This host will be joined and ejected from pool A, it means its state will be completely reinitialized from scratch
 
 CERT_DIR = "/var/lib/uefistored"
 
@@ -330,3 +332,32 @@ class TestPoolToDiskCertInheritance:
             logging.info(f"Check host {h} has no certificate on disk.")
             for key in keys:
                 assert not h.file_exists(f'{CERT_DIR}/{key}.auth')
+
+@pytest.mark.usefixtures("host_at_least_8_3", "pool_without_uefi_certs")
+class TestPoolToDiskCertInheritanceOnJoin:
+    @pytest.fixture(scope='function')
+    def keys_auths_for_joined_host(self, host, hostB1):
+        from packaging import version
+        version_str = "8.3"
+        if not hostB1.xcp_version >= version.parse(version_str):
+            pytest.skip(f"This test requires a second XCP-ng pool with version >= {version_str}")
+
+        # Install certs before host join
+        keys = ['PK', 'KEK', 'db', 'dbx']
+        pool_auths = generate_keys(as_dict=True)
+        host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
+
+        logging.info(f"> Join host {hostB1} to pool {host} after certificates installed.")
+        hostB1.join_pool(host.pool)
+        joined_host = host.pool.get_host_by_uuid(hostB1.uuid)
+        yield keys, pool_auths, joined_host
+
+        logging.info(f"< Eject host {joined_host} from pool {host}.")
+        # Warning: triggers a reboot of ejected host.
+        host.pool.eject_host(joined_host)
+        host.pool.clear_uefi_certs()
+
+    def test_host_certificates_updated_after_join(self, keys_auths_for_joined_host):
+        keys, pool_auths, joined_host = keys_auths_for_joined_host
+        for key in keys:
+            check_disk_cert_md5sum(joined_host, key, pool_auths[key].auth)

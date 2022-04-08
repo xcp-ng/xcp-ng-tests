@@ -2,7 +2,7 @@ import logging
 
 import lib.commands as commands
 
-from lib.common import safe_split
+from lib.common import safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
 
@@ -136,3 +136,10 @@ class Pool:
             host.ssh(['secureboot-certs', 'install'] + params)
         finally:
             host.ssh(['rm', '-f'] + list(auths_dict.values()))
+
+    def eject_host(self, host):
+        master = self.master
+        master.xe('pool-eject', {'host-uuid': host.uuid, 'force': True})
+        wait_for_not(lambda: host.uuid in self.hosts_uuids(), "Wait for host {host} to be ejected of pool {master}.")
+        self.hosts = [h for h in self.hosts if h.uuid != host.uuid]
+        wait_for(host.is_enabled, f"Wait for host {host} to restart in its own pool.", timeout_secs=600)
