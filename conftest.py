@@ -225,6 +225,13 @@ def sr_disk_for_all_hosts(request, host):
         logging.info(f">> Disk or block device {disk} is present and free on all pool members")
     yield candidates[0]
 
+@pytest.fixture(scope='session')
+def formatted_and_mounted_ext4_disk(host, sr_disk):
+    mountpoint = '/var/tmp/sr_disk_mountpoint'
+    setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
+    yield mountpoint
+    teardown_formatted_and_mounted_disk(host, mountpoint)
+
 @pytest.fixture(scope='module')
 def vm_ref(request):
     ref = request.param
@@ -386,10 +393,3 @@ def pytest_generate_tests(metafunc):
     if "sr_disk_for_all_hosts" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
-
-@pytest.fixture(scope='session')
-def formatted_and_mounted_ext4_disk(host, sr_disk):
-    mountpoint = '/var/tmp/sr_disk_mountpoint'
-    setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
-    yield mountpoint
-    teardown_formatted_and_mounted_disk(host, mountpoint)
