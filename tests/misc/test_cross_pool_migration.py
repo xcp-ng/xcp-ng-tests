@@ -2,9 +2,7 @@ import logging
 
 from lib.common import wait_for, wait_for_not
 
-def test_cross_pool_migration(host, hostB1, imported_vm):
-    assert host.pool.uuid != hostB1.pool.uuid
-
+def test_cross_pool_migration(hostB1, imported_vm):
     vm = imported_vm.clone()
     try:
         vm.start()
