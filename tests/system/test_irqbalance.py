@@ -25,7 +25,8 @@ def four_vms(imported_vm):
     logging.info("< Destroy VM2")
     vm2.destroy()
 
-
+@pytest.mark.flaky # sometimes IRQs are not balanced and we don't know why. And sometimes a VM doesn't report an IP.
+@pytest.mark.small_vm # run with a small VM to test the features
 class TestIrqBalance:
     """
     In the past, a security fix broke IRQ balancing for VIFs.

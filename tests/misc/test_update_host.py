@@ -3,6 +3,7 @@ import pytest
 
 from lib.common import wait_for
 
+@pytest.mark.reboot # host reboots
 def test(host):
     logging.info("Check for updates")
     if not host.has_updates():

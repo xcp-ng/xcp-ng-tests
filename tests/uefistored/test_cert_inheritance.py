@@ -13,7 +13,7 @@ from .utils import generate_keys, revert_vm_state
 # - host(A1): XCP-ng host >= 8.2 (+ updates) (or >= 8.3 for other tests)
 #   with UEFI certs either absent, or present and consistent (state will be saved and restored)
 #   Master of a, at least, 2 hosts pool
-# - hostB1: XCP-ng host >= 8.3
+# - hostB1: XCP-ng host >= 8.3 (required only if hostA1 is already >=8.3, else no hostB1 is needed)
 #   This host will be joined and ejected from pool A, it means its state will be completely reinitialized from scratch
 
 CERT_DIR = "/var/lib/uefistored"
@@ -36,6 +36,7 @@ def check_disk_cert_md5sum(host, key, reference_file):
     logging.debug('Host disk MD5: %s' % host_disk_md5)
     assert host_disk_md5 == reference_md5
 
+@pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.usefixtures("host_less_than_8_3", "pool_without_uefi_certs")
 class TestPoolToDiskCertInheritanceAtVmStart:
     @pytest.fixture(autouse=True)
@@ -210,6 +211,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
+@pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestPoolToVMCertInheritance:
     @pytest.fixture(autouse=True)
@@ -297,7 +299,7 @@ class TestPoolToVMCertInheritance:
             self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
 @pytest.mark.usefixtures("host_at_least_8_3", "hostA2", "pool_without_uefi_certs")
-class TestPoolToDiskCertInheritance:
+class TestPoolToDiskCertPropagationToAllHosts:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, host):
         yield
@@ -334,7 +336,7 @@ class TestPoolToDiskCertInheritance:
                 assert not h.file_exists(f'{CERT_DIR}/{key}.auth')
 
 @pytest.mark.usefixtures("host_at_least_8_3", "pool_without_uefi_certs")
-class TestPoolToDiskCertInheritanceOnJoin:
+class TestPoolToDiskCertInheritanceOnPoolJoin:
     @pytest.fixture(scope='function')
     def keys_auths_for_joined_host(self, host, hostB1):
         from packaging import version

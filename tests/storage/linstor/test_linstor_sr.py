@@ -45,14 +45,18 @@ class TestLinstorSRCreateDestroy:
         vm.destroy(verify=True)
         destroy_linstor_sr(hosts_with_linstor, sr)
 
-@pytest.mark.usefixtures("linstor_sr", "vm_on_linstor_sr")
+@pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_linstor_sr):
         vm = vm_on_linstor_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_snapshot(self, vm_on_linstor_sr):
         vm = vm_on_linstor_sr
         vm.start()
@@ -62,7 +66,9 @@ class TestLinstorSR:
 
     # *** tests with reboots (longer tests).
 
-    def test_reboot(self, host, linstor_sr, vm_on_linstor_sr):
+    @pytest.mark.reboot # reboots the host
+    @pytest.mark.small_vm # run with a small VM to test the features
+    def test_reboot(self, vm_on_linstor_sr, host, linstor_sr):
         sr = linstor_sr
         vm = vm_on_linstor_sr
         host.reboot(verify=True)
@@ -72,6 +78,7 @@ class TestLinstorSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.reboot # reboots the host
     def test_linstor_missing(self, linstor_sr, host):
         packages = ['python-linstor', 'linstor-client']
         sr = linstor_sr

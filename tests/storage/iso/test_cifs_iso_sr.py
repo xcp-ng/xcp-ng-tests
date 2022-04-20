@@ -32,6 +32,7 @@ class TestCIFSISOSRCreateDestroy:
         sr = host.sr_create('iso', "ISO-CIFS-SR-test", cifs_iso_device_config, shared=True, verify=True)
         sr.forget()
 
+@pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.usefixtures("cifs_iso_sr")
 class TestCIFSISOSR:
 

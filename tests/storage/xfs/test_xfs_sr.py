@@ -39,14 +39,18 @@ class TestXFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("xfs_sr", "vm_on_xfs_sr")
+@pytest.mark.usefixtures("xfs_sr")
 class TestXFSSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_xfs_sr):
         vm = vm_on_xfs_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_snapshot(self, vm_on_xfs_sr):
         vm = vm_on_xfs_sr
         vm.start()
@@ -56,7 +60,9 @@ class TestXFSSR:
 
     # *** tests with reboots (longer tests).
 
-    def test_reboot(self, host, xfs_sr, vm_on_xfs_sr):
+    @pytest.mark.reboot # reboots the host
+    @pytest.mark.small_vm # run with a small VM to test the features
+    def test_reboot(self, vm_on_xfs_sr, host, xfs_sr):
         sr = xfs_sr
         vm = vm_on_xfs_sr
         host.reboot(verify=True)
@@ -66,6 +72,7 @@ class TestXFSSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.reboot # reboots the host
     def test_xfsprogs_missing(self, host, xfs_sr):
         sr = xfs_sr
         xfsprogs_installed = True

@@ -59,14 +59,17 @@ def _save_ip_configuration_mode(host, pif_uuid):
 
     return args
 
-@pytest.mark.incremental
+@pytest.mark.small_vm # what we test here is that evacuate works, the goal is not to test with various VMs
 class TestHostEvacuate:
-    # first in list so that it fails early in case the --second-network parameter is missing or wrong
-    def test_host_evacuate_with_network(self, host, hostA2, second_network, vm_on_nfs_sr):
-        _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr)
-
     def test_host_evacuate(self, host, hostA2, vm_on_nfs_sr):
         _host_evacuate_test(host, hostA2, None, vm_on_nfs_sr)
+
+@pytest.mark.complex_prerequisites # requires a special network setup.
+@pytest.mark.small_vm # what we test here is the network-uuid option, the goal is not to test with various VMs
+@pytest.mark.usefixtures("host_at_least_8_3")
+class TestHostEvacuateWithNetwork:
+    def test_host_evacuate_with_network(self, host, hostA2, second_network, vm_on_nfs_sr):
+        _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr)
 
     def test_host_evacuate_with_network_no_ip(self, host, hostA2, second_network, vm_on_nfs_sr):
         pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': second_network}, minimal=True)

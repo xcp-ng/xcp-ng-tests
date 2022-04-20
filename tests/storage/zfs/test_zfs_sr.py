@@ -41,14 +41,18 @@ class TestZFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("zpool_vol0", "vm_on_zfs_sr")
+@pytest.mark.usefixtures("zpool_vol0")
 class TestZFSSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_zfs_sr):
         vm = vm_on_zfs_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_snapshot(self, vm_on_zfs_sr):
         vm = vm_on_zfs_sr
         vm.start()
@@ -58,7 +62,9 @@ class TestZFSSR:
 
     # *** tests with reboots (longer tests).
 
-    def test_reboot(self, host, zfs_sr, vm_on_zfs_sr):
+    @pytest.mark.reboot # reboots the host
+    @pytest.mark.small_vm # run with a small VM to test the features
+    def test_reboot(self, vm_on_zfs_sr, host, zfs_sr):
         sr = zfs_sr
         vm = vm_on_zfs_sr
         host.reboot(verify=True)
@@ -68,6 +74,7 @@ class TestZFSSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.reboot # reboots the host
     def test_zfs_missing(self, host, zfs_sr):
         sr = zfs_sr
         zfs_installed = True
@@ -95,6 +102,7 @@ class TestZFSSR:
                 host.yum_install(['zfs'])
                 host.ssh(['modprobe', 'zfs'])
 
+    @pytest.mark.reboot # reboots the host
     def test_zfs_unmounted(self, host, zfs_sr):
         sr = zfs_sr
         zpool_imported = True

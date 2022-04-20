@@ -10,6 +10,8 @@ from .conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm
 # - A VM to import
 # From data.py or --sr-device-config parameter: configuration to create a new NFS ISO SR.
 
+@pytest.mark.reboot # reboots the host
+@pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.usefixtures("nfs_iso_sr")
 class TestNFSISOSRReboot:
     """
