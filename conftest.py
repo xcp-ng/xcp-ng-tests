@@ -405,11 +405,21 @@ def pytest_collection_modifyitems(items, config):
     # Check pytest.ini or pytest --markers for marker descriptions.
     for item in items:
         fixturenames = getattr(item, 'fixturenames', ())
-        if 'vm_ref' not in fixturenames:
-            item.add_marker('no_vm')
         if 'uefi_vm' in fixturenames:
             item.add_marker('uefi_vm')
         if 'unix_vm' in fixturenames:
             item.add_marker('unix_vm')
         if 'windows_vm' in fixturenames:
             item.add_marker('windows_vm')
+
+        # A test using a VM must specify the target through manual markers.
+        if 'vm_ref' in fixturenames:
+            if not item.get_closest_marker('small_vm') \
+                    and not item.get_closest_marker('big_vm') \
+                    and not item.get_closest_marker('multi_vms'):
+                # no marker found, raise
+                raise Exception(f"Test {item} from {item.module} uses a VM but does not define a "
+                                "target marker (small_vm, multi_vms, ...). You need to add one. "
+                                "Check pytest.ini for the list and description of VM-related test targets.")
+        else:
+            item.add_marker('no_vm')
