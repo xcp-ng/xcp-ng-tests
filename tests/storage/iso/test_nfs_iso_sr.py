@@ -34,6 +34,7 @@ class TestNFSISOSRCreateDestroy:
         sr.forget()
 
 
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("nfs_iso_sr")
 class TestNFSISOSR:
 

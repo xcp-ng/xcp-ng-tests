@@ -16,12 +16,16 @@ class TestNFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("nfs_sr", "vm_on_nfs_sr")
 class TestNFSSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_nfs_sr):
         vm = vm_on_nfs_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
     def test_snapshot(self, vm_on_nfs_sr):
         vm = vm_on_nfs_sr
         vm.start()
@@ -31,6 +35,8 @@ class TestNFSSR:
 
     # *** tests with reboots (longer tests).
 
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
     def test_reboot(self, host, nfs_sr, vm_on_nfs_sr):
         sr = nfs_sr
         vm = vm_on_nfs_sr

@@ -38,6 +38,7 @@ class TestLocalISOSRCreateDestroy:
         sr = create_local_iso_sr(host, location)
         sr.destroy(verify=True)
 
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("local_iso_sr")
 class TestLocalISOSR:
 

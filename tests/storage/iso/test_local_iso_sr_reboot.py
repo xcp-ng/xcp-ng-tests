@@ -11,6 +11,8 @@ from .conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm
 # From --vm parameter:
 # - A VM to import
 
+@pytest.mark.reboot
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("local_iso_sr")
 class TestLocalISOSRReboot:
     """

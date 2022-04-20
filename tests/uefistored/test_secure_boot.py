@@ -56,6 +56,7 @@ def sign_efi_bins(vm, db):
     if shutdown:
         vm.shutdown(verify=True)
 
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("pool_without_uefi_certs", "unix_vm")
 class TestGuestLinuxUEFISecureBoot:
     @pytest.fixture(autouse=True)
@@ -91,6 +92,7 @@ class TestGuestLinuxUEFISecureBoot:
         vm.param_set('platform', 'secureboot', True)
         boot_and_check_sb_failed(vm)
 
+    @pytest.mark.multi_vms # test that SB works on various UEFI unix/linux VMs, not just on `small_vm`
     def test_boot_success_when_pool_db_set_and_images_signed(self, uefi_vm):
         vm = uefi_vm
         vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
@@ -156,6 +158,7 @@ class TestGuestWindowsUEFISecureBoot:
         # clear pool certs for next test
         vm.host.pool.clear_uefi_certs()
 
+    @pytest.mark.small_vm # test on the smallest Windows VM, if that means anything with Windows
     def test_windows_fails(self, uefi_vm):
         vm = uefi_vm
         PK, KEK, db, _ = generate_keys(self_signed=True)
@@ -163,6 +166,7 @@ class TestGuestWindowsUEFISecureBoot:
         vm.param_set('platform', 'secureboot', True)
         boot_and_check_sb_failed(vm)
 
+    @pytest.mark.multi_vms # test that SB works on every Windows VM we have
     def test_windows_succeeds(self, uefi_vm):
         vm = uefi_vm
         vm.param_set('platform', 'secureboot', True)
@@ -172,6 +176,7 @@ class TestGuestWindowsUEFISecureBoot:
         boot_and_check_sb_succeeded(vm)
 
 
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("pool_without_uefi_certs")
 class TestCertsMissingAndSbOn:
     @pytest.fixture(autouse=True)
@@ -229,6 +234,7 @@ class TestCertsMissingAndSbOn:
         vm.install_uefi_certs([db])
         self.check_vm_start_fails_and_uefistored_dies(vm)
 
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("pool_without_uefi_certs", "unix_vm")
 class TestUEFIKeyExchange:
     @pytest.fixture(autouse=True)
