@@ -8,6 +8,8 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 # From --vm parameter
 # - A VM to import to the EXT SR
 
+@pytest.mark.small_vm # run with a small VM to test the features
+@pytest.mark.big_vm # and ideally with a big VM to test it scales
 @pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2")
 class Test:
     def test_cold_intrapool_migration(self, host, hostA2, vm_on_ext_sr, ext_sr, local_sr_on_hostA2):

@@ -25,7 +25,9 @@ def existing_shared_sr(host):
     assert sr is not None, "A shared SR on the pool is required"
     return sr
 
-@pytest.mark.incremental
+@pytest.mark.incremental # tests depend on each other. If one test fails, don't execute the others
+@pytest.mark.multi_vms # run them on a variety of VMs
+@pytest.mark.big_vm # and also on a really big VM ideally
 class TestBasicNoSSH:
     def test_start(self, imported_vm):
         vm = imported_vm

@@ -1,7 +1,10 @@
 import logging
+import pytest
 
 from lib.common import wait_for, wait_for_not
 
+@pytest.mark.multi_vms # run on a variety of VMs
+@pytest.mark.big_vm # and also on a really big VM ideally
 def test_cross_pool_migration(hostB1, imported_vm):
     vm = imported_vm.clone()
     try:

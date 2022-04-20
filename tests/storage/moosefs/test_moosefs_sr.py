@@ -40,15 +40,18 @@ class TestMooseFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-
-@pytest.mark.usefixtures("moosefs_sr", "vm_on_moosefs_sr")
+@pytest.mark.usefixtures("moosefs_sr")
 class TestMooseFSSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_moosefs_sr):
         vm = vm_on_moosefs_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
     def test_snapshot(self, vm_on_moosefs_sr):
         vm = vm_on_moosefs_sr
         vm.start()
@@ -58,7 +61,9 @@ class TestMooseFSSR:
 
     # *** tests with reboots (longer tests).
 
-    def test_reboot(self, host, moosefs_sr, vm_on_moosefs_sr):
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
+    def test_reboot(self, vm_on_moosefs_sr, host, moosefs_sr):
         sr = moosefs_sr
         vm = vm_on_moosefs_sr
         host.reboot(verify=True)
@@ -68,6 +73,7 @@ class TestMooseFSSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.reboot # reboots the host
     def test_moosefs_missing(self, host, moosefs_sr):
         sr = moosefs_sr
         moosefs_installed = True

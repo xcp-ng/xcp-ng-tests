@@ -15,7 +15,9 @@ class State:
         self.tools_version = None
         self.vm_distro = None
 
-@pytest.mark.incremental
+@pytest.mark.incremental # tests depend on each other. If one test fails, don't execute the others
+@pytest.mark.multi_vms
+@pytest.mark.usefixtures("unix_vm")
 class TestGuestToolsUnix:
     @pytest.fixture(scope='class')
     def state(self):
@@ -34,9 +36,7 @@ class TestGuestToolsUnix:
     def test_install(self, running_vm, state):
         vm = running_vm
 
-        # skip test for windows and some unixes
-        if vm.is_windows:
-            pytest.skip('Test module only valid for Unix VMs')
+        # skip test for some unixes
         state.vm_distro = vm.distro()
         if state.vm_distro == "alpine":
             pytest.skip('Alpine not supported by the guest tools installation script at the moment')

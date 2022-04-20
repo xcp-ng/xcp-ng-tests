@@ -27,12 +27,16 @@ class TestEXTSRCreateDestroy:
 
 @pytest.mark.usefixtures("ext_sr", "vm_on_ext_sr")
 class TestEXTSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_ext_sr):
         vm = vm_on_ext_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
     def test_snapshot(self, vm_on_ext_sr):
         vm = vm_on_ext_sr
         vm.start()
@@ -42,6 +46,8 @@ class TestEXTSR:
 
     # *** tests with reboots (longer tests).
 
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
     def test_reboot(self, host, ext_sr, vm_on_ext_sr):
         sr = ext_sr
         vm = vm_on_ext_sr

@@ -38,31 +38,23 @@ class TestGlusterFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("sr_disk_for_all_hosts", "glusterfs_sr", "vm_on_glusterfs_sr")
+@pytest.mark.usefixtures("sr_disk_for_all_hosts", "glusterfs_sr")
 class TestGlusterFSSR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_glusterfs_sr):
         vm = vm_on_glusterfs_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
     def test_snapshot(self, vm_on_glusterfs_sr):
         vm = vm_on_glusterfs_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.test_snapshot_on_running_vm()
-        vm.shutdown(verify=True)
-
-    # *** tests with reboots (longer tests).
-
-    def test_reboot(self, host, glusterfs_sr, vm_on_glusterfs_sr):
-        sr = glusterfs_sr
-        vm = vm_on_glusterfs_sr
-        host.reboot(verify=True)
-        wait_for(sr.all_pbds_attached, "Wait for PDB attached")
-        # start the VM as a way to check that the underlying SR is operational
-        vm.start()
-        vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
     def test_volume_stopped(self, host, glusterfs_sr):
@@ -83,5 +75,20 @@ class TestGlusterFSSR:
         finally:
             if not volume_running:
                 host.ssh(['gluster', '--mode=script', 'volume', 'start', 'vol0'])
+
+    # *** tests with reboots (longer tests).
+
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
+    @pytest.mark.flaky # sometimes SR doesn't come back up after reboot
+    def test_reboot(self, vm_on_glusterfs_sr, host, glusterfs_sr):
+        sr = glusterfs_sr
+        vm = vm_on_glusterfs_sr
+        host.reboot(verify=True)
+        wait_for(sr.all_pbds_attached, "Wait for PDB attached")
+        # start the VM as a way to check that the underlying SR is operational
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.shutdown(verify=True)
 
     # *** End of tests with reboots

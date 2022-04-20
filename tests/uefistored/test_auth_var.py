@@ -39,6 +39,7 @@ def set_and_assert_var(vm, cert, new, should_pass):
         assert not ok, 'This var should not have successfully set'
 
 
+@pytest.mark.small_vm
 @pytest.mark.usefixtures("unix_vm")
 def test_auth_variable(uefi_vm):
     vm = uefi_vm
@@ -67,6 +68,7 @@ def test_auth_variable(uefi_vm):
         vm.shutdown(verify=True)
 
 
+@pytest.mark.small_vm # run with a small VM to test the features (/!\ but this small VM must have efitools)
 @pytest.mark.usefixtures("unix_vm")
 def test_db_append(uefi_vm):
     """Pass if appending the DB succeeds. Otherwise, fail."""
