@@ -1,5 +1,7 @@
+import pytest
+
 # Requirements:
-# - an XCP-ng host (--hosts) > 8.2
+# - an XCP-ng host (--hosts) >= 8.3
 # - a VM (--vm) without xvd{n, o, p} device
 
 def _orig_vdis_from_snapshot(host, snapshot):
@@ -17,6 +19,7 @@ def _orig_vdis_from_snapshot(host, snapshot):
         snap_vdis
     ))
 
+@pytest.mark.small_vm # we just test the feature here, not that it scales
 def test_snapshot(host, vdis, vm_with_vbds):
     vm = vm_with_vbds
 
@@ -28,6 +31,8 @@ def test_snapshot(host, vdis, vm_with_vbds):
 
     snapshot.destroy()
 
+@pytest.mark.small_vm # we just test the feature here, not that it scales
+@pytest.mark.usefixtures("host_at_least_8_3")
 def test_snapshot_ignore_vdi(host, vdis, vm_with_vbds):
     vdi_A, vdi_B, vdi_C = vdis
     vm = vm_with_vbds
@@ -41,6 +46,8 @@ def test_snapshot_ignore_vdi(host, vdis, vm_with_vbds):
 
     snapshot.destroy()
 
+@pytest.mark.small_vm # we just test the feature here, not that it scales
+@pytest.mark.usefixtures("host_at_least_8_3")
 def test_snapshot_ignore_multiple_vdis(host, vdis, vm_with_vbds):
     vdi_A, vdi_B, vdi_C = vdis
     vm = vm_with_vbds

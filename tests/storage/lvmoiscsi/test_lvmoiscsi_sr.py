@@ -24,12 +24,16 @@ class TestLVMOISCSISRCreateDestroy:
 
 @pytest.mark.usefixtures("lvmoiscsi_sr", "vm_on_lvmoiscsi_sr")
 class TestLVMOISCSISR:
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_lvmoiscsi_sr):
         vm = vm_on_lvmoiscsi_sr
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm # run with a small VM to test the features
+    @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_snapshot(self, vm_on_lvmoiscsi_sr):
         vm = vm_on_lvmoiscsi_sr
         vm.start()
@@ -39,6 +43,8 @@ class TestLVMOISCSISR:
 
     # *** tests with reboots (longer tests).
 
+    @pytest.mark.reboot # reboots the host
+    @pytest.mark.small_vm # run with a small VM to test the features
     def test_reboot(self, host, lvmoiscsi_sr, vm_on_lvmoiscsi_sr):
         sr = lvmoiscsi_sr
         vm = vm_on_lvmoiscsi_sr

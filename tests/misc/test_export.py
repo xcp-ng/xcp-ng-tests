@@ -1,4 +1,5 @@
 import logging
+import pytest
 
 # Requirements:
 # From --hosts parameter:
@@ -36,14 +37,17 @@ def export_test(host, vm, filepath, compress='none'):
         if vm2 is not None:
             vm2.destroy()
 
-def test_export_zstd(host, formatted_and_mounted_ext4_disk, imported_vm):
-    filepath = formatted_and_mounted_ext4_disk + '/test-export-zstd.xva'
-    export_test(host, imported_vm, filepath, 'zstd')
+@pytest.mark.small_vm # run on a small VM to test the functions
+@pytest.mark.big_vm # and also on a really big VM ideally to make sure it scales
+class TestExport:
+    def test_export_zstd(self, host, formatted_and_mounted_ext4_disk, imported_vm):
+        filepath = formatted_and_mounted_ext4_disk + '/test-export-zstd.xva'
+        export_test(host, imported_vm, filepath, 'zstd')
 
-def test_export_gzip(host, formatted_and_mounted_ext4_disk, imported_vm):
-    filepath = formatted_and_mounted_ext4_disk + '/test-export-gzip.xva'
-    export_test(host, imported_vm, filepath, 'gzip')
+    def test_export_gzip(self, host, formatted_and_mounted_ext4_disk, imported_vm):
+        filepath = formatted_and_mounted_ext4_disk + '/test-export-gzip.xva'
+        export_test(host, imported_vm, filepath, 'gzip')
 
-def test_export_uncompressed(host, formatted_and_mounted_ext4_disk, imported_vm):
-    filepath = formatted_and_mounted_ext4_disk + '/test-export-uncompressed.xva'
-    export_test(host, imported_vm, filepath, 'none')
+    def test_export_uncompressed(self, host, formatted_and_mounted_ext4_disk, imported_vm):
+        filepath = formatted_and_mounted_ext4_disk + '/test-export-uncompressed.xva'
+        export_test(host, imported_vm, filepath, 'none')
