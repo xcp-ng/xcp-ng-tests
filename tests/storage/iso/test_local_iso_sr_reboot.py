@@ -1,7 +1,7 @@
 import pytest
 import os
 from lib.common import wait_for
-from conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm, remove_iso_from_sr
+from .conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm, remove_iso_from_sr
 
 # Requirements:
 # From --hosts parameter:

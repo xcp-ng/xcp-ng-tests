@@ -5,7 +5,7 @@ from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES
 
-from utils import generate_keys, revert_vm_state, VM_SECURE_BOOT_FAILED
+from .utils import generate_keys, revert_vm_state, VM_SECURE_BOOT_FAILED
 
 # Requirements:
 # On the test runner:

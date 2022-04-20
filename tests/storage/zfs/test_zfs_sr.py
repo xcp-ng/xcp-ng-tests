@@ -2,7 +2,7 @@ import logging
 import time
 import pytest
 
-from conftest import VOLUME_PATH, VOLUME_NAME
+from .conftest import VOLUME_PATH, VOLUME_NAME
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 

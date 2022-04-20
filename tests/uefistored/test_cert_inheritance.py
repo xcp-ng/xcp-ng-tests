@@ -4,7 +4,7 @@ import pytest
 
 from lib.efi import get_secure_boot_guid, esl_from_auth_file
 
-from utils import generate_keys, revert_vm_state
+from .utils import generate_keys, revert_vm_state
 
 # Requirements:
 # On the test runner:

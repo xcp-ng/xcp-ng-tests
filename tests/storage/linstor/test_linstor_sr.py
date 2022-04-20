@@ -2,7 +2,7 @@ import logging
 import pytest
 import time
 
-from conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
+from .conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 
