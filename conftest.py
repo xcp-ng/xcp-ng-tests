@@ -11,6 +11,11 @@ from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_
 from lib.pool import Pool
 from lib.vm import VM
 
+# Import package-scoped fixtures. Although we need to define them in a separate file so that we can
+# then import them in individual packages to fix the buggy package scope handling by pytest, we also
+# need to import them in the global conftest.py so that they are recognized as fixtures.
+from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
+
 # *** Support for incremental tests in test classes ***
 # From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
 def pytest_runtest_makereport(item, call):
@@ -191,12 +196,6 @@ def sr_disk(request, host):
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_wiped(host, sr_disk):
-    logging.info(">> wipe disk %s" % sr_disk)
-    host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
-    yield sr_disk
-
-@pytest.fixture(scope='session')
 def sr_disk_for_all_hosts(request, host):
     disk = request.param
     master_disks = host.available_disks()
@@ -224,13 +223,6 @@ def sr_disk_for_all_hosts(request, host):
             f"disk or block device {disk} was not found to be present and free on all hosts"
         logging.info(f">> Disk or block device {disk} is present and free on all pool members")
     yield candidates[0]
-
-@pytest.fixture(scope='session')
-def formatted_and_mounted_ext4_disk(host, sr_disk):
-    mountpoint = '/var/tmp/sr_disk_mountpoint'
-    setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
-    yield mountpoint
-    teardown_formatted_and_mounted_disk(host, mountpoint)
 
 @pytest.fixture(scope='module')
 def vm_ref(request):

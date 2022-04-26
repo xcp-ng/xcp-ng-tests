@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def host_with_xfsprogs(host):
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
         "xfsprogs must not be installed on the host at the beginning of the tests"
@@ -11,7 +11,7 @@ def host_with_xfsprogs(host):
     # teardown
     host.yum_restore_saved_state()
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def xfs_sr(sr_disk, host_with_xfsprogs):
     """ A XFS SR on first host. """
     sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})

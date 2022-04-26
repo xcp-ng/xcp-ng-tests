@@ -62,7 +62,7 @@ def _teardown_host_with_glusterfs(host):
     if len(errors) > 0:
         raise Exception("\n".join(repr(e) for e in errors))
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def pool_with_glusterfs(host):
     setup_errors = []
     for h in host.pool.hosts:
@@ -86,7 +86,7 @@ def pool_with_glusterfs(host):
     if len(teardown_errors) > 0:
         raise Exception("\n".join(repr(e) for e in teardown_errors))
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def gluster_disk(host, sr_disk_for_all_hosts):
     sr_disk = sr_disk_for_all_hosts
     hosts = host.pool.hosts
@@ -136,7 +136,7 @@ def _fallback_gluster_teardown(host):
                 logging.error("< Fallback teardown failed on host: %s with error: %s" % (h, e))
                 pass
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def gluster_volume_started(host, hostA2, gluster_disk):
     hosts = host.pool.hosts
 
@@ -174,7 +174,7 @@ def gluster_volume_started(host, hostA2, gluster_disk):
         h.ssh(['rm', '-rf', '/mnt/sr_disk/vol0'])
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def glusterfs_device_config(host):
     backup_servers = []
     for h in host.pool.hosts[1:]:
@@ -185,7 +185,7 @@ def glusterfs_device_config(host):
         'backupservers': ':'.join(backup_servers)
     }
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def glusterfs_sr(host, pool_with_glusterfs, gluster_volume_started, glusterfs_device_config):
     """ A GlusterFS SR on first host. """
     # Create the SR

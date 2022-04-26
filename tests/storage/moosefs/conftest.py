@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def host_with_moosefs(host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \
         "MooseFS client should not be installed on the host before all tests"
@@ -16,7 +16,7 @@ def host_with_moosefs(host):
     host.ssh(['sh', '-c', '"rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
     host.ssh(['sh', '-c', '"rm -f /etc/yum.repos.d/MooseFS.repo"'])
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def moosefs_device_config(sr_device_config):
     if sr_device_config is not None:
         # SR device config from CLI param
@@ -33,7 +33,7 @@ def moosefs_device_config(sr_device_config):
             raise Exception("No default MooseFS device-config found, neither in CLI nor in data.py defaults")
     return config
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def moosefs_sr(moosefs_device_config, host_with_moosefs):
     """ MooseFS SR on a specific host. """
     sr = host_with_moosefs.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True)
