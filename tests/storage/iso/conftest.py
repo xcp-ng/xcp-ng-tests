@@ -2,6 +2,9 @@ import pytest
 import time
 import os
 
+# explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
+from pkgfixtures import formatted_and_mounted_ext4_disk
+
 def create_local_iso_sr(host, location):
     host.ssh(['mkdir', '-p', location])
     device_config = {
@@ -10,7 +13,7 @@ def create_local_iso_sr(host, location):
     }
     return host.sr_create('iso', "ISO-local-SR-test", device_config, verify=True)
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def local_iso_sr(host, formatted_and_mounted_ext4_disk):
     """ An ISO SR on first host. """
     location = formatted_and_mounted_ext4_disk + '/iso_sr'
@@ -19,7 +22,7 @@ def local_iso_sr(host, formatted_and_mounted_ext4_disk):
     # teardown
     sr.destroy()
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def nfs_iso_device_config(sr_device_config):
     if sr_device_config is not None:
         # SR device config from CLI param
@@ -36,7 +39,7 @@ def nfs_iso_device_config(sr_device_config):
             raise Exception("No default NFS ISO device-config found, neither in CLI nor in data.py defaults")
     return config
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def cifs_iso_device_config(sr_device_config):
     if sr_device_config is not None:
         # SR device config from CLI param
@@ -53,7 +56,7 @@ def cifs_iso_device_config(sr_device_config):
             raise Exception("No default CIFS ISO device-config found, neither in CLI nor in data.py defaults")
     return config
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def nfs_iso_sr(host, nfs_iso_device_config):
     """ A NFS ISO SR. """
     sr = host.sr_create('iso', "ISO-NFS-SR-test", nfs_iso_device_config, shared=True, verify=True)
@@ -61,7 +64,7 @@ def nfs_iso_sr(host, nfs_iso_device_config):
     # teardown
     sr.forget()
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def cifs_iso_sr(host, cifs_iso_device_config):
     """ A Samba/CIFS SR. """
     sr = host.sr_create('iso', "ISO-CIFS-SR-test", cifs_iso_device_config, shared=True, verify=True)

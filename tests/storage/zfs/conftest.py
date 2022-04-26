@@ -1,10 +1,13 @@
 import logging
 import pytest
 
+# explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
+from pkgfixtures import sr_disk_wiped
+
 VOLUME_NAME = 'vol0'
 VOLUME_PATH = '/' + VOLUME_NAME
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def host_with_zfs(host):
     assert not host.file_exists('/usr/sbin/zpool'), \
         "zfs must not be installed on the host at the beginning of the tests"
@@ -15,14 +18,14 @@ def host_with_zfs(host):
     # teardown
     host.yum_restore_saved_state()
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def zpool_vol0(sr_disk_wiped, host_with_zfs):
     host_with_zfs.ssh(['zpool', 'create', '-f', VOLUME_NAME, '/dev/' + sr_disk_wiped])
     yield
     # teardown
     host_with_zfs.ssh(['zpool', 'destroy', VOLUME_NAME])
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def zfs_sr(host, zpool_vol0):
     """ A ZFS SR on first host. """
     sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': VOLUME_PATH})

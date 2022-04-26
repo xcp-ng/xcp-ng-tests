@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def lvmoiscsi_device_config(sr_device_config):
     if sr_device_config is not None:
         # SR device config from CLI param
@@ -18,7 +18,7 @@ def lvmoiscsi_device_config(sr_device_config):
             raise Exception("No default lvmoiscsi device-config found, neither in CLI nor in data.py defaults")
     return config
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def lvmoiscsi_sr(host, lvmoiscsi_device_config):
     """ A lvmoiscsi SR on first host. """
     sr = host.sr_create('lvmoiscsi', "lvmoiscsi-SR-test", lvmoiscsi_device_config, shared=True)
