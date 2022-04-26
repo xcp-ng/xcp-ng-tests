@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def ext_sr(host, sr_disk):
     """ An EXT SR on first host. """
     sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk})

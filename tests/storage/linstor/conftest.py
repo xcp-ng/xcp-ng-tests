@@ -6,7 +6,7 @@ from lib.common import wait_for_not
 GROUP_NAME = 'linstor_group'
 LINSTOR_PACKAGES = ['drbd', 'kmod-drbd', 'linstor-client', 'linstor-controller', 'linstor-satellite', 'python-linstor']
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def lvm_disks(host):
     disks = []
     hosts = host.pool.hosts
@@ -30,7 +30,7 @@ def check_linstor_packages(host):
     if not host.check_packages_available(LINSTOR_PACKAGES):
         raise Exception('Unable to find LINSTOR packages in the yum repositories of {}'.format(host))
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def hosts_with_linstor(host, additional_repos):
     master = host
     hosts = master.pool.hosts
@@ -102,7 +102,7 @@ def destroy_linstor_sr(hosts_with_linstor, sr):
     sr.destroy(verify=True, force=True)
     delete_linstor_nodes(hosts_with_linstor)
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def linstor_sr(hosts_with_linstor, lvm_disks):
     sr = create_linstor_sr(hosts_with_linstor)
     yield sr

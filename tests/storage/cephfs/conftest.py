@@ -8,7 +8,7 @@ def _setup_host_with_ceph(host):
     host.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras")
     host.yum_install(['ceph-common'], enablerepo="base,extras")
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def pool_with_ceph(host):
     for h in host.pool.hosts:
         _setup_host_with_ceph(h)
@@ -18,7 +18,7 @@ def pool_with_ceph(host):
     for h in host.pool.hosts:
         h.yum_restore_saved_state()
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def cephfs_device_config(sr_device_config):
     if sr_device_config is not None:
         # SR device config from CLI param
@@ -35,7 +35,7 @@ def cephfs_device_config(sr_device_config):
             raise Exception("No default CephFS device-config found, neither in CLI nor in data.py defaults")
     return config
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def cephfs_sr(host, cephfs_device_config, pool_with_ceph):
     """ A CephFS SR on first host. """
     sr = host.sr_create('cephfs', "CephFS-SR-test", cephfs_device_config, shared=True)
