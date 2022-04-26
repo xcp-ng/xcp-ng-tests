@@ -284,7 +284,7 @@ def pesign(key, cert, name, image):
 
         # Sign the image
         commands.local_cmd([
-            'pesign', '-n', certdir, '-c', common_name, '-s', '-i', image,
+            'pesign', '-f', '-n', certdir, '-c', common_name, '-s', '-i', image,
             '-o', signed
         ])
 
