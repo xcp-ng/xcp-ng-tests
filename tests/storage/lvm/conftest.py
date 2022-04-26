@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='package')
 def lvm_sr(host, sr_disk):
     """ An LVM SR on first host. """
     sr = host.sr_create('lvm', "LVM-local-SR-test", {'device': '/dev/' + sr_disk})
