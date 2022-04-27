@@ -56,11 +56,11 @@ def sign_efi_bins(vm, db):
     if shutdown:
         vm.shutdown(verify=True)
 
-@pytest.mark.usefixtures("pool_without_uefi_certs")
+@pytest.mark.usefixtures("pool_without_uefi_certs", "unix_vm")
 class TestGuestLinuxUEFISecureBoot:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, unix_uefi_vm_and_snapshot):
-        vm, snapshot = unix_uefi_vm_and_snapshot
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
         yield
         revert_vm_state(vm, snapshot)
@@ -146,13 +146,11 @@ class TestGuestLinuxUEFISecureBoot:
         assert not vm.booted_with_secureboot()
 
 
-@pytest.mark.usefixtures("pool_without_uefi_certs")
+@pytest.mark.usefixtures("pool_without_uefi_certs", "windows_vm")
 class TestGuestWindowsUEFISecureBoot:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot):
         vm, snapshot = uefi_vm_and_snapshot
-        if not vm.is_windows:
-            pytest.skip('only valid for Windows VMs')
         yield
         revert_vm_state(vm, snapshot)
         # clear pool certs for next test
@@ -231,11 +229,11 @@ class TestCertsMissingAndSbOn:
         vm.install_uefi_certs([db])
         self.check_vm_start_fails_and_uefistored_dies(vm)
 
-@pytest.mark.usefixtures("pool_without_uefi_certs")
+@pytest.mark.usefixtures("pool_without_uefi_certs", "unix_vm")
 class TestUEFIKeyExchange:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, unix_uefi_vm_and_snapshot):
-        vm, snapshot = unix_uefi_vm_and_snapshot
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
         yield
         revert_vm_state(vm, snapshot)
 
