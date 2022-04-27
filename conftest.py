@@ -403,14 +403,21 @@ def pytest_generate_tests(metafunc):
 def pytest_collection_modifyitems(items, config):
     # automatically mark tests based on fixtures they require
     # check pytest.ini or pytest --markers for marker descriptions
+
+    markable_fixtures = [
+        'uefi_vm',
+        'unix_vm',
+        'windows_vm',
+        'hostA2',
+        'hostB1',
+        'sr_disk'
+    ]
+
     for item in items:
         fixturenames = getattr(item, 'fixturenames', ())
-        if 'uefi_vm' in fixturenames:
-            item.add_marker('uefi_vm')
-        if 'unix_vm' in fixturenames:
-            item.add_marker('unix_vm')
-        if 'windows_vm' in fixturenames:
-            item.add_marker('windows_vm')
+        for fixturename in markable_fixtures:
+            if fixturename in fixturenames:
+                item.add_marker(fixturename)
 
         # A test using a VM must specify the target through manual markers.
         if 'vm_ref' in fixturenames:
@@ -423,3 +430,7 @@ def pytest_collection_modifyitems(items, config):
                                 "Check pytest.ini for the list and description of VM-related test targets.")
         else:
             item.add_marker('no_vm')
+
+        if item.get_closest_marker('multi_vms'):
+            # multi_vms implies small_vm
+            item.add_marker('small_vm')
