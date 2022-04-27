@@ -6,7 +6,7 @@ import pytest
 # And:
 # - access to XCP-ng RPM repository from hostA1
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='module')
 def host_without_netdata(host):
     assert not host.call_plugin('netdata.py', 'is_netdata_installed')
     yield host
