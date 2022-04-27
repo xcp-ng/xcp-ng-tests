@@ -5,7 +5,7 @@ import pytest
 # From --hosts parameter:
 # - host(A1): first XCP-ng host > 8.2.
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='module')
 def host_with_raid(host):
     dummy_raid = False
     if not host.file_exists('/dev/md127', regular_file=False):
