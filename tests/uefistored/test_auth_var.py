@@ -1,3 +1,5 @@
+import pytest
+
 from lib.commands import SSHCommandFailed
 from lib.efi import (
     Certificate,
@@ -37,8 +39,9 @@ def set_and_assert_var(vm, cert, new, should_pass):
         assert not ok, 'This var should not have successfully set'
 
 
-def test_auth_variable(unix_uefi_vm):
-    vm = unix_uefi_vm
+@pytest.mark.usefixtures("unix_vm")
+def test_auth_variable(uefi_vm):
+    vm = uefi_vm
     vm.start()
 
     try:
@@ -64,9 +67,10 @@ def test_auth_variable(unix_uefi_vm):
         vm.shutdown(verify=True)
 
 
-def test_db_append(unix_uefi_vm):
+@pytest.mark.usefixtures("unix_vm")
+def test_db_append(uefi_vm):
     """Pass if appending the DB succeeds. Otherwise, fail."""
-    vm = unix_uefi_vm
+    vm = uefi_vm
 
     PK, KEK, db, db2 = EFIAuth("PK"), EFIAuth("KEK"), EFIAuth("db"), Certificate("db")
     PK.sign_auth(PK)
@@ -77,6 +81,7 @@ def test_db_append(unix_uefi_vm):
     vm.start()
     vm.wait_for_os_booted()
 
+    # This particular test requires a VM that has efi-updatevar
     assert vm.ssh_with_result(["which", "efi-updatevar"]).returncode == 0, "This test requires efi-updatevar"
 
     old = vm.get_efi_var(db.name, db.guid)

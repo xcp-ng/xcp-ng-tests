@@ -32,11 +32,3 @@ def uefi_vm_and_snapshot(uefi_vm):
     yield vm, snapshot
 
     snapshot.destroy()
-
-@pytest.fixture(scope='module')
-def unix_uefi_vm(unix_vm, uefi_vm):
-    return uefi_vm
-
-@pytest.fixture(scope='module')
-def unix_uefi_vm_and_snapshot(unix_vm, uefi_vm_and_snapshot):
-    yield uefi_vm_and_snapshot

@@ -286,7 +286,7 @@ def running_vm(imported_vm):
 def unix_vm(imported_vm):
     vm = imported_vm
     if vm.is_windows:
-        pytest.skip("This test is not compatible with Windows VMs.")
+        pytest.skip("This test is only compatible with unix VMs.")
     yield vm
 
 @pytest.fixture(scope="module")
@@ -295,11 +295,17 @@ def running_unix_vm(unix_vm, running_vm):
     # no teardown
 
 @pytest.fixture(scope='module')
+def windows_vm(imported_vm):
+    vm = imported_vm
+    if not vm.is_windows:
+        pytest.skip("This test is only compatible with Windows VMs.")
+    yield vm
+
+@pytest.fixture(scope='module')
 def uefi_vm(imported_vm):
     vm = imported_vm
     if not vm.is_uefi:
         pytest.skip('This test requires an UEFI VM')
-
     yield vm
 
 @pytest.fixture(scope='session')
@@ -393,3 +399,17 @@ def pytest_generate_tests(metafunc):
     if "sr_disk_for_all_hosts" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
+
+def pytest_collection_modifyitems(items, config):
+    # Automatically mark tests based on fixtures they require.
+    # Check pytest.ini or pytest --markers for marker descriptions.
+    for item in items:
+        fixturenames = getattr(item, 'fixturenames', ())
+        if 'vm_ref' not in fixturenames:
+            item.add_marker('no_vm')
+        if 'uefi_vm' in fixturenames:
+            item.add_marker('uefi_vm')
+        if 'unix_vm' in fixturenames:
+            item.add_marker('unix_vm')
+        if 'windows_vm' in fixturenames:
+            item.add_marker('windows_vm')
