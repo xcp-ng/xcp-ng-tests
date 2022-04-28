@@ -219,17 +219,26 @@ class Host:
         """
         Get the last transaction in yum history.
 
-        The output looks like this:
-        Loaded plugins: fastestmirror
+        The output looks like this (when not polluted by plugin output, hence '--noplugins' below):
+
         ID     | Command line             | Date and time    | Action(s)      | Altered
         -------------------------------------------------------------------------------
             37 | install -y --enablerepo= | 2021-03-08 15:27 | Install        |    1
             36 | remove ceph-common       | 2021-03-08 15:26 | Erase          |    1
             35 | install -y --enablerepo= | 2021-03-08 15:19 | Install        |    1
             34 | remove -y ceph-common    | 2021-03-08 15:13 | Erase          |    1
+        [...]
         """
-        history = self.ssh(['yum', 'history', 'list']).splitlines()
-        return history[3].split()[0]
+        try:
+            history = self.ssh(['yum', 'history', 'list', '--noplugins']).splitlines()
+        except commands.SSHCommandFailed as e:
+            # yum history list fails if the list is empty, and it's also not possible to rollback
+            # to before the first transaction, so "0" would not be appropriate as last transaction.
+            # To workaround this, create transactions: install and remove an small package.
+            self.ssh(['yum', 'install', '-y', 'gpm-libs'])
+            self.ssh(['yum', 'remove', '-y', 'gpm-libs'])
+            history = self.ssh(['yum', 'history', 'list', '--noplugins']).splitlines()
+        return history[2].split()[0]
 
     def yum_install(self, packages, enablerepo=None):
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
