@@ -234,7 +234,7 @@ class Host:
         except commands.SSHCommandFailed as e:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
-            # To workaround this, create transactions: install and remove an small package.
+            # To workaround this, create transactions: install and remove a small package.
             logging.info('Install and remove a small package to workaround empty yum history.')
             self.yum_install('gpm-libs')
             self.yum_remove('gpm-libs')
