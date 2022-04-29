@@ -295,8 +295,8 @@ class Host:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
 
     def disks(self):
-        """ List of SCSI disks, e.g ['sda', 'sdb']. """
-        disks = self.ssh(['lsblk', '-nd', '-I', '8', '--output', 'NAME']).splitlines()
+        """ List of SCSI disks, e.g ['sda', 'sdb', 'nvme0n1']. """
+        disks = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME']).splitlines()
         disks.sort()
         return disks
 
