@@ -236,8 +236,8 @@ class Host:
             # to before the first transaction, so "0" would not be appropriate as last transaction.
             # To workaround this, create transactions: install and remove a small package.
             logging.info('Install and remove a small package to workaround empty yum history.')
-            self.yum_install('gpm-libs')
-            self.yum_remove('gpm-libs')
+            self.yum_install(['gpm-libs'])
+            self.yum_remove(['gpm-libs'])
             history = self.ssh(['yum', 'history', 'list', '--noplugins']).splitlines()
         return history[2].split()[0]
 
