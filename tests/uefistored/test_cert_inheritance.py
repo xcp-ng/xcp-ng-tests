@@ -331,7 +331,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
         vm, snapshot = uefi_vm_and_snapshot
         for h in host.pool.hosts:
             logging.info(f"Check host {h} has no certificate on disk except PK.")
-            # Make sure PK has been fetched from fallback dir so none SB UEFI VMs can still be booted
+            # Make sure PK has been fetched from fallback dir so UEFI VMs without certs can still be booted
             assert h.file_exists(f'{CERT_DIR}/PK.auth')
             for key in ['KEK', 'db', 'dbx']:
                 assert not h.file_exists(f'{CERT_DIR}/{key}.auth')
