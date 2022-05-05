@@ -169,7 +169,8 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         install_certs_to_disks(host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
         host.restart_toolstack(verify=True)
         logging.info('Check that the certs on disk have been erased since there is none in the pool.')
-        for key in ['PK', 'KEK', 'db', 'dbx']:
+        assert host.file_exists(f'{CERT_DIR}/PK.auth')
+        for key in ['KEK', 'db', 'dbx']:
             assert not host.file_exists(f'{CERT_DIR}/{key}.auth')
 
     def test_pool_certs_present_and_some_different_disk_certs_present(self, host):
@@ -325,15 +326,18 @@ class TestPoolToDiskCertPropagationToAllHosts:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth)
             assert not h.file_exists(f'{CERT_DIR}/{missing_key}.auth')
 
-    def test_clear_certificates_from_pool(self, host):
-        keys = ['PK', 'KEK', 'db', 'dbx']
-        pool_auths = generate_keys(as_dict=True)
-        host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
-        host.pool.clear_uefi_certs()
+    @pytest.mark.small_vm
+    def test_clear_certificates_from_pool(self, host, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
         for h in host.pool.hosts:
-            logging.info(f"Check host {h} has no certificate on disk.")
-            for key in keys:
+            logging.info(f"Check host {h} has no certificate on disk except PK.")
+            # Make sure PK has been fetched from fallback dir so none SB UEFI VMs can still be booted
+            assert h.file_exists(f'{CERT_DIR}/PK.auth')
+            for key in ['KEK', 'db', 'dbx']:
                 assert not h.file_exists(f'{CERT_DIR}/{key}.auth')
+        # UEFI VM should still be able to boot
+        vm.start()
+        revert_vm_state(vm, snapshot)
 
 @pytest.mark.usefixtures("host_at_least_8_3", "pool_without_uefi_certs")
 class TestPoolToDiskCertInheritanceOnPoolJoin:

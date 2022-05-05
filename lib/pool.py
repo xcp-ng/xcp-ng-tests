@@ -1,5 +1,7 @@
 import logging
 
+from packaging import version
+
 import lib.commands as commands
 
 from lib.common import safe_split, wait_for, wait_for_not
@@ -105,9 +107,10 @@ class Pool:
     def clear_uefi_certs(self):
         logging.info('Clearing pool UEFI certificates in XAPI and on hosts disks')
         self.master.ssh(['secureboot-certs', 'clear'])
-        # remove files on each host
-        for host in self.hosts:
-            host.ssh(['rm', '-f', '/var/lib/uefistored/*'])
+        # remove files on each host on XCP-ng < 8.3
+        if self.master.xcp_version < version.parse("8.3"):
+            for host in self.hosts:
+                host.ssh(['rm', '-f', '/var/lib/uefistored/*'])
 
     def install_custom_uefi_certs(self, auths):
         host = self.master
