@@ -14,6 +14,9 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
+XAPI_CONF_FILE = '/etc/xapi.conf'
+XAPI_CONF_DIR = '/etc/xapi.conf.d'
+
 def host_data(hostname_or_ip):
     # read from data.py
     from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS
@@ -389,3 +392,13 @@ class Host:
             lambda: master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}),
             f"Wait for pool {master} to see joined host {self} as enabled."
         )
+
+    def activate_smapi_driver(self, driver):
+        sm_plugins = self.ssh(['grep', '[[:space:]]*sm-plugins[[:space:]]*=[[:space:]]*', XAPI_CONF_FILE]).splitlines()
+        sm_plugins = sm_plugins[-1] + ' ' + driver
+        self.ssh([f'echo "{sm_plugins}" > {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
+        self.restart_toolstack(verify=True)
+
+    def deactivate_smapi_driver(self, driver):
+        self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
+        self.restart_toolstack(verify=True)

@@ -10,8 +10,14 @@ def host_with_moosefs(host):
     host.yum_save_state()
     host.yum_install(['fuse'])
     host.yum_install(['moosefs-client'])
+
+    host.activate_smapi_driver('moosefs')
+
     yield host
+
     # teardown
+    host.deactivate_smapi_driver('moosefs')
+
     host.yum_restore_saved_state()
     host.ssh(['sh', '-c', '"rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
     host.ssh(['sh', '-c', '"rm -f /etc/yum.repos.d/MooseFS.repo"'])
