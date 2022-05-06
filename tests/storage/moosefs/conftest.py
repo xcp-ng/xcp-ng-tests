@@ -5,8 +5,8 @@ import pytest
 def host_with_moosefs(host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \
         "MooseFS client should not be installed on the host before all tests"
-    host.ssh(['sh', '-c', '"curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
-    host.ssh(['sh', '-c', '"curl http://ppa.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo"'])
+    host.ssh(['curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS'])
+    host.ssh(['curl http://ppa.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo'])
     host.yum_save_state()
     host.yum_install(['fuse'])
     host.yum_install(['moosefs-client'])
@@ -19,8 +19,8 @@ def host_with_moosefs(host):
     host.deactivate_smapi_driver('moosefs')
 
     host.yum_restore_saved_state()
-    host.ssh(['sh', '-c', '"rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS"'])
-    host.ssh(['sh', '-c', '"rm -f /etc/yum.repos.d/MooseFS.repo"'])
+    host.ssh(['rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS'])
+    host.ssh(['rm -f /etc/yum.repos.d/MooseFS.repo'])
 
 @pytest.fixture(scope='package')
 def moosefs_device_config(sr_device_config):
