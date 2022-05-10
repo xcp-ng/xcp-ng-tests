@@ -1,8 +1,9 @@
 import logging
 import pytest
 
-@pytest.fixture(scope='package')
-def host_with_moosefs(host):
+from lib.pool import Pool
+
+def enable_moosefs(host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \
         "MooseFS client should not be installed on the host before all tests"
     host.ssh(['curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS'])
@@ -13,14 +14,23 @@ def host_with_moosefs(host):
 
     host.activate_smapi_driver('moosefs')
 
-    yield host
-
-    # teardown
+def disable_moosefs(host):
     host.deactivate_smapi_driver('moosefs')
 
     host.yum_restore_saved_state()
     host.ssh(['rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS'])
     host.ssh(['rm -f /etc/yum.repos.d/MooseFS.repo'])
+
+@pytest.fixture(scope='package')
+def pool_with_moosefs(hostA1):
+    pool = Pool(hostA1.hostname_or_ip)
+    for host in pool.hosts:
+        enable_moosefs(host)
+
+    yield pool
+
+    for host in pool.hosts:
+        disable_moosefs(host)
 
 @pytest.fixture(scope='package')
 def moosefs_device_config(sr_device_config):
@@ -40,9 +50,9 @@ def moosefs_device_config(sr_device_config):
     return config
 
 @pytest.fixture(scope='package')
-def moosefs_sr(moosefs_device_config, host_with_moosefs):
+def moosefs_sr(moosefs_device_config, pool_with_moosefs):
     """ MooseFS SR on a specific host. """
-    sr = host_with_moosefs.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True)
+    sr = pool_with_moosefs.master.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True)
     yield sr
     # teardown
     sr.destroy()
