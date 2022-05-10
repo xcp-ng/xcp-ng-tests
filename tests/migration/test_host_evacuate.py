@@ -20,8 +20,7 @@ from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
 #   This network will be disconnected at some point during the tests
 
 def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=False, error=""):
-    source_name = source_host.xe('host-param-get', {'uuid': source_host.uuid, 'param-name': 'name-label'})
-    vm.start(on=source_name)
+    vm.start(on=source_host.uuid)
     vm.wait_for_os_booted()
     args = {'host': source_host.uuid}
     if network_uuid is not None:
