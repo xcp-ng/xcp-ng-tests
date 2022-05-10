@@ -63,6 +63,12 @@ class BaseVM:
                 return False
         return True
 
+    def all_vdis_on_sr(self, sr):
+        for vdi_uuid in self.vdi_uuids():
+            if self.get_vdi_sr_uuid(vdi_uuid) != sr.uuid:
+                return False
+        return True
+
     def get_sr(self):
         # in this method we assume the SR of the first VDI is the VM SR
         vdis = self.vdi_uuids()

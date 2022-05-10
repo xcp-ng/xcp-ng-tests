@@ -79,7 +79,7 @@ class TestBasicNoSSH:
         def live_migrate(vm, dest_host, dest_sr, check_vdis=False):
             vm.migrate(dest_host, dest_sr)
             if check_vdis:
-                wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
+                wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
             wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
 
         vm = imported_vm

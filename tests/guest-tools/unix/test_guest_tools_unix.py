@@ -120,7 +120,7 @@ class TestGuestToolsUnix:
         vm = running_vm
         # migrate to default SR on hostA2
         vm.migrate(hostA2, local_sr_on_hostA2)
-        wait_for(lambda: vm.all_vdis_on_host(hostA2), "Wait for all VDIs on destination host")
+        wait_for(lambda: vm.all_vdis_on_sr(local_sr_on_hostA2), "Wait for all VDIs on destination SR")
         wait_for(lambda: vm.is_running_on_host(hostA2), "Wait for VM to be running on destination host")
         self._check_tools_version(vm, state.tools_version)
         self._check_os_info(vm, state.vm_distro)
