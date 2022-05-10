@@ -17,29 +17,29 @@ def cold_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
     assert vm.is_halted()
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
-    wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
+    wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
     # Start VM to make sure it works
-    vm.start()
+    vm.start(on=dest_host.uuid)
     vm.wait_for_os_booted()
     vm.shutdown(verify=True)
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
-    wait_for(lambda: vm.all_vdis_on_host(prov_host), "Wait for all VDIs back on provenance host")
+    wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
     # Start VM to make sure it works
-    vm.start()
+    vm.start(on=prov_host.uuid)
     vm.wait_for_os_booted()
     vm.shutdown(verify=True)
 
 def live_storage_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
     # start VM
-    vm.start()
+    vm.start(on=prov_host.uuid)
     vm.wait_for_os_booted()
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
-    wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
+    wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
     wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
-    wait_for(lambda: vm.all_vdis_on_host(prov_host), "Wait for all VDIs back on provenance host")
+    wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
     wait_for(lambda: vm.is_running_on_host(prov_host), "Wait for VM to be running on provenance host")
     vm.shutdown(verify=True)

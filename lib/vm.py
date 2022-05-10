@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import tempfile
@@ -34,7 +35,7 @@ class VM(BaseVM):
     def is_paused(self):
         return self.power_state() == 'paused'
 
-    # By xe design on must be an host name-label
+    # `on` can be an host name-label or UUID
     def start(self, on=None):
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
@@ -178,7 +179,10 @@ class VM(BaseVM):
         }
         if sr is not None:
             msg += " (SR: %s)" % sr.uuid
-            params['sr'] = sr.uuid
+            mapping = {}
+            for vdi_uuid in self.vdi_uuids():
+                mapping[vdi_uuid] = sr.uuid
+            params['mapVdisSrs'] = 'json:' + json.dumps(mapping)
         logging.info(msg)
         xo_cli('vm.migrate', params)
         self.previous_host = self.host
