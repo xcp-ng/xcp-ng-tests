@@ -411,16 +411,7 @@ def pytest_collection_modifyitems(items, config):
             if fixturename in fixturenames:
                 item.add_marker(fixturename)
 
-        # A test using a VM must specify the target through manual markers.
-        if 'vm_ref' in fixturenames:
-            if not item.get_closest_marker('small_vm') \
-                    and not item.get_closest_marker('big_vm') \
-                    and not item.get_closest_marker('multi_vms'):
-                # no marker found, raise
-                raise Exception(f"Test {item} from {item.module} uses a VM but does not define a "
-                                "target marker (small_vm, multi_vms, ...). You need to add one. "
-                                "Check pytest.ini for the list and description of VM-related test targets.")
-        else:
+        if 'vm_ref' not in fixturenames:
             item.add_marker('no_vm')
 
         if item.get_closest_marker('multi_vms'):
