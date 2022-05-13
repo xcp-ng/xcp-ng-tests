@@ -8,7 +8,7 @@ from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
 
 # Requirements:
 # From --hosts parameter:
-# - host(A1): first XCP-ng host >= 8.2 (+ XAPI patch allowing to select migration network for evacuate)
+# - host(A1): first XCP-ng host >= 8.3 (for most tests)
 # - hostA2: Second member of the pool.
 # From --vm parameter
 # - A VM to import
