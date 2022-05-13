@@ -1,0 +1,27 @@
+# All values below are left empty on purpose, for you to fill them with your VM references.
+# The VM references will be passed over by jobs.py to pytest through pytest's --vm parameter.
+# Consult README.md for accepted values.
+# Example value: "http://somewhere/images/small_vm.xva"
+
+VMS = {
+    "single": {
+        # basic small VM
+        "small_vm": "",
+        # small VM on which the guest tools are installable. Excludes alpine currently.
+        "small_vm_unix_tools": "",
+        # small UEFI VM on which efitools is installed, for some uefistored tests
+        "small_vm_efitools": "",
+        # "small" Windows VM (UEFI)
+        "small_vm_windows": "",
+    },
+    "multi": {
+        # all VMs we want to run "multi_vms" tests on
+        "all": [],
+        # VMs which support the installation of our unix guest tools from the ISO
+        "tools_unix": [],
+        # UEFI unix/linux Vms
+        "uefi_unix": [],
+        # Windows VMs
+        "windows": [],
+    }
+}
