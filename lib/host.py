@@ -282,10 +282,11 @@ class Host:
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
             missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
-            extra = [x for x in pkgs if x not in set(self.saved_packages_list)]
-            raise Exception(
-                "Yum state badly restored missing: [%s], extra: [%s]." % (' '.join(missing), ' '.join(extra))
-            )
+            extra = [x for x in pkgs if x not in set(self.saved_packages_list) and not x.startswith("gpg-pubkey-")]
+            if missing or extra:
+                raise Exception(
+                    "Yum state badly restored. Missing: [%s], extra: [%s]." % (' '.join(missing), ' '.join(extra))
+                )
         # We can resave a new state after that.
         self.saved_packages_list = None
         self.saved_rollback_id = None
