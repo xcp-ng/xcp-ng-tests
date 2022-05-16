@@ -30,7 +30,7 @@ class TestCephFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host, pool_with_ceph, cephfs_device_config):
+    def test_create_and_destroy_sr(self, host, cephfs_device_config, pool_with_ceph):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('cephfs', "CephFS-SR-test", cephfs_device_config, shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
