@@ -30,7 +30,7 @@ class TestMooseFSSRCreateDestroy:
             sr.destroy()
             assert False, "MooseFS SR creation should failed!"
 
-    def test_create_and_destroy_sr(self, pool_with_moosefs, moosefs_device_config):
+    def test_create_and_destroy_sr(self, moosefs_device_config, pool_with_moosefs):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = pool_with_moosefs.master
         sr = master.sr_create('moosefs', "MooseFS-SR-test2", moosefs_device_config, shared=True, verify=True)
