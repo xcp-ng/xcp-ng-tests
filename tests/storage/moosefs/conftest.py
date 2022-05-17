@@ -9,8 +9,7 @@ def enable_moosefs(host):
     host.ssh(['curl https://ppa.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS'])
     host.ssh(['curl http://ppa.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo'])
     host.yum_save_state()
-    host.yum_install(['fuse'])
-    host.yum_install(['moosefs-client'])
+    host.yum_install(['fuse', 'moosefs-client'])
 
     host.activate_smapi_driver('moosefs')
 
