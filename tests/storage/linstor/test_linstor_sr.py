@@ -74,7 +74,7 @@ class TestLinstorSR:
         host.reboot(verify=True)
         wait_for(sr.all_pbds_attached, "Wait for PDB attached")
         # start the VM as a way to check that the underlying SR is operational
-        vm.start()
+        vm.start(on=host.uuid)
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
