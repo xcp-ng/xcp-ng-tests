@@ -23,14 +23,16 @@ def install_certs_to_disks(pool, certs_dict, keys):
         logging.debug('Installing to host %s:' % host.hostname_or_ip)
         for key in keys:
             value = certs_dict[key].auth
-            hash = hashlib.md5(open(value, 'rb').read()).hexdigest()
+            with open(value, 'rb') as f:
+                hash = hashlib.md5(f.read()).hexdigest()
             logging.debug('    - key: %s, value: %s' % (key, hash))
             host.scp(value, f'{CERT_DIR}/{key}.auth')
 
 def check_disk_cert_md5sum(host, key, reference_file):
     auth_filepath_on_host = f'{CERT_DIR}/{key}.auth'
     assert host.file_exists(auth_filepath_on_host)
-    reference_md5 = hashlib.md5(open(reference_file, 'rb').read()).hexdigest()
+    with open(reference_file, 'rb') as rf:
+        reference_md5 = hashlib.md5(rf.read()).hexdigest()
     host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
     logging.debug('Reference MD5: %s' % reference_md5)
     logging.debug('Host disk MD5: %s' % host_disk_md5)
