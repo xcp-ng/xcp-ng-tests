@@ -21,6 +21,9 @@ class Test:
         vm = running_vm
         vm.test_snapshot_on_running_vm()
 
+    # When using a windows VM the background ssh process is never terminated
+    # This result in a ResourceWarning
+    @pytest.mark.filterwarnings("ignore::ResourceWarning")
     def test_checkpoint(self, running_vm):
         vm = running_vm
         logging.info("Start a 'sleep' process on VM through SSH")
