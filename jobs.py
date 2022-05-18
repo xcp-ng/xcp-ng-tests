@@ -69,7 +69,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot",
-        "name_filter": "not migration and not linstor",
+        "name_filter": "not migration and not linstor and not moosefs",
     },
     "storage-migrations": {
         "description": "tests migrations with all storage drivers (except linstor)",
@@ -87,7 +87,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "",
-        "name_filter": "migration and not linstor",
+        "name_filter": "migration and not linstor and not moosefs",
     },
     "storage-reboots": {
         "description": "storage driver tests that involve rebooting hosts (except linstor and flaky tests)",
@@ -104,7 +104,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "reboot and not flaky",
-        "name_filter": "not linstor",
+        "name_filter": "not linstor and not moosefs",
     },
     "sb-main": {
         "description": "tests uefistored and SecureBoot using a small unix VM (or no VM when none needed)",
@@ -208,7 +208,8 @@ JOBS = {
 BROKEN_TESTS = [
     "tests/storage/linstor", # needs updating and fixing
     "tests/misc/test_update_host.py", # doesn't test anything currently unless the host is out of date
-    "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork" # not really broken but we'll handle it later
+    "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork", # not really broken but we'll handle it later
+    "tests/storage/moosefs", # needs a driver fix to let it create a subdir in the share, and more attention
 ]
 
 def get_vm_or_vms_refs(handle):
