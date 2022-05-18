@@ -197,7 +197,7 @@ class Host:
         logging.info("Restart toolstack on host %s" % self)
         self.ssh(['xe-toolstack-restart'])
         if verify:
-            wait_for(self.is_enabled, "Wait for host enabled")
+            wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=1800)
 
     def is_enabled(self):
         try:
@@ -301,7 +301,7 @@ class Host:
                 raise
         if verify or reconnect_xo:
             wait_for_not(self.is_enabled, "Wait for host down")
-            wait_for(self.is_enabled, "Wait for host up", timeout_secs=600)
+            wait_for(self.is_enabled, "Wait for host up", timeout_secs=1800)
         if reconnect_xo and self.is_master():
             self.xo_server_reconnect()
 
