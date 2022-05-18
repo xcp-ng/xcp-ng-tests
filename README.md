@@ -1,6 +1,6 @@
 # Test scripts for XCP-ng
 
-Note: this is a work in progress.
+Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
 * python >= 3.5
@@ -27,10 +27,10 @@ $ pip install -r requirements/dev.txt
 * XCP-ng hosts that you can ssh to using a SSH key, non-interactively
 * VM images suited to what the tests want. Some tests want a linux VM with SSH, available to import as an OVA over HTTP, for example.
 
-On XCP-ng's test lab, the CI SSH private key allows to connect to any host installed for CI via PXE, and to any linux VM imported from pre-made images (OVA) and started.
+On XCP-ng's test lab, the CI SSH private key allows to connect to any host installed for CI via PXE, and to any linux VM imported from pre-made images (OVA).
 
 For Guest UEFI Secure Boot tests, the requirements are:
-* Test Runner
+* Test Runner (where pytest will be executed)
     * `sbsign` or `pesign`
     * If using `pesign`, `certutil` and `pk12util` must also be installed.
       These should be included as package dependencies for your distro.
@@ -43,11 +43,14 @@ For Guest UEFI Secure Boot tests, the requirements are:
     * `uefistored`
     * `varstored-tools`
 
+Many tests have specific requirements, detailed in a comment at the top of the test file: minimal number of hosts in a pool, number of pools, VMs with specific characteristics (OS, BIOS vs UEFI, additional tools installed in the VM, additional networks in the pool, presence of an unused disk on one host or every host...). Markers, jobs defined in `jobs.py` (`./jobs.py show JOBNAME` will display the requirements and the reference to a VM or VM group), VMs and VM groups defined in `vm-data.py-dist` may all help understanding what tests can run with what VMs.
+
 ## Configuration
 The main configuration file is data.py. Copy data.py-dist to data.py and modify it if needed.
 
 ## Running tests
-A crash-course about pytest will help you understanding how to start tests or groups of tests.
+
+Refer to pytest's documentation or tutorials to understand how to start tests or groups of tests.
 
 Examples:
 ```
@@ -68,6 +71,8 @@ Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those 
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
+See also, below: "Markers and test selection" and "Running test jobs with `jobs.py`"
+
 ### Test log level
 
 Using `pytest` you can choose to change the log level that appears in your console with the [`--log-cli-level` option](https://docs.pytest.org/en/latest/how-to/logging.html#live-logs).
@@ -76,10 +81,173 @@ To log to a file you can use `--log-file` option and choose the level with `--lo
 
 More info about pytest logging available here: https://docs.pytest.org/en/latest/how-to/logging.html.
 
+See also, below: "Markers and test selection" and "Running test jobs with `jobs.py`"
+
+### Markers and test selection
+
+pytest allows the use of markers to select tests, using the `-m` switch.
+
+Refer to the marker definitions in our `pytest.ini`.
+
+We defined various markers, that currently belong to the following conceptual families of markers:
+* Descriptive markers:
+  * Automatically added based on the fixtures required by the tests: do they require a VM? Unix? Windows? UEFI? Do they need a free disk that they can format? Do they require a second host in the first pool? A second pool? /!\ Not all fixtures are automatically translated into markers! (this is handled by the `pytest_collection_modifyitems` hook in `conftest.py`)
+  * Manually added to the tests by developers for easier test filtering: does the test reboot a host? Is it a flaky test? Does it have complex prerequisites?
+* Target markers, manually added, that hint about what kind of configuration is best appropriate with a given test:
+  * Tests that should be preferrably just run with a small and fast-booting VM, for faster execution.
+  * Tests that should be run on the largest variety of VMs.
+  * Tests that should be run at least once with a very big VM.
+* Markers used in the tests themselves to change their behaviour. Those won't be very useful to select tests with `-m`. We're just mentioning them for the sake of completeness.
+
+Here's an example of selection we can do thanks to the markers:
+
+```
+# Run storage driver tests that either need no VM at all, or advise to use a small VM. Exclude tests that reboot the hosts.
+pytest tests/storage -m "(small_vm or no_vm) and not reboot" --hosts=ip_of_poolmaster1,ip_of_poolmaster2 --vm=http://path/to/a_small_vm.xva --sr-disk=auto
+```
+
+Another example:
+
+```
+# Run secure boot tests that require a Unix VM (as opposed to a Windows VM) and that should ideally be run on a large variety of VMs
+pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/unix_vm_1.xva --vm=http://path/to/unix_vm_2.xva --vm=http://path/to/unix_vm_3.xva
+```
+
+
+The `-k` option may also be used to select tests, but this time based on their name. To be used with caution as this can be a fragile filter.
+
+TIP: Use pytest's `--collect-only` parameter to list the tests and check the effect of your selection, before actually running them.
+
+Options `-m` and `-k` are heavily used in `jobs.py`.
+
+### Running test jobs with `jobs.py`
+
+`jobs.py` is a script that was primarily developed to define test jobs that we can run in our test automation. There are various constraints to take into account. Mainly: test prerequisites (pools and VMs), test duration (some tests can be very long), and also whether the tests will make the pool temporarily unavailable (tests that reboot), or whether the tests are flaky (usually pass, but sometimes fail for a reason difficult to avoid or fix).
+
+We wanted the job definitions to be in this git repository, that's why the job definitions are in the `jobs.py` file itself (plus `vm_data.py` for VM selection).
+
+To use `./jobs.py`, you also need to populate `vm_data.py` to define the VM groups that are necessary to run jobs (unless `--vm` is provided on the command line to override the defaults).
+
+The output of commands below is given as example and may not reflect the current state of the jobs definitions.
+
+#### List jobs
+```
+$ ./jobs.py list
+main: a group of not-too-long tests that run either without a VM, or with a single small one
+main-multi: a group of tests that need to run on the largest variety of VMs
+quicktest: XAPI's quicktest, not so quick by the way
+storage-main: tests all storage drivers (except linstor), but avoids migrations and reboots
+storage-migrations: tests migrations with all storage drivers (except linstor)
+storage-reboots: storage driver tests that involve rebooting hosts (except linstor and flaky tests)
+sb-main: tests uefistored and SecureBoot using a small unix VM (or no VM when none needed)
+sb-windows: tests uefistored and SecureBoot using a Windows VM
+sb-unix-multi: checks basic Secure-Boot support on a variety of Unix VMs
+sb-windows-multi: checks basic Secure-Boot support on a variety of Windows VMs
+tools-unix: tests our unix guest tools on a single small VM
+tools-unix-multi: tests our unix guest tools on a variety of VMs
+flaky: tests that usually pass, but sometimes fail unexpectedly
+```
+
+#### Display information about a job
+```
+$ ./jobs.py show sb-unix-multi
+{
+    "description": "checks basic Secure-Boot support on a variety of Unix VMs",
+    "requirements": [
+        "A pool >= 8.2.1. One host is enough.",
+        "A variety of UEFI Unix VMs.",
+        "See README.md for requirements on the test runner itself."
+    ],
+    "nb_pools": 1,
+    "params": {
+        "--vm[]": "multi/uefi_unix"
+    },
+    "paths": [
+        "tests/uefistored"
+    ],
+    "markers": "multi_vms and unix_vm"
+}
+```
+
+Here you get the requirements for the job and the test selection (`paths` and optionnaly `markers` and/or `name_filter`).
+
+A very important information is also the `--vm` (single VM) or `--vm[]` (multiple VMs) parameter. The value is the key of a list of VMs that must be defined in `vm_data.py`, or the job won't execute (actually, you can still execute the job by passing one or more `--vm` parameters manually). Check the example `vm_data.py-dist` file. Inside XCP-ng's testing lab, a ready to use `vm_data.py` is available that lists the VMs available in the lab.
+
+#### Display more information about a job
+There are two more commands that you can use to display information about a job:
+
+```
+$ ./jobs.py collect sb-unix-multi --vm=a_vm
+[...]
+collected 175 items / 170 deselected / 5 selected
+
+<Package uefistored>
+  <Module test_secure_boot.py>
+    <Class TestGuestLinuxUEFISecureBoot>
+      <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm1.xva]>
+      <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm2.xva]>
+      <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm3.xva]>
+```
+
+(the output can be a lot bigger)
+
+Lastly, the `run` command with the `--print-only` switch will display the command it would execute, but not execute it.
+
+```
+# job with default parameters
+$ ./jobs.py run --print-only sb-unix-multi ip_of_poolmaster
+pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm1.xva --vm=http://path/to/vm2.xva --vm=http://path/to/vm3.xva
+
+# same, but we override the list of VMs
+$ ./jobs.py run --print-only sb-unix-multi ip_of_poolmaster --vm=http://path/to/vm4.xva
+pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm4.xva
+```
+
+#### Run a job
+```
+usage: jobs.py run [-h] [--print-only] job hosts ...
+
+positional arguments:
+  job               name of the job to run.
+  hosts             master host(s) of pools to run the tests on, comma-separated.
+  pytest_args       all additional arguments after the last positional argument will be passed to pytest and replace default job params if needed.
+
+optional arguments:
+  -h, --help        show this help message and exit
+  --print-only, -p  print the command, but don't run it. Must be specified before positional arguments.
+```
+
+Example:
+```
+# job with default parameters
+$ ./jobs.py run sb-unix-multi ip_of_poolmaster
+pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm1.xva --vm=http://path/to/vm2.xva --vm=http://path/to/vm3.xva
+[... job executes...]
+```
+
+Any parameter added at the end of the command will be passed to `pytest`. Any parameter added that is already defined in the jobs's "params" (see output of `./jobs.py show`) will replace it, and `--vm` also replaces `--vm[]` in the case of jobs designed to run tests on multiple VMs.
+
+```
+# same, but we override the list of VMs
+$ ./jobs.py run --print-only sb-unix-multi ip_of_poolmaster --vm=http://path/to/vm4.xva
+pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm4.xva
+[... job executes...]
+```
+
+
+#### Check job consistency
+`./jobs.py check` will attempt to check whether the jobs are consistent. For example: are all tests defined in this repository selected in at least one job?
+
+It is automatically executed after every pull request or commit pushed to this repository.
+
+#### More
+Check `./jobs.py --help` and `./jobs.py {command name} --help`.
+
 ## VM setup
 Many tests expect VMs with:
 * OpenSSH server installed and accepting pubkey authentication for the `root` user
 * Guest tools installed so that the VM reports its IP address, can be shutdown cleanly, and migrated without issues
+* Other common prerequisites detailed below.
 
 Here are instructions that should help creating such VMs.
 
@@ -90,7 +258,8 @@ Here are instructions that should help creating such VMs.
 * Install openssh-server and enable it
 * Install bash in order to ensure a common shell is available in all test VMs
 * Install guest tools, then eject guest tools ISO
-* Add XCP-ng's CI public key in /root/.ssh/authorized_keys (mode 0600)
+* Add a SSH public key in /root/.ssh/authorized_keys (mode 0600) so that tests may run SSH commands inside the VMs
+  * For XCP-ng's test lab, add XCP-ng's CI public key
 * Test you can ssh to it
 * Reboot, check everything is fine
 * Poweroff
@@ -137,7 +306,7 @@ New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Pr
 * Reboot, check it's still OK
 * Poweroff
 
-# Automating VM Setup with Ansible
+## Automating VM Setup with Ansible
 
 There is an Ansible runner that performs automatic updates on VMs using Ansible
 playbooks. The runner then exports the updated VMs as XVAs. The runner is found
@@ -167,7 +336,7 @@ optional arguments:
                         image. Defaults to /root/ansible-updates/
 ```
 
-## The Ansible Playbook
+### The Ansible Playbook
 
 The Ansible playbook must have a host name that matches the file name of an
 XVA located at the http server found using the `DEF_VM_URL` variable in
@@ -202,7 +371,7 @@ in data.py.
         name: util-linux efitools
 ```
 
-# Bash scripts
+## Bash scripts
 
  * get_xva_bridge.sh: a script to get the XAPI bridge value from inside a xva file and the compression method used for this xva file.
 
