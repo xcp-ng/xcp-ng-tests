@@ -189,7 +189,7 @@ collected 175 items / 170 deselected / 5 selected
       <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm3.xva]>
 ```
 
-This lists the tests that are selected by the job. Tests may be repeated if they will run several times, as in the case in this example because there are 3 VMs to test. I chose a job whose output is small for the sake of documentation conciseness, but the output can be a lot bigger!
+This lists the tests that are selected by the job. Tests may be repeated if they will run several times, as in the case of this example because there are 3 VMs to test. I chose a job whose output is small for the sake of documentation conciseness, but the output can be a lot bigger!
 
 Lastly, the `run` command with the `--print-only` switch will display the command it would execute, but not execute it.
 
@@ -225,7 +225,7 @@ pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm
 [... job executes...]
 ```
 
-Any parameter added at the end of the command will be passed to `pytest`. Any parameter added that is already defined in the jobs's "params" (see output of `./jobs.py show`) will replace it, and `--vm` also replaces `--vm[]` in the case of jobs designed to run tests on multiple VMs.
+Any parameter added at the end of the command will be passed to `pytest`. Any parameter added that is already defined in the job's "params" (see output of `./jobs.py show`) will replace it, and `--vm` also replaces `--vm[]` in the case of jobs designed to run tests on multiple VMs.
 
 ```
 # same, but we override the list of VMs
