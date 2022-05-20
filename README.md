@@ -177,7 +177,7 @@ A very important information is also the `--vm` (single VM) or `--vm[]` (multipl
 There are two more commands that you can use to display information about a job:
 
 ```
-$ ./jobs.py collect sb-unix-multi --vm=a_vm
+$ ./jobs.py collect sb-unix-multi
 [...]
 collected 175 items / 170 deselected / 5 selected
 
@@ -189,7 +189,7 @@ collected 175 items / 170 deselected / 5 selected
       <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm3.xva]>
 ```
 
-(the output can be a lot bigger)
+This lists the tests that are selected by the job. Tests may be repeated if they will run several times, as in the case in this example because there are 3 VMs to test. I chose a job whose output is small for the sake of documentation conciseness, but the output can be a lot bigger!
 
 Lastly, the `run` command with the `--print-only` switch will display the command it would execute, but not execute it.
 
