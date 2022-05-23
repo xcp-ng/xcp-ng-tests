@@ -352,7 +352,8 @@ def action_run(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Manage test jobs")
-    subparsers = parser.add_subparsers(dest="action", required=True, metavar="action")
+    subparsers = parser.add_subparsers(dest="action", metavar="action")
+    subparsers.required = True
 
     list_parser = subparsers.add_parser("list", help="list available jobs.")
     list_parser.set_defaults(func=action_list)
