@@ -79,7 +79,7 @@ class TestMooseFSSR:
         pbd_uuid = sr.pbd_for_host(host)
         moosefs_installed = True
         try:
-            sr.unplub_pbd(pbd_uuid)
+            sr.unplug_pbd(pbd_uuid)
             host.yum_remove(['moosefs-client'])
             moosefs_installed = False
             try:
