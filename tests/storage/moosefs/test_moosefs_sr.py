@@ -59,6 +59,42 @@ class TestMooseFSSR:
         vm.test_snapshot_on_running_vm()
         vm.shutdown(verify=True)
 
+    def test_moosefs_missing_client_scan_fails(self, host, moosefs_sr):
+        sr = moosefs_sr
+        moosefs_installed = True
+        try:
+            host.yum_remove(['moosefs-client'])
+            moosefs_installed = False
+            try:
+                sr.scan()
+                assert False, "SR scan should have failed"
+            except SSHCommandFailed:
+                logging.info("SR scan failed as expected.")
+        finally:
+            if not moosefs_installed:
+                host.yum_install(['moosefs-client'])
+
+    def test_moosefs_missing_client_pbd_plug_fails(self, host, moosefs_sr):
+        sr = moosefs_sr
+        pbd_uuid = sr.pbd_for_host(host)
+        moosefs_installed = True
+        try:
+            sr.unplug_pbd(pbd_uuid)
+            host.yum_remove(['moosefs-client'])
+            moosefs_installed = False
+            try:
+                sr.plug_pbd(pbd_uuid)
+                assert False, "PBD plug should have failed"
+            except SSHCommandFailed:
+                logging.info("PBD plug failed as expected.")
+            host.yum_install(['moosefs-client'])
+            moosefs_installed = True
+            sr.plug_pbd(pbd_uuid)
+            sr.scan()
+        finally:
+            if not moosefs_installed:
+                host.yum_install(['moosefs-client'])
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
@@ -72,30 +108,5 @@ class TestMooseFSSR:
         vm.start(on=host.uuid)
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
-
-    @pytest.mark.reboot # reboots the host
-    def test_moosefs_missing(self, host, moosefs_sr):
-        sr = moosefs_sr
-        moosefs_installed = True
-        try:
-            host.yum_remove(['moosefs-client'])
-            moosefs_installed = False
-            try:
-                sr.scan()
-                assert False, "SR scan should have failed"
-            except SSHCommandFailed:
-                logging.info("SR scan failed as expected.")
-            host.reboot(verify=True)
-            # give the host some time to try to attach the SR
-            time.sleep(10)
-            logging.info("Assert PBD not attached")
-            assert not sr.all_pbds_attached()
-            host.yum_install(['moosefs-client'])
-            moosefs_installed = True
-            sr.plug_pbds(verify=True)
-            sr.scan()
-        finally:
-            if not moosefs_installed:
-                host.yum_install(['moosefs-client'])
 
     # *** End of tests with reboots

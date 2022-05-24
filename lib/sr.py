@@ -14,17 +14,27 @@ class SR:
     def pbd_uuids(self):
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
 
+    def pbd_for_host(self, host):
+        return safe_split(self.pool.master.xe(
+            'pbd-list',
+            {'sr-uuid': self.uuid, 'host-uuid': host.uuid},
+            minimal=True
+        ))[0]
+
+    def unplug_pbd(self, pbd_uuid, force=False):
+        try:
+            self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
+        except commands.SSHCommandFailed as e:
+            # We must be sure to execute correctly "unplug" on unplugged VDIs without error
+            # if force is set.
+            if not force:
+                raise
+            logging.warning('Ignore exception during PBD unplug: {}'.format(e))
+
     def unplug_pbds(self, force=False):
         logging.info(f"Unplug PBDs for SR {self.uuid}")
         for pbd_uuid in self.pbd_uuids():
-            try:
-                self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
-            except commands.SSHCommandFailed as e:
-                # We must be sure to execute correctly "unplug" on unplugged VDIs without error
-                # if force is set.
-                if not force:
-                    raise
-                logging.warning('Ignore exception during PBD unplug: {}'.format(e))
+            self.unplug_pbd(pbd_uuid, force=force)
 
     def all_pbds_attached(self):
         all_attached = True
@@ -33,10 +43,13 @@ class SR:
                                                                 'param-name': 'currently-attached'})
         return all_attached
 
+    def plug_pbd(self, pbd_uuid):
+        self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
+
     def plug_pbds(self, verify=True):
         logging.info("Attach PBDs")
         for pbd_uuid in self.pbd_uuids():
-            self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
+            self.plug_pbd(pbd_uuid)
         if verify:
             wait_for(self.all_pbds_attached, "Wait for PDBs attached")
 
