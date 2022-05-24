@@ -28,14 +28,14 @@ def pool_with_moosefs_installed(pool_with_saved_yum_state):
     pool = pool_with_saved_yum_state
     pool.exec_on_hosts_on_error_rollback(install_moosefs, uninstall_moosefs_repo)
     yield pool
-    pool.exec_on_hosts.on_error_continue(uninstall_moosefs_repo)
+    pool.exec_on_hosts_on_error_continue(uninstall_moosefs_repo)
 
 @pytest.fixture(scope='package')
 def pool_with_moosefs_enabled(pool_with_moosefs_installed):
     pool = pool_with_moosefs_installed
     pool.exec_on_hosts_on_error_rollback(enable_moosefs, disable_moosefs)
     yield pool
-    pool.exec_on_hosts.on_error_continue(disable_moosefs)
+    pool.exec_on_hosts_on_error_continue(disable_moosefs)
 
 @pytest.fixture(scope='package')
 def moosefs_device_config(sr_device_config):
