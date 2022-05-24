@@ -345,8 +345,7 @@ class Host:
             params['device-config:{}'.format(key)] = value
 
         logging.info(
-            "Create %s SR on host %s's %s device-config with label '%s'" %
-            (sr_type, self, str(device_config), label)
+            f"Create {sr_type} SR on host {self} with label '{label}' and device-config: {str(device_config)}"
         )
         sr_uuid = self.xe('sr-create', params)
         sr = SR(sr_uuid, self.pool)
