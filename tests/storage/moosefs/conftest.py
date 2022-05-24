@@ -5,7 +5,7 @@ import pytest
 from lib.pool import Pool
 
 # explicit import for package-scope fixtures
-from conftest import pool_with_saved_yum_state
+from pkgfixtures import pool_with_saved_yum_state
 
 def install_moosefs(host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \
