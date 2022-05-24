@@ -17,7 +17,7 @@ class SR:
     def pbd_for_host(self, host):
         return safe_split(self.pool.master.xe(
             'pbd-list',
-            {'sr-uuid': self.uuid, 'host_uuid': host.uuid},
+            {'sr-uuid': self.uuid, 'host-uuid': host.uuid},
             minimal=True
         ))[0]
 
