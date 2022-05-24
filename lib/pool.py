@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 import lib.commands as commands
 
@@ -18,6 +19,58 @@ class Pool:
                 self.hosts.append(host)
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs = None
+
+    def exec_on_hosts_on_error_rollback(self, func, rollback_func, host_list=[]):
+        """
+        Execute a function on all hosts of the pool.
+
+        If something fails: execute rollback_func on each host on which the command was already executed.
+        Then stop.
+        Designed mainly for use in fixture setups that alter the hosts state.
+        """
+        hosts_done = []
+        hosts = host_list if host_list else self.hosts
+        for h in hosts:
+            try:
+                func(h)
+                hosts_done.append(h)
+            except Exception as e:
+                if rollback_func:
+                    logging.warning(
+                        f"An error occurred in `exec_on_hosts_on_error_rollback` for host {h}\n"
+                        f"Backtrace:\n{traceback.format_exc()}"
+                    )
+                    rollback_hosts = hosts_done + [h]
+
+                    logging.info("Attempting to run the rollback function on host(s) "
+                                 f"{', '.join([str(h) for h in rollback_hosts])}...")
+                    try:
+                        self.exec_on_hosts_on_error_continue(rollback_func, rollback_hosts)
+                    except Exception:
+                        pass
+                raise e
+
+    def exec_on_hosts_on_error_continue(self, func, host_list=[]):
+        """
+        Execute a function on all hosts of the pool.
+
+        If something fails: store the exception but still attempt the function on the next hosts.
+        Designed mainly for use in fixture teardowns.
+        """
+        errors = {}
+        hosts = host_list if host_list else self.hosts
+        for h in hosts:
+            try:
+                func(h)
+            except Exception as e:
+                logging.warning(
+                    f"An error occurred in `exec_on_hosts_on_error_continue` for host {h}\n"
+                    f"Backtrace:\n{traceback.format_exc()}"
+                )
+                logging.info("Attempting to run the function on the next hosts of the pool if there are any left...")
+                errors[h.hostname_or_ip] = e
+        if errors:
+            raise Exception(f"One or more exceptions were raised in `exec_on_hosts_on_error_continue`: {errors}")
 
     def hosts_uuids(self):
         return safe_split(self.master.xe('host-list', {}, minimal=True))
