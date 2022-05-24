@@ -149,7 +149,7 @@ def hostA1_with_saved_yum_state(host):
 def pool_with_saved_yum_state(host):
     for h in host.pool.hosts:
         h.yum_save_state()
-    yield host
+    yield host.pool
     host.pool.exec_on_hosts_on_error_continue(lambda h: h.yum_restore_saved_state())
 
 @pytest.fixture(scope='session')
