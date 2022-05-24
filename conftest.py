@@ -138,6 +138,20 @@ def hostB1(hosts):
     logging.info(">>> hostB1 present: %s" % _hostB1)
     yield _hostB1
 
+# package scope. Don't forget to explicly import in packages conftest.py to workaround pytest scope bug.
+@pytest.fixture(scope='package')
+def hostA1_with_saved_yum_state(host):
+    host.yum_save_state()
+    yield host
+    host.yum_restore_saved_state()
+
+@pytest.fixture(scope='package')
+def pool_with_saved_yum_state(host):
+    for h in host.pool.hosts:
+        h.yum_save_state()
+    yield host
+    host.pool.exec_on_hosts_on_error_continue(lambda h: h.yum_restore_saved_state())
+
 @pytest.fixture(scope='session')
 def host_at_least_8_3(host):
     version_str = "8.3"

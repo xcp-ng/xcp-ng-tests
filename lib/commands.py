@@ -16,16 +16,18 @@ class BaseCommandFailed(Exception):
 
 class SSHCommandFailed(BaseCommandFailed):
     def __init__(self, returncode, stdout, cmd):
+        msg_end = f": {stdout}" if stdout else "."
         super(SSHCommandFailed, self).__init__(
             returncode, stdout, cmd,
-            f'SSH command ({cmd}) failed with return code {returncode}: {stdout}'
+            f'SSH command ({cmd}) failed with return code {returncode}{msg_end}'
         )
 
 class LocalCommandFailed(BaseCommandFailed):
     def __init__(self, returncode, stdout, cmd):
+        msg_end = f": {stdout}" if stdout else "."
         super(SSHCommandFailed, self).__init__(
             returncode, stdout, cmd,
-            f'Local command ({cmd}) failed with return code {returncode}: {stdout}'
+            f'Local command ({cmd}) failed with return code {returncode}{msg_end}'
         )
 
 class BaseCmdResult:
