@@ -12,14 +12,14 @@ class SR:
         self._main_host = None # cached value for main_host()
 
     def pbd_uuids(self):
-        return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))[0]
+        return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
 
     def pbd_for_host(self, host):
         return safe_split(self.pool.master.xe(
             'pbd-list',
             {'sr-uuid': self.uuid, 'host_uuid': host.uuid},
             minimal=True
-        ))
+        ))[0]
 
     def unplug_pbd(self, pbd_uuid, force=False):
         try:
