@@ -1,6 +1,8 @@
+import getpass
+import inspect
 import logging
 import time
-import getpass
+import traceback
 from enum import Enum
 from uuid import UUID
 
@@ -98,3 +100,24 @@ def teardown_formatted_and_mounted_disk(host, mountpoint):
     host.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
     host.ssh(['umount', mountpoint])
     host.ssh(['rmdir', mountpoint])
+
+def exec_nofail(func):
+    """ Execute a function, log a warning if it fails, and return eiter [] or [e] where e is the exception. """
+    caller_name = inspect.stack()[1].function
+    try:
+        func()
+        return []
+    except Exception as e:
+        logging.warning(
+            f"An error occurred in `{caller_name}`\n"
+            f"Backtrace:\n{traceback.format_exc()}"
+        )
+        return [e]
+
+def raise_errors(errors):
+    if not errors:
+        return
+    elif len(errors) == 1:
+        raise errors[0]
+    else:
+        raise Exception("Several exceptions were catched: " + "\n".join(repr(e) for e in errors))
