@@ -1,6 +1,8 @@
 import logging
 import pytest
 
+from lib.common import exec_nofail, raise_errors
+
 @pytest.fixture(scope='module')
 def vdis(host, local_sr_on_hostA1):
     def _make_vdi(name):
@@ -14,8 +16,10 @@ def vdis(host, local_sr_on_hostA1):
     yield vdi_A, vdi_B, vdi_C
 
     logging.info('< Destroying VDIs')
+    errors = []
     for vdi in [vdi_A, vdi_B, vdi_C]:
-        host.xe('vdi-destroy', {'uuid': vdi})
+        errors += exec_nofail(lambda: host.xe('vdi-destroy', {'uuid': vdi}))
+    raise_errors(errors)
 
 @pytest.fixture(scope='module')
 def vm_with_vbds(host, vdis, imported_vm):

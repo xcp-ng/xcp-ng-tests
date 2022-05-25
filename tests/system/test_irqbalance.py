@@ -3,6 +3,8 @@ import os
 import pytest
 import tempfile
 
+from lib.common import exec_nofail, raise_errors
+
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.2
 # - a VM (--vm)
@@ -18,12 +20,14 @@ def four_vms(imported_vm):
     vm4 = vm1.clone()
     yield (vm1, vm2, vm3, vm4)
     # teardown
+    errors = []
     logging.info("< Destroy VM4")
-    vm4.destroy()
+    errors += exec_nofail(lambda: vm4.destroy())
     logging.info("< Destroy VM3")
-    vm3.destroy()
+    errors += exec_nofail(lambda: vm3.destroy())
     logging.info("< Destroy VM2")
-    vm2.destroy()
+    errors += exec_nofail(lambda: vm2.destroy())
+    raise_errors(errors)
 
 @pytest.mark.flaky # sometimes IRQs are not balanced and we don't know why. And sometimes a VM doesn't report an IP.
 @pytest.mark.small_vm
