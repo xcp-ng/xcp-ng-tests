@@ -59,7 +59,7 @@ class TestMooseFSSR:
         vm.test_snapshot_on_running_vm()
         vm.shutdown(verify=True)
 
-    def test_moosefs_missing_scan_fails(self, host, moosefs_sr):
+    def test_moosefs_missing_client_scan_fails(self, host, moosefs_sr):
         sr = moosefs_sr
         moosefs_installed = True
         try:
@@ -74,7 +74,7 @@ class TestMooseFSSR:
             if not moosefs_installed:
                 host.yum_install(['moosefs-client'])
 
-    def test_moosefs_missing_pbd_plug_fails(self, host, moosefs_sr):
+    def test_moosefs_missing_client_pbd_plug_fails(self, host, moosefs_sr):
         sr = moosefs_sr
         pbd_uuid = sr.pbd_for_host(host)
         moosefs_installed = True
