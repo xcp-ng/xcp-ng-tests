@@ -6,7 +6,7 @@ from lib.common import wait_for_not
 GROUP_NAME = 'linstor_group'
 LINSTOR_PACKAGES = ['drbd', 'kmod-drbd', 'linstor-client', 'linstor-controller', 'linstor-satellite', 'python-linstor']
 
-# FIXME: make fixtures robust and attemptings to clean behind if something fails in a setup or teardown
+# FIXME: make fixtures robust: clean behind if something fails in a setup or teardown
 
 @pytest.fixture(scope='package')
 def lvm_disks(host):
