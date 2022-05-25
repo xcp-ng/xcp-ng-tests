@@ -35,7 +35,7 @@ class Pool:
             except Exception as e:
                 if rollback_func:
                     logging.warning(
-                        f"An error occurred in `exec_on_hosts_on_error_rollback` for host {h}: {e}\n"
+                        f"An error occurred in `exec_on_hosts_on_error_rollback` for host {h}\n"
                         f"Backtrace:\n{traceback.format_exc()}"
                     )
                     rollback_hosts = hosts_done + [h]
@@ -60,7 +60,7 @@ class Pool:
                 func(h)
             except Exception as e:
                 logging.warning(
-                    f"An error occurred in `exec_on_hosts_on_error_continue` for host {h}: {e}\n"
+                    f"An error occurred in `exec_on_hosts_on_error_continue` for host {h}\n"
                     f"Backtrace:\n{traceback.format_exc()}"
                 )
                 logging.info("Attempting to run the function on the next hosts of the pool if there are any left...")
