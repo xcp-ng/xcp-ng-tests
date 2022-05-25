@@ -1,17 +1,18 @@
 import logging
 import pytest
 
-from lib.commands import SSHCommandFailed
-from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+
+# explicit import for package-scope fixtures
+from pkgfixtures import pool_with_saved_yum_state
 
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 
 def _setup_host_with_glusterfs(host):
-    assert not host.file_exists('/usr/sbin/glusterd'), \
-        "glusterfs-server must not be installed on the host at the beginning of the tests"
-    host.yum_save_state()
+    for service in ['iptables', 'ip6tables']:
+        host.ssh(['cp', '/etc/sysconfig/%s' % service, '/etc/sysconfig/%s.orig' % service])
+
     host.yum_install(['glusterfs-server', 'xfsprogs'])
-    host.ssh(['systemctl', 'enable', '--now', 'glusterd.service'])
 
     for h in host.pool.hosts:
         hostname_or_ip = h.hostname_or_ip
@@ -22,80 +23,60 @@ def _setup_host_with_glusterfs(host):
 
     # Make rules reboot-persistent
     for service in ['iptables', 'ip6tables']:
-        host.ssh(['cp', '/etc/sysconfig/%s' % service, '/etc/sysconfig/%s.orig' % service])
         host.ssh(['service', service, 'save'])
+
+    host.ssh(['systemctl', 'enable', '--now', 'glusterd.service'])
 
 def _teardown_host_with_glusterfs(host):
     errors = []
-    try:
-        host.ssh(['systemctl', 'disable', '--now', 'glusterd.service'])
-    except SSHCommandFailed as e:
-        logging.warning("%s" % e)
-        errors.append(e)
-    host.yum_restore_saved_state()
+    errors += exec_nofail(lambda: host.ssh(['systemctl', 'disable', '--now', 'glusterd.service']))
 
     # Remove any remaining gluster-related data to avoid issues in future test runs
-    try:
-        host.ssh(['rm', '-rf', '/var/lib/glusterd'])
-    except SSHCommandFailed as e:
-        logging.warning("%s" % e)
-        errors.append(e)
+    errors += exec_nofail(lambda: host.ssh(['rm', '-rf', '/var/lib/glusterd']))
 
     for h in host.pool.hosts:
         hostname_or_ip = h.hostname_or_ip
         if hostname_or_ip != host.hostname_or_ip:
             for port, proto in GLUSTERFS_PORTS:
-                try:
-                    host.ssh(
-                        ['iptables', '-D', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT'])
-                except SSHCommandFailed as e:
-                    logging.warning("%s" % e)
-                    errors.append(e)
+                errors += exec_nofail(
+                    lambda: host.ssh(
+                        ['iptables', '-D', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT']
+                    )
+                )
 
     for service in ['iptables', 'ip6tables']:
-        try:
-            host.ssh(['mv', '/etc/sysconfig/%s.orig' % service, '/etc/sysconfig/%s' % service])
-        except SSHCommandFailed as e:
-            logging.warning("%s" % e)
-            errors.append(e)
+        errors += exec_nofail(
+            lambda: host.ssh(['mv', '/etc/sysconfig/%s.orig' % service, '/etc/sysconfig/%s' % service])
+        )
 
-    if len(errors) > 0:
-        raise Exception("\n".join(repr(e) for e in errors))
+    raise_errors(errors)
 
 @pytest.fixture(scope='package')
-def pool_with_glusterfs(host):
-    setup_errors = []
+def pool_without_glusterfs(host):
     for h in host.pool.hosts:
-        try:
-            _setup_host_with_glusterfs(h)
-        except Exception as e:
-            logging.warning("%s" % e)
-            setup_errors.append(e)
-            pass
-    if len(setup_errors) > 0:
-        raise Exception("\n".join(repr(e) for e in setup_errors))
+        if h.file_exists('/usr/sbin/glusterd'):
+            raise Exception(
+                f"glusterfs-server is already installed on host {h}. This should not be the case."
+            )
+    yield host.pool
 
-    yield
-    teardown_errors = []
-    for h in host.pool.hosts:
-        try:
-            _teardown_host_with_glusterfs(h)
-        except Exception as e:
-            teardown_errors.append(e)
-            pass
-    if len(teardown_errors) > 0:
-        raise Exception("\n".join(repr(e) for e in teardown_errors))
+@pytest.fixture(scope='package')
+def pool_with_glusterfs(pool_without_glusterfs, pool_with_saved_yum_state):
+    pool = pool_with_saved_yum_state
+    pool.exec_on_hosts_on_error_rollback(_setup_host_with_glusterfs, _teardown_host_with_glusterfs)
+    yield pool
+    pool.exec_on_hosts_on_error_continue(_teardown_host_with_glusterfs)
 
 @pytest.fixture(scope='package')
 def gluster_disk(host, sr_disk_for_all_hosts):
     sr_disk = sr_disk_for_all_hosts
-    hosts = host.pool.hosts
     mountpoint = '/mnt/sr_disk'
-    for h in hosts:
+    for h in host.pool.hosts:
         setup_formatted_and_mounted_disk(h, sr_disk, 'xfs', mountpoint)
     yield
-    for h in hosts:
-        teardown_formatted_and_mounted_disk(h, mountpoint)
+    host.pool.exec_on_hosts_on_error_continue(
+        lambda h: teardown_formatted_and_mounted_disk(h, mountpoint)
+    )
 
 def _fallback_gluster_teardown(host):
     # See: https://microdevsys.com/wp/volume-delete-volume-failed-some-of-the-peers-are-down/

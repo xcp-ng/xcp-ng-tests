@@ -1,22 +1,25 @@
 import logging
 import pytest
 
-def _setup_host_with_ceph(host):
-    assert not host.file_exists('/usr/sbin/mount.ceph'), \
-        "mount.ceph must not be installed on the host at the beginning of the tests"
-    host.yum_save_state()
-    host.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras")
-    host.yum_install(['ceph-common'], enablerepo="base,extras")
+from lib.common import exec_nofail, raise_errors
+
+# explicit import for package-scope fixtures
+from pkgfixtures import pool_with_saved_yum_state
 
 @pytest.fixture(scope='package')
-def pool_with_ceph(host):
+def pool_without_ceph(host):
     for h in host.pool.hosts:
-        _setup_host_with_ceph(h)
+        assert not host.file_exists('/usr/sbin/mount.ceph'), \
+            "mount.ceph must not be installed on the host at the beginning of the tests"
+    yield host.pool
 
-    yield
-    # teardown
-    for h in host.pool.hosts:
-        h.yum_restore_saved_state()
+@pytest.fixture(scope='package')
+def pool_with_ceph(pool_without_ceph, pool_with_saved_yum_state):
+    pool = pool_with_saved_yum_state
+    for h in pool.hosts:
+        h.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras")
+        h.yum_install(['ceph-common'], enablerepo="base,extras")
+    yield pool
 
 @pytest.fixture(scope='package')
 def cephfs_device_config(sr_device_config):
