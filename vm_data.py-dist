@@ -21,7 +21,7 @@ VMS = {
         "tools_unix": [],
         # UEFI unix/linux Vms
         "uefi_unix": [],
-        # Windows VMs
-        "windows": [],
+        # UEFI Windows VMs
+        "uefi_windows": [],
     }
 }
