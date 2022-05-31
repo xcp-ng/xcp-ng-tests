@@ -155,7 +155,7 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
-            "--vm[]": "multi/windows",
+            "--vm[]": "multi/uefi_windows",
         },
         "paths": ["tests/uefistored"],
         "markers": "multi_vms and windows_vm",
