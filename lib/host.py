@@ -264,12 +264,14 @@ class Host:
         return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
 
     def yum_save_state(self):
+        logging.info(f"Save yum state for host {self}")
         # For now, that saved state feature does not support several saved states
         assert self.saved_packages_list is None, "There is already a saved package list set"
         self.saved_packages_list = self.packages()
         self.saved_rollback_id = self.get_last_yum_history_tid()
 
     def yum_restore_saved_state(self):
+        logging.info(f"Restore yum state for host {self}")
         """ Restore yum state to saved state. """
         assert self.saved_packages_list is not None, \
             "Can't restore previous state without a package list: no saved packages list"
