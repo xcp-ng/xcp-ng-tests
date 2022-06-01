@@ -188,6 +188,15 @@ JOBS = {
         "paths": ["tests/guest-tools/unix"],
         "markers": "multi_vms",
     },
+    "xtf": {
+        "description": "Xen's XTF test suite",
+        "requirements": [
+            "A host with HVM FEP enabled (`hvm_fep` Xen command line parameter).",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/xtf"],
+    },
     "flaky": {
         "description": "tests that usually pass, but sometimes fail unexpectedly",
         "requirements": [
