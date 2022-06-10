@@ -12,7 +12,7 @@ def install_moosefs(host):
     host.yum_install(['fuse', 'moosefs-client'])
 
 def uninstall_moosefs_repo(host):
-    host.ssh(['rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS/etc/yum.repos.d/MooseFS.repo'])
+    host.ssh(['rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS /etc/yum.repos.d/MooseFS.repo'])
 
 def enable_moosefs(host):
     host.activate_smapi_driver('moosefs')
