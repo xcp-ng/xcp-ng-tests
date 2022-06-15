@@ -2,48 +2,45 @@ import logging
 import pytest
 import time
 
-from .conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
+
+from tests.storage.linstor import create_linstor_sr
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
 # - access to XCP-ng RPM repository from the host
-# - a repo with the LINSTOR RPMs must be given using the command line param `--additional-repos`
 
 class TestLinstorSRCreateDestroy:
-    vm = None
+    """
+    Tests that do not use fixtures that setup the SR or import VMs,
+    because they precisely need to test SR creation and destruction,
+    and VM import.
+    """
 
-    def test_create_sr_without_linstor(self, hosts, lvm_disks):
-        master = hosts[0]
-
+    def test_create_sr_without_linstor(self, hosts, vg_for_all_hosts):
         # This test must be the first in the series in this module
+        master = hosts[0]
         assert not master.binary_exists('linstor'), \
-            "linstor must not be installed on the host at the beginning of the tests"
+            'linstor must not be installed on the host at the beginning of the tests'
+        sr = None
         try:
-            sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
-                'hosts': ','.join([host.hostname() for host in hosts]),
-                'group-name': GROUP_NAME,
-                'redundancy': len(hosts),
-                'provisioning': 'thick'
-            }, shared=True)
-            try:
-                sr.destroy()
-            except Exception:
-                pass
-            assert False, "SR creation should not have succeeded!"
-        except SSHCommandFailed as e:
-            logging.info("SR creation failed, as expected: {}".format(e))
+            sr = create_linstor_sr('LINSTOR-SR-test', hosts)
+        except Exception:
+            logging.info('SR creation failed, as expected.')
+        if sr is not None:
+            sr.destroy()
+            assert False, 'SR creation should not have succeeded!'
 
-    def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks):
+    def test_create_and_destroy_sr(self, hosts_with_linstor, vg_for_all_hosts):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = hosts_with_linstor[0]
-        sr = create_linstor_sr(hosts_with_linstor)
+        sr = create_linstor_sr('LINSTOR-SR-test', hosts_with_linstor)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = master.import_vm(vm_image('mini-linux-x86_64-bios'), sr.uuid)
         vm.destroy(verify=True)
-        destroy_linstor_sr(hosts_with_linstor, sr)
+        sr.destroy(verify=True)
 
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
