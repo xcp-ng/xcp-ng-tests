@@ -371,6 +371,32 @@ in data.py.
         name: util-linux efitools
 ```
 
+## install_xcpng.py
+
+This script installs (or upgrades) XCP-ng in a VM using a PXE server whose configuration can be defined dynamically. Basically, it writes files in a directory named after the MAC address of the VM, on a PXE server that will then build a boot configuration for the given MAC address. This is rather specific to Vates' test lab at the moment. If you are interested in automated installation in general, check https://xcp-ng.org/docs/install.html#automated-install.
+
+```
+usage: install_xcpng.py [-h] [--installer INSTALLER] host vm_uuid action xcpng_version
+```
+
+Installation example:
+```
+python scripts/test_install_xcpng.py 10.0.0.2 3bdf2cc6-4e6e-526d-4f18-bf7899953af6 install 8.2.1 --installer=https://mirrors.xcp-ng.org/netinstall/8.2.1/
+```
+
+Upgrade example:
+```
+python scripts/test_install_xcpng.py 10.0.0.2 f0f5f010-80c6-25ae-44a2-1fb154e32d14 upgrade 8.2.1
+```
+
+The script requires the addressable name or IP of the PXE config server to be defined in `data.py`:
+```
+# PXE config server for automated XCP-ng installation
+PXE_CONFIG_SERVER = 'pxe'
+```
+
+The `installer` parameter is optional. If you leave it empty it will be automatically defined as `http://<PXE_CONFIG_SERVER>/installers/xcp-ng/<version>/`.
+
 ## Bash scripts
 
  * get_xva_bridge.sh: a script to get the XAPI bridge value from inside a xva file and the compression method used for this xva file.

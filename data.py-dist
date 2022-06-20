@@ -20,6 +20,9 @@ HOSTS = {
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
 
+# PXE config server for automated XCP-ng installation
+PXE_CONFIG_SERVER = 'pxe'
+
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
 

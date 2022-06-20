@@ -45,7 +45,7 @@ class VM(BaseVM):
         return self.host.xe('vm-start', args)
 
     def shutdown(self, force=False, verify=False):
-        logging.info("Shutdown VM")
+        logging.info("Shutdown VM" + (" (force)" if force else ""))
         ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': force})
         if verify:
             wait_for(self.is_halted, "Wait for VM halted")
