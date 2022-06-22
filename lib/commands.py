@@ -65,8 +65,8 @@ OUPUT_LOGGER.addHandler(OUTPUT_HANDLER)
 OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
 
 def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-         background=False, target_os='linux', decode=True):
-    options = []
+         background=False, target_os='linux', decode=True, options=[]):
+    options.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
@@ -141,15 +141,15 @@ def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerpri
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-        background=False, target_os='linux', decode=True):
+        background=False, target_os='linux', decode=True, options=[]):
     success, result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                                  background, target_os, decode)
+                                  background, target_os, decode, options)
     if not success:
         raise result_or_exc
     return result_or_exc
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
-    options = ""
+    options = '-o "BatchMode yes"'
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
