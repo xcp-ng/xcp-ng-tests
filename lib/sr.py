@@ -63,6 +63,7 @@ class SR:
         return safe_split(self.pool.master.xe('vdi-list', args, minimal=True))
 
     def destroy(self, verify=False, force=False):
+        logging.info(f"Will attempt SR destroy on {self.uuid}...")
         # Rescan SR to improve the chances of the forced GC run triggered by sr-destroy
         # remove all VDIs in one pass and such have sr-destroy working on first try.
         self.scan()
