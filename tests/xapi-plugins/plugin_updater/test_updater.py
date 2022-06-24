@@ -31,8 +31,7 @@ class TestProxies:
         set_proxies = '{' \
             '"xcp-ng-base": "_none_", ' \
             '"xcp-ng-updates": "_none_", ' \
-            '"xcp-ng-testing": "_none_", ' \
-            '"xcp-ng-staging": "_none_"' \
+            '"xcp-ng-testing": "_none_" ' \
             '}'
         host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies})
 
