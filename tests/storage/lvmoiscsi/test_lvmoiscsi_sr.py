@@ -49,7 +49,7 @@ class TestLVMOISCSISR:
         sr = lvmoiscsi_sr
         vm = vm_on_lvmoiscsi_sr
         host.reboot(verify=True)
-        wait_for(sr.all_pbds_attached, "Wait for PDB attached")
+        wait_for(sr.all_pbds_attached, "Wait for PBD attached")
         # start the VM as a way to check that the underlying SR is operational
         vm.start(on=host.uuid)
         vm.wait_for_os_booted()

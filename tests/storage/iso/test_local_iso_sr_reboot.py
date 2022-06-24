@@ -23,7 +23,7 @@ class TestLocalISOSRReboot:
         sr, location = local_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr, location)
         host.reboot(verify=True)
-        wait_for(sr.all_pbds_attached, "Wait for PDB attached")
+        wait_for(sr.all_pbds_attached, "Wait for PBD attached")
         unix_vm.start()
         unix_vm.wait_for_os_booted()
         try:

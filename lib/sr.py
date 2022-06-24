@@ -51,7 +51,7 @@ class SR:
         for pbd_uuid in self.pbd_uuids():
             self.plug_pbd(pbd_uuid)
         if verify:
-            wait_for(self.all_pbds_attached, "Wait for PDBs attached")
+            wait_for(self.all_pbds_attached, "Wait for PBDs attached")
 
     def vdi_uuids(self, managed=False, name_label=None):
         args = {
