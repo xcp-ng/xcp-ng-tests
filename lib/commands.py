@@ -66,14 +66,15 @@ OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
 
 def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
          background=False, target_os='linux', decode=True, options=[]):
-    options.append('-o "BatchMode yes"')
+    opts = list(options)
+    opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        options.append('-o "StrictHostKeyChecking no"')
-        options.append('-o "LogLevel ERROR"')
-        options.append('-o "UserKnownHostsFile /dev/null"')
+        opts.append('-o "StrictHostKeyChecking no"')
+        opts.append('-o "LogLevel ERROR"')
+        opts.append('-o "UserKnownHostsFile /dev/null"')
 
     command = " ".join(cmd)
     if background and target_os != "windows":
@@ -82,13 +83,13 @@ def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerpri
         # Bash being available on VMs is a documented requirement.
         command = "nohup bash -c \"%s &>/dev/null &\"" % command
 
-    ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(options)} {shlex.quote(command)}"
+    ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(opts)} {shlex.quote(command)}"
 
     windows_background = background and target_os == "windows"
     # Fetch banner and remove it to avoid stdout/stderr pollution.
     if config.ignore_ssh_banner and not windows_background:
         banner_res = subprocess.run(
-            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(options), '\n'),
+            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(opts), '\n'),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -149,19 +150,19 @@ def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprin
     return result_or_exc
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
-    options = '-o "BatchMode yes"'
+    opts = '-o "BatchMode yes"'
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        options = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+        opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
     if local_dest:
         src = 'root@{}:{}'.format(hostname_or_ip, src)
     else:
         dest = 'root@{}:{}'.format(hostname_or_ip, dest)
 
-    command = "scp {} {} {}".format(options, src, dest)
+    command = "scp {} {} {}".format(opts, src, dest)
     res = subprocess.run(
         command,
         shell=True,
