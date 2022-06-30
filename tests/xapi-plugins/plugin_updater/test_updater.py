@@ -21,22 +21,6 @@ class TestUpdate:
 
 class TestProxies:
     def test_get_proxies(self, host):
-        host.call_plugin('updater.py', 'get_proxies')
-
-    # TODO: test more set with URLs etc and trigger errors
-
-    def test_set_proxies(self, host):
-        proxies = host.call_plugin('updater.py', 'get_proxies')
-
-        set_proxies = '{' \
-            '"xcp-ng-base": "_none_", ' \
-            '"xcp-ng-updates": "_none_", ' \
-            '"xcp-ng-testing": "_none_" ' \
-            '}'
-        host.call_plugin('updater.py', 'set_proxies', {"proxies": set_proxies})
-
-        res = host.call_plugin('updater.py', 'get_proxies')
-        assert json.loads(res) == json.loads(set_proxies)
-
-        host.call_plugin('updater.py', 'set_proxies', {"proxies": proxies})
-        assert json.loads(res) == json.loads(proxies)
+        proxies = json.loads(host.call_plugin('updater.py', 'get_proxies'))
+        for repo in 'xcp-ng-base', 'xcp-ng-testing', 'xcp-ng-updates':
+            assert repo in proxies
