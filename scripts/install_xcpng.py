@@ -62,7 +62,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, type, hdd):
         elif type == 'upgrade':
             answerfile.write(f"""<?xml version="1.0"?>
 <installation mode="upgrade">
-    <existing-installation>sda</existing-installation>
+    <existing-installation>{hdd}</existing-installation>
     <source type="url">{installer}</source>
     <script stage="filesystem-populated" type="url">
         http://{pxe}/configs/presets/scripts/filesystem-populated.py
