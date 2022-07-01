@@ -30,21 +30,25 @@ def pxe_address():
     except ImportError:
         raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
 
-def generate_boot_conf(directory, installer):
+def generate_boot_conf(directory, installer, action):
+    # in case of restore, we disable the text ui from the installer completely,
+    # to workaround a bug that leaves us stuck on a confirmation dialog at the end of the operation.
+    rt = 'rt=1' if action == 'restore' else ''
     with open(f'{directory}/boot.conf', 'w') as bootfile:
         bootfile.write(f"""answerfile=custom
-    installer={installer}
-    is_default=1
-    """)
+installer={installer}
+is_default=1
+{rt}
+""")
 
-def generate_answerfile(directory, installer, hostname_or_ip, type, hdd):
+def generate_answerfile(directory, installer, hostname_or_ip, action, hdd):
     pxe = pxe_address()
     password = host_data(hostname_or_ip)['password']
     cmd = ['openssl', 'passwd', '-6', password]
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     encrypted_password = res.stdout.decode().strip()
     with open(f'{directory}/answerfile.xml', 'w') as answerfile:
-        if type == 'install':
+        if action == 'install':
             answerfile.write(f"""<?xml version="1.0"?>
 <installation>
     <keymap>fr</keymap>
@@ -59,7 +63,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, type, hdd):
     </script>
 </installation>
         """)
-        elif type == 'upgrade':
+        elif action == 'upgrade':
             answerfile.write(f"""<?xml version="1.0"?>
 <installation mode="upgrade">
     <existing-installation>{hdd}</existing-installation>
@@ -69,8 +73,13 @@ def generate_answerfile(directory, installer, hostname_or_ip, type, hdd):
     </script>
 </installation>
         """)
+        elif action == 'restore':
+            answerfile.write(f"""<?xml version="1.0"?>
+<restore>
+</restore>
+        """)
         else:
-            raise Exception(f"Unknown type `{type}`")
+            raise Exception(f"Unknown action: `{action}`")
 
 def copy_files_to_pxe(mac_address, tmp_local_path):
     assert mac_address
@@ -152,14 +161,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "host",
-        help="hostname or IP address of the host hosting the VM that will be installed/upgraded"
+        help="hostname or IP address of the host hosting the VM that will be installed/upgraded/restored"
     )
-    parser.add_argument("vm_uuid", help="UUID of an existing VM in which XCP-ng will be installed (or upgraded)")
-    parser.add_argument("action", metavar='action', choices=['install', 'upgrade'], help="install or upgrade")
+    parser.add_argument("vm_uuid", help="UUID of an existing VM in which XCP-ng will be installed/upgraded/restored")
+    parser.add_argument(
+        "action", metavar='action', choices=['install', 'upgrade', 'restore'], help="install, upgrade or restore"
+    )
     parser.add_argument(
         "xcpng_version",
         help="target version, used to build the installer URL if none provided via --installer, "
              "and also used to check the system version at the end. Example: 8.2.1"
+             "In case of a restore, specify the version of the installer."
     )
     parser.add_argument("--installer", help="URL of the installer")
     args = parser.parse_args()
@@ -206,7 +218,7 @@ def main():
         logging.info('Generate files: answerfile.xml and boot.conf')
         hdd = 'nvme0n1' if vm.is_uefi else 'sda'
         generate_answerfile(tmp_local_path, installer, args.host, args.action, hdd)
-        generate_boot_conf(tmp_local_path, installer)
+        generate_boot_conf(tmp_local_path, installer, args.action)
         logging.info('Copy files to the pxe server')
         copy_files_to_pxe(mac_address, tmp_local_path)
         atexit.register(lambda: clean_files_on_pxe(mac_address))
@@ -230,11 +242,15 @@ def main():
         host2 = pool2.master
         host2.inventory = host2._get_xensource_inventory()
         check_mac_address(host2, mac_address)
-        logging.info('New host is started and enabled')
-        if host2.xcp_version != version.parse(xcp_version):
+        logging.info(f'Target host is started and enabled in version: {host2.xcp_version}')
+        if args.action == 'restore' and host2.xcp_version >= version.parse(xcp_version):
+            raise Exception(
+                f"The installed host ({vm_ip_address}) is not in a previous version. Got: {host2.xcp_version}.\n"
+            )
+        elif args.action != 'restore' and host2.xcp_version != version.parse(xcp_version):
             raise Exception(
                 f"The installed host ({vm_ip_address}) is not in the expected version. Got: {host2.xcp_version}.\n"
-                f"Expected: {xcp_version}."""
+                f"Expected: {xcp_version}."
             )
 
 if __name__ == '__main__':
