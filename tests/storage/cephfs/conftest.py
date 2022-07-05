@@ -47,6 +47,12 @@ def cephfs_sr(host, cephfs_device_config, pool_with_ceph):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_cephfs_sr(cephfs_sr):
+    vdi = cephfs_sr.create_vdi('CephFS-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_cephfs_sr(host, cephfs_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=cephfs_sr.uuid)
     yield vm

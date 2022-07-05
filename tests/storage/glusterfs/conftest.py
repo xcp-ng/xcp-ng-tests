@@ -176,6 +176,12 @@ def glusterfs_sr(host, pool_with_glusterfs, gluster_volume_started, glusterfs_de
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_glusterfs_sr(glusterfs_sr):
+    vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_glusterfs_sr(host, glusterfs_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=glusterfs_sr.uuid)
     yield vm

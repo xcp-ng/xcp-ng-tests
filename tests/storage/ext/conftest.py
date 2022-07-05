@@ -10,6 +10,12 @@ def ext_sr(host, sr_disk):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_ext_sr(ext_sr):
+    vdi = ext_sr.create_vdi('EXT-local-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_ext_sr(host, ext_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=ext_sr.uuid)
     yield vm

@@ -6,9 +6,7 @@ from lib.common import exec_nofail, raise_errors
 @pytest.fixture(scope='module')
 def vdis(host, local_sr_on_hostA1):
     def _make_vdi(name):
-        return host.xe('vdi-create', {'name-label': name, 'virtual-size': '64', 'sr-uuid': sr.uuid})
-
-    sr = local_sr_on_hostA1
+        return local_sr_on_hostA1.create_vdi(name).uuid
 
     logging.info('> Creating VDIs')
     vdi_A, vdi_B, vdi_C = _make_vdi('VDI_A'), _make_vdi('VDI_B'), _make_vdi('VDI_C')

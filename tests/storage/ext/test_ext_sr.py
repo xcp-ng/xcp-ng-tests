@@ -1,6 +1,6 @@
 import pytest
 from lib.common import wait_for, vm_image
-from tests.storage import try_to_create_sr_with_missing_device
+from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
@@ -24,9 +24,11 @@ class TestEXTSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-
-@pytest.mark.usefixtures("ext_sr", "vm_on_ext_sr")
+@pytest.mark.usefixtures("ext_sr")
 class TestEXTSR:
+    def test_vdi_is_not_open(self, vdi_on_ext_sr):
+        assert not vdi_is_open(vdi_on_ext_sr)
+
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_ext_sr):

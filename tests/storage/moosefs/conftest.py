@@ -60,6 +60,12 @@ def moosefs_sr(moosefs_device_config, pool_with_moosefs_enabled):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_moosefs_sr(moosefs_sr):
+    vdi = moosefs_sr.create_vdi('MooseFS-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_moosefs_sr(host, moosefs_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=moosefs_sr.uuid)
     yield vm

@@ -35,6 +35,12 @@ def zfs_sr(host, zpool_vol0):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_zfs_sr(zfs_sr):
+    vdi = zfs_sr.create_vdi('ZFS-local-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_zfs_sr(host, zfs_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=zfs_sr.uuid)
     yield vm
