@@ -10,6 +10,12 @@ def lvm_sr(host, sr_disk):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_lvm_sr(lvm_sr):
+    vdi = lvm_sr.create_vdi('LVM-local-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_lvm_sr(host, lvm_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=lvm_sr.uuid)
     yield vm

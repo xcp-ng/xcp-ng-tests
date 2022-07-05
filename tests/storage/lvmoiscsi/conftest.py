@@ -27,6 +27,12 @@ def lvmoiscsi_sr(host, lvmoiscsi_device_config):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_lvmoiscsi_sr(lvmoiscsi_sr):
+    vdi = lvmoiscsi_sr.create_vdi('lvmoiscsi-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_lvmoiscsi_sr(host, lvmoiscsi_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=lvmoiscsi_sr.uuid)
     yield vm

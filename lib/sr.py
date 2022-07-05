@@ -2,7 +2,8 @@ import logging
 
 import lib.commands as commands
 
-from lib.common import safe_split, wait_for, wait_for_not
+from lib.common import prefix_object_name, safe_split, wait_for, wait_for_not
+from lib.vdi import VDI
 
 class SR:
     def __init__(self, uuid, pool):
@@ -137,3 +138,11 @@ class SR:
         if self._is_shared is None:
             self._is_shared = self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'})
         return self._is_shared
+
+    def create_vdi(self, name_label, virtual_size=64):
+        vdi_uuid = self.pool.master.xe('vdi-create', {
+            'name-label': prefix_object_name(name_label),
+            'virtual-size': str(virtual_size),
+            'sr-uuid': self.uuid
+        })
+        return VDI(self, vdi_uuid)

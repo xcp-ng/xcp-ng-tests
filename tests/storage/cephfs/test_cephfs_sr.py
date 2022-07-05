@@ -4,6 +4,7 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
+from tests.storage import vdi_is_open
 
 # Requirements:
 # - one XCP-ng host >= 8.2
@@ -39,9 +40,11 @@ class TestCephFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-
 @pytest.mark.usefixtures("cephfs_sr")
 class TestCephFSSR:
+    def test_vdi_is_not_open(self, vdi_on_cephfs_sr):
+        assert not vdi_is_open(vdi_on_cephfs_sr)
+
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_cephfs_sr):

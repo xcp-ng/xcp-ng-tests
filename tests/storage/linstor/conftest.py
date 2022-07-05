@@ -111,6 +111,12 @@ def linstor_sr(hosts_with_linstor, lvm_disks):
     destroy_linstor_sr(hosts_with_linstor, sr)
 
 @pytest.fixture(scope='module')
+def vdi_on_linstor_sr(linstor_sr):
+    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_linstor_sr(host, linstor_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
     yield vm

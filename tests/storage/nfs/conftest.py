@@ -27,6 +27,12 @@ def nfs_sr(host, nfs_device_config):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_nfs_sr(nfs_sr):
+    vdi = nfs_sr.create_vdi('NFS-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_nfs_sr(host, nfs_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=nfs_sr.uuid)
     yield vm

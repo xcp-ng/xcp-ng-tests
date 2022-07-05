@@ -20,6 +20,12 @@ def xfs_sr(sr_disk, host_with_xfsprogs):
     sr.destroy()
 
 @pytest.fixture(scope='module')
+def vdi_on_xfs_sr(xfs_sr):
+    vdi = xfs_sr.create_vdi('XFS-local-VDI-test')
+    yield vdi
+    vdi.destroy()
+
+@pytest.fixture(scope='module')
 def vm_on_xfs_sr(host, xfs_sr, vm_ref):
     vm = host.import_vm(vm_ref, sr_uuid=xfs_sr.uuid)
     yield vm
