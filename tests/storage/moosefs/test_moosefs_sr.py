@@ -43,6 +43,10 @@ class TestMooseFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("moosefs_sr")
 class TestMooseFSSR:
+    @pytest.mark.quicktest
+    def test_quicktest(self, moosefs_sr):
+        moosefs_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_moosefs_sr):
         assert not vdi_is_open(vdi_on_moosefs_sr)
 

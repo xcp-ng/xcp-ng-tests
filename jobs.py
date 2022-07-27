@@ -56,16 +56,6 @@ JOBS = {
         "paths": ["tests/packages"],
         "markers": "",
     },
-    "quicktest": {
-        "description": "XAPI's quicktest, not so quick by the way",
-        "requirements": [
-            "Any pool.",
-            "Execution depends on the SRs present, as each SR from the pool will get tested.",
-        ],
-        "nb_pools": 1,
-        "params": {},
-        "paths": ["tests/quicktest"],
-    },
     "storage-main": {
         "description": "tests all storage drivers, but avoids migrations and reboots",
         "requirements": [
@@ -80,7 +70,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "(small_vm or no_vm) and not reboot",
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest",
         "name_filter": "not migration",
     },
     "storage-migrations": {
@@ -115,7 +105,21 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "reboot and not flaky",
+        "markers": "reboot and not flaky and not quicktest",
+    },
+    "storage-quicktest": {
+        "description": "runs `quicktest on all storage drivers`",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "Configuration in data.py for each remote SR that will be tested.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--sr-disk": "auto",
+        },
+        "paths": ["tests/storage"],
+        "markers": "quicktest",
     },
     "sb-main": {
         "description": "tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)",

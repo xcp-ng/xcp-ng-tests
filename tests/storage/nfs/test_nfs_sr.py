@@ -17,6 +17,10 @@ class TestNFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("nfs_sr")
 class TestNFSSR:
+    @pytest.mark.quicktest
+    def test_quicktest(self, nfs_sr):
+        nfs_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_nfs_sr):
         assert not vdi_is_open(vdi_on_nfs_sr)
 

@@ -26,6 +26,10 @@ class TestEXTSRCreateDestroy:
 
 @pytest.mark.usefixtures("ext_sr")
 class TestEXTSR:
+    @pytest.mark.quicktest
+    def test_quicktest(self, ext_sr):
+        ext_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_ext_sr):
         assert not vdi_is_open(vdi_on_ext_sr)
 

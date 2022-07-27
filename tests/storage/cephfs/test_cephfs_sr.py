@@ -42,6 +42,10 @@ class TestCephFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("cephfs_sr")
 class TestCephFSSR:
+    @pytest.mark.quicktest
+    def test_quicktest(self, cephfs_sr):
+        cephfs_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_cephfs_sr):
         assert not vdi_is_open(vdi_on_cephfs_sr)
 

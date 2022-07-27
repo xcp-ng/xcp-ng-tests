@@ -44,6 +44,10 @@ class TestZFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("zpool_vol0")
 class TestZFSSR:
+    @pytest.mark.quicktest
+    def test_quicktest(self, zfs_sr):
+        zfs_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_zfs_sr):
         assert not vdi_is_open(vdi_on_zfs_sr)
 
