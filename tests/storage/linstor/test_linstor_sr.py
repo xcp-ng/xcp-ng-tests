@@ -52,6 +52,9 @@ class TestLinstorSRCreateDestroy:
 
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
+    def test_quicktest(self, linstor_sr):
+        linstor_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_linstor_sr):
         assert not vdi_is_open(vdi_on_linstor_sr)
 

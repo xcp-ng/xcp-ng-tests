@@ -157,3 +157,6 @@ class SR:
             'sr-uuid': self.uuid
         })
         return VDI(self, vdi_uuid)
+
+    def run_quicktest(self):
+        self.pool.master.ssh(['/opt/xensource/debug/quicktest', '-sr', self.uuid])

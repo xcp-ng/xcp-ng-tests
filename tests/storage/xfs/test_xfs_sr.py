@@ -42,6 +42,9 @@ class TestXFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("xfs_sr")
 class TestXFSSR:
+    def test_quicktest(self, xfs_sr):
+        xfs_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_xfs_sr):
         assert not vdi_is_open(vdi_on_xfs_sr)
 

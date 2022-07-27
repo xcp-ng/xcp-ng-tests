@@ -56,16 +56,6 @@ JOBS = {
         "paths": ["tests/packages"],
         "markers": "",
     },
-    "quicktest": {
-        "description": "XAPI's quicktest, not so quick by the way",
-        "requirements": [
-            "Any pool.",
-            "Execution depends on the SRs present, as each SR from the pool will get tested.",
-        ],
-        "nb_pools": 1,
-        "params": {},
-        "paths": ["tests/quicktest"],
-    },
     "storage-main": {
         "description": "tests all storage drivers, but avoids migrations and reboots",
         "requirements": [

@@ -41,6 +41,9 @@ class TestGlusterFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("sr_disk_for_all_hosts", "glusterfs_sr")
 class TestGlusterFSSR:
+    def test_quicktest(self, glusterfs_sr):
+        glusterfs_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_glusterfs_sr):
         assert not vdi_is_open(vdi_on_glusterfs_sr)
 

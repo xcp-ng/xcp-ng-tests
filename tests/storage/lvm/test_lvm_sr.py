@@ -26,6 +26,9 @@ class TestLVMSRCreateDestroy:
 
 @pytest.mark.usefixtures("lvm_sr")
 class TestLVMSR:
+    def test_quicktest(self, lvm_sr):
+        lvm_sr.run_quicktest()
+
     def test_vdi_is_not_open(self, vdi_on_lvm_sr):
         assert not vdi_is_open(vdi_on_lvm_sr)
 
