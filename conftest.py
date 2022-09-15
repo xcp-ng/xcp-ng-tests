@@ -209,10 +209,7 @@ def sr_disk_for_all_hosts(request, host):
     candidates = list(master_disks)
     for h in host.pool.hosts[1:]:
         other_disks = h.available_disks()
-        for d in master_disks:
-            if d not in other_disks:
-                candidates.remove(d)
-                continue
+        candidates = [d for d in candidates if d in other_disks]
 
     if disk == "auto":
         assert len(candidates) > 0, \
