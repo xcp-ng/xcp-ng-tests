@@ -470,23 +470,24 @@ class VM(BaseVM):
         The whole operation can take several seconds.
         """
         dom_id = self.param_get('dom-id')
-        pty = self.host.ssh(['xenstore-read', f'/local/domain/{dom_id}/serial/0/tty'])
-        tmp_file = self.host.ssh(['mktemp'])
+        res_host = self.get_residence_host()
+        pty = res_host.ssh(['xenstore-read', f'/local/domain/{dom_id}/serial/0/tty'])
+        tmp_file = res_host.ssh(['mktemp'])
         session = f"detached-cat-{self.uuid}"
         ret = False
         try:
-            self.host.ssh(['screen', '-dmS', session])
+            res_host.ssh(['screen', '-dmS', session])
             # run `cat` on the pty in a background screen session and redirect to a tmp file.
             # `cat` will run until we kill the session.
-            self.host.ssh(['screen', '-S', session, '-X', 'stuff', f'"cat {pty} > {tmp_file}^M"'])
+            res_host.ssh(['screen', '-S', session, '-X', 'stuff', f'"cat {pty} > {tmp_file}^M"'])
             # Send the `ver` command to the pty.
             # The first \r is meant to give us access to the shell prompt in case we arrived
             # before the end of the 5s countdown during the UEFI shell startup.
             # The second \r submits the command to the UEFI shell.
-            self.host.ssh(['echo', '-e', r'"\rver\r"', '>', pty])
+            res_host.ssh(['echo', '-e', r'"\rver\r"', '>', pty])
             try:
                 wait_for(
-                    lambda: "UEFI Interactive Shell" in self.host.ssh(['cat', '-v', tmp_file]),
+                    lambda: "UEFI Interactive Shell" in res_host.ssh(['cat', '-v', tmp_file]),
                     "Wait for UEFI shell response in pty output",
                     10
                 )
@@ -495,6 +496,6 @@ class VM(BaseVM):
                 logging.debug(e)
                 pass
         finally:
-            self.host.ssh(['screen', '-S', session, '-X', 'quit'], check=False)
-            self.host.ssh(['rm', '-f', tmp_file], check=False)
+            res_host.ssh(['screen', '-S', session, '-X', 'quit'], check=False)
+            res_host.ssh(['rm', '-f', tmp_file], check=False)
         return ret
