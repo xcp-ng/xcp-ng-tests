@@ -404,3 +404,9 @@ class Host:
     def deactivate_smapi_driver(self, driver):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
         self.restart_toolstack(verify=True)
+
+    def varstore_dir(self):
+        if self.xcp_version < version.parse("8.3"):
+            return "/var/lib/uefistored"
+        else:
+            return "/var/lib/varstored"
