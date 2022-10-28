@@ -177,7 +177,7 @@ class TestGuestWindowsUEFISecureBoot:
 
 
 @pytest.mark.small_vm
-@pytest.mark.usefixtures("pool_without_uefi_certs")
+@pytest.mark.usefixtures("pool_without_uefi_certs", "xfail_on_xcpng_8_3")
 class TestCertsMissingAndSbOn:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot):

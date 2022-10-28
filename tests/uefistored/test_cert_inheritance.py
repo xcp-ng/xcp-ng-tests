@@ -164,6 +164,8 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
+    # FIXME: this behaviour will never exist in 8.3: no certs will mean "use the default certs"
+    @pytest.mark.usefixtures("xfail_on_xcpng_8_3")
     def test_pool_certs_absent_and_disk_certs_present(self, host):
         # start with no pool certs and with certs on disks
         disk_auths = generate_keys(as_dict=True)
@@ -187,6 +189,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_8_3")
     def test_pool_certs_present_except_dbx_and_disk_certs_different(self, host):
         # start with no dbx on pool and all, different, certs on disks
         pool_auths = generate_keys(as_dict=True)
@@ -284,6 +287,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
+    @pytest.mark.usefixtures("host_less_than_8_3")
     def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
         vm = uefi_vm
         # start with some certs on pool and some certs in the VM, partially overlaping
