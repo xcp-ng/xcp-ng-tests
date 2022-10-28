@@ -16,6 +16,7 @@ from .utils import generate_keys, revert_vm_state
 # - hostB1: XCP-ng host >= 8.3 (required only if hostA1 is already >=8.3, else no hostB1 is needed)
 #   This host will be joined and ejected from pool A, it means its state will be completely reinitialized from scratch
 
+pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
 def install_certs_to_disks(pool, certs_dict, keys):
     for host in pool.hosts:
