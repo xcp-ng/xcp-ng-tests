@@ -362,6 +362,15 @@ class VM(BaseVM):
         # The efivarfs file starts with the attributes, which are 4 bytes long
         return data[4:]
 
+    def clear_uefi_variables(self):
+        """
+        Remove all UEFI variables.
+
+        This makes it look like the VM is new, in the eyes of uefistored/varstored,
+        and so it will propagate certs from disk to its NVRAM when it boots next.
+        """
+        self.param_remove('NVRAM', 'EFI-variables')
+
     def file_exists(self, filepath):
         """Returns True if the file exists, otherwise returns False."""
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0

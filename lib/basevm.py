@@ -34,6 +34,18 @@ class BaseVM:
 
         return self.host.xe('vm-param-set', args)
 
+    def param_remove(self, param_name, key=None, accept_unknown_key=False):
+        args = {'uuid': self.uuid, 'param-name': param_name}
+        if key is not None:
+            args['param-key'] = key
+        try:
+            self.host.xe('vm-param-remove', args)
+        except commands.SSHCommandFailed as e:
+            if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
+                pass
+            else:
+                raise
+
     def name(self):
         return self.param_get('name-label')
 

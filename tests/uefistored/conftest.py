@@ -22,10 +22,9 @@ def uefi_vm_and_snapshot(uefi_vm):
     vm = uefi_vm
 
     # Any VM that has been booted at least once comes with some
-    # UEFI variable state, so simply clear the state of
-    # secure boot specific variables
+    # UEFI variable state, so clear the state of UEFI variables.
     logging.info('Clear VM UEFI certs and set SB to false')
-    vm.host.ssh(['varstore-sb-state', vm.uuid, 'setup'])
+    vm.clear_uefi_variables()
     vm.param_set('platform', 'secureboot', False)
     snapshot = vm.snapshot()
 
