@@ -68,30 +68,6 @@ class TestGuestLinuxUEFISecureBoot:
         # clear pool certs for next test
         vm.host.pool.clear_uefi_certs()
 
-    def test_boot_succeeds_when_pool_certs_set_and_sb_disabled(self, uefi_vm):
-        vm = uefi_vm
-        vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', False)
-        boot_and_check_no_sb_errors(vm)
-
-    def test_boot_succeeds_when_vm_certs_set_and_sb_disabled(self, uefi_vm):
-        vm = uefi_vm
-        vm.install_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', False)
-        boot_and_check_no_sb_errors(vm)
-
-    def test_boot_fails_when_pool_db_set_and_images_unsigned(self, uefi_vm):
-        vm = uefi_vm
-        vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', True)
-        boot_and_check_sb_failed(vm)
-
-    def test_boot_fails_when_vm_db_set_and_images_unsigned(self, uefi_vm):
-        vm = uefi_vm
-        vm.install_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', True)
-        boot_and_check_sb_failed(vm)
-
     @pytest.mark.multi_vms # test that SB works on various UEFI unix/linux VMs, not just on `small_vm`
     def test_boot_success_when_pool_db_set_and_images_signed(self, uefi_vm):
         vm = uefi_vm
@@ -106,6 +82,30 @@ class TestGuestLinuxUEFISecureBoot:
         sign_efi_bins(vm, self.db)
         vm.param_set('platform', 'secureboot', True)
         boot_and_check_sb_succeeded(vm)
+
+    def test_boot_fails_when_pool_db_set_and_images_unsigned(self, uefi_vm):
+        vm = uefi_vm
+        vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
+        vm.param_set('platform', 'secureboot', True)
+        boot_and_check_sb_failed(vm)
+
+    def test_boot_fails_when_vm_db_set_and_images_unsigned(self, uefi_vm):
+        vm = uefi_vm
+        vm.install_uefi_certs([self.PK, self.KEK, self.db])
+        vm.param_set('platform', 'secureboot', True)
+        boot_and_check_sb_failed(vm)
+
+    def test_boot_succeeds_when_pool_certs_set_and_sb_disabled(self, uefi_vm):
+        vm = uefi_vm
+        vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
+        vm.param_set('platform', 'secureboot', False)
+        boot_and_check_no_sb_errors(vm)
+
+    def test_boot_succeeds_when_vm_certs_set_and_sb_disabled(self, uefi_vm):
+        vm = uefi_vm
+        vm.install_uefi_certs([self.PK, self.KEK, self.db])
+        vm.param_set('platform', 'secureboot', False)
+        boot_and_check_no_sb_errors(vm)
 
     def test_boot_fails_when_pool_dbx_revokes_signed_images(self, uefi_vm):
         vm = uefi_vm
@@ -177,7 +177,7 @@ class TestGuestWindowsUEFISecureBoot:
 
 
 @pytest.mark.small_vm
-@pytest.mark.usefixtures("pool_without_uefi_certs")
+@pytest.mark.usefixtures("pool_without_uefi_certs", "xfail_on_xcpng_8_3")
 class TestCertsMissingAndSbOn:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot):

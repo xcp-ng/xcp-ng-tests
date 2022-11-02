@@ -16,7 +16,7 @@ from .utils import generate_keys, revert_vm_state
 # - hostB1: XCP-ng host >= 8.3 (required only if hostA1 is already >=8.3, else no hostB1 is needed)
 #   This host will be joined and ejected from pool A, it means its state will be completely reinitialized from scratch
 
-CERT_DIR = "/var/lib/uefistored"
+pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
 def install_certs_to_disks(pool, certs_dict, keys):
     for host in pool.hosts:
@@ -26,10 +26,10 @@ def install_certs_to_disks(pool, certs_dict, keys):
             with open(value, 'rb') as f:
                 hash = hashlib.md5(f.read()).hexdigest()
             logging.debug('    - key: %s, value: %s' % (key, hash))
-            host.scp(value, f'{CERT_DIR}/{key}.auth')
+            host.scp(value, f'{host.varstore_dir()}/{key}.auth')
 
 def check_disk_cert_md5sum(host, key, reference_file):
-    auth_filepath_on_host = f'{CERT_DIR}/{key}.auth'
+    auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
     assert host.file_exists(auth_filepath_on_host)
     with open(reference_file, 'rb') as rf:
         reference_md5 = hashlib.md5(rf.read()).hexdigest()
@@ -164,6 +164,8 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
+    # FIXME: this behaviour will never exist in 8.3: no certs will mean "use the default certs"
+    @pytest.mark.usefixtures("xfail_on_xcpng_8_3")
     def test_pool_certs_absent_and_disk_certs_present(self, host):
         # start with no pool certs and with certs on disks
         disk_auths = generate_keys(as_dict=True)
@@ -172,7 +174,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         host.restart_toolstack(verify=True)
         logging.info('Check that the certs on disk have been erased since there is none in the pool.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not host.file_exists(f'{CERT_DIR}/{key}.auth')
+            assert not host.file_exists(f'{host.varstore_dir()}/{key}.auth')
 
     def test_pool_certs_present_and_some_different_disk_certs_present(self, host):
         # start with all certs on pool and just two certs on disks
@@ -187,6 +189,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_8_3")
     def test_pool_certs_present_except_dbx_and_disk_certs_different(self, host):
         # start with no dbx on pool and all, different, certs on disks
         pool_auths = generate_keys(as_dict=True)
@@ -200,7 +203,7 @@ class TestPoolToDiskCertInheritanceAtXapiStart:
         for key in ['PK', 'KEK', 'db']:
             check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
-        assert not host.file_exists('{CERT_DIR}/dbx.auth')
+        assert not host.file_exists(f'{host.varstore_dir()}/dbx.auth')
 
     def test_pool_certs_present_and_disk_certs_present_and_same(self, host):
         # start with certs on pool and no certs on host disks
@@ -284,6 +287,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
+    @pytest.mark.usefixtures("host_less_than_8_3")
     def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
         vm = uefi_vm
         # start with some certs on pool and some certs in the VM, partially overlaping
@@ -325,7 +329,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
             logging.info(f"Check Pool.set_uefi_certificates update host {h} certificate on disk.")
             for key in keys:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth)
-            assert not h.file_exists(f'{CERT_DIR}/{missing_key}.auth')
+            assert not h.file_exists(f'{host.varstore_dir()}/{missing_key}.auth')
 
     def test_clear_certificates_from_pool(self, host):
         keys = ['PK', 'KEK', 'db', 'dbx']
@@ -335,7 +339,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
         for h in host.pool.hosts:
             logging.info(f"Check host {h} has no certificate on disk.")
             for key in keys:
-                assert not h.file_exists(f'{CERT_DIR}/{key}.auth')
+                assert not h.file_exists(f'{host.varstore_dir()}/{key}.auth')
 
 @pytest.mark.usefixtures("host_at_least_8_3", "pool_without_uefi_certs")
 class TestPoolToDiskCertInheritanceOnPoolJoin:

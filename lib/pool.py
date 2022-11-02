@@ -160,7 +160,7 @@ class Pool:
         self.master.ssh(['secureboot-certs', 'clear'])
         # remove files on each host
         for host in self.hosts:
-            host.ssh(['rm', '-f', '/var/lib/uefistored/*'])
+            host.ssh(['rm', '-f', f'{host.varstore_dir()}/*'])
 
     def install_custom_uefi_certs(self, auths):
         host = self.master
