@@ -5,7 +5,7 @@ from .conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm
 
 # Requirements:
 # From --hosts parameter:
-# - host: a XCP-ng host
+# - host: a XCP-ng host, with the default SR being either a shared SR, or a local SR on the master host
 # From --sr-disk parameter:
 # - an additional unused disk for the SR
 # From --vm parameter:
@@ -24,7 +24,7 @@ class TestLocalISOSRReboot:
         iso_path = copy_tools_iso_to_iso_sr(host, sr, location)
         host.reboot(verify=True)
         wait_for(sr.all_pbds_attached, "Wait for PBD attached")
-        unix_vm.start()
+        unix_vm.start(on=host.uuid)
         unix_vm.wait_for_os_booted()
         try:
             check_iso_mount_and_read_from_vm(host, os.path.basename(iso_path), unix_vm)

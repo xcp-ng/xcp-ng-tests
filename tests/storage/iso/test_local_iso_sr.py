@@ -6,7 +6,7 @@ from .conftest import create_local_iso_sr, copy_tools_iso_to_iso_sr, \
 
 # Requirements:
 # From --hosts parameter:
-# - host: a XCP-ng host
+# - host: a XCP-ng host, with the default SR being either a shared SR, or a local SR on the master host
 # From --sr-disk parameter:
 # - an additional unused disk for the SR
 # From --vm parameter:
@@ -42,11 +42,13 @@ class TestLocalISOSRCreateDestroy:
 @pytest.mark.usefixtures("local_iso_sr")
 class TestLocalISOSR:
 
-    def test_iso_mount_and_read(self, host, local_iso_sr, running_unix_vm):
+    def test_iso_mount_and_read(self, host, local_iso_sr, unix_vm):
         sr, location = local_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr, location)
+        unix_vm.start(on=host.uuid)
+        unix_vm.wait_for_vm_running_and_ssh_up()
         try:
-            check_iso_mount_and_read_from_vm(host, os.path.basename(iso_path), running_unix_vm)
+            check_iso_mount_and_read_from_vm(host, os.path.basename(iso_path), unix_vm)
         finally:
             # SR cleaning
             remove_iso_from_sr(host, sr, iso_path)
