@@ -107,7 +107,7 @@ JOBS = {
         "name_filter": "not linstor",
     },
     "sb-main": {
-        "description": "tests uefistored and SecureBoot using a small unix VM (or no VM when none needed)",
+        "description": "tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)",
         "requirements": [
             "A pool >= 8.2.1. One host is enough.",
             "A fast-booting unix UEFI VM with efitools.",
@@ -117,11 +117,25 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_efitools",
         },
-        "paths": ["tests/uefistored"],
+        "paths": ["tests/uefistored/test_auth_var.py", "tests/uefistored/test_secure_boot.py"],
         "markers": "not windows_vm",
     },
+    "sb-certificates": {
+        "description": "[8.3+] tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored",
+        "requirements": [
+            "A pool >= 8.2.1. On 8.3+, it needs at least two hosts.",
+            "On 8.3+ only, a second pool, single-host, available for temporarily joining the first pool.",
+            "A fast-booting unix UEFI VM with efitools.",
+        ],
+        # nb_pools left to 1 so that the job can run on XCP-ng 8.2 with just one pool, but 2 are required in 8.3+
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm_efitools",
+        },
+        "paths": ["tests/uefistored/test_cert_inheritance.py"],
+    },
     "sb-windows": {
-        "description": "tests uefistored and SecureBoot using a Windows VM",
+        "description": "tests uefistored/varstored and SecureBoot using a Windows VM",
         "requirements": [
             "A pool >= 8.2.1. One host is enough.",
             "A (small if possible) Windows UEFI VM.",
