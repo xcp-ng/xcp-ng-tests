@@ -9,8 +9,7 @@ from lib.common import exec_nofail, raise_errors
 # - an XCP-ng host (--hosts) >= 8.2
 # - a VM (--vm)
 # - enough space to import 4 VMs on default SR
-# - the pool must have 1 shared SR
-# - each host must have a local SR
+# - the default SR must be either shared or local on master host, so that VMs can all start on the same host
 
 @pytest.fixture(scope='module')
 def four_vms(imported_vm):
@@ -37,9 +36,9 @@ class TestIrqBalance:
     We want to avoid this to happen again, so this testcase runs several VMs
     and verifies that the IRQs are balanced on more than one CPU.
     """
-    def test_start_four_vms(self, four_vms):
+    def test_start_four_vms(self, host, four_vms):
         for vm in four_vms:
-            vm.start()
+            vm.start(on=host.uuid)
 
         for vm in four_vms:
             vm.wait_for_vm_running_and_ssh_up()
