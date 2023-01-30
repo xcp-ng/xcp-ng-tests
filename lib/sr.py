@@ -141,7 +141,7 @@ class SR:
 
     def create_vdi(self, name_label, virtual_size=64):
         vdi_uuid = self.pool.master.xe('vdi-create', {
-            'name-label': prefix_object_name(name_label),
+            'name-label': name_label, #prefix_object_name(name_label),
             'virtual-size': str(virtual_size),
             'sr-uuid': self.uuid
         })

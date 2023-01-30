@@ -339,7 +339,7 @@ class Host:
         params = {
             'host-uuid': self.uuid,
             'type': sr_type,
-            'name-label': prefix_object_name(label),
+            'name-label': label, #prefix_object_name(label),
             'content-type': 'iso' if sr_type == 'iso' else 'user',
             'shared': shared
         }
