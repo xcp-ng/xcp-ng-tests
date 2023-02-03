@@ -8,7 +8,7 @@ from lib.commands import SSHCommandFailed
 # - host: XCP-ng host >= 8.2, with Xen booted with the hvm_fep command line parameter
 #         See https://xenbits.xen.org/docs/xtf/
 
-@pytest.mark.usefixtures("host_with_hvm_fep")
+@pytest.mark.usefixtures("host_with_hvm_fep", "host_with_dynamically_disabled_ept_sp")
 class TestXtf:
     _common_skips = [
         'test-hvm32-umip',

@@ -12,6 +12,19 @@ def host_with_hvm_fep(host):
     yield host
 
 @pytest.fixture(scope="package")
+def host_with_dynamically_disabled_ept_sp(host):
+    """
+    Disable EPT superpages before running XTF.
+
+    The XSA-304 POC will crash hosts with vulnerable hardware if EPT SP are enabled.
+    """
+    logging.info("Switching EPT superpages to secure")
+    host.ssh(['xl', 'set-parameters', 'ept=no-exec-sp'])
+    yield host
+    logging.info("Switching back EPT superpages to fast")
+    host.ssh(['xl', 'set-parameters', 'ept=exec-sp'])
+
+@pytest.fixture(scope="package")
 def host_with_git_and_gcc(host_with_saved_yum_state):
     host = host_with_saved_yum_state
     host.yum_install(['git', 'gcc'])
