@@ -50,3 +50,9 @@ make -j$(nproc)
     # teardown
     logging.info("Delete XTF")
     host.ssh(['rm', '-rf', tmp_dir])
+
+@pytest.fixture(scope="package")
+def host_with_dom0_tests(host_with_saved_yum_state):
+    host = host_with_saved_yum_state
+    host.yum_install(['xen-dom0-tests'])
+    yield host
