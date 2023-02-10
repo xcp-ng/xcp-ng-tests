@@ -6,6 +6,8 @@ import traceback
 from enum import Enum
 from uuid import UUID
 
+import lib.commands as commands
+
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
     RPM = 2
@@ -137,3 +139,17 @@ def strtobool(str):
     if str in ('n', 'no', 'f', 'false', 'off', '0'):
         return False
     raise ValueError("invalid truth value '{}'".format(str))
+
+def _param_get(host, xe_prefix, uuid, param_name, key=None, accept_unknown_key=False):
+    """ Common implementation for param_get. """
+    args = {'uuid': uuid, 'param-name': param_name}
+    if key is not None:
+        args['param-key'] = key
+    try:
+        value = host.xe(f'{xe_prefix}-param-get', args)
+    except commands.SSHCommandFailed as e:
+        if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
+            value = None
+        else:
+            raise
+    return value
