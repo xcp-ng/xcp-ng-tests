@@ -24,6 +24,7 @@ JOBS = {
             "tests/misc",
             "tests/migration",
             "tests/snapshot",
+            "tests/xapi",
             "tests/xapi-plugins",
         ],
         "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
