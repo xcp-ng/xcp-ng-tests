@@ -8,7 +8,7 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import safe_split, to_xapi_bool, wait_for, wait_for_not
+from lib.common import _param_get, safe_split, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.sr import SR
 from lib.vm import VM
@@ -27,6 +27,8 @@ def host_data(hostname_or_ip):
         return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
 
 class Host:
+    xe_prefix = "host"
+
     def __init__(self, pool, hostname_or_ip):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
@@ -84,6 +86,9 @@ class Host:
         if result == 'false':
             return False
         return result
+
+    def param_get(self, param_name, key=None, accept_unknown_key=False):
+        return _param_get(self, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
     def execute_script(self, script_contents, shebang='sh', simple_output=True):
         with tempfile.NamedTemporaryFile('w') as script:
@@ -201,7 +206,7 @@ class Host:
 
     def is_enabled(self):
         try:
-            return self.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'})
+            return self.param_get('enabled')
         except commands.SSHCommandFailed:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False

@@ -1,22 +1,16 @@
 import lib.commands as commands
 
+from lib.common import _param_get
+
 class VIF:
+    xe_prefix = "vif"
+
     def __init__(self, uuid, vm):
         self.uuid = uuid
         self.vm = vm
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
-        args = {'uuid': self.uuid, 'param-name': param_name}
-        if key is not None:
-            args['param-key'] = key
-        try:
-            value = self.vm.host.xe('vif-param-get', args)
-        except commands.SSHCommandFailed as e:
-            if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
-                value = None
-            else:
-                raise
-        return value
+        return _param_get(self.vm.host, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
     def device_id(self):
         """ Build the identifier that will allow to grep for the VIF's interrupts. """
