@@ -90,6 +90,29 @@ class Host:
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
+    def create_file(self, filename, text):
+        with tempfile.NamedTemporaryFile('w') as file:
+            file.write(text)
+            file.flush()
+            self.scp(file.name, filename)
+
+    def add_xcpng_repo(self, name):
+        major = self.xcp_version.major
+        minor = self.xcp_version.minor
+        version = f"{major}.{minor}"
+        self.create_file(f"/etc/yum.repos.d/xcp-ng-{name}.repo", (
+            f"[xcp-ng-{name}]\n"
+            f"name=XCP-ng {name} Repository\n"
+            f"baseurl=http://mirrors.xcp-ng.org/{major}/{version}/{name}/x86_64/ http://updates.xcp-ng.org/{major}/{version}/{name}/x86_64/\n" # noqa
+            "enabled=1\n"
+            "gpgcheck=1\n"
+            "repo_gpgcheck=1\n"
+            "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-xcpng\n"
+        ))
+
+    def remove_xcpng_repo(self, name):
+        self.ssh(['rm -f /etc/yum.repos.d/xcp-ng-{}.repo'.format(name)])
+
     def execute_script(self, script_contents, shebang='sh', simple_output=True):
         with tempfile.NamedTemporaryFile('w') as script:
             os.chmod(script.name, 0o775)
