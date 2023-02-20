@@ -1,0 +1,78 @@
+  atd.service                                              loaded    active   running Job spooling tools
+  attach-static-vdis.service                               loaded    active   exited  Attach statically-configured VDIs to dom0
+  blk-availability.service                                 loaded    active   exited  Availability of block devices
+  chrony-wait.service                                      loaded    active   exited  Wait for chrony to synchronize system clock
+  chronyd.service                                          loaded    active   running NTP client/server
+  cpumond.service                                          loaded    active   running CPU monitoring daemon
+  crond.service                                            loaded    active   running Command Scheduler
+  dbus.service                                             loaded    active   running D-Bus System Message Bus
+  dom0term.service                                         loaded    active   running vncterm for dom0
+  forkexecd.service                                        loaded    active   running Manages subprocesses independently from a multithreaded program.
+  gencert.service                                          loaded    active   exited  Generate xapi ssl certificate
+  gssproxy.service                                         loaded    active   running GSSAPI Proxy Daemon
+  import-trusted-keys.service                              loaded    active   exited  Import GPG keys used by vendors to sign updates
+  interface-rename.service                                 loaded    active   exited  Running interface-rename to ensure ordering of ethernet names
+  iptables.service                                         loaded    active   exited  IPv4 firewall with iptables
+  irqbalance.service                                       loaded    active   running irqbalance daemon
+  iscsi-shutdown.service                                   loaded    active   exited  Logout off all iSCSI sessions on shutdown
+  kdump.service                                            loaded    active   exited  Set up crash environment
+  kmod-static-nodes.service                                loaded    active   exited  Create list of required static device nodes for the current kernel
+  lldpad.service                                           loaded    active   running Link Layer Discovery Protocol Agent Daemon.
+  mcelog.service                                           loaded    active   running Machine Check Exception Logging Daemon
+  message-switch.service                                   loaded    active   running Xapi toolstack store-and-forward message switch
+  move-kernel-messages.service                             loaded    active   exited  Move kernel messages to tty2
+  mpathalert.service                                       loaded    active   running MPathAlert Daemon Service
+  mpathcount.service                                       loaded    active   running Multipath scanner
+  multipathd.service                                       loaded    active   running Device-Mapper Multipath Device Controller
+  openvswitch-xapi-sync.service                            loaded    active   running Open vSwitch XAPI Sync
+  openvswitch.service                                      loaded    active   running Open vSwitch
+  perfmon.service                                          loaded    active   running Performance monitoring/alarm generation daemon
+  portreserve.service                                      loaded    active   running Port reservation utility
+  rpcbind.service                                          loaded    active   running RPC bind service
+  rsyslog.service                                          loaded    active   running System Logging Service
+  save-boot-info.service                                   loaded    active   exited  Record boot-time CPU config for xapi
+  serial-getty@hvc0.service                                loaded    active   running Serial Getty on hvc0
+  sm-mpath-root.service                                    loaded    active   exited  Ensure symlinks for multipathed rootdev
+  smartd.service                                           loaded    active   running Self Monitoring and Reporting Technology (SMART) Daemon
+  squeezed.service                                         loaded    active   running XCP ballooning daemon
+  sshd.service                                             loaded    active   running OpenSSH server daemon
+  stunnel@xapi.service                                     loaded    active   running TLS tunnel for xapi
+  sysstat.service                                          loaded    active   exited  Resets System Activity Logs
+  systemd-fsck-root.service                                loaded    active   exited  File System Check on Root Device
+  systemd-fsck@dev-disk-by\x2dlabel-logs\x2dyngiif.service loaded    active   exited  File System Check on /dev/disk/by-label/logs-yngiif
+  systemd-journal-flush.service                            loaded    active   exited  Flush Journal to Persistent Storage
+  systemd-journald.service                                 loaded    active   running Journal Service
+  systemd-logind.service                                   loaded    active   running Login Service
+  systemd-random-seed.service                              loaded    active   exited  Load/Save Random Seed
+  systemd-remount-fs.service                               loaded    active   exited  Remount Root and Kernel File Systems
+  systemd-sysctl.service                                   loaded    active   exited  Apply Kernel Variables
+  systemd-tmpfiles-setup-dev.service                       loaded    active   exited  Create Static Device Nodes in /dev
+  systemd-tmpfiles-setup.service                           loaded    active   exited  Create Volatile Files and Directories
+  systemd-udev-settle.service                              loaded    active   exited  udev Wait for Complete Device Initialization
+  systemd-udev-trigger.service                             loaded    active   exited  udev Coldplug all Devices
+  systemd-udevd.service                                    loaded    active   running udev Kernel Device Manager
+  systemd-update-utmp.service                              loaded    active   exited  Update UTMP about System Boot/Shutdown
+  systemd-user-sessions.service                            loaded    active   exited  Permit User Sessions
+  systemd-vconsole-setup.service                           loaded    active   exited  Setup Virtual Console
+  tapback.service                                          loaded    active   running Tapback daemon for blktap3
+  update-issue.service                                     loaded    active   exited  Update logon message
+  usb-scan.service                                         loaded    active   running USB device scanner
+  v6d.service                                              loaded    active   running XCP-ng feature daemon
+  varstored-guard.service                                  loaded    active   running Varstored XAPI socket deprivileging daemon
+  xapi-domains.service                                     loaded    active   exited  Start/stop domains on dom0 start/shutdown
+  xapi-nbd.service                                         loaded    active   running NBD server that exposes XCP-ng disks
+  xapi-storage-script.service                              loaded    active   running Xapi storage script plugin server
+  xapi-wait-init-complete.service                          loaded    active   exited  Wait for Xapi to complete initialisation
+  xapi.service                                             loaded    active   running XenAPI server (XAPI)
+  xcp-networkd.service                                     loaded    active   running XCP networking daemon
+  xcp-rrdd-gpumon.service                                  loaded    active   running GPU monitor RRD plugin
+  xcp-rrdd-iostat.service                                  loaded    active   running XCP RRD daemon iostat plugin
+  xcp-rrdd-squeezed.service                                loaded    active   running XCP RRD daemon squeezed plugin
+  xcp-rrdd-xenpm.service                                   loaded    active   running XCP RRD daemon iostat plugin
+  xcp-rrdd.service                                         loaded    active   running XCP RRD daemon
+  xen-init-dom0.service                                    loaded    active   exited  xen-init-dom0, initialise Dom0 configuration (xenstore nodes, JSON configuration stub)
+  xenconsoled.service                                      loaded    active   running Xenconsoled - handles logging from guest consoles and hypervisor
+  xenopsd-xc.service                                       loaded    active   running VM manager for Xen using libxc
+  xenstored.service                                        loaded    active   exited  The Xen xenstore
+  xs-sm.service                                            loaded    active   exited  XCP-ng Storage Manager (SM)
+  xsconsole.service                                        loaded    active   running XCP-ng Console

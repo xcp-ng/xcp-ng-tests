@@ -1,0 +1,73 @@
+● auditd.service                                           not-found inactive dead    auditd.service
+  auth-rpcgss-module.service                               loaded    inactive dead    Kernel Module supporting RPCSEC_GSS
+  control-domain-params-init.service                       loaded    inactive dead    Initialize control domain parameters
+  create-guest-templates.service                           loaded    inactive dead    Import guest templates into XAPI
+● display-manager.service                                  not-found inactive dead    display-manager.service
+  dracut-shutdown.service                                  loaded    inactive dead    Restore /run/initramfs
+  emergency.service                                        loaded    inactive dead    Emergency Shell
+  fcoe.service                                             loaded    inactive dead    Open-FCoE Inititator.
+  generate-iscsi-iqn.service                               loaded    inactive dead    Generate an iSCSI IQN for the local host
+● getty@tty1.service                                       masked    inactive dead    getty@tty1.service
+  ip6tables.service                                        loaded    inactive dead    IPv6 firewall with ip6tables
+  iscsi.service                                            loaded    inactive dead    Login and scanning of iSCSI devices
+  iscsid.service                                           loaded    inactive dead    Open-iSCSI
+  iscsiuio.service                                         loaded    inactive dead    iSCSI UserSpace I/O driver
+● libvirt-guests.service                                   not-found inactive dead    libvirt-guests.service
+● libvirtd.service                                         not-found inactive dead    libvirtd.service
+  linstor-monitor.service                                  loaded    inactive dead    LINSTOR Monitor
+● lvm2-activation-early.service                            masked    inactive dead    lvm2-activation-early.service
+● lvm2-activation-net.service                              masked    inactive dead    lvm2-activation-net.service
+● lvm2-activation.service                                  masked    inactive dead    lvm2-activation.service
+● lvm2-lvmetad.service                                     not-found inactive dead    lvm2-lvmetad.service
+  lvm2-lvmpolld.service                                    loaded    inactive dead    LVM2 poll daemon
+  make-dummy-sr.service                                    loaded    inactive dead    Make a dummy SR if necessary
+  network-init.service                                     loaded    inactive dead    Prepare networking during first boot
+  network.service                                          loaded    inactive dead    LSB: Bring up/down networking
+● NetworkManager-wait-online.service                       not-found inactive dead    NetworkManager-wait-online.service
+● NetworkManager.service                                   not-found inactive dead    NetworkManager.service
+  nfs-config.service                                       loaded    inactive dead    Preprocess NFS configuration
+  nfs-idmapd.service                                       loaded    inactive dead    NFSv4 ID-name mapping service
+  nfs-mountd.service                                       loaded    inactive dead    NFS Mount Daemon
+● nfs-secure-server.service                                not-found inactive dead    nfs-secure-server.service
+  nfs-server.service                                       loaded    inactive dead    NFS server and services
+  nfs-utils.service                                        loaded    inactive dead    NFS server and client services
+● ntpd.service                                             not-found inactive dead    ntpd.service
+● ntpdate.service                                          not-found inactive dead    ntpdate.service
+  plymouth-quit-wait.service                               loaded    inactive dead    Wait for Plymouth Boot Screen to Quit
+  plymouth-quit.service                                    loaded    inactive dead    Terminate Plymouth Boot Screen
+  plymouth-read-write.service                              loaded    inactive dead    Tell Plymouth To Write Out Runtime Data
+  plymouth-start.service                                   loaded    inactive dead    Show Plymouth Boot Screen
+● qemuback.service                                         not-found inactive dead    qemuback.service
+● rbdmap.service                                           not-found inactive dead    rbdmap.service
+  rc-local.service                                         loaded    inactive dead    /etc/rc.d/rc.local Compatibility
+  rescue.service                                           loaded    inactive dead    Rescue Shell
+  rpc-gssd.service                                         loaded    inactive dead    RPC security service for NFS client and server
+  rpc-statd-notify.service                                 loaded    inactive dead    Notify NFS peers of a restart
+  rpc-statd.service                                        loaded    inactive dead    NFS status monitor for NFSv2/3 locking.
+  snmpd.service                                            loaded    inactive dead    Simple Network Management Protocol (SNMP) Daemon.
+● sntp.service                                             not-found inactive dead    sntp.service
+  sshd-keygen.service                                      loaded    inactive dead    OpenSSH Server Key Generation
+  storage-init.service                                     loaded    inactive dead    Initialize host storage during first boot
+● syslog.service                                           not-found inactive dead    syslog.service
+  systemd-ask-password-console.service                     loaded    inactive dead    Dispatch Password Requests to Console
+  systemd-ask-password-plymouth.service                    loaded    inactive dead    Forward Password Requests to Plymouth
+  systemd-ask-password-wall.service                        loaded    inactive dead    Forward Password Requests to Wall
+  systemd-binfmt.service                                   loaded    inactive dead    Set Up Additional Binary Formats
+  systemd-firstboot.service                                loaded    inactive dead    First Boot Wizard
+  systemd-hwdb-update.service                              loaded    inactive dead    Rebuild Hardware Database
+  systemd-initctl.service                                  loaded    inactive dead    /dev/initctl Compatibility Daemon
+  systemd-journal-catalog-update.service                   loaded    inactive dead    Rebuild Journal Catalog
+  systemd-machine-id-commit.service                        loaded    inactive dead    Commit a transient machine-id on disk
+  systemd-modules-load.service                             loaded    inactive dead    Load Kernel Modules
+  systemd-readahead-collect.service                        loaded    inactive dead    Collect Read-Ahead Data
+  systemd-readahead-done.service                           loaded    inactive dead    Stop Read-Ahead Data Collection
+  systemd-readahead-replay.service                         loaded    inactive dead    Replay Read-Ahead Data
+  systemd-reboot.service                                   loaded    inactive dead    Reboot
+  systemd-shutdownd.service                                loaded    inactive dead    Delayed Shutdown Service
+● systemd-sysusers.service                                 not-found inactive dead    systemd-sysusers.service
+● systemd-timesyncd.service                                not-found inactive dead    systemd-timesyncd.service
+  systemd-tmpfiles-clean.service                           loaded    inactive dead    Cleanup of Temporary Directories
+  systemd-update-done.service                              loaded    inactive dead    Update is Completed
+  systemd-update-utmp-runlevel.service                     loaded    inactive dead    Update UTMP about System Runlevel Changes
+● xenopsd.service                                          not-found inactive dead    xenopsd.service
+  xs-fcoe.service                                          loaded    inactive dead    Open-FCoE Initialiser
