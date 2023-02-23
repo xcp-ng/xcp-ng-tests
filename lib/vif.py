@@ -10,7 +10,7 @@ class VIF:
         self.vm = vm
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
-        return _param_get(self.vm.host, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+        return _param_get(self.vm.host, VIF.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
     def device_id(self):
         """ Build the identifier that will allow to grep for the VIF's interrupts. """
