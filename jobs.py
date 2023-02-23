@@ -23,6 +23,7 @@ JOBS = {
         "paths": [
             "tests/misc",
             "tests/migration",
+            "tests/network",
             "tests/snapshot",
             "tests/xapi",
             "tests/xapi-plugins",
