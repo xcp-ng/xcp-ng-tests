@@ -5,7 +5,7 @@ Note: this is a perpertual work in progress. If you encounter any obstacles or b
 ## Main requirements
 * python >= 3.5
 * pytest >= 5.4 (python3 version)
-* xo-cli installed, in the PATH, and registered to an instance of XO that will be used during the tests
+* xo-cli >= 0.17.0 installed, in the PATH, and registered to an instance of XO that will be used during the tests
 
 ### Quick install (python requirements)
 
