@@ -3,7 +3,7 @@ import subprocess
 
 def xo_cli(action, args={}, check=True, simple_output=True):
     res = subprocess.run(
-        ['xo-cli', action] + ["%s=%s" % (key, value) for key, value in args.items()],
+        ['xo-cli', action, '--json'] + ["%s=%s" % (key, value) for key, value in args.items()],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=check

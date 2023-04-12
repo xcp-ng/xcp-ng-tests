@@ -1,4 +1,6 @@
 import logging
+import subprocess
+import re
 import pytest
 import tempfile
 
@@ -83,7 +85,32 @@ def pytest_addoption(parser):
              "Set it to 'auto' to let the fixtures auto-detect available disks."
     )
 
+def check_xo_cli_version():
+    try:
+        output = subprocess.check_output(['xo-cli', '--help'])
+    except FileNotFoundError:
+        pytest.exit("Could not find xo-cli in path")
+    lines = output.splitlines()
+    for line in lines:
+        line = line.decode('utf-8')
+        if not line.startswith("xo-cli "):
+            continue
+        match = re.match(rf"{re.escape('xo-cli')}\s+v(\d+)\.(\d+)\.(\d+)", line)
+
+        if match is None:
+            continue
+
+        major, minor, patch = map(int, match.groups())
+        if major <= 0 and minor < 17:
+            pytest.exit(f"Expected xo-cli >= v0.17.0, found v{major}.{minor}.{patch}".format(), 1)
+        else:
+            return
+
+    pytest.exit("Could not find xo-cli version", 1)
+
+
 def pytest_configure(config):
+    check_xo_cli_version()
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
