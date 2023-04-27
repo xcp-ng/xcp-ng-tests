@@ -136,7 +136,7 @@ class Host:
         return inventory
 
     def xo_get_server_id(self, store=True):
-        servers = json.loads(xo_cli('server.getAll'))
+        servers = xo_cli('server.getAll', use_json=True)
         for server in servers:
             if server['host'] == self.hostname_or_ip:
                 if store:
@@ -148,7 +148,7 @@ class Host:
         if self.xo_srv_id is not None:
             xo_cli('server.remove', {'id': self.xo_srv_id})
         else:
-            servers = json.loads(xo_cli('server.getAll'))
+            servers = xo_cli('server.getAll', use_json=True)
             for server in servers:
                 if server['host'] == self.hostname_or_ip:
                     xo_cli('server.remove', {'id': server['id']})
@@ -172,7 +172,7 @@ class Host:
         self.xo_srv_id = xo_srv_id
 
     def xo_server_status(self):
-        servers = json.loads(xo_cli('server.getAll'))
+        servers = xo_cli('server.getAll', use_json=True)
         for server in servers:
             if server['host'] == self.hostname_or_ip:
                 return server['status']
