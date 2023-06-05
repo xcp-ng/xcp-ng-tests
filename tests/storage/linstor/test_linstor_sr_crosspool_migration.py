@@ -9,7 +9,6 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 # - A VM to import to the LINSTOR SR
 # And:
 # - access to XCP-ng RPM repository from hostA1
-# - a repo with the LINSTOR RPMs must be given using the command line param `--additional-repos`
 
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally on a big VM to test it scales

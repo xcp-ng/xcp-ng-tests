@@ -66,7 +66,7 @@ JOBS = {
         "paths": ["tests/quicktest"],
     },
     "storage-main": {
-        "description": "tests all storage drivers (except linstor), but avoids migrations and reboots",
+        "description": "tests all storage drivers, but avoids migrations and reboots",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -80,10 +80,10 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot",
-        "name_filter": "not migration and not linstor",
+        "name_filter": "not migration",
     },
     "storage-migrations": {
-        "description": "tests migrations with all storage drivers (except linstor)",
+        "description": "tests migrations with all storage drivers",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -98,10 +98,10 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "",
-        "name_filter": "migration and not linstor",
+        "name_filter": "migration",
     },
     "storage-reboots": {
-        "description": "storage driver tests that involve rebooting hosts (except linstor and flaky tests)",
+        "description": "storage driver tests that involve rebooting hosts (except flaky tests)",
         "requirements": [
             "A pool with at least 3 hosts, whose master host can be rebooted (best if reboots fast).",
             "An additional free disk on every host.",
@@ -115,7 +115,6 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "reboot and not flaky",
-        "name_filter": "not linstor",
     },
     "sb-main": {
         "description": "tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)",
@@ -243,7 +242,6 @@ JOBS = {
 # if they are not selected by any test job.
 # Adding a test to this list does not exclude it from test jobs. This is independent.
 BROKEN_TESTS = [
-    "tests/storage/linstor", # needs updating and fixing
     # not really broken but has complex prerequisites (3 NICs on 3 different networks)
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
 ]
