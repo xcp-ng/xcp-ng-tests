@@ -291,6 +291,18 @@ class Host:
         """ Check if a given package list is available in the YUM repositories. """
         return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
 
+    def get_available_package_versions(self, package):
+        return self.ssh(['repoquery', '--show-duplicates', package]).splitlines()
+
+    def is_package_installed(self, package):
+        try:
+            self.ssh(['yum', 'list', 'installed', package])
+            return True
+        except commands.SSHCommandFailed as e:
+            if e.stdout.endswith('Error: No matching Packages to list'):
+                return False
+            raise e
+
     def yum_save_state(self):
         logging.info(f"Save yum state for host {self}")
         # For now, that saved state feature does not support several saved states

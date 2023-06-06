@@ -1,3 +1,4 @@
+from pkgfixtures import host_with_saved_yum_state
 import json
 
 # Requirements:
@@ -18,6 +19,20 @@ class TestUpdate:
         assert res == "[]"
 
         host.yum_restore_saved_state()
+
+    def test_package_update(self, host_with_saved_yum_state):
+        host = host_with_saved_yum_state
+        packages = host.get_available_package_versions('dummypkg')
+        assert len(packages) == 2
+        assert packages[0].startswith('dummypkg-0:1.0-1.xcpng')
+        assert packages[1].startswith('dummypkg-0:1.0-2.xcpng')
+
+        assert not host.is_package_installed(packages[0])
+        host.call_plugin('updater.py', 'install', {'packages': packages[0]})
+        assert host.is_package_installed(packages[0])
+
+        host.call_plugin('updater.py', 'update', {'packages': 'dummypkg'})
+        assert host.is_package_installed(packages[1])
 
 class TestProxies:
     def test_get_proxies(self, host):
