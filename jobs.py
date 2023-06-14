@@ -231,7 +231,6 @@ JOBS = {
 
 BROKEN_TESTS = [
     "tests/storage/linstor", # needs updating and fixing
-    "tests/misc/test_update_host.py", # doesn't test anything currently unless the host is out of date
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork", # not really broken but we'll handle it later
     "tests/storage/fsp", # driver not present by default. Needs test setup to be improved.
 ]
