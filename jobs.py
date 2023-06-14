@@ -234,7 +234,8 @@ JOBS = {
 # Adding a test to this list does not exclude it from test jobs. This is independent.
 BROKEN_TESTS = [
     "tests/storage/linstor", # needs updating and fixing
-    "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork", # not really broken but we'll handle it later
+    # not really broken but has complex prerequisites (3 NICs on 3 different networks)
+    "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
 ]
 
 def get_vm_or_vms_refs(handle):
