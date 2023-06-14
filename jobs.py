@@ -229,6 +229,9 @@ JOBS = {
     },
 }
 
+# List used by the 'check' action: tests listed here will not raise a check error
+# if they are not selected by any test job.
+# Adding a test to this list does not exclude it from test jobs. This is independent.
 BROKEN_TESTS = [
     "tests/storage/linstor", # needs updating and fixing
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork", # not really broken but we'll handle it later
