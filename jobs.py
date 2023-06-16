@@ -70,7 +70,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot",
-        "name_filter": "not migration and not linstor and not test_fsp_sr.py",
+        "name_filter": "not migration and not linstor",
     },
     "storage-migrations": {
         "description": "tests migrations with all storage drivers (except linstor)",
@@ -229,11 +229,13 @@ JOBS = {
     },
 }
 
+# List used by the 'check' action: tests listed here will not raise a check error
+# if they are not selected by any test job.
+# Adding a test to this list does not exclude it from test jobs. This is independent.
 BROKEN_TESTS = [
     "tests/storage/linstor", # needs updating and fixing
-    "tests/misc/test_update_host.py", # doesn't test anything currently unless the host is out of date
-    "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork", # not really broken but we'll handle it later
-    "tests/storage/fsp", # driver not present by default. Needs test setup to be improved.
+    # not really broken but has complex prerequisites (3 NICs on 3 different networks)
+    "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
 ]
 
 def get_vm_or_vms_refs(handle):
