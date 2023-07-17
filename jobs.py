@@ -45,6 +45,16 @@ JOBS = {
         "paths": ["tests/misc"],
         "markers": "multi_vms and not flaky and not reboot",
     },
+    "packages": {
+        "description": "tests that packages can be installed correctly",
+        "requirements": [
+            "Any pool.",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/packages"],
+        "markers": "",
+    },
     "quicktest": {
         "description": "XAPI's quicktest, not so quick by the way",
         "requirements": [
