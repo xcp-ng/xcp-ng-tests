@@ -275,7 +275,7 @@ class Host:
     def yum_install(self, packages, enablerepo=None):
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
         enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
-        return self.ssh(['yum', 'install', '-y'] + enablerepo_cmd + packages)
+        return self.ssh(['yum', 'install', '--setopt=skip_missing_names_on_install=False', '-y'] + enablerepo_cmd + packages)
 
     def yum_remove(self, packages):
         logging.info('Remove packages: %s from host %s' % (' '.join(packages), self))
