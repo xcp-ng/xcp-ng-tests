@@ -4,7 +4,7 @@ import urllib.request
 
 @pytest.fixture(scope="session")
 def extra_pkgs(host):
-    version = host.xcp_version
+    version = host.xcp_version_short
     url = f"https://reports.xcp-ng.org/{version}/extra_installable.txt"
 
     logging.info(f"Getting extra packages from {url}")
