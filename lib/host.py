@@ -46,6 +46,7 @@ class Host:
         self.inventory = self._get_xensource_inventory()
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
+        self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
 
     def __str__(self):
         return self.hostname_or_ip
@@ -98,8 +99,7 @@ class Host:
 
     def add_xcpng_repo(self, name):
         major = self.xcp_version.major
-        minor = self.xcp_version.minor
-        version = f"{major}.{minor}"
+        version = self.xcp_version_short
         self.create_file(f"/etc/yum.repos.d/xcp-ng-{name}.repo", (
             f"[xcp-ng-{name}]\n"
             f"name=XCP-ng {name} Repository\n"
