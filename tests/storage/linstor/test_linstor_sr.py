@@ -2,7 +2,7 @@ import logging
 import pytest
 import time
 
-from .conftest import GROUP_NAME, create_linstor_sr, destroy_linstor_sr
+from .conftest import STORAGE_POOL_NAME, LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 from tests.storage import vdi_is_open
@@ -10,23 +10,23 @@ from tests.storage import vdi_is_open
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
 # - access to XCP-ng RPM repository from the host
-# - a repo with the LINSTOR RPMs must be given using the command line param `--additional-repos`
 
 class TestLinstorSRCreateDestroy:
-    vm = None
+    """
+    Tests that do not use fixtures that setup the SR or import VMs,
+    because they precisely need to test SR creation and destruction,
+    and VM import.
+    """
 
-    def test_create_sr_without_linstor(self, hosts, lvm_disks):
-        master = hosts[0]
-
+    def test_create_sr_without_linstor(self, host, lvm_disk):
         # This test must be the first in the series in this module
-        assert not master.binary_exists('linstor'), \
+        assert not host.is_package_installed('python-linstor'), \
             "linstor must not be installed on the host at the beginning of the tests"
         try:
-            sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
-                'hosts': ','.join([host.hostname() for host in hosts]),
-                'group-name': GROUP_NAME,
-                'redundancy': len(hosts),
-                'provisioning': 'thick'
+            sr = host.sr_create('linstor', 'LINSTOR-SR-test', {
+                'group-name': STORAGE_POOL_NAME,
+                'redundancy': '1',
+                'provisioning': 'thin'
             }, shared=True)
             try:
                 sr.destroy()
@@ -36,15 +36,19 @@ class TestLinstorSRCreateDestroy:
         except SSHCommandFailed as e:
             logging.info("SR creation failed, as expected: {}".format(e))
 
-    def test_create_and_destroy_sr(self, hosts_with_linstor, lvm_disks):
+    def test_create_and_destroy_sr(self, pool_with_linstor):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        master = hosts_with_linstor[0]
-        sr = create_linstor_sr(hosts_with_linstor)
+        master = pool_with_linstor.master
+        sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
+            'group-name': STORAGE_POOL_NAME,
+            'redundancy': '1',
+            'provisioning': 'thin'
+        }, shared=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = master.import_vm(vm_image('mini-linux-x86_64-bios'), sr.uuid)
         vm.destroy(verify=True)
-        destroy_linstor_sr(hosts_with_linstor, sr)
+        sr.destroy(verify=True)
 
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
@@ -84,11 +88,10 @@ class TestLinstorSR:
 
     @pytest.mark.reboot
     def test_linstor_missing(self, linstor_sr, host):
-        packages = ['python-linstor', 'linstor-client']
         sr = linstor_sr
         linstor_installed = True
         try:
-            host.yum_remove(packages)
+            host.yum_remove(['python-linstor', 'linstor-client'])
             linstor_installed = False
             try:
                 sr.scan()
@@ -100,12 +103,18 @@ class TestLinstorSR:
             time.sleep(10)
             logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
-            host.yum_install(packages)
+            host.yum_install(['xcp-ng-linstor'])
             linstor_installed = True
+
+            # Needed because the linstor driver is not in the xapi
+            # sm-plugins list because xcp-ng-linstor RPM has been
+            # removed by the `yum remove ...` call.
+            host.restart_toolstack(verify=True)
+
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not linstor_installed:
-                host.yum_install(packages)
+                host.yum_install([LINSTOR_PACKAGE])
 
     # *** End of tests with reboots
