@@ -261,7 +261,7 @@ class Host:
         [...]
         """
         try:
-            history = self.ssh(['yum', 'history', 'list', '--noplugins']).splitlines()
+            history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
         except commands.SSHCommandFailed as e:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
@@ -269,8 +269,13 @@ class Host:
             logging.info('Install and remove a small package to workaround empty yum history.')
             self.yum_install(['gpm-libs'])
             self.yum_remove(['gpm-libs'])
-            history = self.ssh(['yum', 'history', 'list', '--noplugins']).splitlines()
-        return history[2].split()[0]
+            history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
+
+        history = history_str.splitlines()
+        try:
+            return int(history[2].split()[0])
+        except ValueError:
+            raise Exception('Unable to parse correctly last yum history tid. Output\n:' + history_str)
 
     def yum_install(self, packages, enablerepo=None):
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
@@ -318,9 +323,12 @@ class Host:
             "Can't restore previous state without a package list: no saved packages list"
         assert self.saved_rollback_id is not None, \
             "Can't restore previous state without a package list: no rollback id"
+
+        assert isinstance(self.saved_rollback_id, int)
+
         self.ssh([
             'yum', 'history', 'rollback', '--enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates',
-            self.saved_rollback_id, '-y'
+            str(self.saved_rollback_id), '-y'
         ])
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
