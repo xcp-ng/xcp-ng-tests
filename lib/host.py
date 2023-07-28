@@ -272,10 +272,19 @@ class Host:
             history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
 
         history = history_str.splitlines()
+        line_index = None
+        for i in range(len(history)):
+            if history[i].startswith('--------'):
+                line_index = i
+                break
+
+        if line_index is None:
+            raise Exception('Unable to get yum transactions')
+
         try:
-            return int(history[2].split()[0])
+            return int(history[line_index + 1].split()[0])
         except ValueError:
-            raise Exception('Unable to parse correctly last yum history tid. Output\n:' + history_str)
+            raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
     def yum_install(self, packages, enablerepo=None):
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
