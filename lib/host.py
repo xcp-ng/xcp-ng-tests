@@ -71,7 +71,7 @@ class Host:
         maybe_param_minimal = ['--minimal'] if minimal else []
 
         def stringify(key, value):
-            if type(value) == bool:
+            if isinstance(value, bool):
                 return "{}={}".format(key, to_xapi_bool(value))
             return "{}={}".format(key, shlex.quote(value))
 
