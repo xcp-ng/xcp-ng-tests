@@ -13,6 +13,8 @@ VMS = {
         "small_vm_efitools": "",
         # "small" Windows VM (UEFI)
         "small_vm_windows": "",
+        # Debian VM (UEFI, no GUI)
+        "debian_uefi_vm": "",
     },
     "multi": {
         # all VMs we want to run "multi_vms" tests on
