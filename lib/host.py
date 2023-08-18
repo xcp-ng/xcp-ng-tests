@@ -67,15 +67,17 @@ class Host:
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
-    def xe(self, action, args={}, check=True, simple_output=True, minimal=False):
+    def xe(self, action, args={}, check=True, simple_output=True, minimal=False, force=False):
         maybe_param_minimal = ['--minimal'] if minimal else []
+        maybe_param_force = ['--force'] if force else []
 
         def stringify(key, value):
             if isinstance(value, bool):
                 return "{}={}".format(key, to_xapi_bool(value))
             return "{}={}".format(key, shlex.quote(value))
 
-        command = ['xe', action] + maybe_param_minimal + [stringify(key, value) for key, value in args.items()]
+        command = ['xe', action] + maybe_param_minimal + maybe_param_force + \
+                  [stringify(key, value) for key, value in args.items()]
         result = self.ssh(
             command,
             check=check,
