@@ -468,3 +468,12 @@ class Host:
             return "/var/lib/uefistored"
         else:
             return "/var/lib/varstored"
+
+    def enable_hsts_header(self):
+        self.ssh(['echo', '"add_hsts_response_header = true"', '>',
+                  f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
+        self.restart_toolstack(verify=True)
+
+    def disable_hsts_header(self):
+        self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
+        self.restart_toolstack(verify=True)
