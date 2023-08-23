@@ -4,7 +4,9 @@ import argparse
 import atexit
 import logging
 import os
+import random
 import requests
+import string
 import subprocess
 import sys
 import tempfile
@@ -41,12 +43,16 @@ is_default=1
 {rt}
 """)
 
-def generate_answerfile(directory, installer, hostname_or_ip, action, hdd):
+def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd):
     pxe = pxe_address()
     password = host_data(hostname_or_ip)['password']
     cmd = ['openssl', 'passwd', '-6', password]
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     encrypted_password = res.stdout.decode().strip()
+    if target_hostname is None:
+        target_hostname = "xcp-ng-" + "".join(
+            random.choice(string.ascii_lowercase) for i in range(5)
+        )
     with open(f'{directory}/answerfile.xml', 'w') as answerfile:
         if action == 'install':
             answerfile.write(f"""<?xml version="1.0"?>
@@ -58,6 +64,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, action, hdd):
     <source type="url">{installer}</source>
     <admin-interface name="eth0" proto="dhcp" />
     <timezone>Europe/Paris</timezone>
+    <hostname>{target_hostname}</hostname>
     <script stage="filesystem-populated" type="url">
         http://{pxe}/configs/presets/scripts/filesystem-populated.py
     </script>
@@ -174,6 +181,11 @@ def main():
              "In case of a restore, specify the version of the installer."
     )
     parser.add_argument("--installer", help="URL of the installer")
+    parser.add_argument(
+        "-t", "--target-hostname",
+        help="The hostname of the VM in which XCP-ng will be installed. By default "
+             "a hostname is generated starting with xcp-ng-XXXXX where XXXXX is "
+             "randomly generated using lowercase characters.")
     args = parser.parse_args()
 
     # *** "fail early" checks
@@ -217,7 +229,7 @@ def main():
     with tempfile.TemporaryDirectory(suffix=mac_address) as tmp_local_path:
         logging.info('Generate files: answerfile.xml and boot.conf')
         hdd = 'nvme0n1' if vm.is_uefi else 'sda'
-        generate_answerfile(tmp_local_path, installer, args.host, args.action, hdd)
+        generate_answerfile(tmp_local_path, installer, args.host, args.target_hostname, args.action, hdd)
         generate_boot_conf(tmp_local_path, installer, args.action)
         logging.info('Copy files to the pxe server')
         copy_files_to_pxe(mac_address, tmp_local_path)
