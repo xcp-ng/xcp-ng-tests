@@ -7,7 +7,7 @@ FSP_PACKAGES = ['xcp-ng-xapi-storage']
 DIRECTORIES_PATH = 'directories'
 
 def install_fsp(host):
-    host.add_xcpng_repo(FSP_REPO_NAME)
+    host.add_xcpng_repo(FSP_REPO_NAME, 'vates')
     host.yum_save_state()
     host.yum_install(FSP_PACKAGES)
 
