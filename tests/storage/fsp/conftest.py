@@ -6,20 +6,20 @@ FSP_PACKAGES = ['xcp-ng-xapi-storage']
 
 DIRECTORIES_PATH = 'directories'
 
-def install_fsp(host):
+@pytest.fixture(scope='package')
+def host_with_runx_repo(host_with_saved_yum_state):
+    host = host_with_saved_yum_state
     host.add_xcpng_repo(FSP_REPO_NAME, 'vates')
-    host.yum_save_state()
-    host.yum_install(FSP_PACKAGES)
-
-def uninstall_fsp(host):
-    host.yum_restore_saved_state()
+    yield host
+    # teardown
     host.remove_xcpng_repo(FSP_REPO_NAME)
 
 @pytest.fixture(scope='package')
-def host_with_fsp(host):
-    install_fsp(host)
+def host_with_fsp(host_with_runx_repo):
+    host = host_with_runx_repo
+    host.yum_install(FSP_PACKAGES)
     yield host
-    uninstall_fsp(host)
+    # teardown: nothing to do, done by host_with_saved_yum_state.
 
 @pytest.fixture(scope='package')
 def fsp_config(host_with_fsp):
