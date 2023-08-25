@@ -1,5 +1,8 @@
 import pytest
 
+# Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
+from pkgfixtures import host_with_saved_yum_state
+
 FSP_REPO_NAME = 'runx'
 
 FSP_PACKAGES = ['xcp-ng-xapi-storage']
