@@ -411,6 +411,19 @@ class VM(BaseVM):
 
         return binaries
 
+    def get_vtpm_uuid(self):
+        return self.host.xe('vtpm-list', {'vm': self.uuid}, minimal=True)
+
+    def create_vtpm(self):
+        logging.info("Creating vTPM for vm %s" % self.uuid)
+        return self.host.xe('vtpm-create', {'vm-uuid': self.uuid})
+
+    def destroy_vtpm(self):
+        vtpm_uuid = self.get_vtpm_uuid()
+        assert vtpm_uuid, "A vTPM must be present"
+        logging.info("Destroying vTPM %s" % vtpm_uuid)
+        return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
+
     def clone(self):
         name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
