@@ -221,6 +221,20 @@ JOBS = {
         "params": {},
         "paths": ["tests/xen"],
     },
+    "vtpm": {
+        "description": "Testing vTPM functionalities",
+        "requirements": [
+            "A XCP-ng host >= 8.3 and a Unix RPM-based or DEB-based UEFI VM with "
+            "tpm2-tools installable from default repositories.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            # The test also works on CentOS, for example, but in this job definition
+            # we settle for a debian VM
+            "--vm": "single/debian_uefi_vm",
+        },
+        "paths": ["tests/vtpm"],
+    },
     "flaky": {
         "description": "tests that usually pass, but sometimes fail unexpectedly",
         "requirements": [

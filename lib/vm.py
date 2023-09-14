@@ -44,11 +44,21 @@ class VM(BaseVM):
             args['on'] = on
         return self.host.xe('vm-start', args)
 
-    def shutdown(self, force=False, verify=False):
+    def shutdown(self, force=False, verify=False, force_if_fails=False):
+        assert not (force and force_if_fails), "force and force_if_fails cannot be both True"
         logging.info("Shutdown VM" + (" (force)" if force else ""))
-        ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': force})
-        if verify:
-            wait_for(self.is_halted, "Wait for VM halted")
+
+        try:
+            ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': force})
+            if verify:
+                wait_for(self.is_halted, "Wait for VM halted")
+        except Exception as e:
+            if force_if_fails:
+                logging.warning("Shutdown failed: %s" % e)
+                ret = self.shutdown(force=True, verify=verify)
+            else:
+                raise
+
         return ret
 
     def reboot(self, force=False, verify=False):
@@ -400,6 +410,19 @@ class VM(BaseVM):
                 binaries.append(fpath)
 
         return binaries
+
+    def get_vtpm_uuid(self):
+        return self.host.xe('vtpm-list', {'vm': self.uuid}, minimal=True)
+
+    def create_vtpm(self):
+        logging.info("Creating vTPM for vm %s" % self.uuid)
+        return self.host.xe('vtpm-create', {'vm-uuid': self.uuid})
+
+    def destroy_vtpm(self):
+        vtpm_uuid = self.get_vtpm_uuid()
+        assert vtpm_uuid, "A vTPM must be present"
+        logging.info("Destroying vTPM %s" % vtpm_uuid)
+        return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
     def clone(self):
         name = self.name() + '_clone_for_tests'
