@@ -10,6 +10,7 @@ import lib.commands as commands
 
 from lib.common import _param_get, safe_split, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
+from lib.netutil import wrap_ip
 from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
@@ -147,7 +148,7 @@ class Host:
     def xo_get_server_id(self, store=True):
         servers = xo_cli('server.getAll', use_json=True)
         for server in servers:
-            if server['host'] == self.hostname_or_ip:
+            if server['host'] == wrap_ip(self.hostname_or_ip):
                 if store:
                     self.xo_srv_id = server['id']
                 return server['id']
@@ -159,7 +160,7 @@ class Host:
         else:
             servers = xo_cli('server.getAll', use_json=True)
             for server in servers:
-                if server['host'] == self.hostname_or_ip:
+                if server['host'] == wrap_ip(self.hostname_or_ip):
                     xo_cli('server.remove', {'id': server['id']})
 
     def xo_server_add(self, username, password, label=None, unregister_first=True):
@@ -171,7 +172,7 @@ class Host:
         xo_srv_id = xo_cli(
             'server.add',
             {
-                'host': self.hostname_or_ip,
+                'host': wrap_ip(self.hostname_or_ip),
                 'username': username,
                 'password': password,
                 'allowUnauthorized': 'true',
@@ -183,7 +184,7 @@ class Host:
     def xo_server_status(self):
         servers = xo_cli('server.getAll', use_json=True)
         for server in servers:
-            if server['host'] == self.hostname_or_ip:
+            if server['host'] == wrap_ip(self.hostname_or_ip):
                 return server['status']
         return None
 

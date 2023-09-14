@@ -111,5 +111,8 @@ class TestHostEvacuateWithNetwork:
             pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
             args['uuid'] = pif_uuid
             logging.info(f"Re-add and plug PIF {pif_uuid}")
+            if ipv6:
+                # Default is IPv4
+                host.xe('pif-set-primary-address-type', {'uuid': pif_uuid, 'primary_address_type': 'ipv6'})
             host.xe(reconfigure_method, args)
             host.xe('pif-plug', {'uuid': pif_uuid})

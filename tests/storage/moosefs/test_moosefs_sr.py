@@ -31,6 +31,8 @@ class TestMooseFSSRCreateDestroy:
             sr.destroy()
             assert False, "MooseFS SR creation should failed!"
 
+    # MooseFS doesn't support IPv6
+    @pytest.mark.usefixtures("host_no_ipv6")
     def test_create_and_destroy_sr(self, moosefs_device_config, pool_with_moosefs_enabled):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = pool_with_moosefs_enabled.master
@@ -41,7 +43,8 @@ class TestMooseFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("moosefs_sr")
+# MooseFS doesn't support IPv6
+@pytest.mark.usefixtures("moosefs_sr", "host_no_ipv6")
 class TestMooseFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, moosefs_sr):
