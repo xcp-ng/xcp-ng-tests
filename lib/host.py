@@ -91,7 +91,7 @@ class Host:
         return result
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
-        return _param_get(self, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+        return _param_get(self, Host.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
     def create_file(self, filename, text):
         with tempfile.NamedTemporaryFile('w') as file:

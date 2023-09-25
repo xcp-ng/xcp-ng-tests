@@ -153,3 +153,35 @@ def _param_get(host, xe_prefix, uuid, param_name, key=None, accept_unknown_key=F
         else:
             raise
     return value
+
+def _param_set(host, xe_prefix, uuid, param_name, value, key=None):
+    """ Common implementation for param_set. """
+    args = {'uuid': uuid}
+
+    if key is not None:
+        param_name = '{}:{}'.format(param_name, key)
+
+    args[param_name] = value
+
+    host.xe(f'{xe_prefix}-param-set', args)
+
+def _param_add(host, xe_prefix, uuid, param_name, value, key=None):
+    """ Common implementation for param_add. """
+    param_key = f'{key}={value}' if key is not None else value
+    args = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
+
+    host.xe(f'{xe_prefix}-param-add', args)
+
+def _param_remove(host, xe_prefix, uuid, param_name, key, accept_unknown_key=False):
+    """ Common implementation for param_remove. """
+    args = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
+    try:
+        host.xe(f'{xe_prefix}-param-remove', args)
+    except commands.SSHCommandFailed as e:
+        if not accept_unknown_key or e.stdout != "Error: Key %s not found in map" % key:
+            raise
+
+def _param_clear(host, xe_prefix, uuid, param_name):
+    """ Common implementation for param_clear. """
+    args = {'uuid': uuid, 'param-name': param_name}
+    host.xe(f'{xe_prefix}-param-clear', args)
