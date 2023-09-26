@@ -474,7 +474,7 @@ class Host:
             return "/var/lib/varstored"
 
     def enable_hsts_header(self):
-        self.ssh(['echo', '"add_hsts_response_header = true"', '>',
+        self.ssh(['echo', '"hsts_max_age = 63072000"', '>',
                   f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
 

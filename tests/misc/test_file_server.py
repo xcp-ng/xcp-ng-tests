@@ -19,7 +19,7 @@ def test_fileserver_redirect_https(host):
     assert lines[2].strip() == "location:https://" + host.hostname_or_ip + path
 
 class TestHSTS:
-    HSTS_HEADER = "Strict-Transport-Security:max-age=63072000"
+    HSTS_HEADER = "strict-transport-security:max-age=63072000"
 
     def __get_header(host):
         process = subprocess.Popen(
