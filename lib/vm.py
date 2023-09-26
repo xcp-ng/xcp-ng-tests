@@ -412,7 +412,7 @@ class VM(BaseVM):
         return binaries
 
     def get_vtpm_uuid(self):
-        return self.host.xe('vtpm-list', {'vm': self.uuid}, minimal=True)
+        return self.host.xe('vtpm-list', {'vm-uuid': self.uuid}, minimal=True)
 
     def create_vtpm(self):
         logging.info("Creating vTPM for vm %s" % self.uuid)
