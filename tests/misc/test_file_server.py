@@ -1,9 +1,10 @@
+import pytest
 import subprocess
 
 # These tests are meant to test an host fileserver behavior.
 #
 # Requirements:
-# - an XCP-ng host >= 8.2 with latest updates.
+# - an XCP-ng host >= 8.2 with latest updates (and >= 8.3 for the HSTS test).
 #   The host must be configured with `website-https-only` set to true (which is the default config).
 
 def test_fileserver_redirect_https(host):
@@ -18,6 +19,7 @@ def test_fileserver_redirect_https(host):
     assert lines[0].strip() == "HTTP/1.1 301 Moved Permanently"
     assert lines[2].strip() == "location:https://" + host.hostname_or_ip + path
 
+@pytest.mark.usefixtures("host_at_least_8_3")
 class TestHSTS:
     HSTS_HEADER = "strict-transport-security:max-age=63072000"
 
