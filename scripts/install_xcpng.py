@@ -43,7 +43,7 @@ is_default=1
 {rt}
 """)
 
-def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd):
+def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
     pxe = pxe_address()
     password = host_data(hostname_or_ip)['password']
     cmd = ['openssl', 'passwd', '-6', password]
@@ -56,7 +56,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
     with open(f'{directory}/answerfile.xml', 'w') as answerfile:
         if action == 'install':
             answerfile.write(f"""<?xml version="1.0"?>
-<installation>
+<installation{netinstall_gpg_check}>
     <keymap>fr</keymap>
     <primary-disk>{hdd}</primary-disk>
     <guest-disk>{hdd}</guest-disk>
@@ -72,7 +72,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
         """)
         elif action == 'upgrade':
             answerfile.write(f"""<?xml version="1.0"?>
-<installation mode="upgrade">
+<installation mode="upgrade"{netinstall_gpg_check}>
     <existing-installation>{hdd}</existing-installation>
     <source type="url">{installer}</source>
     <script stage="filesystem-populated" type="url">
@@ -186,6 +186,7 @@ def main():
         help="The hostname of the VM in which XCP-ng will be installed. By default "
              "a hostname is generated starting with xcp-ng-XXXXX where XXXXX is "
              "randomly generated using lowercase characters.")
+    parser.add_argument("--netinstall-gpg-check", default=False, action='store_true', help="Disable GPG Check")
     args = parser.parse_args()
 
     # *** "fail early" checks
@@ -199,6 +200,11 @@ def main():
         xcp_version = args.xcpng_version
     else:
         raise Exception(f'The version does not seem valid: {args.xcpng_version}')
+
+    if args.netinstall_gpg_check:
+        netinstall_gpg_check = " netinstall-gpg-check=\"false\""
+    else:
+        netinstall_gpg_check = ""
 
     # *** slower checks (involving network, SSH...)
 
@@ -229,7 +235,8 @@ def main():
     with tempfile.TemporaryDirectory(suffix=mac_address) as tmp_local_path:
         logging.info('Generate files: answerfile.xml and boot.conf')
         hdd = 'nvme0n1' if vm.is_uefi else 'sda'
-        generate_answerfile(tmp_local_path, installer, args.host, args.target_hostname, args.action, hdd)
+        generate_answerfile(tmp_local_path, installer, args.host, args.target_hostname, args.action, hdd,
+                            netinstall_gpg_check)
         generate_boot_conf(tmp_local_path, installer, args.action)
         logging.info('Copy files to the pxe server')
         copy_files_to_pxe(mac_address, tmp_local_path)
