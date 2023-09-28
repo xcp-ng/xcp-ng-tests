@@ -284,6 +284,24 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
 
     job_params = dict(job_data["params"])
 
+    # Merge name filter
+    cli_name_filters = []
+    try:
+        while True:
+            i = pytest_args.index("-k")
+            value = pytest_args[i + 1]
+            del pytest_args[i + 1]
+            del pytest_args[i]
+            cli_name_filters.append(value)
+    except ValueError:
+        pass
+
+    joined_cli_filters = ") and (".join(cli_name_filters)
+    if name_filter and joined_cli_filters:
+        name_filter = f"({name_filter}) and ({joined_cli_filters})"
+    elif joined_cli_filters:
+        name_filter = f"({joined_cli_filters})"
+
     # pytest_args may override job_params
     pytest_args_keys = []
     for arg in pytest_args:
