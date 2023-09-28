@@ -69,7 +69,7 @@ class TestTLSVerification:
         hostA2 = hostA2_with_saved_cert
         logging.info(f"Replace the certificate on host {hostA2}")
         hostA2.ssh(['rm', XAPI_POOL_PEM_FILEPATH])
-        hostA2.ssh(['/opt/xensource/libexec/gencert', XAPI_POOL_PEM_FILEPATH, 'xapi:pool'])
+        hostA2.ssh(['/opt/xensource/libexec/gencert', XAPI_POOL_PEM_FILEPATH, '-1', 'xapi:pool'])
         hostA2.ssh(['systemctl', 'reload-or-restart stunnel@xapi'])
         # Restart toolstack on client host to clear any existing TLS connection
         hostA1.restart_toolstack(True)
