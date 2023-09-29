@@ -1,4 +1,5 @@
 import logging
+import time
 
 import lib.commands as commands
 
@@ -95,7 +96,17 @@ class SR:
                     else:
                         logging.info("SR destroy failed due to SR not empty but there aren't any managed VDIs left.")
                         if i < max_tries:
-                            logging.info(f"Retrying sr-destroy in case it failed due to incomplete GC.")
+                            if i == max_tries - 1:
+                                # We tried already 4 times to destroy the SR, and there still are hidden VDIs that
+                                # couldn't be force-GCed. In this case, we likely need to give time to the normal GC
+                                # to run, which might also coalesce some VDIs if that's what it really needs.
+                                # The GC should kick approximately 5 minutes after the last operation we did, so let's
+                                # give it these 5 minutes plus extra time to complete.
+                                gc_delay = 600
+                                logging.warning(f"SR destroy failed {i} times in a row. "
+                                                f"Wait for {gc_delay}s, hoping GC fully runs before next try")
+                                time.sleep(gc_delay)
+                            logging.info("Retrying sr-destroy in case it previously failed due to incomplete GC.")
                             continue
                         else:
                             raise Exception(f"Could not destroy the SR even after {i} attempts.")
