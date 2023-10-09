@@ -160,4 +160,13 @@ class SR:
 
     def run_quicktest(self):
         logging.info(f"Run quicktest on SR {self.uuid}")
-        self.pool.master.ssh(['/opt/xensource/debug/quicktest', '-sr', self.uuid])
+        # Always display the output of quicktest, failed or not.
+        # This will duplicate the output in some cases, but it ensures we always have it for failure analysis,
+        # even when quicktest leaves SRs in a state which makes teardown fail (in this case, pytest often doesn't
+        # manage to display the details of the failed command, for a reason unknown - no usable reproducer found)
+        try:
+            output = self.pool.master.ssh(['/opt/xensource/debug/quicktest', '-sr', self.uuid])
+            logging.info(f"Quicktest output: {output}")
+        except commands.SSHCommandFailed as e:
+            logging.error(f"Quicktest output: {e.stdout}")
+            raise
