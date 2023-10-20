@@ -41,6 +41,10 @@ class TestLocalISOSRCreateDestroy:
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("local_iso_sr")
 class TestLocalISOSR:
+    @pytest.mark.quicktest
+    def test_quicktest(self, local_iso_sr):
+        sr, _ = local_iso_sr
+        sr.run_quicktest()
 
     def test_iso_mount_and_read(self, host, local_iso_sr, unix_vm):
         sr, location = local_iso_sr
