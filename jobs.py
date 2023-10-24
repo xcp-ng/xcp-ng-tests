@@ -128,7 +128,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_efitools",
         },
-        "paths": ["tests/uefistored/test_auth_var.py", "tests/uefistored/test_secure_boot.py"],
+        "paths": ["tests/uefi_sb/test_auth_var.py", "tests/uefi_sb/test_secure_boot.py"],
         "markers": "not windows_vm",
     },
     "sb-certificates": {
@@ -143,7 +143,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_efitools",
         },
-        "paths": ["tests/uefistored/test_cert_inheritance.py"],
+        "paths": ["tests/uefi_sb/test_cert_inheritance.py"],
     },
     "sb-windows": {
         "description": "tests uefistored/varstored and SecureBoot using a Windows VM",
@@ -155,7 +155,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_windows",
         },
-        "paths": ["tests/uefistored"],
+        "paths": ["tests/uefi_sb"],
         "markers": "windows_vm",
     },
     "sb-unix-multi": {
@@ -169,7 +169,7 @@ JOBS = {
         "params": {
             "--vm[]": "multi/uefi_unix",
         },
-        "paths": ["tests/uefistored"],
+        "paths": ["tests/uefi_sb"],
         "markers": "multi_vms and unix_vm",
     },
     "sb-windows-multi": {
@@ -182,7 +182,7 @@ JOBS = {
         "params": {
             "--vm[]": "multi/uefi_windows",
         },
-        "paths": ["tests/uefistored"],
+        "paths": ["tests/uefi_sb"],
         "markers": "multi_vms and windows_vm",
     },
     "tools-unix": {
