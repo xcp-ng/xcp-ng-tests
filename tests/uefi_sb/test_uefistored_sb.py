@@ -5,7 +5,8 @@ from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES
 
-from .utils import generate_keys, revert_vm_state, VM_SECURE_BOOT_FAILED
+from .utils import boot_and_check_no_sb_errors, boot_and_check_sb_failed, boot_and_check_sb_succeeded, generate_keys, \
+    revert_vm_state, sign_efi_bins, VM_SECURE_BOOT_FAILED
 
 # Requirements:
 # On the test runner:
@@ -18,43 +19,6 @@ from .utils import generate_keys, revert_vm_state, VM_SECURE_BOOT_FAILED
 #   Some tests are Linux-only and some tests are Windows-only.
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
-
-def boot_and_check_sb_failed(vm):
-    vm.start()
-    wait_for(
-        lambda: vm.get_messages(VM_SECURE_BOOT_FAILED),
-        'Wait for message %s' % VM_SECURE_BOOT_FAILED
-    )
-
-    # If there is a VM_SECURE_BOOT_FAILED message and yet the OS still
-    # successfully booted, this is a uefistored bug
-    assert vm.is_in_uefi_shell()
-
-def boot_and_check_no_sb_errors(vm):
-    vm.start()
-    vm.wait_for_vm_running_and_ssh_up()
-    logging.info("Verify there's no %s message" % VM_SECURE_BOOT_FAILED)
-    assert not vm.get_messages(VM_SECURE_BOOT_FAILED)
-
-def boot_and_check_sb_succeeded(vm):
-    boot_and_check_no_sb_errors(vm)
-    logging.info("Check that SB is enabled according to the OS.")
-    assert vm.booted_with_secureboot()
-
-def sign_efi_bins(vm, db):
-    '''Boots the VM if it is halted, signs the bootloader, and halts the
-    VM again (if halted was its original state).
-    '''
-    shutdown = not vm.is_running()
-    if shutdown:
-        vm.start()
-        vm.wait_for_vm_running_and_ssh_up()
-
-    logging.info('> Sign bootloader')
-    vm.sign_efi_bins(db)
-
-    if shutdown:
-        vm.shutdown(verify=True)
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("pool_without_uefi_certs", "unix_vm")
