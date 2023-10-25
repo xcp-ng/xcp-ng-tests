@@ -270,7 +270,6 @@ class TestUEFIKeyExchange:
             logging.info('> Testing {} ({})'.format(auth.name, i))
 
             ok = True
-            saved_exception = None
             try:
                 vm.set_efi_var(auth.name, auth.guid,
                                EFI_AT_ATTRS_BYTES, auth.auth_data)
