@@ -265,7 +265,7 @@ class TestPoolToDiskCertInheritanceOnPoolJoin:
         from packaging import version
         version_str = "8.3"
         if not hostB1.xcp_version >= version.parse(version_str):
-            pytest.skip(f"This test requires a second XCP-ng pool with version >= {version_str}")
+            raise Exception(f"This test requires a second XCP-ng pool with version >= {version_str}")
 
         # Install certs before host join
         keys = ['PK', 'KEK', 'db', 'dbx']
