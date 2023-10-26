@@ -100,6 +100,10 @@ class VM(BaseVM):
             local_dest=local_dest
         )
 
+    def sftp_put(self, src, dest, check=True, suppress_fingerprint_warnings=True):
+        cmd = f"put {src} {dest}"
+        return commands.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
+
     def is_ssh_up(self):
         try:
             return self.ssh_with_result(['true']).returncode == 0
@@ -234,7 +238,13 @@ class VM(BaseVM):
                 cmd + '\n'
             ])
             f.flush()
-            self.scp(f.name, script)
+            if self.is_windows:
+                # Use sftp instead of scp for lack of legacy scp protocol in OpenSSH for Windows 11.
+                # sftp doesn't know /tmp from the git-bash environment which is mapped to
+                # /Users/root/AppData/Local/Temp for the user root so copy the script there.
+                self.sftp_put(f.name, script.replace("/tmp/", "/Users/root/AppData/Local/Temp/"))
+            else:
+                self.scp(f.name, script)
             # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
             # It is a documented requirement that bash is present on all test VMs.
             self.ssh(['bash', script], background=True)
