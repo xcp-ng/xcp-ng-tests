@@ -314,13 +314,7 @@ class Host:
         return self.ssh(['repoquery', '--show-duplicates', package]).splitlines()
 
     def is_package_installed(self, package):
-        try:
-            self.ssh(['yum', 'list', 'installed', package])
-            return True
-        except commands.SSHCommandFailed as e:
-            if e.stdout.endswith('Error: No matching Packages to list'):
-                return False
-            raise e
+        return self.ssh_with_result(['rpm', '-q', package]).returncode == 0
 
     def yum_save_state(self):
         logging.info(f"Save yum state for host {self}")
