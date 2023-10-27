@@ -49,7 +49,7 @@ def pool_with_linstor(hostA2, lvm_disk, pool_with_saved_yum_state):
 
     for host in pool.hosts:
         host.yum_install([LINSTOR_RELEASE_PACKAGE])
-        host.yum_install([LINSTOR_PACKAGE])
+        host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
         # Needed because the linstor driver is not in the xapi sm-plugins list
         # before installing the LINSTOR packages.
         host.restart_toolstack(verify=True)
