@@ -94,6 +94,10 @@ class VM(BaseVM):
         return self.ssh(cmd, check=False, simple_output=False)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
+        # Stop execution if scp() is used on Windows VMs as some OpenSSH releases for Windows don't
+        # have support for the scp legacy protocol. Callers must use vm.sftp_put() instead
+        assert not self.is_windows, "You cannot use scp() on Windows VMs. Please use vm.sftp_put() instead"
+
         return commands.scp(
             self.ip, src, dest, check=check,
             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
