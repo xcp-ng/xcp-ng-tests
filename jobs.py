@@ -138,7 +138,7 @@ JOBS = {
     "sb-certificates": {
         "description": "[8.3+] tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored",
         "requirements": [
-            "A pool >= 8.2.1. On 8.3+, it needs at least two hosts.",
+            "A pool >= 8.2.1. On 8.3+, it needs at least two hosts. On 8.2, one is enough but more is better.",
             "On 8.3+ only, a second pool, single-host, available for temporarily joining the first pool.",
             "A fast-booting unix UEFI VM with efitools.",
         ],
@@ -147,7 +147,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_efitools",
         },
-        "paths": ["tests/uefi_sb/test_cert_inheritance.py"],
+        "paths": ["tests/uefi_sb/test_uefistored_cert_flow.py", "tests/uefi_sb/test_varstored_cert_flow.py"],
     },
     "sb-windows": {
         "description": "tests uefistored/varstored and SecureBoot using a Windows VM",
