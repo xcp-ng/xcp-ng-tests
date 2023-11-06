@@ -179,6 +179,29 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
 
     return res
 
+def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
+    if suppress_fingerprint_warnings:
+        # Suppress warnings and questions related to host key fingerprints
+        # because on a test network IPs get reused, VMs are reinstalled, etc.
+        # Based on https://unix.stackexchange.com/a/365976/257493
+        opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+
+    args = "sftp {} -b - root@{}".format(opts, hostname_or_ip)
+    input = bytes("\n".join(cmds), 'utf-8')
+    res = subprocess.run(
+        args,
+        input=input,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False
+    )
+
+    if check and res.returncode:
+        raise SSHCommandFailed(res.returncode, res.stdout.decode(), "{} -- {}".format(args, cmds))
+
+    return res
+
 def local_cmd(cmd, check=True, decode=True):
     """ Run a command locally on tester end. """
     res = subprocess.run(
