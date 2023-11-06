@@ -128,7 +128,11 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_efitools",
         },
-        "paths": ["tests/uefi_sb/test_auth_var.py", "tests/uefi_sb/test_uefistored_sb.py"],
+        "paths": [
+            "tests/uefi_sb/test_auth_var.py",
+            "tests/uefi_sb/test_uefistored_sb.py",
+            "tests/uefi_sb/test_varstored_sb.py"
+        ],
         "markers": "not windows_vm",
     },
     "sb-certificates": {

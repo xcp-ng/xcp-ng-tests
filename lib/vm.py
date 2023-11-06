@@ -392,6 +392,8 @@ class VM(BaseVM):
 
         This makes it look like the VM is new, in the eyes of uefistored/varstored,
         and so it will propagate certs from disk to its NVRAM when it boots next.
+
+        Some VMs will not boot anymore after such an operation. Seen with debian VMs, for example.
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
@@ -536,3 +538,14 @@ class VM(BaseVM):
             res_host.ssh(['screen', '-S', session, '-X', 'quit'], check=False)
             res_host.ssh(['rm', '-f', tmp_file], check=False)
         return ret
+
+    def set_uefi_setup_mode(self):
+        # Note that in XCP-ng 8.2, the VM won't stay in setup mode, because uefistored
+        # will add PK and other certs if available when the guest boots.
+        logging.info(f"Set VM {self.uuid} to UEFI setup mode")
+        self.host.ssh(["varstore-sb-state", self.uuid, "setup"])
+
+    def set_uefi_user_mode(self):
+        # Setting user mode propagates the host's certificates to the VM
+        logging.info(f"Set VM {self.uuid} to UEFI user mode")
+        self.host.ssh(["varstore-sb-state", self.uuid, "user"])

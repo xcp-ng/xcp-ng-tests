@@ -1,6 +1,8 @@
 import logging
 import traceback
 
+from packaging import version
+
 import lib.commands as commands
 
 from lib.common import safe_split, wait_for, wait_for_not
@@ -97,6 +99,24 @@ class Pool:
         return None
 
     def save_uefi_certs(self):
+        """
+        Save UEFI certificates in order to restore them later. XCP-ng 8.2 only.
+
+        This method was developed for XCP-ng 8.2, because many secureboot tests were dependent
+        on the initial state of the pool certificates, due to how certificates propagate.
+        Also, there were no certificates installed by default (except PK) on XCP-ng 8.2, and
+        we tried to be nice and restore the initial state after the tests.
+
+        On XCP-ng 8.3+, the tests don't depend so much on the pool certificates, and when they do we
+        can simply set custom certificates without erasing the default ones, so there's no real need
+        for saving then restoring the certificates.
+        The method was not reviewed for XCP-ng 8.3, and tests should be written in a way that is not
+        dependent on the initial state of pool certificates. To prevent ourselves from using a method
+        that is not appropriate, assert that the version is lower than 8.3.
+
+        This can be revised later if a need for saving custom certificates in 8.3+ arises.
+        """
+        assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
         logging.info('Saving pool UEFI certificates')
 
         if int(self.master.ssh(["secureboot-certs", "--version"]).split(".")[0]) < 1:
@@ -136,6 +156,8 @@ class Pool:
             )
 
     def restore_uefi_certs(self):
+        # See explanation in save_uefi_certs().
+        assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
         assert self.saved_uefi_certs is not None
         if len(self.saved_uefi_certs) == 0:
             logging.info('We need to clear pool UEFI certificates to restore initial state')
@@ -156,11 +178,28 @@ class Pool:
             self.saved_uefi_certs = None
 
     def clear_uefi_certs(self):
+        """
+        Clear UEFI certificates on XCP-ng 8.2.
+
+        On XCP-ng 8.2, clearing the certificates from XAPI doesn't clear them from disk, so we need to do so manually.
+
+        This method is not suitable for XCP-ng 8.3+, where only custom certificates can be modified, and this
+        must all be done through XAPI (which will delete them from disk on each host automatically).
+
+        For XCP-ng 8.3+, see clear_custom_uefi_certificates()
+        """
+        assert self.master.xcp_version < version.parse("8.3"), "function only relevant on XCP-ng 8.2"
         logging.info('Clearing pool UEFI certificates in XAPI and on hosts disks')
         self.master.ssh(['secureboot-certs', 'clear'])
         # remove files on each host
         for host in self.hosts:
             host.ssh(['rm', '-f', f'{host.varstore_dir()}/*'])
+
+    def clear_custom_uefi_certs(self):
+        """ Clear Custom UEFI certificates on XCP-ng 8.3+. """
+        assert self.master.xcp_version >= version.parse("8.3"), "function only relevant on XCP-ng 8.3+"
+        logging.info('Clearing custom pool UEFI certificates')
+        self.master.ssh(['secureboot-certs', 'clear'])
 
     def install_custom_uefi_certs(self, auths):
         host = self.master

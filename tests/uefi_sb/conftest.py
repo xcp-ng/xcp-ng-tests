@@ -1,8 +1,11 @@
 import logging
 import pytest
 
+from packaging import version
+
 @pytest.fixture(scope='module')
 def pool_without_uefi_certs(host):
+    assert host.xcp_version < version.parse("8.3"), "fixture only relevant on XCP-ng 8.2"
     pool = host.pool
 
     # Save the certs.
@@ -22,9 +25,10 @@ def uefi_vm_and_snapshot(uefi_vm):
     vm = uefi_vm
 
     # Any VM that has been booted at least once comes with some
-    # UEFI variable state, so clear the state of UEFI variables.
-    logging.info('Clear VM UEFI certs and set SB to false')
-    vm.clear_uefi_variables()
+    # UEFI variable state, so simply clear the state of
+    # secure boot specific variables
+    vm.set_uefi_setup_mode()
+    logging.info('Set platform.secureboot to false for VM')
     vm.param_set('platform', 'secureboot', False)
     snapshot = vm.snapshot()
 
