@@ -391,6 +391,9 @@ class Host:
     def binary_exists(self, binary):
         return self.ssh_with_result(['which', binary]).returncode == 0
 
+    def is_symlink(self, filepath):
+        return self.ssh_with_result(['test', '-L', filepath]).returncode == 0
+
     def sr_create(self, sr_type, label, device_config, shared=False, verify=False):
         params = {
             'host-uuid': self.uuid,

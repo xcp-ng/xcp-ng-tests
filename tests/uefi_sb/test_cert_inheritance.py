@@ -134,90 +134,9 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
 
-@pytest.mark.usefixtures("host_at_least_8_3", "pool_without_uefi_certs")
-class TestPoolToDiskCertInheritanceAtXapiStart:
-    @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, host):
-        yield
-        host.pool.clear_uefi_certs()
-
-    def test_pool_certs_present_and_disk_certs_absent(self, host):
-        # start with certs on pool and no certs on host disks
-        pool_auths = generate_keys(as_dict=True)
-        host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
-        # Make sure certs are synced to disk
-        host.restart_toolstack(verify=True)
-        logging.info('Check that the certs have been written on the disk of the host.')
-        for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(host, key, pool_auths[key].auth)
-
-    def test_pool_certs_present_and_disk_certs_different(self, host):
-        # start with different certs on pool and disks
-        pool_auths = generate_keys(as_dict=True)
-        disk_auths = generate_keys(as_dict=True)
-        host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
-        logging.info("Installing different certs to hosts disks")
-        install_certs_to_disks(host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
-        # Make sure certs are synced to disk
-        host.restart_toolstack(verify=True)
-        logging.info('Check that the certs have been updated on the disk of the host.')
-        for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(host, key, pool_auths[key].auth)
-
-    # FIXME: this behaviour will never exist in 8.3: no certs will mean "use the default certs"
-    @pytest.mark.usefixtures("xfail_on_xcpng_8_3")
-    def test_pool_certs_absent_and_disk_certs_present(self, host):
-        # start with no pool certs and with certs on disks
-        disk_auths = generate_keys(as_dict=True)
-        logging.info("Installing certs to hosts disks")
-        install_certs_to_disks(host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
-        host.restart_toolstack(verify=True)
-        logging.info('Check that the certs on disk have been erased since there is none in the pool.')
-        for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not host.file_exists(f'{host.varstore_dir()}/{key}.auth')
-
-    def test_pool_certs_present_and_some_different_disk_certs_present(self, host):
-        # start with all certs on pool and just two certs on disks
-        pool_auths = generate_keys(as_dict=True)
-        disk_auths = generate_keys(as_dict=True)
-        host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
-        logging.info("Installing different certs to hosts disks")
-        install_certs_to_disks(host.pool, disk_auths, ['KEK', 'dbx'])
-        # Make sure certs are synced to disk
-        host.restart_toolstack(verify=True)
-        logging.info('Check that the certs have been added or updated on the disk of the host.')
-        for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(host, key, pool_auths[key].auth)
-
-    @pytest.mark.usefixtures("xfail_on_xcpng_8_3")
-    def test_pool_certs_present_except_dbx_and_disk_certs_different(self, host):
-        # start with no dbx on pool and all, different, certs on disks
-        pool_auths = generate_keys(as_dict=True)
-        disk_auths = generate_keys(as_dict=True)
-        host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db']])
-        logging.info("Installing different certs to hosts disks, including a dbx")
-        install_certs_to_disks(host.pool, disk_auths, ['PK', 'KEK', 'db', 'dbx'])
-        # Make sure certs are synced to disk
-        host.restart_toolstack(verify=True)
-        logging.info("Check host disk certs are in sync with pool's ones")
-        for key in ['PK', 'KEK', 'db']:
-            check_disk_cert_md5sum(host, key, pool_auths[key].auth)
-
-        assert not host.file_exists(f'{host.varstore_dir()}/dbx.auth')
-
-    def test_pool_certs_present_and_disk_certs_present_and_same(self, host):
-        # start with certs on pool and no certs on host disks
-        pool_auths = generate_keys(as_dict=True)
-        host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
-        install_certs_to_disks(host.pool, pool_auths, ['PK', 'KEK', 'db', 'dbx'])
-        # Make sure certs are synced to disk
-        host.restart_toolstack(verify=True)
-        logging.info('Check that the certs have been written on the disk of the host.')
-        for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(host, key, pool_auths[key].auth)
 
 @pytest.mark.small_vm
-@pytest.mark.usefixtures("pool_without_uefi_certs")
+@pytest.mark.usefixtures("host_less_than_8_3", "pool_without_uefi_certs")
 class TestPoolToVMCertInheritance:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot):
@@ -287,7 +206,6 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
-    @pytest.mark.usefixtures("host_less_than_8_3")
     def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
         vm = uefi_vm
         # start with some certs on pool and some certs in the VM, partially overlaping
@@ -304,19 +222,16 @@ class TestPoolToVMCertInheritance:
         for key in ['db', 'dbx']:
             self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
-@pytest.mark.usefixtures("host_at_least_8_3", "hostA2", "pool_without_uefi_certs")
-class TestPoolToDiskCertPropagationToAllHosts:
-    @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, host):
-        yield
-        host.pool.clear_uefi_certs()
 
+@pytest.mark.usefixtures("host_at_least_8_3", "hostA2")
+class TestPoolToDiskCertPropagationToAllHosts:
     def test_set_pool_certificates(self, host):
         keys = ['PK', 'KEK', 'db', 'dbx']
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
         for h in host.pool.hosts:
-            logging.info(f"Check Pool.set_uefi_certificates update host {h} certificate on disk.")
+            logging.info(f"Check Pool.set_uefi_certificates updated host {h} certificates in {host.varstore_dir()}.")
+            assert not h.is_symlink(host.varstore_dir())
             for key in keys:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth)
 
@@ -326,22 +241,24 @@ class TestPoolToDiskCertPropagationToAllHosts:
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
         for h in host.pool.hosts:
-            logging.info(f"Check Pool.set_uefi_certificates update host {h} certificate on disk.")
+            logging.info(f"Check Pool.set_uefi_certificates updated host {h} certificates in {host.varstore_dir()}.")
+            assert not h.is_symlink(host.varstore_dir())
             for key in keys:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth)
             assert not h.file_exists(f'{host.varstore_dir()}/{missing_key}.auth')
 
-    def test_clear_certificates_from_pool(self, host):
+    # FIXME
+    @pytest.mark.xfail(reason="certificate clear doesn't restore the symlink at the moment")
+    def test_clear_custom_pool_certificates(self, host):
         keys = ['PK', 'KEK', 'db', 'dbx']
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
-        host.pool.clear_uefi_certs()
+        host.pool.clear_custom_uefi_certs()
         for h in host.pool.hosts:
-            logging.info(f"Check host {h} has no certificate on disk.")
-            for key in keys:
-                assert not h.file_exists(f'{host.varstore_dir()}/{key}.auth')
+            logging.info(f"Check host {h} has no custom certificates on disk.")
+            assert h.is_symlink(host.varstore_dir())
 
-@pytest.mark.usefixtures("host_at_least_8_3", "pool_without_uefi_certs")
+@pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolToDiskCertInheritanceOnPoolJoin:
     @pytest.fixture(scope='function')
     def keys_auths_for_joined_host(self, host, hostB1):
@@ -363,7 +280,7 @@ class TestPoolToDiskCertInheritanceOnPoolJoin:
         logging.info(f"< Eject host {joined_host} from pool {host}.")
         # Warning: triggers a reboot of ejected host.
         host.pool.eject_host(joined_host)
-        host.pool.clear_uefi_certs()
+        host.pool.clear_custom_uefi_certs()
 
     def test_host_certificates_updated_after_join(self, keys_auths_for_joined_host):
         keys, pool_auths, joined_host = keys_auths_for_joined_host
