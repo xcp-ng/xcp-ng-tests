@@ -136,7 +136,7 @@ JOBS = {
         "markers": "not windows_vm",
     },
     "sb-certificates": {
-        "description": "[8.3+] tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored",
+        "description": "tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored",
         "requirements": [
             "A pool >= 8.2.1. On 8.3+, it needs at least two hosts. On 8.2, one is enough but more is better.",
             "On 8.3+ only, a second pool, single-host, available for temporarily joining the first pool.",
