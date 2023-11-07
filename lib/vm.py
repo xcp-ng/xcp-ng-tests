@@ -549,3 +549,8 @@ class VM(BaseVM):
         # Setting user mode propagates the host's certificates to the VM
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
+
+    def is_cert_present(vm, key):
+        res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
+                          check=False, simple_output=False, decode=False)
+        return res.returncode == 0

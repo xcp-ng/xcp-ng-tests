@@ -2,9 +2,7 @@ import hashlib
 import logging
 import pytest
 
-from lib.efi import get_secure_boot_guid, esl_from_auth_file
-
-from .utils import generate_keys, revert_vm_state
+from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, revert_vm_state
 
 # Requirements:
 # On the test runner:
@@ -27,16 +25,6 @@ def install_certs_to_disks(pool, certs_dict, keys):
                 hash = hashlib.md5(f.read()).hexdigest()
             logging.debug('    - key: %s, value: %s' % (key, hash))
             host.scp(value, f'{host.varstore_dir()}/{key}.auth')
-
-def check_disk_cert_md5sum(host, key, reference_file):
-    auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
-    assert host.file_exists(auth_filepath_on_host)
-    with open(reference_file, 'rb') as rf:
-        reference_md5 = hashlib.md5(rf.read()).hexdigest()
-    host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
-    logging.debug('Reference MD5: %s' % reference_md5)
-    logging.debug('Host disk MD5: %s' % host_disk_md5)
-    assert host_disk_md5 == reference_md5
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_less_than_8_3", "pool_without_uefi_certs")
@@ -147,21 +135,6 @@ class TestPoolToVMCertInheritance:
         # clear pool certs for next test
         vm.host.pool.clear_uefi_certs()
 
-    def is_vm_cert_present(self, vm, key):
-        res = vm.host.ssh(['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
-                          check=False, simple_output=False, decode=False)
-        return res.returncode == 0
-
-    def get_md5sum_from_auth(self, auth):
-        return hashlib.md5(esl_from_auth_file(auth)).hexdigest()
-
-    def check_vm_cert_md5sum(self, vm, key, reference_file):
-        res = vm.host.ssh(['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
-                          check=False, simple_output=False, decode=False)
-        assert res.returncode == 0, f"Cert {key} must be present"
-        reference_md5 = self.get_md5sum_from_auth(reference_file)
-        assert hashlib.md5(res.stdout).hexdigest() == reference_md5
-
     def test_pool_certs_absent_and_vm_certs_absent(self, uefi_vm):
         vm = uefi_vm
         # start with no certs on pool and no certs in the VM
@@ -169,7 +142,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM still has no certs")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not self.is_vm_cert_present(vm, key)
+            assert not vm.is_cert_present(key)
 
     def test_pool_certs_present_and_vm_certs_absent(self, uefi_vm):
         vm = uefi_vm
@@ -180,7 +153,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM got the pool certs")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            self.check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
 
     def test_pool_certs_present_and_vm_certs_present(self, uefi_vm):
         vm = uefi_vm
@@ -193,7 +166,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs are unchanged")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
     def test_pools_certs_absent_and_vm_certs_present(self, uefi_vm):
         vm = uefi_vm
@@ -204,7 +177,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs are unchanged")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
     def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
         vm = uefi_vm
@@ -218,9 +191,9 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM db and dbx certs are unchanged and PK and KEK were updated")
         for key in ['PK', 'KEK']:
-            self.check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
         for key in ['db', 'dbx']:
-            self.check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
 
 
 @pytest.mark.usefixtures("host_at_least_8_3", "hostA2")
