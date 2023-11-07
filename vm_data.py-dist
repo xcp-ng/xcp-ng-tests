@@ -9,7 +9,7 @@ VMS = {
         "small_vm": "",
         # small VM on which the guest tools are installable. Excludes alpine currently.
         "small_vm_unix_tools": "",
-        # small UEFI VM on which efitools is installed, for some uefistored tests
+        # small UEFI VM on which efitools is installed, for some uefistored/varstored tests
         "small_vm_efitools": "",
         # "small" Windows VM (UEFI)
         "small_vm_windows": "",

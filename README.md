@@ -37,11 +37,8 @@ For Guest UEFI Secure Boot tests, the requirements are:
     * `openssl`
 * VM
     * `chattr`
-    * `efitools` for uefistored auth var tests
-    * `util-linux` for uefistored auth var tests in Alpine VMs
-* XCP-ng Host (installed by default on XCP-ng 8.2+)
-    * `uefistored`
-    * `varstored-tools`
+    * `efitools` for uefistored (in 8.2) or varstored (in 8.3+) auth var tests
+    * `util-linux` for uefistored (in 8.2) or varstored (in 8.3+) auth var tests in Alpine VMs
 
 Many tests have specific requirements, detailed in a comment at the top of the test file: minimal number of hosts in a pool, number of pools, VMs with specific characteristics (OS, BIOS vs UEFI, additional tools installed in the VM, additional networks in the pool, presence of an unused disk on one host or every host...). Markers, jobs defined in `jobs.py` (`./jobs.py show JOBNAME` will display the requirements and the reference to a VM or VM group), VMs and VM groups defined in `vm-data.py-dist` may all help understanding what tests can run with what VMs.
 
@@ -110,7 +107,7 @@ Another example:
 
 ```
 # Run secure boot tests that require a Unix VM (as opposed to a Windows VM) and that should ideally be run on a large variety of VMs
-pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/unix_vm_1.xva --vm=http://path/to/unix_vm_2.xva --vm=http://path/to/unix_vm_3.xva
+pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/unix_vm_1.xva --vm=http://path/to/unix_vm_2.xva --vm=http://path/to/unix_vm_3.xva
 ```
 
 
@@ -135,16 +132,20 @@ The output of commands below is given as example and may not reflect the current
 $ ./jobs.py list
 main: a group of not-too-long tests that run either without a VM, or with a single small one
 main-multi: a group of tests that need to run on the largest variety of VMs
+packages: tests that packages can be installed correctly
 quicktest: XAPI's quicktest, not so quick by the way
-storage-main: tests all storage drivers (except linstor), but avoids migrations and reboots
-storage-migrations: tests migrations with all storage drivers (except linstor)
-storage-reboots: storage driver tests that involve rebooting hosts (except linstor and flaky tests)
-sb-main: tests uefistored and SecureBoot using a small unix VM (or no VM when none needed)
-sb-windows: tests uefistored and SecureBoot using a Windows VM
+storage-main: tests all storage drivers, but avoids migrations and reboots
+storage-migrations: tests migrations with all storage drivers
+storage-reboots: storage driver tests that involve rebooting hosts (except flaky tests)
+sb-main: tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)
+sb-certificates: tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored
+sb-windows: tests uefistored/varstored and SecureBoot using a Windows VM
 sb-unix-multi: checks basic Secure-Boot support on a variety of Unix VMs
 sb-windows-multi: checks basic Secure-Boot support on a variety of Windows VMs
 tools-unix: tests our unix guest tools on a single small VM
 tools-unix-multi: tests our unix guest tools on a variety of VMs
+xen: Testing of the Xen hypervisor itself
+vtpm: Testing vTPM functionalities
 flaky: tests that usually pass, but sometimes fail unexpectedly
 ```
 
@@ -163,7 +164,7 @@ $ ./jobs.py show sb-unix-multi
         "--vm[]": "multi/uefi_unix"
     },
     "paths": [
-        "tests/uefistored"
+        "tests/uefi_sb"
     ],
     "markers": "multi_vms and unix_vm"
 }
@@ -177,16 +178,19 @@ A very important information is also the `--vm` (single VM) or `--vm[]` (multipl
 There are two more commands that you can use to display information about a job:
 
 ```
-$ ./jobs.py collect sb-unix-multi
+$ ./jobs.py collect tools-unix
 [...]
-collected 175 items / 170 deselected / 5 selected
+collected 6 items
 
-<Package uefistored>
-  <Module test_secure_boot.py>
-    <Class TestGuestLinuxUEFISecureBoot>
-      <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm1.xva]>
-      <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm2.xva]>
-      <Function test_boot_success_when_pool_db_set_and_images_signed[hosts0-http://path/to/vm3.xva]>
+<Package unix>
+  <Module test_guest_tools_unix.py>
+    <Class TestGuestToolsUnix>
+      <Function test_install[hosts0-http://pxe/images/alpine-uefi-minimal-efitools-3.12.0.xva]>
+      <Function test_check_tools[hosts0-http://pxe/images/alpine-uefi-minimal-efitools-3.12.0.xva]>
+      <Function test_check_tools_after_reboot[hosts0-http://pxe/images/alpine-uefi-minimal-efitools-3.12.0.xva]>
+      <Function test_xenstore[hosts0-http://pxe/images/alpine-uefi-minimal-efitools-3.12.0.xva]>
+      <Function test_clean_shutdown[hosts0-http://pxe/images/alpine-uefi-minimal-efitools-3.12.0.xva]>
+      <Function test_storage_migration[hosts0-http://pxe/images/alpine-uefi-minimal-efitools-3.12.0.xva]>
 ```
 
 This lists the tests that are selected by the job. Tests may be repeated if they will run several times, as in the case of this example because there are 3 VMs to test. I chose a job whose output is small for the sake of documentation conciseness, but the output can be a lot bigger!
@@ -196,11 +200,11 @@ Lastly, the `run` command with the `--print-only` switch will display the comman
 ```
 # job with default parameters
 $ ./jobs.py run --print-only sb-unix-multi ip_of_poolmaster
-pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm1.xva --vm=http://path/to/vm2.xva --vm=http://path/to/vm3.xva
+pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm1.xva --vm=http://path/to/vm2.xva --vm=http://path/to/vm3.xva
 
 # same, but we override the list of VMs
 $ ./jobs.py run --print-only sb-unix-multi ip_of_poolmaster --vm=http://path/to/vm4.xva
-pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm4.xva
+pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm4.xva
 ```
 
 #### Run a job
@@ -221,7 +225,7 @@ Example:
 ```
 # job with default parameters
 $ ./jobs.py run sb-unix-multi ip_of_poolmaster
-pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm1.xva --vm=http://path/to/vm2.xva --vm=http://path/to/vm3.xva
+pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm1.xva --vm=http://path/to/vm2.xva --vm=http://path/to/vm3.xva
 [... job executes...]
 ```
 
@@ -230,7 +234,7 @@ Any parameter added at the end of the command will be passed to `pytest`. Any pa
 ```
 # same, but we override the list of VMs
 $ ./jobs.py run --print-only sb-unix-multi ip_of_poolmaster --vm=http://path/to/vm4.xva
-pytest tests/uefistored -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm4.xva
+pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/vm4.xva
 [... job executes...]
 ```
 
