@@ -27,12 +27,20 @@ class BaseVM:
     def name(self):
         return self.param_get('name-label')
 
-    def vdi_uuids(self):
+    def vdi_uuids(self, sr_uuid=None):
         output = self._disk_list()
         vdis = []
         for line in output.splitlines():
             vdis.append(line.split(',')[0])
-        return vdis
+
+        if sr_uuid is None:
+            return vdis
+
+        vdis_on_sr = []
+        for vdi in vdis:
+            if self.get_vdi_sr_uuid(vdi) == sr_uuid:
+                vdis_on_sr.append(vdi)
+        return vdis_on_sr
 
     def destroy_vdi(self, vdi_uuid):
         self.host.xe('vdi-destroy', {'uuid': vdi_uuid})
