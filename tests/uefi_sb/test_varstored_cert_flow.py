@@ -43,8 +43,6 @@ class TestPoolToDiskCertPropagationToAllHosts:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth)
             assert not h.file_exists(f'{host.varstore_dir()}/{missing_key}.auth')
 
-    # FIXME
-    @pytest.mark.xfail(reason="certificate clear doesn't restore the symlink at the moment")
     def test_clear_custom_pool_certificates(self, host):
         keys = ['PK', 'KEK', 'db', 'dbx']
         pool_auths = generate_keys(as_dict=True)
