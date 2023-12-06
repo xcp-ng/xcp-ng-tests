@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import atexit
 import copy
+import hashlib
 import logging
 import os
 import shutil
@@ -442,6 +443,8 @@ def esl_from_auth_bytes(auth: bytes) -> bytes:
     """
     return auth[auth.index(EFI_CERT_X509_GUID):]
 
+def get_md5sum_from_auth(auth):
+    return hashlib.md5(esl_from_auth_file(auth)).hexdigest()
 
 if __name__ == '__main__':
     import argparse
