@@ -154,7 +154,7 @@ def _test_key_exchanges(vm):
         if (should_succeed and not ok) or (ok and not should_succeed):
             raise AssertionError('Failed to set {} {}'.format(i, auth.name))
 
-def check_disk_cert_md5sum(host, key, reference_file):
+def check_disk_cert_md5sum(host, key, reference_file, do_assert=True):
     auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
     assert host.file_exists(auth_filepath_on_host)
     with open(reference_file, 'rb') as rf:
@@ -162,7 +162,10 @@ def check_disk_cert_md5sum(host, key, reference_file):
     host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
     logging.debug('Reference MD5: %s' % reference_md5)
     logging.debug('Host disk MD5: %s' % host_disk_md5)
-    assert host_disk_md5 == reference_md5
+    if do_assert:
+        assert host_disk_md5 == reference_md5
+    else:
+        return host_disk_md5 == reference_md5
 
 def check_vm_cert_md5sum(vm, key, reference_file):
     res = vm.host.ssh(['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],

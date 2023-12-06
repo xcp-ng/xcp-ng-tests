@@ -1,6 +1,8 @@
 import logging
 import pytest
 
+from lib.common import wait_for
+
 from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, revert_vm_state
 
 # These tests check the behaviour of XAPI and varstored as they are in XCP-ng 8.3
@@ -190,5 +192,10 @@ class TestPoolToDiskCertInheritanceOnPoolJoin:
 
     def test_host_certificates_updated_after_join(self, keys_auths_for_joined_host):
         keys, pool_auths, joined_host = keys_auths_for_joined_host
+
         for key in keys:
-            check_disk_cert_md5sum(joined_host, key, pool_auths[key].auth)
+            wait_for(
+                lambda: check_disk_cert_md5sum(joined_host, key, pool_auths[key].auth, do_assert=False),
+                f"Wait for new host '{key}' key to be identifical to pool '{key}' key",
+                60
+            )
