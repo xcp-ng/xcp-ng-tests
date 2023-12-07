@@ -37,6 +37,8 @@ import argparse
 import sys
 import subprocess
 import json
+import tempfile
+import os
 from fnmatch import fnmatch
 from enum import Enum
 
@@ -151,7 +153,71 @@ def get_files(host):
 
     return ref_files
 
-def compare_files(ref_files, test_files):
+def sftp_get(host, remote_file, local_file):
+    opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+
+    args = "sftp {} -b - root@{}".format(opts, host)
+    input = bytes("get {} {}".format(remote_file, local_file), 'utf-8')
+    res = subprocess.run(
+        args,
+        input=input,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False
+    )
+
+    if res.returncode:
+        raise Exception("Failed to get file from host: {}".format(res.returncode))
+
+    return res
+
+def remote_diff(host1, host2, filename):
+    try:
+        file1 = None
+        file2 = None
+
+        # check remote files are text files
+        args = ["ssh", "root@{}".format(host1), "file", "-b", filename]
+        cmd = "file -b {}".format(filename)
+        file_type = ssh_cmd(host1, cmd)
+        if not file_type.lower().startswith("ascii"):
+            print("Binary file. Not showing diff")
+            return
+
+        fd, file1 = tempfile.mkstemp()
+        os.close(fd)
+        sftp_get(host1, filename, file1)
+
+        fd, file2 = tempfile.mkstemp()
+        os.close(fd)
+        sftp_get(host2, filename, file2)
+
+        args = ["diff", "-u", file1, file2]
+        diff_res = subprocess.run(args, capture_output=True, text=True)
+
+        match diff_res.returncode:
+            case 1:
+                print(diff_res.stdout)
+            case 2:
+                raise Exception(diff_res.stderr)
+            case _:
+                pass
+
+    except Exception as e:
+        print(e, file=sys.stderr)
+    finally:
+        if file1 is not None and os.path.exists(file1):
+            os.remove(file1)
+        if file2 is not None and os.path.exists(file2):
+            os.remove(file2)
+
+def compare_files(ref, test, show_diff):
+    ref_files = ref['files']
+    ref_host = ref['host']
+    test_files = test['files']
+    test_host = test['host']
+
     for ftype in test_files:
         for file in test_files[ftype]:
             if ignore_file(file):
@@ -163,6 +229,8 @@ def compare_files(ref_files, test_files):
 
             if ref_files[ftype][file] != test_files[ftype][file]:
                 print("{} differs: {}".format(ftype, file))
+                if show_diff:
+                    remote_diff(ref_host, test_host, file)
 
             ref_files[ftype][file] = None
 
@@ -205,7 +273,13 @@ def main():
                         help='Save filesystem information of the reference host to a file')
     parser.add_argument('--load-reference', '-l', dest='load_ref',
                         help='Load reference filesystem information from a file')
+    parser.add_argument('--show-diff', '-d', action='store_true', dest='show_diff',
+                        help='Show diff of text files that differ. A reference host must be supplied with -r')
     args = parser.parse_args(sys.argv[1:])
+
+    if args.ref_host is None and args.show_diff:
+        print("Missing parameters. -d must be used with -r. Try --help", file=sys.stderr)
+        return -1
 
     if args.load_ref:
         print("Get reference files from {}".format(args.load_ref))
@@ -225,8 +299,11 @@ def main():
     print("Get test host files from {}".format(args.test_host))
     test_files = get_files(args.test_host)
 
+    ref = dict([('files', ref_files), ('host', args.ref_host)])
+    test = dict([('files', test_files), ('host', args.test_host)])
+
     print("\nResults:")
-    compare_files(ref_files, test_files)
+    compare_files(ref, test, args.show_diff)
 
     return 0
 
