@@ -100,10 +100,10 @@ def ssh_cmd(host, cmd):
 
     return cmdres.stdout
 
-def ssh_get_files(host, file_type):
+def ssh_get_files(host, file_type, folders):
     md5sum = False
     readlink = False
-    folders = "/boot /etc /opt /usr"
+    folders = " ".join(folders)
 
     match file_type:
         case FileType.FILE:
@@ -139,14 +139,14 @@ def ssh_get_files(host, file_type):
 
     return res
 
-def get_files(host):
+def get_files(host, folders):
     ref_files = dict()
 
     try:
-        ref_files['file'] = ssh_get_files(host, FileType.FILE)
-        ref_files['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK)
-        ref_files['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK)
-        ref_files['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK)
+        ref_files['file'] = ssh_get_files(host, FileType.FILE, folders)
+        ref_files['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
+        ref_files['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
+        ref_files['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
     except Exception as e:
         print(e, file=sys.stderr)
         exit(-1)
@@ -263,6 +263,7 @@ def save_reference_files(files, filename):
 
 def main():
     ref_files = None
+    folders = ["/boot", "/etc", "/opt", "/usr"]
 
     parser = argparse.ArgumentParser(description='Spot filesystem differences between 2 XCP-ng hosts')
     parser.add_argument('--reference-host', '-r', dest='ref_host',
@@ -275,6 +276,9 @@ def main():
                         help='Load reference filesystem information from a file')
     parser.add_argument('--show-diff', '-d', action='store_true', dest='show_diff',
                         help='Show diff of text files that differ. A reference host must be supplied with -r')
+    parser.add_argument('--add-folder', '-f', action='append', dest='folders', default=folders,
+                        help='Add folders to the default searched folders (/boot, /etc, /opt, and /usr). '
+                             'Can be specified multiple times')
     args = parser.parse_args(sys.argv[1:])
 
     if args.ref_host is None and args.show_diff:
@@ -286,7 +290,7 @@ def main():
         ref_files = load_reference_files(args.load_ref)
     elif args.ref_host:
         print("Get reference files from {}".format(args.ref_host))
-        ref_files = get_files(args.ref_host)
+        ref_files = get_files(args.ref_host, args.folders)
 
         if args.save_ref:
             print("Saving reference files to {}".format(args.save_ref))
@@ -297,7 +301,7 @@ def main():
         return -1
 
     print("Get test host files from {}".format(args.test_host))
-    test_files = get_files(args.test_host)
+    test_files = get_files(args.test_host, args.folders)
 
     ref = dict([('files', ref_files), ('host', args.ref_host)])
     test = dict([('files', test_files), ('host', args.test_host)])
