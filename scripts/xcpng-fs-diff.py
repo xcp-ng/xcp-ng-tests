@@ -296,6 +296,9 @@ def main():
             save_reference_files(ref_files, args.save_ref)
 
     if ref_files is None or args.test_host is None:
+        if args.save_ref:
+            return 0
+
         print("\nMissing parameters. Try --help", file=sys.stderr)
         return -1
 
