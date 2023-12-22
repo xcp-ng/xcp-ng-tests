@@ -178,7 +178,6 @@ def remote_diff(host1, host2, filename):
         file2 = None
 
         # check remote files are text files
-        args = ["ssh", "root@{}".format(host1), "file", "-b", filename]
         cmd = "file -b {}".format(filename)
         file_type = ssh_cmd(host1, cmd)
         if not file_type.lower().startswith("ascii"):
