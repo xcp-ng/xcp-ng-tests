@@ -39,6 +39,7 @@ import subprocess
 import json
 import tempfile
 import os
+import shlex
 from fnmatch import fnmatch
 from enum import Enum
 
@@ -128,14 +129,14 @@ def ssh_get_files(host, file_type, folders):
     elif md5sum:
         # This will make one call to md5sum with all files passed as parameter
         # This is much more efficient than using find '-exec md5sum {}'
-        find_cmd += " | xargs md5sum"
+        find_cmd += " -print0 | xargs -0 md5sum"
 
     rawres = ssh_cmd(host, find_cmd)
 
     res = dict()
     for line in rawres.splitlines():
-        entry = line.split()
-        res[entry[1]] = entry[0]
+        entry = line.split(' ', 1)
+        res[entry[1].strip()] = entry[0].strip()
 
     return res
 
@@ -157,7 +158,7 @@ def sftp_get(host, remote_file, local_file):
     opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
     args = "sftp {} -b - root@{}".format(opts, host)
-    input = bytes("get {} {}".format(remote_file, local_file), 'utf-8')
+    input = bytes("get {} {}".format(shlex.quote(remote_file), shlex.quote(local_file)), 'utf-8')
     res = subprocess.run(
         args,
         input=input,
@@ -178,7 +179,7 @@ def remote_diff(host1, host2, filename):
         file2 = None
 
         # check remote files are text files
-        cmd = "file -b {}".format(filename)
+        cmd = "file -b {}".format(shlex.quote(filename))
         file_type = ssh_cmd(host1, cmd)
         if not file_type.lower().startswith("ascii"):
             print("Binary file. Not showing diff")
