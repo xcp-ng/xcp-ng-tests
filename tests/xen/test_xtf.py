@@ -19,6 +19,8 @@ class TestXtf:
         # Depends on pv linear pagetables, which is disabled by default but can be activated on Xen's cmdline.
         # Is not needed for Linux. It is for a NetBSD PV guest.
         'test-pv64-xsa-182',
+        # Will skip if DBEXT support is not present
+        'test-pv64-xsa-444',
     ]
 
     def _extract_skipped_tests(self, output):
