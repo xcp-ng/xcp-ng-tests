@@ -11,10 +11,16 @@ from lib.commands import SSHCommandFailed
 @pytest.mark.usefixtures("host_with_hvm_fep", "host_with_dynamically_disabled_ept_sp")
 class TestXtf:
     _common_skips = [
+        # UMIP requires hardware support, that is a recent enough CPU
         'test-hvm32-umip',
         'test-hvm64-umip',
+        # PV Superpages, a thing which was removed long ago from the hypervisor. Always skips
         'test-pv64-xsa-167',
-        'test-pv64-xsa-182'
+        # Depends on pv linear pagetables, which is disabled by default but can be activated on Xen's cmdline.
+        # Is not needed for Linux. It is for a NetBSD PV guest.
+        'test-pv64-xsa-182',
+        # Will skip if DBEXT support is not present
+        'test-pv64-xsa-444',
     ]
 
     def _extract_skipped_tests(self, output):
@@ -42,6 +48,7 @@ class TestXtf:
                              "Checking whether they belong to the allowed list...")
                 for skipped_test in skipped_tests:
                     if skipped_test not in self._common_skips:
+                        logging.error(f"... At least one doesn't")
                         raise
                 logging.info("... They do")
             else:
