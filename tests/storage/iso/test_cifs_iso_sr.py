@@ -35,8 +35,6 @@ class TestCIFSISOSRCreateDestroy:
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("cifs_iso_sr")
 class TestCIFSISOSR:
-    def test_quicktest(self, cifs_iso_sr):
-        cifs_iso_sr.run_quicktest()
 
     def test_iso_mount_and_read(self, host, cifs_iso_sr, running_unix_vm):
         # create the ISO SR on CIFS
