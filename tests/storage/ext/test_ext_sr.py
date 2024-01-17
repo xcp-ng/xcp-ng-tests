@@ -26,6 +26,7 @@ class TestEXTSRCreateDestroy:
 
 @pytest.mark.usefixtures("ext_sr")
 class TestEXTSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, ext_sr):
         ext_sr.run_quicktest()
 

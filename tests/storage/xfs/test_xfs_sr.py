@@ -42,6 +42,7 @@ class TestXFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("xfs_sr")
 class TestXFSSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, xfs_sr):
         xfs_sr.run_quicktest()
 

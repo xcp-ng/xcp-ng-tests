@@ -44,6 +44,7 @@ class TestZFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("zpool_vol0")
 class TestZFSSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, zfs_sr):
         zfs_sr.run_quicktest()
 

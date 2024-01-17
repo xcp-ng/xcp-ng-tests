@@ -41,6 +41,7 @@ class TestGlusterFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("sr_disk_for_all_hosts", "glusterfs_sr")
 class TestGlusterFSSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, glusterfs_sr):
         glusterfs_sr.run_quicktest()
 

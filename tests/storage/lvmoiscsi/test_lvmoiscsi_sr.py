@@ -24,6 +24,7 @@ class TestLVMOISCSISRCreateDestroy:
 
 @pytest.mark.usefixtures("lvmoiscsi_sr")
 class TestLVMOISCSISR:
+    @pytest.mark.quicktest
     def test_quicktest(self, lvmoiscsi_sr):
         lvmoiscsi_sr.run_quicktest()
 

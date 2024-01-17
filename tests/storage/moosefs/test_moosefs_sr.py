@@ -43,6 +43,7 @@ class TestMooseFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("moosefs_sr")
 class TestMooseFSSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, moosefs_sr):
         moosefs_sr.run_quicktest()
 

@@ -52,6 +52,7 @@ class TestLinstorSRCreateDestroy:
 
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, linstor_sr):
         linstor_sr.run_quicktest()
 

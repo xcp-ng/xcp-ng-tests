@@ -17,6 +17,7 @@ class TestNFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("nfs_sr")
 class TestNFSSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, nfs_sr):
         nfs_sr.run_quicktest()
 

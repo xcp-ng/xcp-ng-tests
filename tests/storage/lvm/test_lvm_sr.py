@@ -26,6 +26,7 @@ class TestLVMSRCreateDestroy:
 
 @pytest.mark.usefixtures("lvm_sr")
 class TestLVMSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, lvm_sr):
         lvm_sr.run_quicktest()
 

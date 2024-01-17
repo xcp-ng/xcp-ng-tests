@@ -42,6 +42,7 @@ class TestCephFSSRCreateDestroy:
 
 @pytest.mark.usefixtures("cephfs_sr")
 class TestCephFSSR:
+    @pytest.mark.quicktest
     def test_quicktest(self, cephfs_sr):
         cephfs_sr.run_quicktest()
 
