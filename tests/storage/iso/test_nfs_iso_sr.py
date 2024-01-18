@@ -37,6 +37,8 @@ class TestNFSISOSRCreateDestroy:
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("nfs_iso_sr")
 class TestNFSISOSR:
+    def test_quicktest(self, nfs_iso_sr):
+        nfs_iso_sr.run_quicktest()
 
     def test_iso_mount_and_read(self, host, nfs_iso_sr, running_unix_vm):
         # create the ISO SR on NFS
