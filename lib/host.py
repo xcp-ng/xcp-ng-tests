@@ -349,7 +349,7 @@ class Host:
         self.saved_packages_list = None
         self.saved_rollback_id = None
 
-    def reboot(self, verify=False, reconnect_xo=True):
+    def reboot(self, verify=False):
         logging.info("Reboot host %s" % self)
         try:
             self.ssh(['reboot'])
@@ -357,11 +357,9 @@ class Host:
             # ssh connection may get killed by the reboot and terminate with an error code
             if "closed by remote host" not in e.stdout:
                 raise
-        if verify or reconnect_xo:
+        if verify:
             wait_for_not(self.is_enabled, "Wait for host down")
             wait_for(self.is_enabled, "Wait for host up", timeout_secs=1800)
-        if reconnect_xo and self.is_master():
-            self.xo_server_reconnect()
 
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
