@@ -71,7 +71,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest",
-        "name_filter": "not migration",
+        "name_filter": "not migration and not linstor",
     },
     "storage-migrations": {
         "description": "tests migrations with all storage drivers",
@@ -89,7 +89,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "",
-        "name_filter": "migration",
+        "name_filter": "migration and not linstor",
     },
     "storage-reboots": {
         "description": "storage driver tests that involve rebooting hosts (except flaky tests)",
@@ -106,6 +106,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "reboot and not flaky",
+        "name_filter": "not linstor",
     },
     "storage-quicktest": {
         "description": "runs `quicktest on all storage drivers`",
@@ -119,6 +120,68 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
+        "markers": "quicktest",
+        "name_filter": "not linstor",
+    },
+    "linstor-main": {
+        "description": "tests the linstor storage driver, but avoids migrations and reboots",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "A small VM that can be imported on the SR.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--sr-disk": "auto",
+        },
+        "paths": ["tests/storage/linstor"],
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest",
+        "name_filter": "not migration",
+    },
+    "linstor-migrations": {
+        "description": "tests migrations with the linstor storage driver",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "A second pool with at least 1 host and a SR to receive VMs.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+            "--sr-disk": "auto",
+        },
+        "paths": ["tests/storage/linstor"],
+        "markers": "",
+        "name_filter": "migration",
+    },
+    "linstor-reboots": {
+        "description": "linstor storage driver tests that involve rebooting hosts",
+        "requirements": [
+            "A pool with at least 3 hosts, whose master host can be rebooted (best if reboots fast).",
+            "An additional free disk on every host.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--sr-disk": "auto",
+        },
+        "paths": ["tests/storage/linstor"],
+        "markers": "reboot",
+    },
+    "linstor-quicktest": {
+        "description": "runs `quicktest` on the linstor storage driver`",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--sr-disk": "auto",
+        },
+        "paths": ["tests/storage/linstor"],
         "markers": "quicktest",
     },
     "sb-main": {
