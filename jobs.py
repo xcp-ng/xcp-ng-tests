@@ -108,7 +108,7 @@ JOBS = {
         "markers": "reboot and not flaky",
     },
     "storage-quicktest": {
-        "description": "runs `quicktest on all storage drivers`",
+        "description": "runs `quicktest` on all storage drivers",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
