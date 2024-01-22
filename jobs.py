@@ -105,7 +105,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "reboot and not flaky and not quicktest",
+        "markers": "reboot and not flaky",
     },
     "storage-quicktest": {
         "description": "runs `quicktest on all storage drivers`",
