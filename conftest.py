@@ -10,6 +10,7 @@ from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.pool import Pool
 from lib.vm import VM
+from lib.xo import xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
@@ -88,15 +89,8 @@ def pytest_configure(config):
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
 def setup_host(hostname_or_ip):
-    logging.info(">>> Connect host %s" % hostname_or_ip)
     pool = Pool(hostname_or_ip)
     h = pool.master
-    # XO connection
-    if not h.skip_xo_config:
-        h.xo_server_add(h.user, h.password)
-    else:
-        h.xo_get_server_id(store=True)
-    wait_for(h.xo_server_connected, timeout_secs=10)
     return h
 
 @pytest.fixture(scope='session')
@@ -105,8 +99,28 @@ def hosts(request):
     hostname_list = request.param.split(',')
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
     yield host_list
+
+@pytest.fixture(scope='session')
+def registered_xo_cli():
+    # The fixture is not responsible for establishing the connection.
+    # We just check that xo-cli is currently registered
+    try:
+        xo_cli('server.getAll')
+    except Exception as e:
+        raise Exception(f"Check for registered xo_cli failed: {e}")
+
+@pytest.fixture(scope='session')
+def hosts_with_xo(hosts, registered_xo_cli):
+    for h in hosts:
+        logging.info(">>> Connect host %s" % h)
+        if not h.skip_xo_config:
+            h.xo_server_add(h.user, h.password)
+        else:
+            h.xo_get_server_id(store=True)
+        wait_for(h.xo_server_connected, timeout_secs=10)
+    yield hosts
     # teardown
-    for h in host_list:
+    for h in hosts:
         if not h.skip_xo_config:
             logging.info("<<< Disconnect host %s" % h)
             h.xo_server_remove()
