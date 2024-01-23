@@ -74,6 +74,11 @@ class Host:
         def stringify(key, value):
             if isinstance(value, bool):
                 return "{}={}".format(key, to_xapi_bool(value))
+            if isinstance(value, dict):
+                ret = ""
+                for key2, value2 in value.items():
+                    ret += f"{key}:{key2}={value2} "
+                return ret.rstrip()
             return "{}={}".format(key, shlex.quote(value))
 
         command = ['xe', action] + maybe_param_minimal + maybe_param_force + \
