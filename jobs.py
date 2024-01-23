@@ -43,7 +43,7 @@ JOBS = {
             "--vm[]": "multi/all",
             "--sr-disk": "auto",
         },
-        "paths": ["tests/misc"],
+        "paths": ["tests/misc", "tests/migration"],
         "markers": "multi_vms and not flaky and not reboot",
     },
     "packages": {
