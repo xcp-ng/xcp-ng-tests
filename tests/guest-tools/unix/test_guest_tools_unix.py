@@ -116,7 +116,6 @@ class TestGuestToolsUnix:
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
 
-    @pytest.mark.usefixtures('hosts_with_xo')
     def test_storage_migration(self, running_vm, host, hostA2, local_sr_on_hostA2, state):
         vm = running_vm
         # migrate to default SR on hostA2
