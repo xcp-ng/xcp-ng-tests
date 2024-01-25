@@ -10,7 +10,6 @@ from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, wait_for, wait_for_not
 from lib.snapshot import Snapshot
 from lib.vif import VIF
-from lib.xo import xo_object_exists, xo_cli
 
 class VM(BaseVM):
     def __init__(self, uuid, host):
@@ -178,31 +177,52 @@ class VM(BaseVM):
     def exists_on_previous_pool(self):
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host, sr=None):
-        # workaround XO bug where sometimes it loses connection without knowing it
-        self.host.pool.master.xo_server_reconnect()
-        if target_host.pool != self.host.pool:
-            target_host.pool.master.xo_server_reconnect()
-
-        # Sometimes we migrate VMs right after creating them
-        # In that case we need to ensure that XO knows about the new VM
-        # Else we risk getting a "no such VM" error
-        # Thus, let's first wait for XO to know about the VM
-        wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about VM %s" % self.uuid)
-
+    def migrate(self, target_host, sr=None, network=None):
         msg = "Migrate VM to host %s" % target_host
         params = {
-            'vm': self.uuid,
-            'targetHost': target_host.uuid
+            'uuid': self.uuid,
+            'host-uuid': target_host.uuid,
+            'live': self.is_running()
         }
+        cross_pool = self.host.pool.uuid != target_host.pool.uuid
         if sr is not None:
-            msg += " (SR: %s)" % sr.uuid
-            mapping = {}
-            for vdi_uuid in self.vdi_uuids():
-                mapping[vdi_uuid] = sr.uuid
-            params['mapVdisSrs'] = 'json:' + json.dumps(mapping)
+            if self.get_sr().uuid == sr.uuid:
+                # Same SR, no need to migrate storage
+                sr = None
+            else:
+                msg += " (SR: %s)" % sr.uuid
+        if network is not None:
+            msg += " (Network: %s)" % network
         logging.info(msg)
-        xo_cli('vm.migrate', params)
+
+        storage_motion = cross_pool or sr is not None or network is not None
+        if storage_motion:
+            remote_master = target_host.pool.master
+            params['remote-master'] = remote_master.hostname_or_ip
+            params['remote-username'] = remote_master.user
+            params['remote-password'] = remote_master.password
+
+            if sr is not None:
+                sr_uuid = sr.uuid
+            else:
+                sr_uuid = target_host.xe('pool-param-get', {'uuid': target_host.pool.uuid, 'param-name': 'default-SR'})
+            vdi_map = {}
+            for vdi_uuid in self.vdi_uuids():
+                vdi_map[vdi_uuid] = sr_uuid
+            params['vdi'] = vdi_map
+
+            if cross_pool:
+                # VIF mapping is only required for cross pool migration
+                if network is None:
+                    network = remote_master.management_network()
+
+                vif_map = {}
+                for vif in self.vifs():
+                    vif_map[vif.uuid] = network
+                params['vif'] = vif_map
+
+        self.host.xe('vm-migrate', params)
+
         self.previous_host = self.host
         self.host = target_host
 

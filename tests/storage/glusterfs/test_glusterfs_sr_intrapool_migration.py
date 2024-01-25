@@ -12,7 +12,7 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
-@pytest.mark.usefixtures("hostA2", "hosts_with_xo", "local_sr_on_hostA2", "sr_disk_for_all_hosts")
+@pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2", "sr_disk_for_all_hosts")
 class Test:
     def test_live_intrapool_shared_migration(self, host, hostA2, vm_on_glusterfs_sr, glusterfs_sr):
         live_storage_migration_then_come_back(vm_on_glusterfs_sr, host, glusterfs_sr, hostA2, glusterfs_sr)

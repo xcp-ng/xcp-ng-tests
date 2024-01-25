@@ -75,7 +75,7 @@ class TestBasicNoSSH:
     # Live migration tests
     # We want to test storage migration (memory+disks) and live migration without storage migration (memory only).
     # The order will depend on the initial location of the VM: a local SR or a shared SR.
-    @pytest.mark.usefixtures("hostA2", 'hosts_with_xo')
+    @pytest.mark.usefixtures("hostA2")
     def test_live_migrate(self, imported_vm, existing_shared_sr):
         def live_migrate(vm, dest_host, dest_sr, check_vdis=False):
             vm.migrate(dest_host, dest_sr)
