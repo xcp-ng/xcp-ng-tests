@@ -107,6 +107,8 @@ def teardown_formatted_and_mounted_disk(host, mountpoint):
         except Exception as e:
             if i < 4:
                 logging.warning(f"umounting {mountpoint} failed with: {e}, retrying...")
+                host.ssh(['lsof', '+D', mountpoint])
+                host.ssh(['fuser', mountpoint])
                 time.sleep(5)
                 continue
             raise e
