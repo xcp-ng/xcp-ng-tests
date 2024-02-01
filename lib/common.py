@@ -100,7 +100,16 @@ def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
 def teardown_formatted_and_mounted_disk(host, mountpoint):
     logging.info(f"<< Restore fstab and unmount {mountpoint} on host {host}")
     host.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
-    host.ssh(['umount', mountpoint])
+    for i in range(5):
+        try:
+            host.ssh(['umount', mountpoint])
+            break
+        except Exception as e:
+            if i < 4:
+                logging.warning(f"umounting {mountpoint} failed with: {e}, retrying...")
+                time.sleep(5)
+                continue
+            raise e
     host.ssh(['rmdir', mountpoint])
 
 def exec_nofail(func):
