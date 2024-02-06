@@ -54,43 +54,7 @@ class FileType(Enum):
     DIR_SYMLINK = 2
     BROKEN_SYMLINK = 3
 
-def ignore_file(filename):
-    ignored_files = [
-        '/boot/initrd-*',
-        '/boot/grub/*',
-        '/boot/vmlinuz-fallback',
-        '/boot/xen-fallback.gz',
-        '/etc/chrony.conf',
-        '/etc/firstboot.d/data/default-storage.conf',
-        '/etc/firstboot.d/data/iqn.conf',
-        '/etc/fstab',
-        '/etc/group*',
-        '/etc/grub.cfg',
-        '/etc/gshadow*',
-        '/etc/hostname',
-        '/etc/iscsi/initiatorname.iscsi',
-        '/etc/issue',
-        '/etc/krb5.conf',
-        '/etc/lvm/backup/*',
-        '/etc/mtab',
-        '/etc/machine-id',
-        '/etc/passwd*',
-        '/etc/pki/ca-trust/extracted/java/cacerts',
-        '/etc/pki/java/cacerts',
-        '/etc/shadow*',
-        '/etc/ssh/ssh_host_*_key.pub',
-        '/etc/ssh/ssh_host_*_key',
-        '/etc/sysconfig/network',
-        '/etc/sysconfig/network-scripts/interface-rename-data/*',
-        '/etc/sysconfig/xencommons',
-        '/etc/vconsole.conf',
-        '/etc/xensource-inventory',
-        '/etc/xensource/boot_time_cpus',
-        '/etc/xensource/ptoken',
-        '/etc/xensource/xapi-ssl.pem',
-        '/opt/xensource/gpg/trustdb.gpg',
-    ]
-
+def ignore_file(filename, ignored_files):
     for i in ignored_files:
         if fnmatch(filename, i):
             return True
@@ -228,7 +192,7 @@ def remote_diff(host1, host2, filename):
         if file2 is not None and os.path.exists(file2):
             os.remove(file2)
 
-def compare_data(ref, test, show_diff):
+def compare_data(ref, test, ignored_file_patterns, show_diff):
     ref_data = ref['data']
     ref_host = ref['host']
     test_data = test['data']
@@ -236,7 +200,7 @@ def compare_data(ref, test, show_diff):
 
     for dtype in test_data:
         for file in test_data[dtype]:
-            if ignore_file(file):
+            if ignore_file(file, ignored_file_patterns):
                 continue
 
             if file not in ref_data[dtype]:
@@ -257,7 +221,7 @@ def compare_data(ref, test, show_diff):
     # Check for files that only exist on the reference host
     for dtype in ref_data:
         for file, val in ref_data[dtype].items():
-            if ignore_file(file):
+            if ignore_file(file, ignored_file_patterns):
                 continue
 
             if val is not None:
@@ -284,6 +248,41 @@ def save_reference_data(files, filename):
 def main():
     ref_data = None
     folders = ["/boot", "/etc", "/opt", "/usr"]
+    ignored_file_patterns = [
+        '/boot/initrd-*',
+        '/boot/grub/*',
+        '/boot/vmlinuz-fallback',
+        '/boot/xen-fallback.gz',
+        '/etc/chrony.conf',
+        '/etc/firstboot.d/data/default-storage.conf',
+        '/etc/firstboot.d/data/iqn.conf',
+        '/etc/fstab',
+        '/etc/group*',
+        '/etc/grub.cfg',
+        '/etc/gshadow*',
+        '/etc/hostname',
+        '/etc/iscsi/initiatorname.iscsi',
+        '/etc/issue',
+        '/etc/krb5.conf',
+        '/etc/lvm/backup/*',
+        '/etc/mtab',
+        '/etc/machine-id',
+        '/etc/passwd*',
+        '/etc/pki/ca-trust/extracted/java/cacerts',
+        '/etc/pki/java/cacerts',
+        '/etc/shadow*',
+        '/etc/ssh/ssh_host_*_key.pub',
+        '/etc/ssh/ssh_host_*_key',
+        '/etc/sysconfig/network',
+        '/etc/sysconfig/network-scripts/interface-rename-data/*',
+        '/etc/sysconfig/xencommons',
+        '/etc/vconsole.conf',
+        '/etc/xensource-inventory',
+        '/etc/xensource/boot_time_cpus',
+        '/etc/xensource/ptoken',
+        '/etc/xensource/xapi-ssl.pem',
+        '/opt/xensource/gpg/trustdb.gpg',
+    ]
 
     parser = argparse.ArgumentParser(description='Spot filesystem differences between 2 XCP-ng hosts')
     parser.add_argument('--reference-host', '-r', dest='ref_host',
@@ -299,6 +298,9 @@ def main():
     parser.add_argument('--add-folder', '-f', action='append', dest='folders', default=folders,
                         help='Add folders to the default searched folders (/boot, /etc, /opt, and /usr). '
                              'Can be specified multiple times')
+    parser.add_argument('--ignore-file', '-i', action='append', dest='ignored_file_patterns',
+                        default=ignored_file_patterns,
+                        help='Add file patterns to the default ignored files. Can be specified multiple times')
     args = parser.parse_args(sys.argv[1:])
 
     if args.ref_host is None and args.show_diff:
@@ -330,7 +332,7 @@ def main():
     test = dict([('data', test_data), ('host', args.test_host)])
 
     print("\nResults:")
-    compare_data(ref, test, args.show_diff)
+    compare_data(ref, test, args.ignored_file_patterns, args.show_diff)
 
     return 0
 
