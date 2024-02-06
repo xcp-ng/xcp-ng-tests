@@ -93,7 +93,7 @@ def ignore_file(filename):
     return False
 
 def ssh_cmd(host, cmd):
-    args = ["ssh", "root@{}".format(host), cmd]
+    args = ["ssh", f"root@{host}", cmd]
 
     cmdres = subprocess.run(args, capture_output=True, text=True)
     if cmdres.returncode:
@@ -123,7 +123,7 @@ def ssh_get_files(host, file_type, folders):
             print("Unknown file type: ", file=sys.stderr)
             return None
 
-    find_cmd = "find {} {}".format(folders, find_type)
+    find_cmd = f"find {folders} {find_type}"
     if readlink:
         find_cmd += " -exec readlink -n {} \\; -exec echo -n '  ' \\; -print"
     elif md5sum:
@@ -157,8 +157,8 @@ def get_data(host, folders):
 def sftp_get(host, remote_file, local_file):
     opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
-    args = "sftp {} -b - root@{}".format(opts, host)
-    input = bytes("get {} {}".format(shlex.quote(remote_file), shlex.quote(local_file)), 'utf-8')
+    args = f"sftp {opts} -b - root@{host}"
+    input = bytes(f"get {shlex.quote(remote_file)} {shlex.quote(local_file)}", 'utf-8')
     res = subprocess.run(
         args,
         input=input,
@@ -169,7 +169,7 @@ def sftp_get(host, remote_file, local_file):
     )
 
     if res.returncode:
-        raise Exception("Failed to get file from host: {}".format(res.returncode))
+        raise Exception(f"Failed to get file from host: {res.returncode}")
 
     return res
 
@@ -179,7 +179,7 @@ def remote_diff(host1, host2, filename):
         file2 = None
 
         # check remote files are text files
-        cmd = "file -b {}".format(shlex.quote(filename))
+        cmd = f"file -b {shlex.quote(filename)}"
         file_type = ssh_cmd(host1, cmd)
         if not file_type.lower().startswith("ascii"):
             print("Binary file. Not showing diff")
@@ -224,11 +224,11 @@ def compare_data(ref, test, show_diff):
                 continue
 
             if file not in ref_data[dtype]:
-                print("{} doesn't exist on reference host: {}".format(dtype, file))
+                print(f"{dtype} doesn't exist on reference host: {file}")
                 continue
 
             if ref_data[dtype][file] != test_data[dtype][file]:
-                print("{} differs: {}".format(dtype, file))
+                print(f"{dtype} differs: {file}")
                 if show_diff:
                     remote_diff(ref_host, test_host, file)
 
@@ -241,7 +241,7 @@ def compare_data(ref, test, show_diff):
                 continue
 
             if val is not None:
-                print("{} doesn't exist on tested host: {}".format(dtype, file))
+                print(f"{dtype} doesn't exist on tested host: {file}")
 
 # Load a previously saved json file containing a the reference files
 def load_reference_files(filename):
@@ -249,7 +249,7 @@ def load_reference_files(filename):
         with open(filename, 'r') as fd:
             return json.load(fd)
     except Exception as e:
-        print("Error: {}".format(e), file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
         exit(-1)
 
 # Save files from a reference host in json format
@@ -258,7 +258,7 @@ def save_reference_data(files, filename):
         with open(filename, 'w') as fd:
             json.dump(files, fd, indent=4)
     except Exception as e:
-        print("Error: {}".format(e), file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
         exit(-1)
 
 def main():
@@ -286,14 +286,14 @@ def main():
         return -1
 
     if args.load_ref:
-        print("Get reference data from {}".format(args.load_ref))
+        print(f"Get reference data from {args.load_ref}")
         ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
-        print("Get reference data from {}".format(args.ref_host))
+        print(f"Get reference data from {args.ref_host}")
         ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
-            print("Saving reference data to {}".format(args.save_ref))
+            print(f"Saving reference data to {args.save_ref}")
             save_reference_data(ref_data, args.save_ref)
 
     if ref_data is None or args.test_host is None:
@@ -303,7 +303,7 @@ def main():
         print("\nMissing parameters. Try --help", file=sys.stderr)
         return -1
 
-    print("Get test host data from {}".format(args.test_host))
+    print(f"Get test host data from {args.test_host}")
     test_data = get_data(args.test_host, args.folders)
 
     ref = dict([('data', ref_data), ('host', args.ref_host)])
