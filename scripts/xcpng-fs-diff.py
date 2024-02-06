@@ -140,19 +140,19 @@ def ssh_get_files(host, file_type, folders):
 
     return res
 
-def get_files(host, folders):
-    ref_files = dict()
+def get_data(host, folders):
+    ref_data = dict()
 
     try:
-        ref_files['file'] = ssh_get_files(host, FileType.FILE, folders)
-        ref_files['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
-        ref_files['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
-        ref_files['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
+        ref_data['file'] = ssh_get_files(host, FileType.FILE, folders)
+        ref_data['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
+        ref_data['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
+        ref_data['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
     except Exception as e:
         print(e, file=sys.stderr)
         exit(-1)
 
-    return ref_files
+    return ref_data
 
 def sftp_get(host, remote_file, local_file):
     opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
@@ -212,36 +212,36 @@ def remote_diff(host1, host2, filename):
         if file2 is not None and os.path.exists(file2):
             os.remove(file2)
 
-def compare_files(ref, test, show_diff):
-    ref_files = ref['files']
+def compare_data(ref, test, show_diff):
+    ref_data = ref['data']
     ref_host = ref['host']
-    test_files = test['files']
+    test_data = test['data']
     test_host = test['host']
 
-    for ftype in test_files:
-        for file in test_files[ftype]:
+    for dtype in test_data:
+        for file in test_data[dtype]:
             if ignore_file(file):
                 continue
 
-            if file not in ref_files[ftype]:
-                print("{} doesn't exist on reference host: {}".format(ftype, file))
+            if file not in ref_data[dtype]:
+                print("{} doesn't exist on reference host: {}".format(dtype, file))
                 continue
 
-            if ref_files[ftype][file] != test_files[ftype][file]:
-                print("{} differs: {}".format(ftype, file))
+            if ref_data[dtype][file] != test_data[dtype][file]:
+                print("{} differs: {}".format(dtype, file))
                 if show_diff:
                     remote_diff(ref_host, test_host, file)
 
-            ref_files[ftype][file] = None
+            ref_data[dtype][file] = None
 
     # Check for files that only exist on the reference host
-    for ftype in ref_files:
-        for file, val in ref_files[ftype].items():
+    for dtype in ref_data:
+        for file, val in ref_data[dtype].items():
             if ignore_file(file):
                 continue
 
             if val is not None:
-                print("{} doesn't exist on tested host: {}".format(ftype, file))
+                print("{} doesn't exist on tested host: {}".format(dtype, file))
 
 # Load a previously saved json file containing a the reference files
 def load_reference_files(filename):
@@ -253,7 +253,7 @@ def load_reference_files(filename):
         exit(-1)
 
 # Save files from a reference host in json format
-def save_reference_files(files, filename):
+def save_reference_data(files, filename):
     try:
         with open(filename, 'w') as fd:
             json.dump(files, fd, indent=4)
@@ -262,7 +262,7 @@ def save_reference_files(files, filename):
         exit(-1)
 
 def main():
-    ref_files = None
+    ref_data = None
     folders = ["/boot", "/etc", "/opt", "/usr"]
 
     parser = argparse.ArgumentParser(description='Spot filesystem differences between 2 XCP-ng hosts')
@@ -286,31 +286,31 @@ def main():
         return -1
 
     if args.load_ref:
-        print("Get reference files from {}".format(args.load_ref))
-        ref_files = load_reference_files(args.load_ref)
+        print("Get reference data from {}".format(args.load_ref))
+        ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
-        print("Get reference files from {}".format(args.ref_host))
-        ref_files = get_files(args.ref_host, args.folders)
+        print("Get reference data from {}".format(args.ref_host))
+        ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
-            print("Saving reference files to {}".format(args.save_ref))
-            save_reference_files(ref_files, args.save_ref)
+            print("Saving reference data to {}".format(args.save_ref))
+            save_reference_data(ref_data, args.save_ref)
 
-    if ref_files is None or args.test_host is None:
+    if ref_data is None or args.test_host is None:
         if args.save_ref:
             return 0
 
         print("\nMissing parameters. Try --help", file=sys.stderr)
         return -1
 
-    print("Get test host files from {}".format(args.test_host))
-    test_files = get_files(args.test_host, args.folders)
+    print("Get test host data from {}".format(args.test_host))
+    test_data = get_data(args.test_host, args.folders)
 
-    ref = dict([('files', ref_files), ('host', args.ref_host)])
-    test = dict([('files', test_files), ('host', args.test_host)])
+    ref = dict([('data', ref_data), ('host', args.ref_host)])
+    test = dict([('data', test_data), ('host', args.test_host)])
 
     print("\nResults:")
-    compare_files(ref, test, args.show_diff)
+    compare_data(ref, test, args.show_diff)
 
     return 0
 
