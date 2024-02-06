@@ -29,6 +29,11 @@
 #       "/usr/lib/firmware/a300_pfp.fw": "qcom/a300_pfp.fw",
 #       "/usr/lib/firmware/a300_pm4.fw": "qcom/a300_pm4.fw",
 #       ...
+#   },
+#   "package": {
+#       "kbd": "1.15.5",
+#       "sudo": "1.8.23",
+#       ...
 #   }
 # }
 #
@@ -140,6 +145,16 @@ def ssh_get_files(host, file_type, folders):
 
     return res
 
+def ssh_get_packages(host):
+    packages = dict()
+
+    res = ssh_cmd(host, "rpm -qa --queryformat '%{NAME} %{VERSION}\n'")
+    for line in res.splitlines():
+        entries = line.split(' ', 1)
+        packages[entries[0]] = entries[1]
+
+    return packages
+
 def get_data(host, folders):
     ref_data = dict()
 
@@ -148,6 +163,7 @@ def get_data(host, folders):
         ref_data['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
         ref_data['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
         ref_data['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
+        ref_data['package'] = ssh_get_packages(host)
     except Exception as e:
         print(e, file=sys.stderr)
         exit(-1)
@@ -228,9 +244,13 @@ def compare_data(ref, test, show_diff):
                 continue
 
             if ref_data[dtype][file] != test_data[dtype][file]:
-                print(f"{dtype} differs: {file}")
-                if show_diff:
-                    remote_diff(ref_host, test_host, file)
+                print(f"{dtype} differs: {file}", end='')
+                if dtype == 'package':
+                    print(f" (ref={ref_data[dtype][file]}, test={test_data[dtype][file]})")
+                else:
+                    print("")
+                    if show_diff:
+                        remote_diff(ref_host, test_host, file)
 
             ref_data[dtype][file] = None
 
