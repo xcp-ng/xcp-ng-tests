@@ -29,6 +29,11 @@
 #       "/usr/lib/firmware/a300_pfp.fw": "qcom/a300_pfp.fw",
 #       "/usr/lib/firmware/a300_pm4.fw": "qcom/a300_pm4.fw",
 #       ...
+#   },
+#   "package": {
+#       "kbd": "1.15.5",
+#       "sudo": "1.8.23",
+#       ...
 #   }
 # }
 #
@@ -49,8 +54,201 @@ class FileType(Enum):
     DIR_SYMLINK = 2
     BROKEN_SYMLINK = 3
 
-def ignore_file(filename):
-    ignored_files = [
+def ignore_file(filename, ignored_files):
+    for i in ignored_files:
+        if fnmatch(filename, i):
+            return True
+
+    return False
+
+def ssh_cmd(host, cmd):
+    args = ["ssh", f"root@{host}", cmd]
+
+    cmdres = subprocess.run(args, capture_output=True, text=True)
+    if cmdres.returncode:
+        raise Exception(cmdres.stderr)
+
+    return cmdres.stdout
+
+def ssh_get_files(host, file_type, folders):
+    md5sum = False
+    readlink = False
+    folders = " ".join(folders)
+
+    match file_type:
+        case FileType.FILE:
+            find_type = "-type f"
+            md5sum = True
+        case FileType.FILE_SYMLINK:
+            find_type = "-type l -xtype f"
+            md5sum = True
+        case FileType.DIR_SYMLINK:
+            find_type = "-type l -xtype d"
+            readlink = True
+        case FileType.BROKEN_SYMLINK:
+            find_type = "-xtype l"
+            readlink = True
+        case _:
+            print("Unknown file type: ", file=sys.stderr)
+            return None
+
+    find_cmd = f"find {folders} {find_type}"
+    if readlink:
+        find_cmd += " -exec readlink -n {} \\; -exec echo -n '  ' \\; -print"
+    elif md5sum:
+        # This will make one call to md5sum with all files passed as parameter
+        # This is much more efficient than using find '-exec md5sum {}'
+        find_cmd += " -print0 | xargs -0 md5sum"
+
+    rawres = ssh_cmd(host, find_cmd)
+
+    res = dict()
+    for line in rawres.splitlines():
+        entry = line.split(' ', 1)
+        res[entry[1].strip()] = entry[0].strip()
+
+    return res
+
+def ssh_get_packages(host):
+    packages = dict()
+
+    res = ssh_cmd(host, "rpm -qa --queryformat '%{NAME} %{VERSION}\n'")
+    for line in res.splitlines():
+        entries = line.split(' ', 1)
+        packages[entries[0]] = entries[1]
+
+    return packages
+
+def get_data(host, folders):
+    ref_data = dict()
+
+    try:
+        ref_data['file'] = ssh_get_files(host, FileType.FILE, folders)
+        ref_data['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
+        ref_data['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
+        ref_data['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
+        ref_data['package'] = ssh_get_packages(host)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        exit(-1)
+
+    return ref_data
+
+def sftp_get(host, remote_file, local_file):
+    opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+
+    args = f"sftp {opts} -b - root@{host}"
+    input = bytes(f"get {shlex.quote(remote_file)} {shlex.quote(local_file)}", 'utf-8')
+    res = subprocess.run(
+        args,
+        input=input,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False
+    )
+
+    if res.returncode:
+        raise Exception(f"Failed to get file from host: {res.returncode}")
+
+    return res
+
+def remote_diff(host1, host2, filename):
+    try:
+        file1 = None
+        file2 = None
+
+        # check remote files are text files
+        cmd = f"file -b {shlex.quote(filename)}"
+        file_type = ssh_cmd(host1, cmd)
+        if not file_type.lower().startswith("ascii"):
+            print("Binary file. Not showing diff")
+            return
+
+        fd, file1 = tempfile.mkstemp()
+        os.close(fd)
+        sftp_get(host1, filename, file1)
+
+        fd, file2 = tempfile.mkstemp()
+        os.close(fd)
+        sftp_get(host2, filename, file2)
+
+        args = ["diff", "-u", file1, file2]
+        diff_res = subprocess.run(args, capture_output=True, text=True)
+
+        match diff_res.returncode:
+            case 1:
+                print(diff_res.stdout)
+            case 2:
+                raise Exception(diff_res.stderr)
+            case _:
+                pass
+
+    except Exception as e:
+        print(e, file=sys.stderr)
+    finally:
+        if file1 is not None and os.path.exists(file1):
+            os.remove(file1)
+        if file2 is not None and os.path.exists(file2):
+            os.remove(file2)
+
+def compare_data(ref, test, ignored_file_patterns, show_diff):
+    ref_data = ref['data']
+    ref_host = ref['host']
+    test_data = test['data']
+    test_host = test['host']
+
+    for dtype in test_data:
+        for file in test_data[dtype]:
+            if ignore_file(file, ignored_file_patterns):
+                continue
+
+            if file not in ref_data[dtype]:
+                print(f"{dtype} doesn't exist on reference host: {file}")
+                continue
+
+            if ref_data[dtype][file] != test_data[dtype][file]:
+                print(f"{dtype} differs: {file}", end='')
+                if dtype == 'package':
+                    print(f" (ref={ref_data[dtype][file]}, test={test_data[dtype][file]})")
+                else:
+                    print("")
+                    if show_diff:
+                        remote_diff(ref_host, test_host, file)
+
+            ref_data[dtype][file] = None
+
+    # Check for files that only exist on the reference host
+    for dtype in ref_data:
+        for file, val in ref_data[dtype].items():
+            if ignore_file(file, ignored_file_patterns):
+                continue
+
+            if val is not None:
+                print(f"{dtype} doesn't exist on tested host: {file}")
+
+# Load a previously saved json file containing a the reference files
+def load_reference_files(filename):
+    try:
+        with open(filename, 'r') as fd:
+            return json.load(fd)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        exit(-1)
+
+# Save files from a reference host in json format
+def save_reference_data(files, filename):
+    try:
+        with open(filename, 'w') as fd:
+            json.dump(files, fd, indent=4)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        exit(-1)
+
+def main():
+    ref_data = None
+    folders = ["/boot", "/etc", "/opt", "/usr"]
+    ignored_file_patterns = [
         '/boot/initrd-*',
         '/boot/grub/*',
         '/boot/vmlinuz-fallback',
@@ -86,185 +284,6 @@ def ignore_file(filename):
         '/opt/xensource/gpg/trustdb.gpg',
     ]
 
-    for i in ignored_files:
-        if fnmatch(filename, i):
-            return True
-
-    return False
-
-def ssh_cmd(host, cmd):
-    args = ["ssh", "root@{}".format(host), cmd]
-
-    cmdres = subprocess.run(args, capture_output=True, text=True)
-    if cmdres.returncode:
-        raise Exception(cmdres.stderr)
-
-    return cmdres.stdout
-
-def ssh_get_files(host, file_type, folders):
-    md5sum = False
-    readlink = False
-    folders = " ".join(folders)
-
-    match file_type:
-        case FileType.FILE:
-            find_type = "-type f"
-            md5sum = True
-        case FileType.FILE_SYMLINK:
-            find_type = "-type l -xtype f"
-            md5sum = True
-        case FileType.DIR_SYMLINK:
-            find_type = "-type l -xtype d"
-            readlink = True
-        case FileType.BROKEN_SYMLINK:
-            find_type = "-xtype l"
-            readlink = True
-        case _:
-            print("Unknown file type: ", file=sys.stderr)
-            return None
-
-    find_cmd = "find {} {}".format(folders, find_type)
-    if readlink:
-        find_cmd += " -exec readlink -n {} \\; -exec echo -n '  ' \\; -print"
-    elif md5sum:
-        # This will make one call to md5sum with all files passed as parameter
-        # This is much more efficient than using find '-exec md5sum {}'
-        find_cmd += " -print0 | xargs -0 md5sum"
-
-    rawres = ssh_cmd(host, find_cmd)
-
-    res = dict()
-    for line in rawres.splitlines():
-        entry = line.split(' ', 1)
-        res[entry[1].strip()] = entry[0].strip()
-
-    return res
-
-def get_files(host, folders):
-    ref_files = dict()
-
-    try:
-        ref_files['file'] = ssh_get_files(host, FileType.FILE, folders)
-        ref_files['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
-        ref_files['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
-        ref_files['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
-    except Exception as e:
-        print(e, file=sys.stderr)
-        exit(-1)
-
-    return ref_files
-
-def sftp_get(host, remote_file, local_file):
-    opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
-
-    args = "sftp {} -b - root@{}".format(opts, host)
-    input = bytes("get {} {}".format(shlex.quote(remote_file), shlex.quote(local_file)), 'utf-8')
-    res = subprocess.run(
-        args,
-        input=input,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False
-    )
-
-    if res.returncode:
-        raise Exception("Failed to get file from host: {}".format(res.returncode))
-
-    return res
-
-def remote_diff(host1, host2, filename):
-    try:
-        file1 = None
-        file2 = None
-
-        # check remote files are text files
-        cmd = "file -b {}".format(shlex.quote(filename))
-        file_type = ssh_cmd(host1, cmd)
-        if not file_type.lower().startswith("ascii"):
-            print("Binary file. Not showing diff")
-            return
-
-        fd, file1 = tempfile.mkstemp()
-        os.close(fd)
-        sftp_get(host1, filename, file1)
-
-        fd, file2 = tempfile.mkstemp()
-        os.close(fd)
-        sftp_get(host2, filename, file2)
-
-        args = ["diff", "-u", file1, file2]
-        diff_res = subprocess.run(args, capture_output=True, text=True)
-
-        match diff_res.returncode:
-            case 1:
-                print(diff_res.stdout)
-            case 2:
-                raise Exception(diff_res.stderr)
-            case _:
-                pass
-
-    except Exception as e:
-        print(e, file=sys.stderr)
-    finally:
-        if file1 is not None and os.path.exists(file1):
-            os.remove(file1)
-        if file2 is not None and os.path.exists(file2):
-            os.remove(file2)
-
-def compare_files(ref, test, show_diff):
-    ref_files = ref['files']
-    ref_host = ref['host']
-    test_files = test['files']
-    test_host = test['host']
-
-    for ftype in test_files:
-        for file in test_files[ftype]:
-            if ignore_file(file):
-                continue
-
-            if file not in ref_files[ftype]:
-                print("{} doesn't exist on reference host: {}".format(ftype, file))
-                continue
-
-            if ref_files[ftype][file] != test_files[ftype][file]:
-                print("{} differs: {}".format(ftype, file))
-                if show_diff:
-                    remote_diff(ref_host, test_host, file)
-
-            ref_files[ftype][file] = None
-
-    # Check for files that only exist on the reference host
-    for ftype in ref_files:
-        for file, val in ref_files[ftype].items():
-            if ignore_file(file):
-                continue
-
-            if val is not None:
-                print("{} doesn't exist on tested host: {}".format(ftype, file))
-
-# Load a previously saved json file containing a the reference files
-def load_reference_files(filename):
-    try:
-        with open(filename, 'r') as fd:
-            return json.load(fd)
-    except Exception as e:
-        print("Error: {}".format(e), file=sys.stderr)
-        exit(-1)
-
-# Save files from a reference host in json format
-def save_reference_files(files, filename):
-    try:
-        with open(filename, 'w') as fd:
-            json.dump(files, fd, indent=4)
-    except Exception as e:
-        print("Error: {}".format(e), file=sys.stderr)
-        exit(-1)
-
-def main():
-    ref_files = None
-    folders = ["/boot", "/etc", "/opt", "/usr"]
-
     parser = argparse.ArgumentParser(description='Spot filesystem differences between 2 XCP-ng hosts')
     parser.add_argument('--reference-host', '-r', dest='ref_host',
                         help='The XCP-ng host used as reference')
@@ -279,6 +298,9 @@ def main():
     parser.add_argument('--add-folder', '-f', action='append', dest='folders', default=folders,
                         help='Add folders to the default searched folders (/boot, /etc, /opt, and /usr). '
                              'Can be specified multiple times')
+    parser.add_argument('--ignore-file', '-i', action='append', dest='ignored_file_patterns',
+                        default=ignored_file_patterns,
+                        help='Add file patterns to the default ignored files. Can be specified multiple times')
     args = parser.parse_args(sys.argv[1:])
 
     if args.ref_host is None and args.show_diff:
@@ -286,31 +308,31 @@ def main():
         return -1
 
     if args.load_ref:
-        print("Get reference files from {}".format(args.load_ref))
-        ref_files = load_reference_files(args.load_ref)
+        print(f"Get reference data from {args.load_ref}")
+        ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
-        print("Get reference files from {}".format(args.ref_host))
-        ref_files = get_files(args.ref_host, args.folders)
+        print(f"Get reference data from {args.ref_host}")
+        ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
-            print("Saving reference files to {}".format(args.save_ref))
-            save_reference_files(ref_files, args.save_ref)
+            print(f"Saving reference data to {args.save_ref}")
+            save_reference_data(ref_data, args.save_ref)
 
-    if ref_files is None or args.test_host is None:
+    if ref_data is None or args.test_host is None:
         if args.save_ref:
             return 0
 
         print("\nMissing parameters. Try --help", file=sys.stderr)
         return -1
 
-    print("Get test host files from {}".format(args.test_host))
-    test_files = get_files(args.test_host, args.folders)
+    print(f"Get test host data from {args.test_host}")
+    test_data = get_data(args.test_host, args.folders)
 
-    ref = dict([('files', ref_files), ('host', args.ref_host)])
-    test = dict([('files', test_files), ('host', args.test_host)])
+    ref = dict([('data', ref_data), ('host', args.ref_host)])
+    test = dict([('data', test_data), ('host', args.test_host)])
 
     print("\nResults:")
-    compare_files(ref, test, args.show_diff)
+    compare_data(ref, test, args.ignored_file_patterns, args.show_diff)
 
     return 0
 
