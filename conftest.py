@@ -373,10 +373,10 @@ def second_network(request, host):
         pytest.fail("This test requires the --second-network parameter!")
     network_uuid = request.param
     pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': network_uuid}, minimal=True)
-    if pif_uuid:
+    if not pif_uuid:
         pytest.fail("The provided --second-network UUID doesn't exist or doesn't have a PIF on master host")
     ip = host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'IP'})
-    if ip:
+    if not ip:
         pytest.fail("The provided --second-network has a PIF but no IP")
     if network_uuid == host.management_network():
         pytest.fail("--second-network must NOT be the management network")

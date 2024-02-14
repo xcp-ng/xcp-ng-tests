@@ -71,10 +71,10 @@ class TestHostEvacuateWithNetwork:
         _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr)
 
     def test_host_evacuate_with_network_no_ip(self, host, hostA2, second_network, vm_on_nfs_sr):
-        pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': second_network}, minimal=True)
+        pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
         ipv6 = (host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'primary-address-type'}) == "IPv6")
         reconfigure_method = 'pif-reconfigure-ipv6' if ipv6 else 'pif-reconfigure-ip'
-        args = _save_ip_configuration_mode(host, pif_uuid)
+        args = _save_ip_configuration_mode(hostA2, pif_uuid)
         logging.info(f"Reconfigure PIF {pif_uuid}: remove its IP")
         host.xe(reconfigure_method, {'uuid': pif_uuid, 'mode': 'none'})
         try:
@@ -85,7 +85,7 @@ class TestHostEvacuateWithNetwork:
             host.xe(reconfigure_method, args)
 
     def test_host_evacuate_with_network_not_attached(self, host, hostA2, second_network, vm_on_nfs_sr):
-        pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': second_network}, minimal=True)
+        pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
         logging.info(f"Unplug PIF {pif_uuid}")
         host.xe('pif-unplug', {'uuid': pif_uuid})
         try:
@@ -97,18 +97,18 @@ class TestHostEvacuateWithNetwork:
             host.xe('pif-plug', {'uuid': pif_uuid})
 
     def test_host_evacuate_with_network_not_present(self, host, hostA2, second_network, vm_on_nfs_sr):
-        pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': second_network}, minimal=True)
+        pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
         ipv6 = (host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'primary-address-type'}) == "IPv6")
         reconfigure_method = 'pif-reconfigure-ipv6' if ipv6 else 'pif-reconfigure-ip'
-        args = _save_ip_configuration_mode(host, pif_uuid)
+        args = _save_ip_configuration_mode(hostA2, pif_uuid)
         logging.info(f"Forget PIF {pif_uuid}")
         host.xe('pif-forget', {'uuid': pif_uuid})
         try:
             not_present_error = 'This host has no PIF on the given network'
             _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, not_present_error)
         finally:
-            host.xe('pif-scan', {'host-uuid': host.uuid})
-            pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': second_network}, minimal=True)
+            host.xe('pif-scan', {'host-uuid': hostA2.uuid})
+            pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
             args['uuid'] = pif_uuid
             logging.info(f"Re-add and plug PIF {pif_uuid}")
             host.xe(reconfigure_method, args)
