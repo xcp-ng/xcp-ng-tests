@@ -4,6 +4,7 @@ import subprocess
 
 import lib.config as config
 
+from lib.netutil import wrap_ip
 
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
@@ -157,10 +158,11 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
         # Based on https://unix.stackexchange.com/a/365976/257493
         opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
+    ip = wrap_ip(hostname_or_ip)
     if local_dest:
-        src = 'root@{}:{}'.format(hostname_or_ip, src)
+        src = 'root@{}:{}'.format(ip, src)
     else:
-        dest = 'root@{}:{}'.format(hostname_or_ip, dest)
+        dest = 'root@{}:{}'.format(ip, dest)
 
     command = "scp {} {} {}".format(opts, src, dest)
     res = subprocess.run(

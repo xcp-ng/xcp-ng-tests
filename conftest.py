@@ -8,6 +8,7 @@ import lib.config as global_config
 
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.vm import VM
 from lib.xo import xo_cli
@@ -175,6 +176,11 @@ def xfail_on_xcpng_8_3(host, request):
     """ Test that is relevant but expected to fail in current state of XCP-ng 8.3. """
     if host.xcp_version >= version.parse("8.3"):
         request.node.add_marker(pytest.mark.xfail)
+
+@pytest.fixture(scope='session')
+def host_no_ipv6(host):
+    if is_ipv6(host.hostname_or_ip):
+        pytest.skip(f"This test requires an IPv4 XCP-ng")
 
 @pytest.fixture(scope='session')
 def local_sr_on_hostA1(hostA1):
@@ -375,7 +381,8 @@ def second_network(request, host):
     pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': network_uuid}, minimal=True)
     if not pif_uuid:
         pytest.fail("The provided --second-network UUID doesn't exist or doesn't have a PIF on master host")
-    ip = host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'IP'})
+    ipv6 = (host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'primary-address-type'}) == "IPv6")
+    ip = host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'IPv6' if ipv6 else 'IP'})
     if not ip:
         pytest.fail("The provided --second-network has a PIF but no IP")
     if network_uuid == host.management_network():

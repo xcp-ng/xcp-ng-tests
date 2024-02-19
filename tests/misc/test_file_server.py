@@ -2,6 +2,8 @@ import pytest
 import re
 import subprocess
 
+from lib.netutil import wrap_ip
+
 # These tests are meant to test an host fileserver behavior.
 #
 # Requirements:
@@ -14,15 +16,16 @@ def _header_equal(header, name, value):
 
 def test_fileserver_redirect_https(host):
     path = "/path/to/dir/file.txt"
+    ip = wrap_ip(host.hostname_or_ip)
     process = subprocess.Popen(
-        ["curl", "-i", "http://" + host.hostname_or_ip + path],
+        ["curl", "-i", "http://" + ip + path],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
     stdout, _ = process.communicate()
     lines = stdout.decode().splitlines()
     assert lines[0].strip() == "HTTP/1.1 301 Moved Permanently"
-    assert _header_equal(lines[2], "location", "https://" + host.hostname_or_ip + path)
+    assert _header_equal(lines[2], "location", "https://" + ip + path)
 
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestHSTS:
@@ -31,7 +34,7 @@ class TestHSTS:
 
     def __get_header(host):
         process = subprocess.Popen(
-            ["curl", "-XGET", "-k", "-I", "https://" + host.hostname_or_ip],
+            ["curl", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
