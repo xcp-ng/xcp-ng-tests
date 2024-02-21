@@ -1,4 +1,5 @@
 import logging
+import json
 import pytest
 
 # Requirements:
@@ -7,10 +8,10 @@ import pytest
 
 @pytest.mark.usefixtures("host_with_dom0_tests")
 class TestXenDom0Tests:
-    def test_cpu_policy(self, host):
-        logging.info("Running test-cpu-policy...")
-        host.ssh(['/usr/libexec/xen/bin/test-cpu-policy'])
-
-    def test_xenstore(self, host):
-        logging.info("Running test-xenstore...")
-        host.ssh(['/usr/libexec/xen/bin/test-xenstore'])
+    def test_dom0(self, host):
+        metadata = host.ssh(['cat', '/usr/share/xen-dom0-tests-metadata.json'])
+        tests = json.loads(metadata)["tests"]
+        assert tests, "Test list must not be empty"
+        for test in tests:
+            logging.info(f"Running {test}...")
+            host.ssh([f'/usr/libexec/xen/bin/{test}'])
