@@ -3,6 +3,15 @@
 # Consult README.md for accepted values.
 # Example value: "http://somewhere/images/small_vm.xva"
 
+# The "single" element contains 1 entry per VM filename:
+# "small_vm": "alpine-minimal-3.12.0.xva",
+# "small_vm_unix_tools": "centos7-64-created_8.0-zstd.xva",
+
+# The "multi" element contains a list of VMs per entry
+# "all": ["alpine-minimal-3.12.0.xva",
+#         "alpine-uefi-minimal-efitools-3.12.0.xva",
+#         ...],
+
 VMS = {
     "single": {
         # basic small VM
@@ -27,3 +36,13 @@ VMS = {
         "uefi_windows": [],
     }
 }
+
+# Example of use for a common XVA_LOCATION
+#
+# XVA_LOCATION="http://somewhere/"
+#
+# for key, vm in dict(VMS["single"]).items():
+#     VMS["single"][key] = XVA_LOCATION + vm
+#
+# for key, vms in dict(VMS["multi"]).items():
+#    VMS["multi"][key] = [XVA_LOCATION + vm for vm in vms]
