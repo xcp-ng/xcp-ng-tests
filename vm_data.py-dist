@@ -3,6 +3,29 @@
 # Consult README.md for accepted values.
 # Example value: "http://somewhere/images/small_vm.xva"
 
+# The "single" element contains 1 entry per VM filename:
+# "small_vm": "alpine-minimal-3.12.0.xva",
+# "small_vm_unix_tools": "centos7-64-created_8.0-zstd.xva",
+
+# If a vm is meant to be used only on a given host version, the version can be specified
+# through a tuple entry with (vm_filename, host_version) as:
+# "small_vm": ("alpine-minimal-3.12.0.xva", "8\.3\.")
+
+# The host version specified for a vm is matched using re.match(), so valid patterns
+# can be "8\.2\.1", "8\.[23]\.", or "(9\.0|8\.2)".
+
+# If host version is not specified, the vm filename will be used whatever the host version
+
+# The "multi" element contains a list of VMs per entry
+# "all": ["alpine-minimal-3.12.0.xva",
+#         "alpine-uefi-minimal-efitools-3.12.0.xva",
+#         ...],
+
+# Same as "single", a vm can be bound to a given host version:
+# "all": ["alpine-minimal-3.12.0.xva",
+#         ("alpine-uefi-minimal-efitools-3.12.0.xva", "8\.2\."),
+#         ...],
+
 VMS = {
     "single": {
         # basic small VM
@@ -27,3 +50,19 @@ VMS = {
         "uefi_windows": [],
     }
 }
+
+# Example of use for a common XVA_LOCATION
+#
+# XVA_LOCATION="http://somewhere/"
+#
+# def prepend_xva_location(vm):
+#     if type(vm) is tuple:
+#         return (XVA_LOCATION + vm[0], vm[1])
+#
+#     return XVA_LOCATION + vm
+#
+# for key, vm in dict(VMS["single"]).items():
+#     VMS["single"][key] = prepend_xva_location(vm)
+#
+# for key, vms in dict(VMS["multi"]).items():
+#     VMS["multi"][key] = [prepend_xva_location(vm) for vm in vms]

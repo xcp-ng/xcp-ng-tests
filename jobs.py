@@ -332,7 +332,24 @@ BROKEN_TESTS = [
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
 ]
 
-def get_vm_or_vms_refs(handle):
+# Returns the vm filename or None if a host_version is passed and matches the one specified
+# with the vm filename in vm_data.py. ex: ("centos6-32-hvm-created_8.2-zstd.xva", "8\.2\..*")
+def filter_vm(vm, host_version):
+    import re
+
+    if type(vm) is tuple:
+        if len(vm) < 2:
+            return None
+
+        if host_version is not None and not re.match(vm[1], host_version):
+            print(f"Host version pattern '{vm[1]}' for '{vm[0]}' doesn't match version '{host_version}'. Filtered out")
+            return None
+
+        return vm[0]
+
+    return vm
+
+def get_vm_or_vms_refs(handle, host_version=None):
     try:
         from vm_data import VMS
     except ImportError:
@@ -347,13 +364,44 @@ def get_vm_or_vms_refs(handle):
         print("You need to update your local vm_data.py.")
         print("You may also bypass this error by providing your own --vm parameter(s).")
         sys.exit(1)
-    return VMS[category][key]
+
+    if type(VMS[category][key]) is list:
+        # Multi VMs
+        vms = list()
+        for vm in VMS[category][key]:
+            xva = filter_vm(vm, host_version)
+            if xva is not None:
+                vms.append(xva)
+        if len(vms) == 0:
+            vms = None
+    else:
+        # Single VMs
+        vms = filter_vm(VMS[category][key], host_version)
+
+    if vms is None:
+        print(f"ERROR: Could not find VMS['{category}']['{key}'] for host version {host_version}.")
+        print("You need to update your local vm_data.py.")
+        print("You may also bypass this error by providing your own --vm parameter(s).")
+        sys.exit(1)
+
+    return vms
 
 def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
     markers = job_data.get("markers", None)
     name_filter = job_data.get("name_filter", None)
 
     job_params = dict(job_data["params"])
+
+    host_version = None
+    if hosts is not None:
+        try:
+            host = hosts.split(',')[0]
+            cmd = ["ssh", host, "lsb_release", "-sr"]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode == 0:
+                host_version = res.stdout.strip()
+        except Exception as e:
+            print(e, file=sys.stderr)
 
     def _join_pytest_args(arg, option):
         cli_args = []
@@ -397,11 +445,11 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
         cmd.append(f"--hosts={hosts}")
     for key, value in job_params.items():
         if key == "--vm[]":
-            vms = get_vm_or_vms_refs(value)
+            vms = get_vm_or_vms_refs(value, host_version)
             for vm_ref in vms:
                 cmd.append(f"--vm={vm_ref}")
         elif key == "--vm":
-            cmd.append(f"--vm={get_vm_or_vms_refs(value)}")
+            cmd.append(f"--vm={get_vm_or_vms_refs(value, host_version)}")
         else:
             cmd.append(f"{key}={value}")
     cmd += pytest_args
