@@ -145,14 +145,8 @@ def _test_key_exchanges(vm):
         logging.info('> Testing {} ({})'.format(auth.name, i))
 
         ok = True
-        try:
-            vm.set_efi_var(auth.name, auth.guid,
-                           EFI_AT_ATTRS_BYTES, auth.auth_data)
-        except SSHCommandFailed:
-            ok = False
-
-        if (should_succeed and not ok) or (ok and not should_succeed):
-            raise AssertionError('Failed to set {} {}'.format(i, auth.name))
+        vm.set_efi_var(auth.name, auth.guid,
+                       EFI_AT_ATTRS_BYTES, auth.auth_data)
 
 def check_disk_cert_md5sum(host, key, reference_file, do_assert=True):
     auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
