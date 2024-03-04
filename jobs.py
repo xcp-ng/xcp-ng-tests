@@ -396,7 +396,7 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
     if hosts is not None:
         try:
             host = hosts.split(',')[0]
-            cmd = ["ssh", host, "lsb_release", "-sr"]
+            cmd = ["ssh", f"root@{host}", "lsb_release", "-sr"]
             res = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
             if res.returncode == 0:
                 host_version = res.stdout.decode().strip()
