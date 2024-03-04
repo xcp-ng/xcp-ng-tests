@@ -397,11 +397,12 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
         try:
             host = hosts.split(',')[0]
             cmd = ["ssh", host, "lsb_release", "-sr"]
-            res = subprocess.run(cmd, capture_output=True, text=True)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
             if res.returncode == 0:
-                host_version = res.stdout.strip()
+                host_version = res.stdout.decode().strip()
         except Exception as e:
             print(e, file=sys.stderr)
+    print(f"Host version is '{host_version}'")
 
     def _join_pytest_args(arg, option):
         cli_args = []
