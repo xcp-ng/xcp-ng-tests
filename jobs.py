@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+from lib.commands import ssh
 
 JOBS = {
     "main": {
@@ -396,10 +397,8 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
     if hosts is not None:
         try:
             host = hosts.split(',')[0]
-            cmd = ["ssh", f"root@{host}", "lsb_release", "-sr"]
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
-            if res.returncode == 0:
-                host_version = res.stdout.decode().strip()
+            cmd = ["lsb_release", "-sr"]
+            host_version = ssh(host, cmd)
         except Exception as e:
             print(e, file=sys.stderr)
     print(f"Host version is '{host_version}'")

@@ -9,10 +9,10 @@
 
 # If a vm is meant to be used only on a given host version, the version can be specified
 # through a tuple entry with (vm_filename, host_version) as:
-# "small_vm": ("alpine-minimal-3.12.0.xva", "8\.3\.")
+# "small_vm": ("alpine-minimal-3.12.0.xva", r"8\.3\.")
 
 # The host version specified for a vm is matched using re.match(), so valid patterns
-# can be "8\.2\.1", "8\.[23]\.", or "(9\.0|8\.2)".
+# must be defined as raw strings: r"8\.2\.1", r"8\.[23]\.", or r"(9\.0|8\.2)".
 
 # If host version is not specified, the vm filename will be used whatever the host version
 
@@ -23,7 +23,7 @@
 
 # Same as "single", a vm can be bound to a given host version:
 # "all": ["alpine-minimal-3.12.0.xva",
-#         ("alpine-uefi-minimal-efitools-3.12.0.xva", "8\.2\."),
+#         ("alpine-uefi-minimal-efitools-3.12.0.xva", r"8\.2\."),
 #         ...],
 
 VMS = {
