@@ -32,6 +32,16 @@ VM_IMAGES = {
     'mini-linux-x86_64-uefi': 'alpine-uefi-minimal-3.12.0.xva'
 }
 
+# In some cases, we may prefer to favour a local SR to store test VM disks,
+# to avoid latency or unstabilities related to network or shared file servers.
+# However it's not good practice to make a local SR the default SR for a pool of several hosts.
+# Hence this configuration value that you can set to `local` so that our tests use this SR by default.
+# This setting affects VMs managed by the `imported_vm` fixture.
+# Possible values:
+# - 'default': keep using the pool's default SR
+# - 'local': use the first local SR found instead
+DEFAULT_SR = 'default'
+
 # Default NFS device config:
 DEFAULT_NFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
