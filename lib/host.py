@@ -454,7 +454,7 @@ class Host:
         try:
             from data import DEFAULT_SR
         except ImportError:
-            DEFAULT_SR = 'default'
+            DEFAULT_SR = 'local'
         assert DEFAULT_SR in ['default', 'local']
 
         sr_uuid = None

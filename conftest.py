@@ -282,7 +282,7 @@ def imported_vm(host, vm_ref):
     try:
         from data import CACHE_IMPORTED_VM
     except ImportError:
-        CACHE_IMPORTED_VM = False
+        CACHE_IMPORTED_VM = True
     assert CACHE_IMPORTED_VM in [True, False]
 
     if is_uuid(vm_ref):
