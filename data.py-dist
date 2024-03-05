@@ -42,6 +42,15 @@ VM_IMAGES = {
 # - 'local': use the first local SR found instead
 DEFAULT_SR = 'default'
 
+# Whether to cache VMs on the test host, that is import them only if not already present
+# This also causes the VM to be cloned at the beginning of each test module, so that
+# the original VM remains untouched.
+# /!\ The VM identifier in cache is merely the URL where it was imported from
+# A cached VM is just a VM which has this URL as its description. Delete it to remove it from cache.
+# A cached VM will only be used if it is present in the target SR for the tentative VM import.
+# This setting affects VMs managed by the `imported_vm` fixture.
+CACHE_IMPORTED_VM = False
+
 # Default NFS device config:
 DEFAULT_NFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
