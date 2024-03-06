@@ -6,7 +6,7 @@ from packaging import version
 
 import lib.config as global_config
 
-from lib.common import safe_split, wait_for, vm_image, is_uuid
+from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
@@ -278,28 +278,28 @@ def vm_ref(request):
 
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
+    # Do we cache VMs?
+    try:
+        from data import CACHE_IMPORTED_VM
+    except ImportError:
+        CACHE_IMPORTED_VM = False
+    assert CACHE_IMPORTED_VM in [True, False]
+
     if is_uuid(vm_ref):
-        vm = VM(vm_ref, host)
-        name = vm.name()
+        vm_orig = VM(vm_ref, host)
+        name = vm_orig.name()
         logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
-        # where to import to: default SR, or first local SR
-        try:
-            from data import DEFAULT_SR
-        except ImportError:
-            DEFAULT_SR = 'default'
-        assert DEFAULT_SR in ['default', 'local']
+        vm_orig = host.import_vm(vm_ref, host.main_sr(), use_cache=CACHE_IMPORTED_VM)
 
-        if DEFAULT_SR == 'default':
-            vm = host.import_vm(vm_ref)
-        elif DEFAULT_SR == 'local':
-            local_sr_uuids = safe_split(
-                # xe sr-list doesn't support filtering by host UUID!
-                host.ssh(['xe sr-list host=$HOSTNAME content-type=user minimal=true']),
-                ','
-            )
-            assert local_sr_uuids, "The first pool master (host A1) MUST have a local SR since DEFAULT_SR=='local'"
-            vm = host.import_vm(vm_ref, local_sr_uuids[0])
+    if CACHE_IMPORTED_VM:
+        # Clone the VM before running tests, so that the original VM remains untouched
+        logging.info(">> Clone cached VM before running tests")
+        vm = vm_orig.clone()
+        # Remove the description, which may contain a cache identifier
+        vm.param_set('name-description', None, "")
+    else:
+        vm = vm_orig
 
     yield vm
     # teardown
