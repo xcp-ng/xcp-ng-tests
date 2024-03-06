@@ -29,7 +29,7 @@ def uefi_vm_and_snapshot(uefi_vm):
     # secure boot specific variables
     vm.set_uefi_setup_mode()
     logging.info('Set platform.secureboot to false for VM')
-    vm.param_set('platform', 'secureboot', False)
+    vm.param_set('platform', False, key='secureboot')
     snapshot = vm.snapshot()
 
     yield vm, snapshot

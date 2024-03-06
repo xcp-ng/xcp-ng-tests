@@ -17,7 +17,7 @@ class BaseVM:
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self.host, BaseVM.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name, key, value):
+    def param_set(self, param_name, value, key=None):
         _param_set(self.host, BaseVM.xe_prefix, self.uuid, param_name, value, key)
 
     def param_remove(self, param_name, key, accept_unknown_key=False):

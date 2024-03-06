@@ -40,52 +40,52 @@ class TestGuestLinuxUEFISecureBoot:
         vm = uefi_vm
         vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_succeeded(vm)
 
     def test_boot_success_when_vm_db_set_and_images_signed(self, uefi_vm):
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_succeeded(vm)
 
     def test_boot_fails_when_pool_db_set_and_images_unsigned(self, uefi_vm):
         vm = uefi_vm
         vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
     def test_boot_fails_when_vm_db_set_and_images_unsigned(self, uefi_vm):
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
     def test_boot_succeeds_when_pool_certs_set_and_sb_disabled(self, uefi_vm):
         vm = uefi_vm
         vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', False)
+        vm.param_set('platform', False, key='secureboot')
         boot_and_check_no_sb_errors(vm)
 
     def test_boot_succeeds_when_vm_certs_set_and_sb_disabled(self, uefi_vm):
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
-        vm.param_set('platform', 'secureboot', False)
+        vm.param_set('platform', False, key='secureboot')
         boot_and_check_no_sb_errors(vm)
 
     def test_boot_fails_when_pool_dbx_revokes_signed_images(self, uefi_vm):
         vm = uefi_vm
         vm.host.pool.install_custom_uefi_certs([self.PK, self.KEK, self.db, self.dbx])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
     def test_boot_fails_when_vm_dbx_revokes_signed_images(self, uefi_vm):
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db, self.dbx])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
     def test_boot_success_when_initial_pool_keys_not_signed_by_parent(self, uefi_vm):
@@ -93,7 +93,7 @@ class TestGuestLinuxUEFISecureBoot:
         PK, KEK, db, _ = generate_keys(self_signed=True)
         vm.host.pool.install_custom_uefi_certs([PK, KEK, db])
         sign_efi_bins(vm, db)
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_succeeded(vm)
 
     def test_boot_success_when_initial_vm_keys_not_signed_by_parent(self, uefi_vm):
@@ -101,14 +101,14 @@ class TestGuestLinuxUEFISecureBoot:
         PK, KEK, db, _ = generate_keys(self_signed=True)
         vm.install_uefi_certs([PK, KEK, db])
         sign_efi_bins(vm, db)
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_succeeded(vm)
 
     def test_sb_off_really_means_off(self, uefi_vm):
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         sign_efi_bins(vm, self.db)
-        vm.param_set('platform', 'secureboot', False)
+        vm.param_set('platform', False, key='secureboot')
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
         logging.info("Check that SB is NOT enabled according to the OS.")
@@ -131,13 +131,13 @@ class TestGuestWindowsUEFISecureBoot:
         vm = uefi_vm
         PK, KEK, db, _ = generate_keys(self_signed=True)
         vm.host.pool.install_custom_uefi_certs([PK, KEK, db])
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
     @pytest.mark.multi_vms # test that SB works on every Windows VM we have
     def test_windows_succeeds(self, uefi_vm):
         vm = uefi_vm
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         # Install default certs. This requires internet access from the host.
         logging.info("Install default certs on pool with secureboot-certs install")
         vm.host.ssh(['secureboot-certs', 'install'])
@@ -151,7 +151,7 @@ class TestCertsMissingAndSbOn:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot):
         vm, snapshot = uefi_vm_and_snapshot
-        vm.param_set('platform', 'secureboot', True)
+        vm.param_set('platform', True, key='secureboot')
         yield
         revert_vm_state(vm, snapshot)
         # clear pool certs for next test
