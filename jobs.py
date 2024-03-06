@@ -266,7 +266,7 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
-            "--vm": "single/small_vm_efitools",
+            "--vm": "single/small_vm_unix_tools",
         },
         "paths": ["tests/guest-tools/unix"],
         "markers": "",
