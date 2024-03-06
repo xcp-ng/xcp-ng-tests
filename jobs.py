@@ -323,6 +323,16 @@ JOBS = {
         "paths": ["tests"],
         "markers": "flaky",
     },
+    "xo": {
+        "description": "tests that use Xen Orchestra, via xo-cli",
+        "requirements": [
+            "An XCP-ng host.",
+            "xo-cli locally installed, in $PATH, and registered to an XO instance.",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/xo"],
+    }
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
