@@ -230,13 +230,13 @@ class Host:
         logging.info("VM UUID: %s" % vm_uuid)
         vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
         vm = VM(vm_uuid, self)
-        vm.param_set('name-label', None, vm_name)
+        vm.param_set('name-label', vm_name)
         # Set VM VIF networks to the host's management network
         for vif in vm.vifs():
             vif.move(self.management_network())
         if use_cache:
             logging.info(f"Marking VM {vm.uuid} as cached")
-            vm.param_set('name-description', None, cache_key)
+            vm.param_set('name-description', cache_key)
         return vm
 
     def pool_has_vm(self, vm_uuid, vm_type='vm'):

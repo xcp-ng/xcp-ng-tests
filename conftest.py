@@ -297,7 +297,7 @@ def imported_vm(host, vm_ref):
         logging.info(">> Clone cached VM before running tests")
         vm = vm_orig.clone()
         # Remove the description, which may contain a cache identifier
-        vm.param_set('name-description', None, "")
+        vm.param_set('name-description', "")
     else:
         vm = vm_orig
 
