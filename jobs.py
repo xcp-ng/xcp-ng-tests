@@ -397,13 +397,13 @@ def get_vm_or_vms_refs(handle, host_version=None):
 
     return vms
 
-def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
+def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
     markers = job_data.get("markers", None)
     name_filter = job_data.get("name_filter", None)
 
     job_params = dict(job_data["params"])
 
-    host_version = None
+    # Set/overwrite host_version with real host version if hosts are specified
     if hosts is not None:
         try:
             host = hosts.split(',')[0]
@@ -472,7 +472,7 @@ def action_show(args):
     print(json.dumps(JOBS[args.job], indent=4))
 
 def action_collect(args):
-    cmd = build_pytest_cmd(JOBS[args.job], None, ["--collect-only"] + args.pytest_args)
+    cmd = build_pytest_cmd(JOBS[args.job], None, args.host_version, ["--collect-only"] + args.pytest_args)
     subprocess.run(cmd)
 
 def action_check(args):
@@ -498,7 +498,7 @@ def action_check(args):
     print("*** Checking that all tests are selected by at least one job... ", end="")
     job_tests = set()
     for job_data in JOBS.values():
-        job_tests |= extract_tests(build_pytest_cmd(job_data, None, ["--collect-only", "-q", "--vm=a_vm"]))
+        job_tests |= extract_tests(build_pytest_cmd(job_data, None, None, ["--collect-only", "-q", "--vm=a_vm"]))
     tests_without_jobs = sorted(list(all_tests - job_tests))
     if tests_without_jobs:
         error = True
@@ -524,7 +524,7 @@ def action_check(args):
     job_tests = set()
     for job_data in JOBS.values():
         if "--vm[]" in job_data["params"]:
-            job_tests |= extract_tests(build_pytest_cmd(job_data, None, ["--collect-only", "-q", "--vm=a_vm"]))
+            job_tests |= extract_tests(build_pytest_cmd(job_data, None, None, ["--collect-only", "-q", "--vm=a_vm"]))
     tests_missing = sorted(list(multi_vm_tests - job_tests))
     if tests_missing:
         error = True
@@ -537,7 +537,7 @@ def action_check(args):
         sys.exit(1)
 
 def action_run(args):
-    cmd = build_pytest_cmd(JOBS[args.job], args.hosts, args.pytest_args)
+    cmd = build_pytest_cmd(JOBS[args.job], args.hosts, None, args.pytest_args)
     print(subprocess.list2cmdline(cmd))
     if args.print_only:
         return
@@ -566,6 +566,7 @@ def main():
 
     run_parser = subparsers.add_parser("collect", help="show test collection based on the job definition.")
     run_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
+    run_parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
     run_parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
                             help="all additional arguments after the last positional argument will "
                                  "be passed to pytest and replace default job params if needed.")
