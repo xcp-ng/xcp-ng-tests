@@ -352,8 +352,8 @@ def filter_vm(vm, host_version):
         if len(vm) < 2:
             return None
 
+        # Filter out this VM if versions match
         if host_version is not None and not re.match(vm[1], host_version):
-            print(f"Host version pattern '{vm[1]}' for '{vm[0]}' doesn't match version '{host_version}'. Filtered out")
             return None
 
         return vm[0]
@@ -411,7 +411,6 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
             host_version = ssh(host, cmd)
         except Exception as e:
             print(e, file=sys.stderr)
-    print(f"Host version is '{host_version}'")
 
     def _join_pytest_args(arg, option):
         cli_args = []
