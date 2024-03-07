@@ -5,11 +5,13 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import safe_split, wait_for, wait_for_not
+from lib.common import safe_split, wait_for, wait_for_not, _param_get, _param_set
 from lib.host import Host
 from lib.sr import SR
 
 class Pool:
+    xe_prefix = "pool"
+
     def __init__(self, master_hostname_or_ip):
         master = Host(self, master_hostname_or_ip)
         assert master.is_master(), f"Host {master_hostname_or_ip} is not a master host. Aborting."
@@ -21,6 +23,12 @@ class Pool:
                 self.hosts.append(host)
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs = None
+
+    def param_get(self, param_name, key=None, accept_unknown_key=False):
+        return _param_get(self.master, Pool.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+
+    def param_set(self, param_name, value, key=None):
+        _param_set(self.master, Pool.xe_prefix, self.uuid, param_name, value, key)
 
     def exec_on_hosts_on_error_rollback(self, func, rollback_func, host_list=[]):
         """
