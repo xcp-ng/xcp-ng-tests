@@ -384,15 +384,25 @@ class VM(BaseVM):
         assert len(attrs) == 4
 
         efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid.as_str())
+        tmp_efivarfs = '/tmp/%s-%s' % (var, guid.as_str())
 
         if self.file_exists(efivarfs):
             self.ssh(['chattr', '-i', efivarfs])
 
-        with tempfile.NamedTemporaryFile('wb') as f:
-            f.write(attrs)
-            f.write(data)
-            f.flush()
-            self.scp(f.name, efivarfs)
+        try:
+            with tempfile.NamedTemporaryFile('wb') as f:
+                f.write(attrs)
+                f.write(data)
+                f.flush()
+
+                # Copy the key in 2 steps because the sftp protocol now used by
+                # scp is not able to write directly to efivarfs. Also use 'cat'
+                # instead of 'cp' since it doesn't work in Alpine image (because
+                # cp is busybox in Alpine)
+                self.scp(f.name, tmp_efivarfs)
+                self.ssh(["cat", tmp_efivarfs, ">", efivarfs])
+        finally:
+            self.ssh(["rm", "-f", tmp_efivarfs], check=False)
 
     def get_efi_var(self, var, guid):
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""
