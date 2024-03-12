@@ -349,14 +349,21 @@ def filter_vm(vm, host_version):
     import re
 
     if type(vm) is tuple:
-        if len(vm) < 2:
-            return None
+        if len(vm) != 2:
+            print(f"ERROR: VM definition from vm_data.py is a tuple so it should contain exactly two items:\n{vm}")
+            sys.exit(1)
 
-        if host_version is not None and not re.match(vm[1], host_version):
-            print(f"Host version pattern '{vm[1]}' for '{vm[0]}' doesn't match version '{host_version}'. Filtered out")
-            return None
+        if host_version is None:
+            print(f"ERROR: Host version required to filter VM definition:\n{vm}")
+            print("\nFor some commands, you can specify the version with option --host-version.")
+            sys.exit(1)
 
-        return vm[0]
+        # Keep the VM if versions match
+        if re.match(vm[1], host_version):
+            return vm[0]
+
+        # Else discard
+        return None
 
     return vm
 
@@ -397,13 +404,13 @@ def get_vm_or_vms_refs(handle, host_version=None):
 
     return vms
 
-def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
+def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
     markers = job_data.get("markers", None)
     name_filter = job_data.get("name_filter", None)
 
     job_params = dict(job_data["params"])
 
-    host_version = None
+    # Set/overwrite host_version with real host version if hosts are specified
     if hosts is not None:
         try:
             host = hosts.split(',')[0]
@@ -411,7 +418,6 @@ def build_pytest_cmd(job_data, hosts=None, pytest_args=[]):
             host_version = ssh(host, cmd)
         except Exception as e:
             print(e, file=sys.stderr)
-    print(f"Host version is '{host_version}'")
 
     def _join_pytest_args(arg, option):
         cli_args = []
@@ -473,7 +479,7 @@ def action_show(args):
     print(json.dumps(JOBS[args.job], indent=4))
 
 def action_collect(args):
-    cmd = build_pytest_cmd(JOBS[args.job], None, ["--collect-only"] + args.pytest_args)
+    cmd = build_pytest_cmd(JOBS[args.job], None, args.host_version, ["--collect-only"] + args.pytest_args)
     subprocess.run(cmd)
 
 def action_check(args):
@@ -499,7 +505,7 @@ def action_check(args):
     print("*** Checking that all tests are selected by at least one job... ", end="")
     job_tests = set()
     for job_data in JOBS.values():
-        job_tests |= extract_tests(build_pytest_cmd(job_data, None, ["--collect-only", "-q", "--vm=a_vm"]))
+        job_tests |= extract_tests(build_pytest_cmd(job_data, None, None, ["--collect-only", "-q", "--vm=a_vm"]))
     tests_without_jobs = sorted(list(all_tests - job_tests))
     if tests_without_jobs:
         error = True
@@ -525,7 +531,7 @@ def action_check(args):
     job_tests = set()
     for job_data in JOBS.values():
         if "--vm[]" in job_data["params"]:
-            job_tests |= extract_tests(build_pytest_cmd(job_data, None, ["--collect-only", "-q", "--vm=a_vm"]))
+            job_tests |= extract_tests(build_pytest_cmd(job_data, None, None, ["--collect-only", "-q", "--vm=a_vm"]))
     tests_missing = sorted(list(multi_vm_tests - job_tests))
     if tests_missing:
         error = True
@@ -538,7 +544,7 @@ def action_check(args):
         sys.exit(1)
 
 def action_run(args):
-    cmd = build_pytest_cmd(JOBS[args.job], args.hosts, args.pytest_args)
+    cmd = build_pytest_cmd(JOBS[args.job], args.hosts, None, args.pytest_args)
     print(subprocess.list2cmdline(cmd))
     if args.print_only:
         return
@@ -567,6 +573,7 @@ def main():
 
     run_parser = subparsers.add_parser("collect", help="show test collection based on the job definition.")
     run_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
+    run_parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
     run_parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
                             help="all additional arguments after the last positional argument will "
                                  "be passed to pytest and replace default job params if needed.")
