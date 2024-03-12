@@ -349,14 +349,21 @@ def filter_vm(vm, host_version):
     import re
 
     if type(vm) is tuple:
-        if len(vm) < 2:
-            return None
+        if len(vm) != 2:
+            print(f"ERROR: VM definition from vm_data.py is a tuple so it should contain exactly two items:\n{vm}")
+            sys.exit(1)
 
-        # Filter out this VM if versions match
-        if host_version is not None and not re.match(vm[1], host_version):
-            return None
+        if host_version is None:
+            print(f"ERROR: Host version required to filter VM definition:\n{vm}")
+            print("\nFor some commands, you can specify the version with option --host-version.")
+            sys.exit(1)
 
-        return vm[0]
+        # Keep the VM if versions match
+        if re.match(vm[1], host_version):
+            return vm[0]
+
+        # Else discard
+        return None
 
     return vm
 
