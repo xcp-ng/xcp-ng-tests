@@ -51,7 +51,7 @@ Refer to pytest's documentation or tutorials to understand how to start tests or
 
 Examples:
 ```
-pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1
+pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1 --sr-disk=auto
 pytest tests/storage/zfs/test_zfs_sr_crosspool_migration.py --hosts=10.0.0.1,10.0.0.2 --vm=mini-linux-x86_64-uefi
 pytest tests/misc/test_vm_basic_operations.py --hosts=10.0.0.1 --vm=mini-linux-x86_64-bios --vm=mini-linux-x86_64-uefi
 ```
