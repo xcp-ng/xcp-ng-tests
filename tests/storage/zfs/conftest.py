@@ -4,8 +4,8 @@ import pytest
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 
-VOLUME_NAME = 'vol0'
-VOLUME_PATH = '/' + VOLUME_NAME
+POOL_NAME = 'pool0'
+POOL_PATH = '/' + POOL_NAME
 
 @pytest.fixture(scope='package')
 def host_without_zfs(host):
@@ -21,15 +21,15 @@ def host_with_zfs(host_without_zfs, host_with_saved_yum_state):
 
 @pytest.fixture(scope='package')
 def zpool_vol0(sr_disk_wiped, host_with_zfs):
-    host_with_zfs.ssh(['zpool', 'create', '-f', VOLUME_NAME, '/dev/' + sr_disk_wiped])
+    host_with_zfs.ssh(['zpool', 'create', '-f', POOL_NAME, '/dev/' + sr_disk_wiped])
     yield
     # teardown
-    host_with_zfs.ssh(['zpool', 'destroy', VOLUME_NAME])
+    host_with_zfs.ssh(['zpool', 'destroy', POOL_NAME])
 
 @pytest.fixture(scope='package')
 def zfs_sr(host, zpool_vol0):
     """ A ZFS SR on first host. """
-    sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': VOLUME_PATH})
+    sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': POOL_PATH})
     yield sr
     # teardown
     sr.destroy()
