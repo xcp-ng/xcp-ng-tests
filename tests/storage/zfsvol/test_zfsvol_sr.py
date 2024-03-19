@@ -83,3 +83,34 @@ class TestZfsvolVm:
         vm.shutdown(verify=True)
 
     # *** End of tests with reboots
+
+@pytest.mark.usefixtures("zfsvol_sr")
+class TestZfsngSrSingleVdiDestroy:
+    "Destruction tests of a single VDI involved in various topologies"
+    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
+    def test_vdi_destroy_with_snap_but_no_clones(self, zfsvol_sr):
+        vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
+        snap = vdi.snapshot()
+        vdi.destroy()
+
+    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
+    def test_vdi_destroy_with_several_snaps_but_no_clones(self, zfsvol_sr):
+        vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
+        snaps = []
+        for i in range(3):
+            snaps.append(vdi.snapshot())
+        vdi.destroy()
+
+    def test_vdi_destroy_with_snap_and_clone(self, zfsvol_sr):
+        vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
+        snap = vdi.snapshot()
+        clone = snap.clone()
+        vdi.destroy()
+
+    def test_vdi_destroy_with_snap_and_several_clones(self, zfsvol_sr):
+        vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
+        snap = vdi.snapshot()
+        clones = []
+        for i in range(3):
+            clones.append(snap.clone())
+        vdi.destroy()
