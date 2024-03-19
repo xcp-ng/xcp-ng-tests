@@ -68,6 +68,74 @@ class TestZfsvolVm:
         finally:
             vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_snapshots_revert(self, vm_on_zfsvol_sr):
+        vm = vm_on_zfsvol_sr
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.wait_for_vm_running_and_ssh_up()
+
+        snap1, snap2, snap3 = None, None, None
+        snap1 = vm.snapshot()
+        vm.ssh_touch_file(f"/{snap1.uuid}")
+        snap2 = vm.snapshot()
+        vm.ssh_touch_file(f"/{snap2.uuid}")
+        snap3 = vm.snapshot()
+
+        # we are in "snap3" state, check all 6 "from A to B"
+        # combinations
+        snap1.revert()
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check files state")
+        vm.ssh([f"test ! -f /{snap1.uuid}"])
+        vm.ssh([f"test ! -f /{snap2.uuid}"])
+        snap2.revert()
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check files state")
+        vm.ssh([f"test -f /{snap1.uuid}"])
+        vm.ssh([f"test ! -f /{snap2.uuid}"])
+        snap3.revert()
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check files state")
+        vm.ssh([f"test -f /{snap1.uuid}"])
+        vm.ssh([f"test -f /{snap2.uuid}"])
+        snap2.revert()
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check files state")
+        vm.ssh([f"test -f /{snap1.uuid}"])
+        vm.ssh([f"test ! -f /{snap2.uuid}"])
+        snap1.revert()
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check files state")
+        vm.ssh([f"test ! -f /{snap1.uuid}"])
+        vm.ssh([f"test ! -f /{snap2.uuid}"])
+        snap3.revert()
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Check files state")
+        vm.ssh([f"test -f /{snap1.uuid}"])
+        vm.ssh([f"test -f /{snap2.uuid}"])
+
+# FIXME: we don't support snapshot destruction yet
+#        snap1.destroy(verify=True)
+#        snap2.destroy(verify=True)
+#        snap3.destroy(verify=True)
+
+    def get_messages(self, name):
+        args = {
+            'obj-uuid': self.uuid,
+            'name': name,
+            'params': 'uuid',
+        }
+
+        lines = self.host.xe('message-list', args).splitlines()
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
