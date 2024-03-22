@@ -11,6 +11,7 @@ class BaseVM:
     xe_prefix = "vm"
 
     def __init__(self, uuid, host):
+        logging.info("New %s: %s", type(self).__name__, uuid)
         self.uuid = uuid
         self.host = host
 
