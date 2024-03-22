@@ -44,9 +44,11 @@ class TestLVMOISCSISR:
     def test_snapshot(self, vm_on_lvmoiscsi_sr):
         vm = vm_on_lvmoiscsi_sr
         vm.start()
-        vm.wait_for_os_booted()
-        vm.test_snapshot_on_running_vm()
-        vm.shutdown(verify=True)
+        try:
+            vm.wait_for_os_booted()
+            vm.test_snapshot_on_running_vm()
+        finally:
+            vm.shutdown(verify=True)
 
     # *** tests with reboots (longer tests).
 
