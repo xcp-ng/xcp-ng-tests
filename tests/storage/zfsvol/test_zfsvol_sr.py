@@ -187,3 +187,32 @@ class TestZfsvolSrVdiChainSnapDestroy:
         clones = [snap.clone(), snap.clone()]
 
         base_vdi.destroy()
+
+@pytest.mark.xfail
+@pytest.mark.usefixtures("zfsvol_sr")
+class TestZfsvolSrVdiChainDestroy:
+    "VDI chain destruction tests with just clones and no snaps"
+    def test_destroy_210(self, zfsvol_sr):
+        vdis = create_vdi_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        assert len(vdis) == 3
+        teardown_vdi_chain(zfsvol_sr, vdis, (2, 1, 0))
+
+    def test_destroy_201(self, zfsvol_sr):
+        vdis = create_vdi_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (2, 0, 1))
+
+    def test_destroy_012(self, zfsvol_sr):
+        vdis = create_vdi_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (0, 1, 2))
+
+    def test_destroy_021(self, zfsvol_sr):
+        vdis = create_vdi_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (0, 2, 1))
+
+    def test_destroy_102(self, zfsvol_sr):
+        vdis = create_vdi_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (1, 0, 2))
+
+    def test_destroy_120(self, zfsvol_sr):
+        vdis = create_vdi_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (1, 2, 0))
