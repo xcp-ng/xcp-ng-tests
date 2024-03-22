@@ -18,5 +18,5 @@ class Snapshot(BaseVM):
         return self.host.pool_has_vm(self.uuid, vm_type='snapshot')
 
     def revert(self):
-        logging.info("Revert snapshot")
+        logging.info("Revert to snapshot %s", self.uuid)
         self.host.xe('snapshot-revert', {'uuid': self.uuid})
