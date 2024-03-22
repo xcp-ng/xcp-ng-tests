@@ -114,3 +114,37 @@ class TestZfsngSrSingleVdiDestroy:
         for i in range(3):
             clones.append(snap.clone())
         vdi.destroy()
+
+# FIXME below should be independent from SR type and label
+
+def create_vdi_and_snaps_chain(sr, vdi_label):
+    "Create a chain of alternating VDI snapshots and clones on first host."
+    vdis = [sr.create_vdi(vdi_label)]
+    for i in range(2):
+        vdis.append(vdis[-1].snapshot())
+        vdis.append(vdis[-1].clone())
+    return vdis
+
+def teardown_vdi_chain(sr, vdis, order):
+    "Destroy a list of VDIs in order specified by a sequence of VDIs indices."
+    for i in order:
+        vdi = vdis[i]
+        logging.debug("zfs state: %r", sr.main_host().ssh(
+            "zfs list -Hp -t all -o name,origin".split()))
+        try:
+            vdi.destroy()
+        except Exception:
+            logging.error("failed to destroy %s", vdi)
+            raise
+
+@pytest.mark.usefixtures("zfsvol_sr")
+class TestZfsvolSrVdiChainSnapDestroy:
+    "VDI chain destruction tests with alternating snap/clone"
+    def test_vdi_and_snaps_teardown(self, zfsvol_sr):
+        "Destroy snapshot chain in reverse order of creation"
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        assert len(vdis) == 5
+        for (i, is_snap) in enumerate([False, True, False, True, False]):
+            assert (vdis[i].snapshot_of is not None) == is_snap, \
+                f"vdis[{i}] should {'' if is_snap else 'not '}be a snapshot"
+        teardown_vdi_chain(zfsvol_sr, vdis, (4, 3, 2, 1, 0))
