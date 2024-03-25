@@ -227,6 +227,11 @@ def sr_disk(request, host):
             f"disk or block device {disk} is either not present or already used on master host"
     yield disk
 
+@pytest.fixture(scope="session")
+def sr_disk_devid(host, sr_disk):
+    #[5:] remove /dev/ at is not expected by normal sr_disk fixture
+    yield host.disk_devid(sr_disk)[0][len("/dev/"):]
+
 @pytest.fixture(scope='session')
 def sr_disk_for_all_hosts(request, host):
     disk = request.param
