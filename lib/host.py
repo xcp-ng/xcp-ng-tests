@@ -407,7 +407,7 @@ class Host:
         return [disk for disk in self.disks() if self.disk_is_available(disk)]
 
     def disk_devid(self, disk):
-        return self.ssh(["find", "-L", "/dev/disk/by-id/", "-samefile", "/dev/"+disk]).splitlines()
+        return self.ssh(["find", "-L", "/dev/disk/by-id/", "-samefile", "/dev/" + disk]).splitlines()
 
     def file_exists(self, filepath, regular_file=True):
         option = '-f' if regular_file else '-e'
