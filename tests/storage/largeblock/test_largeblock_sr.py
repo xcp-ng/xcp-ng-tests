@@ -3,7 +3,7 @@ from lib.common import wait_for, vm_image
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 # Requirements:
-# - one XCP-ng host with an additional unused disk for the SR
+# - one XCP-ng host with an additional unused 4KiB disk for the SR
 
 class TestLARGEBLOCKSRCreateDestroy:
     """

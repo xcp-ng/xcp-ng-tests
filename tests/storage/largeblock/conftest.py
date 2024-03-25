@@ -3,7 +3,7 @@ import pytest
 
 @pytest.fixture(scope='package')
 def largeblock_sr(host, sr_disk):
-    """ An LARGEBLOCK SR on first host. """
+    """ A LARGEBLOCK SR on first host. """
     sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
