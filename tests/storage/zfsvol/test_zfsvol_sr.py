@@ -160,3 +160,21 @@ class TestZfsvolSrVdiChainSnapDestroy:
         "Destroy second-created VDI, then the rest in reverse order of creation"
         vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
         teardown_vdi_chain(zfsvol_sr, vdis, (2, 4, 3, 1, 0))
+
+    # orderings expected to work on first proto
+
+    def test_vdi_and_snaps_destroy_01432(self, zfsvol_sr):
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (0, 1, 4, 3, 2))
+
+    def test_vdi_and_snaps_destroy_01234(self, zfsvol_sr):
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (0, 1, 2, 3, 4))
+
+    def test_vdi_and_snaps_destroy_23410(self, zfsvol_sr):
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (2, 3, 4, 1, 0))
+
+    def test_vdi_and_snaps_destroy_23014(self, zfsvol_sr):
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (2, 3, 0, 1, 4))
