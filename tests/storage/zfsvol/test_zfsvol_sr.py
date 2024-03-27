@@ -29,8 +29,20 @@ class TestZfsvolSRCreateDestroy:
         sr.destroy(verify=True)
 
 @pytest.mark.usefixtures("zfsvol_sr")
-class TestZfsvolVm:
+class TestZfsvolSrBasics:
+    @pytest.mark.xfail # needs support for cloning non-snapshots
+    def test_vdi_clone(self, vdi_on_zfsvol_sr):
+        clone = vdi_on_zfsvol_sr.clone()
+        clone.destroy()
 
+    def test_vdi_snap_clone(self, vdi_on_zfsvol_sr):
+        snap = vdi_on_zfsvol_sr.snapshot()
+        clone = snap.clone()
+        clone.destroy()
+        snap.destroy()
+
+@pytest.mark.usefixtures("zfsvol_sr")
+class TestZfsvolVm:
     @pytest.mark.xfail
     @pytest.mark.quicktest
     def test_quicktest(self, zfsvol_sr):
