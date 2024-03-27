@@ -148,3 +148,15 @@ class TestZfsvolSrVdiChainSnapDestroy:
             assert (vdis[i].snapshot_of is not None) == is_snap, \
                 f"vdis[{i}] should {'' if is_snap else 'not '}be a snapshot"
         teardown_vdi_chain(zfsvol_sr, vdis, (4, 3, 2, 1, 0))
+
+    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
+    def test_vdi_and_snaps_destroy_first_vdi(self, zfsvol_sr):
+        "Destroy first-created VDI, then the rest in reverse order of creation"
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (0, 4, 3, 2, 1))
+
+    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
+    def test_vdi_and_snaps_destroy_intermediate_vdi(self, zfsvol_sr):
+        "Destroy second-created VDI, then the rest in reverse order of creation"
+        vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
+        teardown_vdi_chain(zfsvol_sr, vdis, (2, 4, 3, 1, 0))
