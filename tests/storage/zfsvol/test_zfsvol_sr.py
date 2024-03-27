@@ -178,3 +178,12 @@ class TestZfsvolSrVdiChainSnapDestroy:
     def test_vdi_and_snaps_destroy_23014(self, zfsvol_sr):
         vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
         teardown_vdi_chain(zfsvol_sr, vdis, (2, 3, 0, 1, 4))
+
+    # other topologies
+
+    def test_destroy_vdi_with_snap_with_multiple_clones(self, zfsvol_sr):
+        base_vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
+        snap = base_vdi.snapshot()
+        clones = [snap.clone(), snap.clone()]
+
+        base_vdi.destroy()
