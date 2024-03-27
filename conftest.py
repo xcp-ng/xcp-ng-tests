@@ -229,7 +229,7 @@ def sr_disk(request, host):
 
 @pytest.fixture(scope="session")
 def sr_disk_devid(host, sr_disk):
-    # [5:] remove /dev/ at is not expected by normal sr_disk fixture
+    # Remove /dev/ as it is not expected by normal `sr_disk` fixture
     yield host.disk_devid(sr_disk)[0][len("/dev/"):]
 
 @pytest.fixture(scope='session')
