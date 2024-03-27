@@ -191,6 +191,13 @@ def create_vdi_and_snaps_chain(sr, vdi_label):
         vdis.append(vdis[-1].clone())
     return vdis
 
+def create_vdi_chain(sr, vdi_label):
+    "Create a chain of alternating VDI snapshots and clones on first host."
+    vdis = [sr.create_vdi(vdi_label)]
+    for i in range(2):
+        vdis.append(vdis[-1].clone())
+    return vdis
+
 def teardown_vdi_chain(sr, vdis, order):
     "Destroy a list of VDIs in order specified by a sequence of VDIs indices."
     for i in order:
