@@ -87,13 +87,11 @@ class TestZfsvolVm:
 @pytest.mark.usefixtures("zfsvol_sr")
 class TestZfsngSrSingleVdiDestroy:
     "Destruction tests of a single VDI involved in various topologies"
-    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
     def test_vdi_destroy_with_snap_but_no_clones(self, zfsvol_sr):
         vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
         snap = vdi.snapshot()
         vdi.destroy()
 
-    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
     def test_vdi_destroy_with_several_snaps_but_no_clones(self, zfsvol_sr):
         vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
         snaps = []
@@ -149,13 +147,12 @@ class TestZfsvolSrVdiChainSnapDestroy:
                 f"vdis[{i}] should {'' if is_snap else 'not '}be a snapshot"
         teardown_vdi_chain(zfsvol_sr, vdis, (4, 3, 2, 1, 0))
 
-    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
     def test_vdi_and_snaps_destroy_first_vdi(self, zfsvol_sr):
         "Destroy first-created VDI, then the rest in reverse order of creation"
         vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
         teardown_vdi_chain(zfsvol_sr, vdis, (0, 4, 3, 2, 1))
 
-    @pytest.mark.xfail # needs support for destroying non-snapshots blocked by snaps
+    @pytest.mark.xfail # needs GC of unused extra non-snapshots
     def test_vdi_and_snaps_destroy_intermediate_vdi(self, zfsvol_sr):
         "Destroy second-created VDI, then the rest in reverse order of creation"
         vdis = create_vdi_and_snaps_chain(zfsvol_sr, 'ZFS-local-VDI-test')
