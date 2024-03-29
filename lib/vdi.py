@@ -7,6 +7,10 @@ class VDI:
         # TODO: use a different approach when migration is possible
         self.sr = sr
 
+    def resize(self, size):
+        return self.sr.pool.master.xe('vdi-resize', {'uuid': self.uuid,
+                                                     'disk-size': str(size)})
+
     def snapshot(self):
         logging.info(f"Create snapshot of {self}")
         return VDI(self.sr,

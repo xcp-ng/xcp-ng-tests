@@ -30,6 +30,20 @@ class TestZfsvolSRCreateDestroy:
 
 @pytest.mark.usefixtures("zfsvol_sr")
 class TestZfsvolSrBasics:
+    def test_vdi_resize(self, vdi_on_zfsvol_sr):
+        logging.info("Resize up")
+        vdi_on_zfsvol_sr.resize(1024 * 1024)
+        logging.info("Attempt to resize down")
+        try:
+            vdi_on_zfsvol_sr.resize(64 * 1024)
+        except Exception as e:
+            if "shrinking not allowed" in str(e):
+                # properly refused
+                pass
+            else:
+                logging.error("unexpected error on downsize attempt: %s", e)
+                raise
+
     @pytest.mark.xfail # needs support for cloning non-snapshots
     def test_vdi_clone(self, vdi_on_zfsvol_sr):
         clone = vdi_on_zfsvol_sr.clone()
