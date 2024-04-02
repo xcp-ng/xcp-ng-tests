@@ -151,6 +151,7 @@ class SR:
         return self._is_shared
 
     def create_vdi(self, name_label, virtual_size=64):
+        logging.info("Create VDI %r on SR %s", name_label, self.uuid)
         vdi_uuid = self.pool.master.xe('vdi-create', {
             'name-label': prefix_object_name(name_label),
             'virtual-size': str(virtual_size),

@@ -66,9 +66,11 @@ class TestMooseFSSR:
     def test_snapshot(self, vm_on_moosefs_sr):
         vm = vm_on_moosefs_sr
         vm.start()
-        vm.wait_for_os_booted()
-        vm.test_snapshot_on_running_vm()
-        vm.shutdown(verify=True)
+        try:
+            vm.wait_for_os_booted()
+            vm.test_snapshot_on_running_vm()
+        finally:
+            vm.shutdown(verify=True)
 
     def test_moosefs_missing_client_scan_fails(self, host, moosefs_sr):
         sr = moosefs_sr
