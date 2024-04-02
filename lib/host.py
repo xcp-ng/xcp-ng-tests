@@ -253,7 +253,7 @@ class Host:
         logging.info("Restart toolstack on host %s" % self)
         self.ssh(['xe-toolstack-restart'])
         if verify:
-            wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=1800)
+            wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=30 * 60)
 
     def is_enabled(self):
         try:
@@ -383,7 +383,7 @@ class Host:
                 raise
         if verify:
             wait_for_not(self.is_enabled, "Wait for host down")
-            wait_for(self.is_enabled, "Wait for host up", timeout_secs=1800)
+            wait_for(self.is_enabled, "Wait for host up", timeout_secs=30 * 60)
 
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
