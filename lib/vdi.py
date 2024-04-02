@@ -11,5 +11,4 @@ class VDI:
         self.sr.pool.master.xe('vdi-destroy', {'uuid': self.uuid})
 
     def __str__(self):
-        return (f"VDI {self.uuid} on SR {self.sr.uuid}"
-                f"{f' (snapshot of {self.snapshot_of})' if self.snapshot_of else ''}")
+        return f"VDI {self.uuid} on SR {self.sr.uuid}"
