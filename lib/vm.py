@@ -133,7 +133,8 @@ class VM(BaseVM):
     def ssh_touch_file(self, filepath):
         logging.info("Create file on VM (%s)" % filepath)
         self.ssh(['touch', filepath])
-        self.ssh(['sync', filepath])
+        if not self.is_windows:
+            self.ssh(['sync', filepath])
         logging.info("Check file created")
         self.ssh(['test -f ' + filepath])
 
