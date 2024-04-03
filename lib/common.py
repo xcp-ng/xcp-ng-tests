@@ -29,7 +29,7 @@ def prefix_object_name(label):
         name_prefix = f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
 
-def wait_for(fn, msg=None, timeout_secs=120, retry_delay_secs=2, invert=False):
+def wait_for(fn, msg=None, timeout_secs=2 * 60, retry_delay_secs=2, invert=False):
     if msg is not None:
         logging.info(msg)
     time_left = timeout_secs
