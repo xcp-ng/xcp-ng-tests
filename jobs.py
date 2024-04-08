@@ -122,7 +122,7 @@ JOBS = {
         },
         "paths": ["tests/storage"],
         "markers": "quicktest",
-        "name_filter": "not linstor",
+        "name_filter": "not linstor and not zfsvol",
     },
     "linstor-main": {
         "description": "tests the linstor storage driver, but avoids migrations and reboots",
@@ -341,6 +341,9 @@ JOBS = {
 BROKEN_TESTS = [
     # not really broken but has complex prerequisites (3 NICs on 3 different networks)
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
+    # running quicktest on zfsvol generates dangling TAP devices that are hard to
+    # cleanup. Bug needs to be fixed before enabling quicktest on zfsvol.
+    "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
 ]
 
 # Returns the vm filename or None if a host_version is passed and matches the one specified

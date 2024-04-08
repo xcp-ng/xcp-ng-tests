@@ -19,7 +19,8 @@ class TestZfsvolSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_and_destroy_sr(self, host, sr_disk_wiped):
+    def test_create_and_destroy_sr(self, sr_disk_wiped, host_with_zfsvol):
+        host = host_with_zfsvol
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {'device': '/dev/' + sr_disk_wiped}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
