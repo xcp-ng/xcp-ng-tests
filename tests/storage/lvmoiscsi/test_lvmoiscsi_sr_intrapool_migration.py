@@ -12,11 +12,12 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
 @pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2")
 class Test:
-    def test_live_intrapool_shared_migration(self, host, hostA2, vm_on_lvmoiscsi_sr, lvmoiscsi_sr):
-        live_storage_migration_then_come_back(vm_on_lvmoiscsi_sr, host, lvmoiscsi_sr, hostA2, lvmoiscsi_sr)
+    def test_live_intrapool_shared_migration(self, host, hostA2, vm_on_lvmoiscsi_sr):
+        sr = vm_on_lvmoiscsi_sr.get_sr()
+        live_storage_migration_then_come_back(vm_on_lvmoiscsi_sr, host, hostA2, sr)
 
-    def test_cold_intrapool_migration(self, host, hostA2, vm_on_lvmoiscsi_sr, lvmoiscsi_sr, local_sr_on_hostA2):
-        cold_migration_then_come_back(vm_on_lvmoiscsi_sr, host, lvmoiscsi_sr, hostA2, local_sr_on_hostA2)
+    def test_cold_intrapool_migration(self, host, hostA2, vm_on_lvmoiscsi_sr, local_sr_on_hostA2):
+        cold_migration_then_come_back(vm_on_lvmoiscsi_sr, host, hostA2, local_sr_on_hostA2)
 
-    def test_live_intrapool_migration(self, host, hostA2, vm_on_lvmoiscsi_sr, lvmoiscsi_sr, local_sr_on_hostA2):
-        live_storage_migration_then_come_back(vm_on_lvmoiscsi_sr, host, lvmoiscsi_sr, hostA2, local_sr_on_hostA2)
+    def test_live_intrapool_migration(self, host, hostA2, vm_on_lvmoiscsi_sr, local_sr_on_hostA2):
+        live_storage_migration_then_come_back(vm_on_lvmoiscsi_sr, host, hostA2, local_sr_on_hostA2)

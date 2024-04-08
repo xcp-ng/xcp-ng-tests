@@ -15,7 +15,6 @@ class TestNFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("nfs_sr")
 class TestNFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, nfs_sr):
@@ -47,9 +46,9 @@ class TestNFSSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, host, nfs_sr, vm_on_nfs_sr):
-        sr = nfs_sr
+    def test_reboot(self, host, vm_on_nfs_sr):
         vm = vm_on_nfs_sr
+        sr = vm.get_sr()
         host.reboot(verify=True)
         wait_for(sr.all_pbds_attached, "Wait for PBD attached")
         # start the VM as a way to check that the underlying SR is operational
