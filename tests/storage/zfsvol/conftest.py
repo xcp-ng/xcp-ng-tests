@@ -8,6 +8,7 @@ from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 def host_with_zfsvol(host_with_saved_yum_state):
     host = host_with_saved_yum_state
     host.yum_install(['xcp-ng-xapi-storage-volume-zfsvol'])
+    host.restart_toolstack(verify=True)
     yield host
 
 @pytest.fixture(scope='package')
