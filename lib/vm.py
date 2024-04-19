@@ -70,6 +70,21 @@ class VM(BaseVM):
             self.wait_for_vm_running_and_ssh_up()
         return ret
 
+    def try_get_ip_xenstore(self):
+        domid = self.param_get("dom-id")
+        residence_host = self.get_residence_host()
+        result = residence_host.ssh(
+            ["xenstore", "read", f"/local/domain/{domid}/attr/vif/0/ipv4/0"],
+            check=False, simple_output=False)
+
+        # An IP that starts with 169.254. is not a real routable IP.
+        # VMs may return such an IP before they get an actual one from DHCP.
+        if result.returncode != 0 or result.stdout.startswith('169.254.'):
+            return False
+        else:
+            logging.info("Xenstore VM IP: %s" % result.stdout.rstrip())
+            return True
+
     def try_get_and_store_ip(self):
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
@@ -122,6 +137,7 @@ class VM(BaseVM):
         # waiting for the IP:
         # - allows to make sure the OS actually started (on VMs that have the management agent)
         # - allows to store the IP for future use in the VM object
+        wait_for(self.try_get_ip_xenstore, "Wait for Xenstore VM IP")
         wait_for(self.try_get_and_store_ip, "Wait for VM IP")
         # now wait also for the management agent to have started
         wait_for(self.is_management_agent_up, "Wait for management agent up")
