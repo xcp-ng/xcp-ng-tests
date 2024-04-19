@@ -14,8 +14,8 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.big_vm # and ideally on a big VM to test it scales
 @pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2")
 class Test:
-    def test_cold_intrapool_migration(self, host, hostA2, vm_on_xfs_sr, xfs_sr, local_sr_on_hostA2):
-        cold_migration_then_come_back(vm_on_xfs_sr, host, xfs_sr, hostA2, local_sr_on_hostA2)
+    def test_cold_intrapool_migration(self, host, hostA2, vm_on_xfs_sr, local_sr_on_hostA2):
+        cold_migration_then_come_back(vm_on_xfs_sr, host, hostA2, local_sr_on_hostA2)
 
-    def test_live_intrapool_migration(self, host, hostA2, vm_on_xfs_sr, xfs_sr, local_sr_on_hostA2):
-        live_storage_migration_then_come_back(vm_on_xfs_sr, host, xfs_sr, hostA2, local_sr_on_hostA2)
+    def test_live_intrapool_migration(self, host, hostA2, vm_on_xfs_sr, local_sr_on_hostA2):
+        live_storage_migration_then_come_back(vm_on_xfs_sr, host, hostA2, local_sr_on_hostA2)

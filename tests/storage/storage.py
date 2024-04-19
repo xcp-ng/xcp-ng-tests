@@ -13,8 +13,9 @@ def try_to_create_sr_with_missing_device(sr_type, label, host):
         return
     assert False, 'SR creation should not have succeeded!'
 
-def cold_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
+def cold_migration_then_come_back(vm, prov_host, dest_host, dest_sr):
     """ Storage migration of a shutdown VM, then migrate it back. """
+    prov_sr = vm.get_sr()
     assert vm.is_halted()
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
@@ -31,7 +32,8 @@ def cold_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
     vm.wait_for_os_booted()
     vm.shutdown(verify=True)
 
-def live_storage_migration_then_come_back(vm, prov_host, prov_sr, dest_host, dest_sr):
+def live_storage_migration_then_come_back(vm, prov_host, dest_host, dest_sr):
+    prov_sr = vm.get_sr()
     # start VM
     vm.start(on=prov_host.uuid)
     vm.wait_for_os_booted()

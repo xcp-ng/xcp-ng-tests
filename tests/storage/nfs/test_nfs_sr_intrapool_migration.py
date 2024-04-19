@@ -11,12 +11,18 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
 @pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2")
+# Make sure these fixtures are called before the parametrized one
+@pytest.mark.usefixtures('sr_device_config', 'vm_ref', 'hosts')
 class Test:
-    def test_live_intrapool_shared_migration(self, host, hostA2, vm_on_nfs_sr, nfs_sr):
-        live_storage_migration_then_come_back(vm_on_nfs_sr, host, nfs_sr, hostA2, nfs_sr)
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_live_intrapool_shared_migration(self, host, hostA2, dispatch_nfs):
+        sr = dispatch_nfs.get_sr()
+        live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, sr)
 
-    def test_cold_intrapool_migration(self, host, hostA2, vm_on_nfs_sr, nfs_sr, local_sr_on_hostA2):
-        cold_migration_then_come_back(vm_on_nfs_sr, host, nfs_sr, hostA2, local_sr_on_hostA2)
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_cold_intrapool_migration(self, host, hostA2, dispatch_nfs, local_sr_on_hostA2):
+        cold_migration_then_come_back(dispatch_nfs, host, hostA2, local_sr_on_hostA2)
 
-    def test_live_intrapool_migration(self, host, hostA2, vm_on_nfs_sr, nfs_sr, local_sr_on_hostA2):
-        live_storage_migration_then_come_back(vm_on_nfs_sr, host, nfs_sr, hostA2, local_sr_on_hostA2)
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_live_intrapool_migration(self, host, hostA2, dispatch_nfs, local_sr_on_hostA2):
+        live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, local_sr_on_hostA2)
