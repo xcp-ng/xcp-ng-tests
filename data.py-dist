@@ -66,6 +66,11 @@ DEFAULT_NFS4_DEVICE_CONFIG = {
 #    'nfsversion': '4.1'
 }
 
+# Default NFS-ng device config:
+DEFAULT_NFSNG_DEVICE_CONFIG = {
+#    'uri': 'nfs://10.0.0.2/path/to/shared/mount',
+}
+
 # Default NFS ISO device config:
 DEFAULT_NFS_ISO_DEVICE_CONFIG = {
 #    'location': '10.0.0.2:/path/to/shared/mount' # URL/Hostname of NFS server and path to shared mountpoint
