@@ -480,6 +480,7 @@ class Host:
         else:
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
+        assert sr_uuid != "<not in database>"
         return sr_uuid
 
     def hostname(self):
