@@ -20,6 +20,10 @@ HOSTS = {
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
 
+NETWORKS = {
+#    "MGMT": "7a48464c-1e70-4e2e-a449-9f2514564381",
+}
+
 # PXE config server for automated XCP-ng installation
 PXE_CONFIG_SERVER = 'pxe'
 
