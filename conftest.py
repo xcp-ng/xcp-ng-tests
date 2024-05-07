@@ -8,10 +8,12 @@ from typing import Dict
 
 import lib.config as global_config
 
+from lib.common import callable_marker
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
+from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli
 
@@ -409,6 +411,119 @@ def imported_vm(host, vm_ref):
     if not is_uuid(vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
+
+@pytest.fixture(scope="function")
+def create_vms(request, host):
+    """
+    Returns list of VM objects created from `vm_definitions` marker.
+
+    `vm_definitions` marker test author to specify one or more VMs, by
+    giving for each VM one `dict`, or a callable taking fixtures as
+    arguments and returning such a `dict`.
+
+    Mandatory keys:
+    - `name`: name of the VM to create (str)
+    - `template`: name (or UUID) of template to use (str)
+
+    Optional keys: see example below
+
+    Example:
+    -------
+    > @pytest.mark.vm_definitions(
+    >     dict(name="vm1", template="Other install media"),
+    >     dict(name="vm2",
+    >          template="CentOS 7",
+    >          params=(
+    >              dict(param_name="memory-static-max", value="4GiB"),
+    >              dict(param_name="HVM-boot-params", key="order", value="dcn"),
+    >          ),
+    >          vdis=[dict(name="vm 2 system disk",
+    >                     size="100GiB",
+    >                     device="xvda",
+    >                     userdevice="0",
+    >                     )],
+    >          cd_vbd=dict(device="xvdd", userdevice="3"),
+    >          vifs=(dict(index=0, network_name=NETWORKS["MGMT"]),
+    >                dict(index=1, network_uuid=NETWORKS["MYNET_UUID"]),
+    >          ),
+    >     ))
+    > def test_foo(create_vms):
+    >    ...
+
+    """
+    marker = request.node.get_closest_marker("vm_definitions")
+    if marker is None:
+        raise Exception("No vm_definitions marker specified.")
+
+    vm_defs = []
+    for vm_def in marker.args:
+        vm_def = callable_marker(vm_def, request)
+        assert "name" in vm_def
+        assert "template" in vm_def
+        # FIXME should check optional vdis contents
+        # FIXME should check for extra args
+        vm_defs.append(vm_def)
+
+    try:
+        vms = []
+        vdis = []
+        vbds = []
+        for vm_def in vm_defs:
+            _create_vm(request, vm_def, host, vms, vdis, vbds)
+        yield vms
+
+    except Exception:
+        logging.error("exception caught...")
+        raise
+
+    finally:
+        for vbd in vbds:
+            logging.info("<< Destroy VBD %s", vbd.uuid)
+            vbd.destroy()
+        for vdi in vdis:
+            logging.info("<< Destroy VDI %s", vdi.uuid)
+            vdi.destroy()
+        for vm in vms:
+            logging.info("<< Destroy VM %s", vm.uuid)
+            vm.destroy(verify=True)
+
+def _vm_name(request, vm_def):
+    return f"{vm_def['name']} in {request.node.nodeid}"
+
+def _create_vm(request, vm_def, host, vms, vdis, vbds):
+    vm_name = _vm_name(request, vm_def)
+    vm_template = vm_def["template"]
+
+    logging.info("Installing VM %r from template %r", vm_name, vm_template)
+
+    vm = host.vm_from_template(vm_name, vm_template)
+
+    # VM is now created, make sure we clean it up on any subsequent failure
+    vms.append(vm)
+
+    if "vdis" in vm_def:
+        for vdi_def in vm_def["vdis"]:
+            sr = SR(host.main_sr_uuid(), host.pool)
+            vdi = sr.create_vdi(vdi_def["name"], vdi_def["size"])
+            vdis.append(vdi)
+            # connect to VM
+            vbd = vm.create_vbd(vdi_def["device"], vdi.uuid)
+            vbds.append(vbd)
+            vbd.param_set(param_name="userdevice", value=vdi_def["userdevice"])
+
+    if "cd_vbd" in vm_def:
+        vm.create_cd_vbd(**vm_def["cd_vbd"])
+
+    if "vifs" in vm_def:
+        for vif_def in vm_def["vifs"]:
+            vm.create_vif(vif_def["index"],
+                          network_uuid=vif_def.get("network_uuid", None),
+                          network_name=vif_def.get("network_name", None))
+
+    if "params" in vm_def:
+        for param_def in vm_def["params"]:
+            logging.info("Setting param %s", param_def)
+            vm.param_set(**param_def)
 
 @pytest.fixture(scope="module")
 def started_vm(imported_vm):

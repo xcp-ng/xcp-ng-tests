@@ -12,6 +12,7 @@ import lib.efi as efi
 from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool, wait_for, wait_for_not
 from lib.snapshot import Snapshot
+from lib.vbd import VBD
 from lib.vif import VIF
 
 if TYPE_CHECKING:
@@ -280,6 +281,18 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
+    def create_vif(self, vif_num, *, network_uuid=None, network_name=None):
+        assert bool(network_uuid) != bool(network_name), \
+            "create_vif needs network_uuid XOR network_name"
+        if network_name:
+            network_uuid = self.host.pool.network_named(network_name)
+        assert network_uuid, f"No UUID given, and network name {network_name!r} not found"
+        logging.info("Create VIF %d to network %r on VM %s", vif_num, network_uuid, self.uuid)
+        self.host.xe('vif-create', {'vm-uuid': self.uuid,
+                                    'device': str(vif_num),
+                                    'network-uuid': network_uuid,
+                                    })
+
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
@@ -507,6 +520,27 @@ class VM(BaseVM):
         assert vtpm_uuid, "A vTPM must be present"
         logging.info("Destroying vTPM %s" % vtpm_uuid)
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
+
+    def create_vbd(self, device, vdi_uuid):
+        logging.info("Create VBD %r for VDI %r on VM %s", device, vdi_uuid, self.uuid)
+        vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
+                                               'device': device,
+                                               'vdi-uuid': vdi_uuid,
+                                               })
+        logging.info("New VBD %s", vbd_uuid)
+        return VBD(vbd_uuid, self, device)
+
+    def create_cd_vbd(self, device, userdevice):
+        logging.info("Create CD VBD %r on VM %s", device, self.uuid)
+        vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
+                                               'device': device,
+                                               'type': 'CD',
+                                               'mode': 'RO',
+                                               })
+        vbd = VBD(vbd_uuid, self, device)
+        vbd.param_set(param_name="userdevice", value=userdevice)
+        logging.info("New VBD %s", vbd_uuid)
+        return vbd
 
     def clone(self, *, name=None):
         if name is None:

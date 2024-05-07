@@ -256,3 +256,6 @@ class Pool:
         wait_for_not(lambda: host.uuid in self.hosts_uuids(), f"Wait for host {host} to be ejected of pool {master}.")
         self.hosts = [h for h in self.hosts if h.uuid != host.uuid]
         wait_for(host.is_enabled, f"Wait for host {host} to restart in its own pool.", timeout_secs=10 * 60)
+
+    def network_named(self, network_name):
+        return self.master.xe('network-list', {'name-label': network_name}, minimal=True)

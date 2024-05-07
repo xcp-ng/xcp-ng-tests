@@ -23,6 +23,10 @@ HOSTS: Dict[str, Dict[str, Any]] = {
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
 
+NETWORKS = {
+    "MGMT": "Pool-wide network associated with eth0",
+}
+
 # PXE config server for automated XCP-ng installation
 PXE_CONFIG_SERVER = 'pxe'
 

@@ -353,6 +353,15 @@ class Host:
 
         return VDI(vdi_uuid, sr=sr)
 
+    def vm_from_template(self, name, template):
+        params = {
+            "new-name-label": prefix_object_name(name),
+            "template": template,
+            "sr-uuid": self.main_sr_uuid(),
+        }
+        vm_uuid = self.xe('vm-install', params)
+        return VM(vm_uuid, self)
+
     def pool_has_vm(self, vm_uuid, vm_type='vm'):
         if vm_type == 'snapshot':
             return self.xe('snapshot-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
