@@ -335,12 +335,14 @@ class VM(BaseVM):
             return PackageManagerEnum.UNKNOWN
 
     def insert_cd(self, vdi_name):
+        logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
         self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': vdi_name})
 
     def insert_guest_tools_iso(self):
         self.insert_cd('guest-tools.iso')
 
     def eject_cd(self):
+        logging.info("Ejecting CD from VM %s", self.uuid)
         self.host.xe('vm-cd-eject', {'uuid': self.uuid})
 
     # *** Common reusable test fragments
