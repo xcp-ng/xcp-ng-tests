@@ -460,7 +460,7 @@ class Host:
                 srs.append(sr)
         return srs
 
-    def main_sr(self):
+    def main_sr_uuid(self):
         """ Main SR is either the default SR, or the first local SR, depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
