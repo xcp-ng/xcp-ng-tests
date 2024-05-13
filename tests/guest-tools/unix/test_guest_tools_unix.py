@@ -62,7 +62,7 @@ class TestGuestToolsUnix:
 
         # mount ISO
         logging.info("Mount guest tools ISO")
-        vm.mount_guest_tools_iso()
+        vm.insert_guest_tools_iso()
         tmp_mnt = vm.ssh(['mktemp', '-d'])
         time.sleep(2) # wait a small amount of time just to ensure the device is available
         vm.ssh(['mount', '-t', 'iso9660', '/dev/cdrom', tmp_mnt])
@@ -80,7 +80,7 @@ class TestGuestToolsUnix:
         # unmount ISO
         logging.info("Unmount guest tools ISO")
         vm.ssh(['umount', tmp_mnt])
-        vm.unmount_guest_tools_iso()
+        vm.eject_cd()
 
         # check that xe-daemon is running
         wait_for(lambda: vm.ssh_with_result(['pgrep', '-f', 'xe-daemon']).returncode == 0,
