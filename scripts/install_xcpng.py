@@ -15,6 +15,7 @@ import time
 from packaging import version
 
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..") # noqa
+from lib import pxe
 from lib.commands import ssh, scp, SSHCommandFailed
 from lib.common import wait_for, is_uuid
 from lib.host import host_data
@@ -23,25 +24,8 @@ from lib.vm import VM
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
-PXE_CONFIG_DIR = "/pxe/configs/custom"
-
 def pxe_address():
-    try:
-        from data import PXE_CONFIG_SERVER
-        return PXE_CONFIG_SERVER
-    except ImportError:
-        raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
-
-def generate_boot_conf(directory, installer, action):
-    # in case of restore, we disable the text ui from the installer completely,
-    # to workaround a bug that leaves us stuck on a confirmation dialog at the end of the operation.
-    rt = 'rt=1' if action == 'restore' else ''
-    with open(f'{directory}/boot.conf', 'w') as bootfile:
-        bootfile.write(f"""answerfile=custom
-installer={installer}
-is_default=1
-{rt}
-""")
+    return pxe.PXE_CONFIG_SERVER
 
 def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
     pxe = pxe_address()
@@ -89,37 +73,16 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
             raise Exception(f"Unknown action: `{action}`")
 
 def copy_files_to_pxe(mac_address, tmp_local_path):
-    assert mac_address
-    pxe = pxe_address()
-    remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    clean_files_on_pxe(mac_address)
-    ssh(pxe, ['mkdir', '-p', remote_dir])
-    scp(pxe, f'{tmp_local_path}/boot.conf', remote_dir)
-    scp(pxe, f'{tmp_local_path}/answerfile.xml', remote_dir)
+    pxe.server_push_config(mac_address, tmp_local_path)
 
 def clean_files_on_pxe(mac_address):
-    assert mac_address # protection against deleting the whole parent dir!
-    pxe = pxe_address()
-    remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    ssh(pxe, ['rm', '-rf', remote_dir])
+    pxe.server_remove_config(mac_address)
 
 def clean_bootconf_on_pxe(mac_address):
-    assert mac_address
-    pxe = pxe_address()
-    distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
-    try:
-        ssh(pxe, ['rm', '-rf', distant_file])
-    except SSHCommandFailed as e:
-        raise Exception('ERROR: failed to clean the boot.conf file.' + e)
+    pxe.server_remove_bootconf(mac_address)
 
 def get_candidate_ips(mac_address):
-    pxe = pxe_address()
-    output = ssh(
-        pxe,
-        ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
-    )
-    candidate_ips = output.splitlines()
-    return candidate_ips
+    return pxe.arp_addresses_for(mac_address)
 
 def is_ip_active(ip):
     return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
@@ -191,8 +154,6 @@ def main():
 
     # *** "fail early" checks
 
-    pxe = pxe_address() # raises if not defined
-
     if not is_uuid(args.vm_uuid):
         raise Exception(f'The provided VM UUID is invalid: {args.vm_uuid}')
 
@@ -237,7 +198,7 @@ def main():
         hdd = 'nvme0n1' if vm.is_uefi else 'sda'
         generate_answerfile(tmp_local_path, installer, args.host, args.target_hostname, args.action, hdd,
                             netinstall_gpg_check)
-        generate_boot_conf(tmp_local_path, installer, args.action)
+        pxe.generate_boot_conf(tmp_local_path, installer)
         logging.info('Copy files to the pxe server')
         copy_files_to_pxe(mac_address, tmp_local_path)
         atexit.register(lambda: clean_files_on_pxe(mac_address))
