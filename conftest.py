@@ -314,7 +314,7 @@ def imported_vm(host, vm_ref):
         name = vm_orig.name()
         logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
-        vm_orig = host.import_vm(vm_ref, host.main_sr(), use_cache=CACHE_IMPORTED_VM)
+        vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=CACHE_IMPORTED_VM)
 
     if CACHE_IMPORTED_VM:
         # Clone the VM before running tests, so that the original VM remains untouched
