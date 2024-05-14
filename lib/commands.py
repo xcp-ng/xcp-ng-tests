@@ -205,6 +205,7 @@ def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
 
 def local_cmd(cmd, check=True, decode=True):
     """ Run a command locally on tester end. """
+    logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
