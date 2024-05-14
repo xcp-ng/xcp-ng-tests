@@ -65,8 +65,8 @@ OUTPUT_HANDLER = logging.StreamHandler()
 OUPUT_LOGGER.addHandler(OUTPUT_HANDLER)
 OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
 
-def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-         background=False, target_os='linux', decode=True, options=[]):
+def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
+         background, target_os, decode, options):
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
