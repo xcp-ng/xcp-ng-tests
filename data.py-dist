@@ -26,10 +26,30 @@ PXE_CONFIG_SERVER = 'pxe'
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
 
+ANSWERFILE_URL = f"http://{PXE_CONFIG_SERVER}/configs/custom/ydi/install-8.2-uefi-iso-ext.xml" # FIXME
+
+# Default shared ISO SR
+ISOSR_SRV = "nfs-server"
+ISOSR_PATH = "/srv/iso-sr"
+
+# Tools
+TOOLS = {
+#    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
+}
+
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
 VM_IMAGES = {
     'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
     'mini-linux-x86_64-uefi': 'alpine-uefi-minimal-3.12.0.xva'
+}
+
+# FIXME: use URLs and an optional cache?
+ISO_IMAGES = {
+#    'xcpng-8.2.0': "/home/user/iso/xcp-ng-8.2.0.iso",
+#    'xcpng-8.2.1': "/home/user/iso/xcp-ng-8.2.1.iso",
+#    'xcpng-8.2.1-2023': "/home/user/iso/xcp-ng-8.2.1-20231130.iso",
+#    'xcpng-8.3-beta2': "/home/user/iso/xcp-ng-8.3.0-beta2.iso",
+#    'xcpng-8.3-beta2-net': "/home/user/iso/xcp-ng-8.3.0-beta2-netinstall.iso",
 }
 
 # In some cases, we may prefer to favour a local SR to store test VM disks,
