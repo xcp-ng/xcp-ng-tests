@@ -13,7 +13,7 @@ def iso_remaster(request):
     param_mapping = marker.kwargs.get("param_mapping", {})
     iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
-    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, TOOLS
+    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
@@ -23,9 +23,22 @@ def iso_remaster(request):
 
     with tempfile.TemporaryDirectory() as isotmp:
         remastered_iso = os.path.join(isotmp, "image.iso")
+        img_patcher_script = os.path.join(isotmp, "img-patcher")
         iso_patcher_script = os.path.join(isotmp, "iso-patcher")
 
         logging.info("Remastering %s to %s", SOURCE_ISO, remastered_iso)
+
+        # generate install.img-patcher script
+        with open(img_patcher_script, "xt") as patcher_fd:
+            print(f"""#!/bin/bash
+set -ex
+INSTALLIMG="$1"
+
+mkdir -p "$INSTALLIMG/root/.ssh"
+echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+""",
+                  file=patcher_fd)
+            os.chmod(patcher_fd.fileno(), 0o755)
 
         # generate iso-patcher script
         with open(iso_patcher_script, "xt") as patcher_fd:
@@ -45,6 +58,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
 
         # do remaster
         local_cmd([iso_remaster,
+                   "--install-patcher", img_patcher_script,
                    "--iso-patcher", iso_patcher_script,
                    SOURCE_ISO, remastered_iso
                    ])
