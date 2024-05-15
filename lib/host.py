@@ -401,14 +401,22 @@ class Host:
     def disk_is_available(self, disk):
         return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
-    def available_disks(self):
+    def available_disks(self, blocksize=512):
         """
         Return a list of available disks for formatting, creating SRs or such.
 
         Returns a list of disk names (eg.: ['sdb', 'sdc']) that don't have any mountpoint in
         the output of lsblk (including their children such as partitions or md RAID devices)
         """
-        return [disk for disk in self.disks() if self.disk_is_available(disk)]
+        avail_disks = []
+        blk_output = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME,LOG-SEC']).splitlines()
+        for line in blk_output:
+            line = line.split()
+            disk = line[0]
+            sec_size = line[1]
+            if sec_size == str(blocksize):
+                avail_disks.append(disk)
+        return [disk for disk in avail_disks if self.disk_is_available(disk)]
 
     def file_exists(self, filepath, regular_file=True):
         option = '-f' if regular_file else '-e'

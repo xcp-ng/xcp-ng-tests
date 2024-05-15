@@ -84,6 +84,14 @@ def pytest_addoption(parser):
         help="Name of an available disk (sdb) or partition device (sdb2) to be formatted and used in storage tests. "
              "Set it to 'auto' to let the fixtures auto-detect available disks."
     )
+    parser.addoption(
+        "--sr-disk-4k",
+        action="append",
+        default=[],
+        help="Name of an available disk (sdb) or partition device (sdb2) with "
+             "4KiB blocksize to be formatted and used in storage tests. "
+             "Set it to 'auto' to let the fixtures auto-detect available disks."
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -225,6 +233,21 @@ def sr_disk(request, host):
         logging.info(f">> Check that disk or block device {disk} is available on the master host")
         assert disk in host.available_disks(), \
             f"disk or block device {disk} is either not present or already used on master host"
+    yield disk
+
+@pytest.fixture(scope='session')
+def sr_disk_4k(request, host):
+    disk = request.param
+    if disk == "auto":
+        logging.info(">> Check for the presence of a free 4KiB block device on the master host")
+        disks = host.available_disks(4096)
+        assert len(disks) > 0, "a free 4KiB block device is required on the master host"
+        disk = disks[0]
+        logging.info(f">> Found free 4KiB block device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
+    else:
+        logging.info(f">> Check that 4KiB block device {disk} is available on the master host")
+        assert disk in host.available_disks(4096), \
+            f"4KiB block device {disk} must be available for use on master host"
     yield disk
 
 @pytest.fixture(scope='session')
@@ -435,6 +458,9 @@ def pytest_generate_tests(metafunc):
     if "sr_disk" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk", disk, indirect=True, scope="session")
+    if "sr_disk_4k" in metafunc.fixturenames:
+        disk = metafunc.config.getoption("sr_disk_4k")
+        metafunc.parametrize("sr_disk_4k", disk, indirect=True, scope="session")
     if "sr_disk_for_all_hosts" in metafunc.fixturenames:
         disk = metafunc.config.getoption("sr_disk")
         metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
@@ -449,7 +475,8 @@ def pytest_collection_modifyitems(items, config):
         'windows_vm',
         'hostA2',
         'hostB1',
-        'sr_disk'
+        'sr_disk',
+        'sr_disk_4k'
     ]
 
     for item in items:

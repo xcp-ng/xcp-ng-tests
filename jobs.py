@@ -71,7 +71,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "(small_vm or no_vm) and not reboot and not quicktest",
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not sr_disk_4k",
         "name_filter": "not migration and not linstor",
     },
     "storage-migrations": {
@@ -89,7 +89,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "",
+        "markers": "not sr_disk_4k",
         "name_filter": "migration and not linstor",
     },
     "storage-reboots": {
@@ -106,7 +106,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "reboot and not flaky",
+        "markers": "reboot and not flaky and not sr_disk_4k",
         "name_filter": "not linstor",
     },
     "storage-quicktest": {
@@ -121,7 +121,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "quicktest",
+        "markers": "quicktest and not sr_disk_4k",
         "name_filter": "not linstor and not zfsvol",
     },
     "linstor-main": {
@@ -184,6 +184,67 @@ JOBS = {
         },
         "paths": ["tests/storage/linstor"],
         "markers": "quicktest",
+    },
+    "largeblock-main": {
+        "description": "tests the largeblock storage driver. avoids quicktest, migrations and reboots",
+        "requirements": [
+            "A pool with at least 1 host.",
+            "An additional free 4KiB disk on the first host.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--sr-disk-4k": "auto",
+        },
+        "paths": ["tests/storage"],
+        "markers": "(small_vm or no_vm) and sr_disk_4k and not reboot and not quicktest",
+        "name_filter": "not migration",
+    },
+    "largeblock-migrations": {
+        "description": "a group of tests that need to run on hosts with 4KiB disks and migrates the VDI around",
+        "requirements": [
+            "A pool with at least 2 hosts, each with a local SR.",
+            "An additional free 4KiB disk on the first host.",
+            "A second pool with a SR to receive migrated VMs.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+            "--sr-disk-4k": "auto",
+        },
+        "paths": ["tests/storage"],
+        "markers": "sr_disk_4k",
+        "name_filter": "migration",
+    },
+    "largeblock-reboots": {
+        "description": "largeblock storage driver tests that involve rebooting hosts",
+        "requirements": [
+            "A pool with at least 1 host.",
+            "An additional free 4KiB disk on the first host.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--sr-disk-4k": "auto",
+        },
+        "paths": ["tests/storage"],
+        "markers": "sr_disk_4k and reboot",
+    },
+    "largeblock-quicktest": {
+        "description": "runs `quicktest` on the largeblock storage driver",
+        "requirements": [
+            "A pool with at least 1 host",
+            "An additional free 4KiB disk on the first host.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--sr-disk-4k": "auto",
+        },
+        "paths": ["tests/storage"],
+        "markers": "sr_disk_4k and quicktest",
     },
     "sb-main": {
         "description": "tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)",
@@ -342,7 +403,7 @@ JOBS = {
         "nb_pools": 1,
         "params": {},
         "paths": ["tests/pci_passthrough"],
-    }
+    },
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
