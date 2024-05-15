@@ -260,7 +260,8 @@ JOBS = {
         "paths": [
             "tests/uefi_sb/test_auth_var.py",
             "tests/uefi_sb/test_uefistored_sb.py",
-            "tests/uefi_sb/test_varstored_sb.py"
+            "tests/uefi_sb/test_varstored_sb.py",
+            "tests/uefi_sb/test_sb_state.py"
         ],
         "markers": "not windows_vm",
     },
