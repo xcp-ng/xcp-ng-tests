@@ -481,7 +481,6 @@ class VM(BaseVM):
         name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
-        logging.info("New VM: %s (%s)" % (uuid, name))
         return VM(uuid, self.host)
 
     def install_uefi_certs(self, auths):

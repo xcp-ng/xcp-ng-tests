@@ -227,7 +227,6 @@ class Host:
             params['sr-uuid'] = sr_uuid
         logging.info(msg)
         vm_uuid = self.xe('vm-import', params)
-        logging.info("VM UUID: %s" % vm_uuid)
         vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
         vm = VM(vm_uuid, self)
         vm.param_set('name-label', vm_name)
