@@ -473,8 +473,9 @@ class VM(BaseVM):
         logging.info("Destroying vTPM %s" % vtpm_uuid)
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
-    def clone(self):
-        name = self.name() + '_clone_for_tests'
+    def clone(self, *, name=None):
+        if name is None:
+            name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
