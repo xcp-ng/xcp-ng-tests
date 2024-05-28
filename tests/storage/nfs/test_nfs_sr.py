@@ -20,7 +20,7 @@ class TestNFSSRCreateDestroy:
         sr.destroy(verify=True)
 
 # Make sure these fixtures are called before the parametrized one
-@pytest.mark.usefixtures('sr_device_config', 'hosts')
+@pytest.mark.usefixtures('sr_device_config')
 class TestNFSSR:
     @pytest.mark.quicktest
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)

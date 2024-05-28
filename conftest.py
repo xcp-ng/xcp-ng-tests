@@ -1,3 +1,4 @@
+import itertools
 import logging
 import pytest
 import tempfile
@@ -103,10 +104,14 @@ def setup_host(hostname_or_ip):
     return h
 
 @pytest.fixture(scope='session')
-def hosts(request):
+def hosts(pytestconfig):
     # a list of master hosts, each from a different pool
-    hostname_list = request.param.split(',')
+    hosts_args = pytestconfig.getoption("hosts")
+    hosts_split = [hostlist.split(',') for hostlist in hosts_args]
+    hostname_list = list(itertools.chain(*hosts_split))
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
+    if not host_list:
+        pytest.fail("This test requires at least one --hosts parameter")
     yield host_list
 
 @pytest.fixture(scope='session')
@@ -430,8 +435,6 @@ def second_network(request, host):
     return network_uuid
 
 def pytest_generate_tests(metafunc):
-    if "hosts" in metafunc.fixturenames:
-        metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
     if "vm_ref" in metafunc.fixturenames:
         vms = metafunc.config.getoption("vm")
         if not vms:
