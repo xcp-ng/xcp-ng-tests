@@ -55,12 +55,6 @@ def pytest_addoption(parser):
              "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
     )
     parser.addoption(
-        "--additional-repos",
-        action="append",
-        default=[],
-        help="Additional repo URLs added to the yum config"
-    )
-    parser.addoption(
         "--second-network",
         action="store",
         default=None,
@@ -456,14 +450,6 @@ def pytest_generate_tests(metafunc):
             # For us it means use the defaults.
             configs = [None]
         metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
-    if "additional_repos" in metafunc.fixturenames:
-        repos = metafunc.config.getoption("additional_repos")
-        if not repos:
-            # No --additional-repos parameter doesn't mean skip the test.
-            # It's an optional parameter, if missing we must execute additional_repos fixture
-            # without error.
-            repos = [None]
-        metafunc.parametrize("additional_repos", repos, indirect=True, scope="session")
     if "second_network" in metafunc.fixturenames:
         second_network = metafunc.config.getoption("second_network")
         metafunc.parametrize("second_network", [second_network], indirect=True, scope="session")
