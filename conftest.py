@@ -422,10 +422,11 @@ gpgcheck=0
             host_.ssh(['rm', '-f', repo_file])
 
 @pytest.fixture(scope='session')
-def second_network(request, host):
-    if request.param is None:
-        pytest.fail("This test requires the --second-network parameter!")
-    network_uuid = request.param
+def second_network(pytestconfig, host):
+    network_uuids = pytestconfig.getoption("second_network")
+    if len(network_uuids) != 1:
+        pytest.fail("This test requires exactly one --second-network parameter!")
+    network_uuid = network_uuids[0]
     pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': network_uuid}, minimal=True)
     if not pif_uuid:
         pytest.fail("The provided --second-network UUID doesn't exist or doesn't have a PIF on master host")
@@ -450,9 +451,6 @@ def pytest_generate_tests(metafunc):
             # For us it means use the defaults.
             configs = [None]
         metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
-    if "second_network" in metafunc.fixturenames:
-        second_network = metafunc.config.getoption("second_network")
-        metafunc.parametrize("second_network", [second_network], indirect=True, scope="session")
 
 def pytest_collection_modifyitems(items, config):
     # Automatically mark tests based on fixtures they require.
