@@ -226,8 +226,11 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def sr_disk(request, host):
-    disk = request.param
+def sr_disk(pytestconfig, host):
+    disks = pytestconfig.getoption("sr_disk")
+    if len(disks) != 1:
+        pytest.fail("This test requires exactly one --sr-disk parameter")
+    disk = disks[0]
     if disk == "auto":
         logging.info(">> Check for the presence of a free disk device on the master host")
         disks = host.available_disks()
@@ -241,8 +244,11 @@ def sr_disk(request, host):
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_4k(request, host):
-    disk = request.param
+def sr_disk_4k(pytestconfig, host):
+    disks = pytestconfig.getoption("sr_disk_4k")
+    if len(disks) != 1:
+        pytest.fail("This test requires exactly one --sr-disks-4k parameter")
+    disk = disks[0]
     if disk == "auto":
         logging.info(">> Check for the presence of a free 4KiB block device on the master host")
         disks = host.available_disks(4096)
@@ -256,8 +262,11 @@ def sr_disk_4k(request, host):
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_for_all_hosts(request, host):
-    disk = request.param
+def sr_disk_for_all_hosts(pytestconfig, request, host):
+    disks = pytestconfig.getoption("sr_disk")
+    if len(disks) != 1:
+        pytest.fail("This test requires exactly one --sr-disk parameter")
+    disk = disks[0]
     master_disks = host.available_disks()
     assert len(master_disks) > 0, "a free disk device is required on the master host"
 
@@ -458,15 +467,6 @@ def pytest_generate_tests(metafunc):
     if "second_network" in metafunc.fixturenames:
         second_network = metafunc.config.getoption("second_network")
         metafunc.parametrize("second_network", [second_network], indirect=True, scope="session")
-    if "sr_disk" in metafunc.fixturenames:
-        disk = metafunc.config.getoption("sr_disk")
-        metafunc.parametrize("sr_disk", disk, indirect=True, scope="session")
-    if "sr_disk_4k" in metafunc.fixturenames:
-        disk = metafunc.config.getoption("sr_disk_4k")
-        metafunc.parametrize("sr_disk_4k", disk, indirect=True, scope="session")
-    if "sr_disk_for_all_hosts" in metafunc.fixturenames:
-        disk = metafunc.config.getoption("sr_disk")
-        metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
 
 def pytest_collection_modifyitems(items, config):
     # Automatically mark tests based on fixtures they require.
