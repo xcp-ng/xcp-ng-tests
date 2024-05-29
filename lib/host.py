@@ -215,6 +215,7 @@ class Host:
                 if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
                     logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
                     return vm
+            logging.info("Not found vm in cache with key %r", cache_key)
 
         params = {}
         msg = "Import VM %s" % uri
