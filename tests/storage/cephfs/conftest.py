@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from lib.common import exec_nofail, raise_errors
+from lib import config
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
@@ -22,21 +23,8 @@ def pool_with_ceph(pool_without_ceph, pool_with_saved_yum_state):
     yield pool
 
 @pytest.fixture(scope='package')
-def cephfs_device_config(sr_device_config):
-    if sr_device_config is not None:
-        # SR device config from CLI param
-        config = sr_device_config
-    else:
-        # SR device config from data.py defaults
-        try:
-            from data import DEFAULT_CEPHFS_DEVICE_CONFIG
-        except ImportError:
-            DEFAULT_CEPHFS_DEVICE_CONFIG = {}
-        if DEFAULT_CEPHFS_DEVICE_CONFIG:
-            config = DEFAULT_CEPHFS_DEVICE_CONFIG
-        else:
-            raise Exception("No default CephFS device-config found, neither in CLI nor in data.py defaults")
-    return config
+def cephfs_device_config():
+    return config.sr_device_config("CEPHFS_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
 def cephfs_sr(host, cephfs_device_config, pool_with_ceph):

@@ -48,13 +48,6 @@ def pytest_addoption(parser):
         help="VM key or OVA URL for tests that require only one VM",
     )
     parser.addoption(
-        "--sr-device-config",
-        action="append",
-        default=[],
-        help="device-config keys and values for a remote SR. "
-             "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
-    )
-    parser.addoption(
         "--second-network",
         action="store",
         default=None,
@@ -378,21 +371,6 @@ def uefi_vm(imported_vm):
     yield vm
 
 @pytest.fixture(scope='session')
-def sr_device_config(request):
-    raw_config = request.param
-
-    if raw_config is None:
-        # Use defaults
-        return None
-
-    config = {}
-    for key_val in raw_config.split(','):
-        key = key_val.split(':')[0]
-        value = key_val[key_val.index(':') + 1:]
-        config[key] = value
-    return config
-
-@pytest.fixture(scope='session')
 def additional_repos(request, hosts):
     if request.param is None:
         yield []
@@ -444,13 +422,6 @@ def pytest_generate_tests(metafunc):
         if not vms:
             vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
-    if "sr_device_config" in metafunc.fixturenames:
-        configs = metafunc.config.getoption("sr_device_config")
-        if not configs:
-            # No --sr-device-config parameter doesn't mean skip the test.
-            # For us it means use the defaults.
-            configs = [None]
-        metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
 
 def pytest_collection_modifyitems(items, config):
     # Automatically mark tests based on fixtures they require.

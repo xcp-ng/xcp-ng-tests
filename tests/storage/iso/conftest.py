@@ -2,6 +2,8 @@ import pytest
 import time
 import os
 
+from lib import config
+
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import formatted_and_mounted_ext4_disk
 
@@ -23,38 +25,12 @@ def local_iso_sr(host, formatted_and_mounted_ext4_disk):
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def nfs_iso_device_config(sr_device_config):
-    if sr_device_config is not None:
-        # SR device config from CLI param
-        config = sr_device_config
-    else:
-        # SR device config from data.py defaults
-        try:
-            from data import DEFAULT_NFS_ISO_DEVICE_CONFIG
-        except ImportError:
-            DEFAULT_NFS_ISO_DEVICE_CONFIG = {}
-        if DEFAULT_NFS_ISO_DEVICE_CONFIG:
-            config = DEFAULT_NFS_ISO_DEVICE_CONFIG
-        else:
-            raise Exception("No default NFS ISO device-config found, neither in CLI nor in data.py defaults")
-    return config
+def nfs_iso_device_config():
+    return config.sr_device_config("NFS_ISO_DEVICE_CONFIG")
 
 @pytest.fixture(scope='module')
-def cifs_iso_device_config(sr_device_config):
-    if sr_device_config is not None:
-        # SR device config from CLI param
-        config = sr_device_config
-    else:
-        # SR device config from data.py defaults
-        try:
-            from data import DEFAULT_CIFS_ISO_DEVICE_CONFIG
-        except ImportError:
-            DEFAULT_CIFS_ISO_DEVICE_CONFIG = {}
-        if DEFAULT_CIFS_ISO_DEVICE_CONFIG:
-            config = DEFAULT_CIFS_ISO_DEVICE_CONFIG
-        else:
-            raise Exception("No default CIFS ISO device-config found, neither in CLI nor in data.py defaults")
-    return config
+def cifs_iso_device_config():
+    return config.sr_device_config("CIFS_ISO_DEVICE_CONFIG")
 
 @pytest.fixture(scope='module')
 def nfs_iso_sr(host, nfs_iso_device_config):
