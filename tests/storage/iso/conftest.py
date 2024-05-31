@@ -26,7 +26,7 @@ def local_iso_sr(host, formatted_and_mounted_ext4_disk):
 
 @pytest.fixture(scope='module')
 def nfs_iso_device_config():
-    return config.sr_device_config("NFS_ISO_DEVICE_CONFIG")
+    return config.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=['location'])
 
 @pytest.fixture(scope='module')
 def cifs_iso_device_config():
