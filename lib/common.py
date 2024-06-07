@@ -32,15 +32,14 @@ def prefix_object_name(label):
 def wait_for(fn, msg=None, timeout_secs=2 * 60, retry_delay_secs=2, invert=False):
     if msg is not None:
         logging.info(msg)
-    time_left = timeout_secs
+    start_time = time.perf_counter()
     while True:
         ret = fn()
         if not invert and ret:
             return
         if invert and not ret:
             return
-        time_left -= retry_delay_secs
-        if time_left <= 0:
+        if time.perf_counter() - start_time >= timeout_secs:
             expected = 'True' if not invert else 'False'
             raise TimeoutError(
                 "Timeout reached while waiting for fn call to yield %s (%s)." % (expected, timeout_secs)
