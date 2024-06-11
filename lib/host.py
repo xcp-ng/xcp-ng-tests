@@ -8,7 +8,7 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import _param_get, safe_split, to_xapi_bool, wait_for, wait_for_not
+from lib.common import _param_get, safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
@@ -203,7 +203,7 @@ class Host:
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
         if use_cache:
             assert sr_uuid, "A SR UUID is necessary to use import cache"
-            cache_key = f"[Cache for {uri}]"
+            cache_key = f"[Cache for {strip_suffix(uri, '.xva')}]"
             # Look for an existing cache VM
             vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
 
