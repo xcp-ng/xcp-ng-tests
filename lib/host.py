@@ -8,7 +8,7 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import _param_get, safe_split, to_xapi_bool, wait_for, wait_for_not
+from lib.common import _param_get, safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
@@ -202,7 +202,7 @@ class Host:
 
     @staticmethod
     def vm_cache_key(uri):
-        return f"[Cache for {uri}]"
+        return f"[Cache for {strip_suffix(uri, '.xva')}]"
 
     def cached_vm(self, uri, sr_uuid):
         assert sr_uuid, "A SR UUID is necessary to use import cache"
