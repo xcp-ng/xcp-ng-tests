@@ -1,6 +1,7 @@
 import getpass
 import inspect
 import logging
+import sys
 import time
 import traceback
 from enum import Enum
@@ -74,6 +75,20 @@ def parse_xe_dict(xe_dict):
 def safe_split(text, sep=','):
     """ A split function that returns an empty list if the input string is empty. """
     return text.split(sep) if len(text) > 0 else []
+
+def strip_prefix(string, prefix):
+    if sys.version_info >= (3, 9):
+        return string.removeprefix(prefix)
+    if string.startswith(prefix):
+        return string[len(prefix):]
+    return string
+
+def strip_suffix(string, suffix):
+    if sys.version_info >= (3, 9):
+        return string.removesuffix(suffix)
+    if string.endswith(suffix):
+        return string[:-len(suffix)]
+    return string
 
 def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
     if fs_type == 'ext4':
