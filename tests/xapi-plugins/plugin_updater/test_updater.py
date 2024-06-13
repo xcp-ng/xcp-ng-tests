@@ -1,4 +1,3 @@
-from pkgfixtures import host_with_saved_yum_state
 import json
 
 # Requirements:
