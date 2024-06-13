@@ -480,9 +480,11 @@ class Host:
 
         sr_uuid = None
         if DEFAULT_SR == 'local':
+            hostname = self.xe('host-param-get', {'uuid': self.uuid,
+                                                  'param-name': 'name-label'})
             local_sr_uuids = safe_split(
                 # xe sr-list doesn't support filtering by host UUID!
-                self.ssh(['xe sr-list host=$HOSTNAME content-type=user minimal=true']),
+                self.xe('sr-list', {'host': hostname, 'content-type': 'user', 'minimal': 'true'}),
                 ','
             )
             assert local_sr_uuids, f"DEFAULT_SR=='local' so there must be a local SR on host {self}"
