@@ -25,12 +25,11 @@ class TestsNetdata:
         return stdout.decode().splitlines()
 
     # Verify the ActiveState for the netdata service
-    def test_netdata_service(self, host_with_netdata):
-        host_with_netdata.ssh(['systemctl', 'is-active', 'netdata.service'])
+    def test_netdata_service(self, host):
+        host.ssh(['systemctl', 'is-active', 'netdata.service'])
 
     # Netdata configuration should be accessible only from the host
-    def test_netdata_conf(self, host_with_netdata):
-        host = host_with_netdata
+    def test_netdata_conf(self, host):
         lines = TestsNetdata.__get_headers(host, 19999, "netdata.conf")
         assert lines[0].strip() == "HTTP/1.1 403 Forbidden"
 
@@ -39,7 +38,6 @@ class TestsNetdata:
         assert lines[0].strip() == "HTTP/1.1 200 OK"
 
     # Verify the web UI is accessible. i.e. port 19999 is opened
-    def test_netdata_webui(self, host_with_netdata):
-        host = host_with_netdata
+    def test_netdata_webui(self, host):
         lines = TestsNetdata.__get_headers(host, 19999)
         assert lines[0].strip() == "HTTP/1.1 200 OK"
