@@ -11,6 +11,7 @@ from lib.pool import Pool
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("iso_version", (
+        "80", "81",
         "ch821.1", "xs8",
         "821.1", "83b2",
     ))
@@ -38,6 +39,8 @@ class TestNested:
                                 param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
         lambda version: {
+            "80": "xcpng-8.0",
+            "81": "xcpng-8.1",
             "821.1": "xcpng-8.2.1-2023",
             "83b2": "xcpng-8.3-beta2",
             "ch821.1": "ch-8.2.1-23",
@@ -134,10 +137,13 @@ class TestNested:
         #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
         "821.1-83b2",
         "821.1-83b2-83b2",
+        "81-83b2", "81-83b2-83b2",
+        "80-83b2", "80-83b2-83b2",
         "ch821.1-83b2",
         "ch821.1-83b2-83b2",
         "821.1",
         "821.1-821.1",
+        "81", "80",
         "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -174,6 +180,8 @@ class TestNested:
         expected_rel = {
             "ch821.1": "8.2.1",
             "xs8": "8.4.0",
+            "80": "8.0.0",
+            "81": "8.1.0",
             "821.1": "8.2.1",
             "83b2": "8.3.0",
         }[expected_rel_id]
@@ -227,21 +235,45 @@ class TestNested:
             # wait for XAPI
             wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 
-            # check for firstboot issues
-            # FIXME: flaky, must check logs extraction on failure
-            for service in ["control-domain-params-init",
+            if lsb_rel in ["8.2.1", "8.3.0", "8.4.0"]:
+                SERVICES =["control-domain-params-init",
                             "network-init",
                             "storage-init",
                             "generate-iscsi-iqn",
                             "create-guest-templates",
-                            ]:
-                try:
-                    wait_for(lambda: pool.master.ssh(["test", "-e", f"/var/lib/misc/ran-{service}"],
+                            ]
+                STAMPS_DIR = "/var/lib/misc"
+                STAMPS = [f"ran-{service}" for service in SERVICES]
+            elif lsb_rel in ["8.0.0", "8.1.0"]:
+                SERVICES = ["xs-firstboot"]
+                STAMPS_DIR = "/etc/firstboot.d/state"
+                STAMPS = [
+                    "05-prepare-networking",
+                    "10-prepare-storage",
+                    "15-set-default-storage",
+                    "20-udev-storage",
+                    "25-multipath",
+                    "40-generate-iscsi-iqn",
+                    "50-prepare-control-domain-params",
+                    "60-import-keys",
+                    "60-upgrade-likewise-to-pbis",
+                    "62-create-guest-templates",
+                    "80-common-criteria",
+                    "90-flush-pool-db",
+                    "95-legacy-logrotate",
+                    "99-remove-firstboot-flag",
+                ]
+            # check for firstboot issues
+            # FIXME: flaky, must check logs extraction on failure
+            try:
+                for stamp in STAMPS:
+                    wait_for(lambda: pool.master.ssh(["test", "-e", f"{STAMPS_DIR}/{stamp}"],
                                                      check=False, simple_output=False,
                                                      ).returncode == 0,
-                             f"Wait for ran-{service} stamp")
-                except TimeoutError:
-                    logging.warning("investigating lack of ran-{service} stamp")
+                             f"Wait for {stamp} stamp")
+            except TimeoutError:
+                logging.warning("investigating lack of {stamp} service stamp")
+                for service in SERVICES:
                     out = pool.master.ssh(["systemctl", "status", service], check=False)
                     logging.warning("service status: %s", out)
                     out = pool.master.ssh(["grep", "-r", service, "/var/log"], check=False)
@@ -277,6 +309,8 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1", "821.1"),
+        ("80", "83b2"),
+        ("81", "83b2"),
         ("ch821.1", "83b2"),
         ("821.1", "83b2"),
         #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
@@ -380,6 +414,8 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1-83b2", "83b2"),
+        ("80-83b2", "83b2"),
+        ("81-83b2", "83b2"),
         ("ch821.1-83b2", "83b2"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
