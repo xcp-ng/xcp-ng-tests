@@ -11,7 +11,7 @@ from lib.pool import Pool
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("iso_version", (
-        "80", "81",
+        "75", "76", "80", "81",
         "ch821.1", "xs8",
         "821.1", "83b2",
     ))
@@ -39,6 +39,8 @@ class TestNested:
                                 param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
         lambda version: {
+            "75": "xcpng-7.5",
+            "76": "xcpng-7.6",
             "80": "xcpng-8.0",
             "81": "xcpng-8.1",
             "821.1": "xcpng-8.2.1-2023",
@@ -139,11 +141,14 @@ class TestNested:
         "821.1-83b2-83b2",
         "81-83b2", "81-83b2-83b2",
         "80-83b2", "80-83b2-83b2",
+        "76-83b2", "76-83b2-83b2",
+        "75-83b2", "75-83b2-83b2",
         "ch821.1-83b2",
         "ch821.1-83b2-83b2",
         "821.1",
         "821.1-821.1",
         "81", "80",
+        "76", "75",
         "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -180,6 +185,8 @@ class TestNested:
         expected_rel = {
             "ch821.1": "8.2.1",
             "xs8": "8.4.0",
+            "75": "7.5.0",
+            "76": "7.6.0",
             "80": "8.0.0",
             "81": "8.1.0",
             "821.1": "8.2.1",
@@ -244,7 +251,7 @@ class TestNested:
                             ]
                 STAMPS_DIR = "/var/lib/misc"
                 STAMPS = [f"ran-{service}" for service in SERVICES]
-            elif lsb_rel in ["8.0.0", "8.1.0"]:
+            elif lsb_rel in ["7.5.0", "7.6.0", "8.0.0", "8.1.0"]:
                 SERVICES = ["xs-firstboot"]
                 STAMPS_DIR = "/etc/firstboot.d/state"
                 STAMPS = [
@@ -258,11 +265,14 @@ class TestNested:
                     "60-import-keys",
                     "60-upgrade-likewise-to-pbis",
                     "62-create-guest-templates",
-                    "80-common-criteria",
                     "90-flush-pool-db",
                     "95-legacy-logrotate",
                     "99-remove-firstboot-flag",
                 ]
+                if lsb_rel in ["8.0.0", "8.1.0"]:
+                    STAMPS += [
+                        "80-common-criteria",
+                    ]
             # check for firstboot issues
             # FIXME: flaky, must check logs extraction on failure
             try:
@@ -309,6 +319,8 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1", "821.1"),
+        ("75", "83b2"),
+        ("76", "83b2"),
         ("80", "83b2"),
         ("81", "83b2"),
         ("ch821.1", "83b2"),
@@ -414,6 +426,8 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1-83b2", "83b2"),
+        ("75-83b2", "83b2"),
+        ("76-83b2", "83b2"),
         ("80-83b2", "83b2"),
         ("81-83b2", "83b2"),
         ("ch821.1-83b2", "83b2"),
