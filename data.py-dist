@@ -134,6 +134,8 @@ ISO_IMAGES: Dict[str, "IsoImageDef"] = {
     '820': {'path': "8.2/xcp-ng-8.2.0.iso"},
     '81': {'path': "8.1/xcp-ng-8.1.0-2.iso"},
     '80': {'path': "8.0/xcp-ng-8.0.0.iso"},
+    '76': {'path': "7.6/xcp-ng-7.6.0.iso"},
+    '75': {'path': "7.5/xcp-ng-7.5.0-2.iso"},
     'xs8': {'path': "XenServer8_2024-03-18.iso"},
     'ch821.1': {'path': "CitrixHypervisor-8.2.1-2306-install-cd.iso"},
     'ch821': {'path': "CitrixHypervisor-8.2.1-install-cd.iso"},
