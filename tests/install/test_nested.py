@@ -13,6 +13,7 @@ pytestmark = pytest.mark.dependency()
 
 @pytest.mark.parametrize("iso_version", (
     "821.1", "83b2",
+    "81", "80",
     "xs8", "ch821.1",
 ))
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
@@ -50,6 +51,8 @@ pytestmark = pytest.mark.dependency()
     lambda version: {
         "821.1": "xcpng-8.2.1-2023",
         "83b2": "xcpng-8.3-beta2",
+        "81": "xcpng-8.1",
+        "80": "xcpng-8.0",
         "xs8": "xs8-2024-03",
         "ch821.1": "ch-8.2.1-23",
     }[version],
@@ -134,10 +137,13 @@ def test_install(iso_remaster, create_vms, iso_version, firmware):
     #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
     "821.1-83b2",
     "821.1-83b2-83b2",
+    "81-83b2", "81-83b2-83b2",
+    "80-83b2", "80-83b2-83b2",
     "ch821.1-83b2",
     "ch821.1-83b2-83b2",
     "821.1",
     "821.1-821.1",
+    "81", "80",
     "xs8", "ch821.1",
 ), scope="class")
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
@@ -240,27 +246,52 @@ class TestFirstboot:
 
     def test_firstboot_services(self, firstboot_host, mode, firmware):
         host = firstboot_host
+        lsb_rel = host.ssh(["lsb_release", "-sr"])
 
-        # check for firstboot issues
-        # FIXME: flaky, must check logs extraction on failure
-        for service in ["control-domain-params-init",
+        if lsb_rel in ["8.2.1", "8.3.0", "8.4.0"]:
+            SERVICES = ["control-domain-params-init",
                         "network-init",
                         "storage-init",
                         "generate-iscsi-iqn",
                         "create-guest-templates",
-                        ]:
-            try:
-                wait_for(lambda: host.ssh(["test", "-e", f"/var/lib/misc/ran-{service}"],
+                        ]
+            STAMPS_DIR = "/var/lib/misc"
+            STAMPS = [f"ran-{service}" for service in SERVICES]
+        elif lsb_rel in ["8.0.0", "8.1.0"]:
+            SERVICES = ["xs-firstboot"]
+            STAMPS_DIR = "/etc/firstboot.d/state"
+            STAMPS = [
+                "05-prepare-networking",
+                "10-prepare-storage",
+                "15-set-default-storage",
+                "20-udev-storage",
+                "25-multipath",
+                "40-generate-iscsi-iqn",
+                "50-prepare-control-domain-params",
+                "60-import-keys",
+                "60-upgrade-likewise-to-pbis",
+                "62-create-guest-templates",
+                "80-common-criteria",
+                "90-flush-pool-db",
+                "95-legacy-logrotate",
+                "99-remove-firstboot-flag",
+            ]
+        # check for firstboot issues
+        # FIXME: flaky, must check logs extraction on failure
+        try:
+            for stamp in STAMPS:
+                wait_for(lambda: host.ssh(["test", "-e", f"{STAMPS_DIR}/{stamp}"],
                                           check=False, simple_output=False,
                                           ).returncode == 0,
-                         f"Wait for ran-{service} stamp")
-            except TimeoutError:
-                logging.warning("investigating lack of ran-%s stamp", service)
+                         f"Wait for {stamp} stamp")
+        except TimeoutError:
+            logging.warning("investigating lack of ran-%s stamp", service)
+            for service in SERVICES:
                 out = host.ssh(["systemctl", "status", service], check=False)
                 logging.warning("service status: %s", out)
                 out = host.ssh(["grep", "-r", service, "/var/log"], check=False)
                 logging.warning("in logs: %s", out)
-                raise
+            raise
 
     def test_product_version(self, firstboot_host, mode, firmware):
         host = firstboot_host
@@ -282,6 +313,8 @@ class TestFirstboot:
         expected_rel = {
             "821.1": "8.2.1",
             "83b2": "8.3.0",
+            "81": "8.1.0",
+            "80": "8.0.0",
             "xs8": "8.4.0",
             "ch821.1": "8.2.1",
         }[expected_rel_id]
@@ -294,6 +327,8 @@ class TestFirstboot:
 @pytest.mark.parametrize(("orig_version", "iso_version"), [
     ("821.1", "821.1"),
     ("821.1", "83b2"),
+    ("81", "83b2"),
+    ("80", "83b2"),
     ("ch821.1", "83b2"),
     #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
 ], scope="class")
@@ -398,6 +433,8 @@ def test_upgrade(xcpng_chained_class, iso_remaster, create_vms, orig_version, is
 
 @pytest.mark.parametrize(("orig_version", "iso_version"), [
     ("821.1-83b2", "83b2"),
+    ("81-83b2", "83b2"),
+    ("80-83b2", "83b2"),
     ("ch821.1-83b2", "83b2"),
 ], scope="class")
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
