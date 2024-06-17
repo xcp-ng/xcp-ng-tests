@@ -13,7 +13,7 @@ pytestmark = pytest.mark.dependency()
 
 @pytest.mark.parametrize("iso_version", (
     "821.1", "83b2",
-    "ch821.1", "xs8",
+    "xs8", "ch821.1",
 ))
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
 @pytest.mark.vm_definitions(lambda firmware: dict(
@@ -50,6 +50,8 @@ pytestmark = pytest.mark.dependency()
     lambda version: {
         "821.1": "xcpng-8.2.1-2023",
         "83b2": "xcpng-8.3-beta2",
+        "xs8": "xs8-2024-03",
+        "ch821.1": "ch-8.2.1-23",
     }[version],
     param_mapping={"version": "iso_version"})
 def test_install(iso_remaster, create_vms, iso_version, firmware):
@@ -132,8 +134,11 @@ def test_install(iso_remaster, create_vms, iso_version, firmware):
     #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
     "821.1-83b2",
     "821.1-83b2-83b2",
+    "ch821.1-83b2",
+    "ch821.1-83b2-83b2",
     "821.1",
     "821.1-821.1",
+    "xs8", "ch821.1",
 ), scope="class")
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
 @pytest.mark.continuation_of(
@@ -261,7 +266,12 @@ class TestFirstboot:
         host = firstboot_host
 
         # determine version info from `mode`
-        expected_dist = "XCP-ng"
+        if mode.startswith("xs"):
+            expected_dist = "XenServer"
+        elif mode.startswith("ch"):
+            expected_dist = "CitrixHypervisor"
+        else:
+            expected_dist = "XCP-ng"
         # succession of insta/upg/rst operations
         split_mode = mode.split("-")
         if len(split_mode) == 3:
@@ -272,6 +282,8 @@ class TestFirstboot:
         expected_rel = {
             "821.1": "8.2.1",
             "83b2": "8.3.0",
+            "xs8": "8.4.0",
+            "ch821.1": "8.2.1",
         }[expected_rel_id]
 
         lsb_dist = host.ssh(["lsb_release", "-si"])
@@ -282,6 +294,7 @@ class TestFirstboot:
 @pytest.mark.parametrize(("orig_version", "iso_version"), [
     ("821.1", "821.1"),
     ("821.1", "83b2"),
+    ("ch821.1", "83b2"),
     #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
 ], scope="class")
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
@@ -385,6 +398,7 @@ def test_upgrade(xcpng_chained_class, iso_remaster, create_vms, orig_version, is
 
 @pytest.mark.parametrize(("orig_version", "iso_version"), [
     ("821.1-83b2", "83b2"),
+    ("ch821.1-83b2", "83b2"),
 ], scope="class")
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
 @pytest.mark.continuation_of(
