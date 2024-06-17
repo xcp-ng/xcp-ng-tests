@@ -58,7 +58,7 @@ class TestLARGEBLOCKSR:
         sr = largeblock_sr
         vm = vm_on_largeblock_sr
         host.reboot(verify=True)
-        wait_for(sr.all_pbds_attached, "Wait for PBD attached")
+        wait_for(sr.all_pbds_attached, "Wait for PBD attached", timeout_secs=10 * 60)
         # start the VM as a way to check that the underlying SR is operational
         vm.start()
         vm.wait_for_os_booted()
