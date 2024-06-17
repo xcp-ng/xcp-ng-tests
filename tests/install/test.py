@@ -11,6 +11,7 @@ from lib.pool import Pool
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("iso_version", (
+        "ch821.1", "xs8",
         "821.1", "83b2",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -39,6 +40,8 @@ class TestNested:
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
             "83b2": "xcpng-8.3-beta2",
+            "ch821.1": "ch-8.2.1-23",
+            "xs8": "xs8-2024-03",
         }[version],
         param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware: {
@@ -131,8 +134,11 @@ class TestNested:
         #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
         "821.1-83b2",
         "821.1-83b2-83b2",
+        "ch821.1-83b2",
+        "ch821.1-83b2-83b2",
         "821.1",
         "821.1-821.1",
+        "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(lambda params, firmware: [dict(
@@ -152,7 +158,12 @@ class TestNested:
         logging.info("Host VM has MAC %s", mac_address)
 
         # determine version info from `mode`
-        expected_dist = "XCP-ng"
+        if mode.startswith("xs"):
+            expected_dist = "XenServer"
+        elif mode.startswith("ch"):
+            expected_dist = "CitrixHypervisor"
+        else:
+            expected_dist = "XCP-ng"
         # succession of insta/upg/rst operations
         split_mode = mode.split("-")
         if len(split_mode) == 3:
@@ -161,6 +172,8 @@ class TestNested:
         else:
             expected_rel_id = split_mode[-1]
         expected_rel = {
+            "ch821.1": "8.2.1",
+            "xs8": "8.4.0",
             "821.1": "8.2.1",
             "83b2": "8.3.0",
         }[expected_rel_id]
@@ -264,6 +277,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1", "821.1"),
+        ("ch821.1", "83b2"),
         ("821.1", "83b2"),
         #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
     ])
@@ -366,6 +380,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1-83b2", "83b2"),
+        ("ch821.1-83b2", "83b2"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(lambda firmware, params: [dict(
