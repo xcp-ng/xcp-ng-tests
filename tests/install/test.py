@@ -85,6 +85,20 @@ class TestNested:
         mac_address = vif.param_get('MAC')
         logging.info("Host VM has MAC %s", mac_address)
 
+        # determine version info from `mode`
+        expected_dist = "XCP-ng"
+        # succession of insta/upg/rst operations
+        split_mode = mode.split("-")
+        if len(split_mode) == 3:
+            # restore: back to 1st installed version
+            expected_rel_id = split_mode[0]
+        else:
+            expected_rel_id = split_mode[-1]
+        expected_rel = {
+            "821.1": "8.2.1",
+            "83b2": "8.3.0",
+        }[expected_rel_id]
+
         try:
             # FIXME: evict MAC from ARP cache first?
             host_vm.start()
@@ -103,6 +117,11 @@ class TestNested:
                 lambda: commands.local_cmd(
                     ["nc", "-zw5", host_vm.ip, "22"], check=False).returncode == 0,
                 "Wait for ssh back up on Host VM", retry_delay_secs=5, timeout_secs=4 * 60)
+
+            logging.info("Checking installed version")
+            lsb_dist = commands.ssh(host_vm.ip, ["lsb_release", "-si"])
+            lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
+            assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
             # wait for XAPI startup to be done, which avoids:
             # - waiting for XAPI to start listening to its socket
