@@ -54,11 +54,29 @@ class TestNested:
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
-    def _test_firstboot(self, create_vms, mode):
+    def _test_firstboot(self, create_vms, mode, is_restore=False):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
         logging.info("Host VM has MAC %s", mac_address)
+
+        # succession of insta/upg/rst operations
+        split_mode = mode.split("-")
+        if is_restore:
+            # restore: back to previous installed version
+            expected_rel_id = split_mode[-3]
+        else:
+            expected_rel_id = split_mode[-1]
+        expected_rel = {
+            "821.1": "8.2.1",
+            "83b1": "8.3.0",
+            "83b2": "8.3.0",
+            "83rc1": "8.3.0",
+            "83nightly": "8.3.0",
+        }[expected_rel_id]
+
+        # determine version info from `mode`
+        expected_dist = "XCP-ng"
 
         try:
             # FIXME: evict MAC from ARP cache first?
@@ -78,6 +96,12 @@ class TestNested:
                 lambda: commands.local_cmd(
                     ["nc", "-zw5", host_vm.ip, "22"], check=False).returncode == 0,
                 "Wait for ssh back up on Host VM", retry_delay_secs=5, timeout_secs=4 * 60)
+
+            logging.info("Checking installed version (expecting %r %r)",
+                         expected_dist, expected_rel)
+            lsb_dist = commands.ssh(host_vm.ip, ["lsb_release", "-si"])
+            lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
+            assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
             # pool master must be reachable here
             pool = Pool(host_vm.ip)
@@ -181,7 +205,7 @@ class TestNested:
             image_test=(f"TestNested::test_restore[{firmware}-{mode}]"))])
     def test_boot_rst(self, create_vms,
                       firmware, mode):
-        self._test_firstboot(create_vms, mode)
+        self._test_firstboot(create_vms, mode, is_restore=True)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
