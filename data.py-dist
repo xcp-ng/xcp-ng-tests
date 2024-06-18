@@ -8,7 +8,7 @@ HOST_DEFAULT_PASSWORD = ""
 HOST_DEFAULT_PASSWORD_HASH = "" # FIXME
 
 # Public key for a private key available to the test runner
-TEST_SSH_PUBKEY = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKz9uQOoxq6Q0SQ0XTzQHhDolvuo/7EyrDZsYQbRELhcPJG8MT/o5u3HyJFhIP2+HqBSXXgmqRPJUkwz9wUwb2sUwf44qZm/pyPUWOoxyVtrDXzokU/uiaNKUMhbnfaXMz6Ogovtjua63qld2+ZRXnIgrVtYKtYBeu/qKGVSnf4FTOUKl1w3uKkr59IUwwAO8ay3wVnxXIHI/iJgq6JBgQNHbn3C/SpYU++nqL9G7dMyqGD36QPFuqH/cayL8TjNZ67TgAzsPX8OvmRSqjrv3KFbeSlpS/R4enHkSemhgfc8Z2f49tE7qxWZ6x4Uyp5E6ur37FsRf/tEtKIUJGMRXN XCP-ng CI"
+TEST_SSH_PUBKEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI"
 
 # The following prefix will be added to the `name-label` parameter of XAPI objects
 # that the tests will create or import, such as VMs and SRs.
