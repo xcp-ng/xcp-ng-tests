@@ -9,6 +9,7 @@ from lib.common import wait_for, PackageManagerEnum
 # - hostA2: Second member of the pool. Can have any local SR. No need to specify it on CLI.
 # From --vm parameter
 # - A VM to import, supported by the Linux/install.sh script of the guest tools ISO
+#   (without this flag you get an alpine, and that is not suitable)
 
 class State:
     def __init__(self):
