@@ -113,6 +113,27 @@ def pytest_collection_modifyitems(items, config):
             # multi_vms implies small_vm
             item.add_marker('small_vm')
 
+# BEGIN make test results visible from fixtures
+# from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+
+# FIXME we may have to move this into lib/ if fixtures in sub-packages
+# want to make use of this feature
+
+PHASE_REPORT_KEY = pytest.StashKey[dict[str, pytest.CollectReport]]()
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item, call):
+    # execute all other hooks to obtain the report object
+    rep = yield
+
+    # store test results for each phase of a call, which can
+    # be "setup", "call", "teardown"
+    item.stash.setdefault(PHASE_REPORT_KEY, {})[rep.when] = rep
+
+    return rep
+
+# END make test results visible from fixtures
+
+
 # fixtures
 
 def setup_host(hostname_or_ip):
