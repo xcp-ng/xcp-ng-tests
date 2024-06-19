@@ -1,6 +1,6 @@
 import itertools
 import logging
-import pytest
+import pytest, _pytest
 import tempfile
 
 from packaging import version
@@ -105,6 +105,34 @@ def pytest_collection_modifyitems(items, config):
         if item.get_closest_marker('multi_vms'):
             # multi_vms implies small_vm
             item.add_marker('small_vm')
+
+# BEGIN make test results visible from fixtures
+# adapted from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+
+# FIXME we may have to move this into lib/ if fixtures in sub-packages
+# want to make use of this feature
+from pytest import StashKey, CollectReport
+PHASE_REPORT_KEY = StashKey[dict[str, CollectReport]]()
+PHASE_REPORT_CHILDREN_KEY = StashKey[dict[str, CollectReport]]()
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item, call):
+    # execute all other hooks to obtain the report object
+    rep = yield
+
+    # store test results for each phase of a call, which can
+    # be "setup", "call", "teardown"
+    item.stash.setdefault(PHASE_REPORT_KEY, {})[rep.when] = rep
+
+    # if this test is within a class, make it accessible from the class
+    parent_class = item.getparent(_pytest.python.Class)
+    if parent_class:
+        parent_class.stash.setdefault(PHASE_REPORT_CHILDREN_KEY, []).append(item)
+
+    return rep
+
+# END make test results visible from fixtures
+
 
 ### fixtures
 
