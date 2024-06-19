@@ -19,6 +19,8 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
+# pytest hooks
+
 def pytest_addoption(parser):
     parser.addoption(
         "--hosts",
@@ -69,6 +71,42 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
+
+def pytest_generate_tests(metafunc):
+    if "vm_ref" in metafunc.fixturenames:
+        vms = metafunc.config.getoption("vm")
+        if not vms:
+            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
+        metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
+
+def pytest_collection_modifyitems(items, config):
+    # Automatically mark tests based on fixtures they require.
+    # Check pytest.ini or pytest --markers for marker descriptions.
+
+    markable_fixtures = [
+        'uefi_vm',
+        'unix_vm',
+        'windows_vm',
+        'hostA2',
+        'hostB1',
+        'sr_disk',
+        'sr_disk_4k'
+    ]
+
+    for item in items:
+        fixturenames = getattr(item, 'fixturenames', ())
+        for fixturename in markable_fixtures:
+            if fixturename in fixturenames:
+                item.add_marker(fixturename)
+
+        if 'vm_ref' not in fixturenames:
+            item.add_marker('no_vm')
+
+        if item.get_closest_marker('multi_vms'):
+            # multi_vms implies small_vm
+            item.add_marker('small_vm')
+
+# fixtures
 
 def setup_host(hostname_or_ip):
     pool = Pool(hostname_or_ip)
@@ -404,37 +442,3 @@ def second_network(pytestconfig, host):
     if network_uuid == host.management_network():
         pytest.fail("--second-network must NOT be the management network")
     return network_uuid
-
-def pytest_generate_tests(metafunc):
-    if "vm_ref" in metafunc.fixturenames:
-        vms = metafunc.config.getoption("vm")
-        if not vms:
-            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
-        metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
-
-def pytest_collection_modifyitems(items, config):
-    # Automatically mark tests based on fixtures they require.
-    # Check pytest.ini or pytest --markers for marker descriptions.
-
-    markable_fixtures = [
-        'uefi_vm',
-        'unix_vm',
-        'windows_vm',
-        'hostA2',
-        'hostB1',
-        'sr_disk',
-        'sr_disk_4k'
-    ]
-
-    for item in items:
-        fixturenames = getattr(item, 'fixturenames', ())
-        for fixturename in markable_fixtures:
-            if fixturename in fixturenames:
-                item.add_marker(fixturename)
-
-        if 'vm_ref' not in fixturenames:
-            item.add_marker('no_vm')
-
-        if item.get_closest_marker('multi_vms'):
-            # multi_vms implies small_vm
-            item.add_marker('small_vm')
