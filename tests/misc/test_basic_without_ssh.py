@@ -16,8 +16,6 @@ from lib.common import wait_for
 # - when using an existing VM, the VM can be on any host of the pool,
 #   the local SR or shared SR: the test will adapt itself.
 #   Note however that an existing VM will be left on a different SR after the tests.
-#
-# This test suite is meant to be run entirely. There's no guarantee that cherry-picking tests will work.
 
 @pytest.fixture(scope='session')
 def existing_shared_sr(host):
@@ -25,21 +23,25 @@ def existing_shared_sr(host):
     assert sr is not None, "A shared SR on the pool is required"
     return sr
 
-@pytest.mark.incremental # tests depend on each other. If one test fails, don't execute the others
 @pytest.mark.multi_vms # run them on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
-class TestBasicNoSSH:
-    def test_start(self, imported_vm):
-        vm = imported_vm
-        # if VM already running, stop it
-        if (vm.is_running()):
-            logging.info("VM already running, shutting it down first")
-            vm.shutdown(verify=True)
-        vm.start()
-        # this also tests the guest tools at the same time since they are used
-        # for retrieving the IP address and management agent status.
-        vm.wait_for_os_booted()
+def test_vm_start_stop(imported_vm):
+    vm = imported_vm
+    # if VM already running, stop it
+    if (vm.is_running()):
+        logging.info("VM already running, shutting it down first")
+        vm.shutdown(verify=True)
+    vm.start()
+    # this also tests the guest tools at the same time since they are used
+    # for retrieving the IP address and management agent status.
+    vm.wait_for_os_booted()
 
+    vm.shutdown(verify=True)
+
+@pytest.mark.multi_vms # run them on a variety of VMs
+@pytest.mark.big_vm # and also on a really big VM ideally
+@pytest.mark.usefixtures("started_vm")
+class TestBasicNoSSH:
     def test_pause(self, imported_vm):
         vm = imported_vm
         vm.pause(verify=True)
@@ -104,7 +106,3 @@ class TestBasicNoSSH:
         else:
             logging.info("* Preparing for live migration without storage motion *")
             live_migrate(vm, host1, existing_shared_sr)
-
-    def test_shutdown(self, imported_vm):
-        vm = imported_vm
-        vm.shutdown(verify=True)

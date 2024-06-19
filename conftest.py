@@ -332,17 +332,21 @@ def imported_vm(host, vm_ref):
         vm.destroy(verify=True)
 
 @pytest.fixture(scope="module")
-def running_vm(imported_vm):
+def started_vm(imported_vm):
     vm = imported_vm
-
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
         vm.start()
     wait_for(vm.is_running, '> Wait for VM running')
     wait_for(vm.try_get_and_store_ip, "> Wait for VM IP", timeout_secs=5 * 60)
-    wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
     # no teardown
+
+@pytest.fixture(scope="module")
+def running_vm(started_vm):
+    vm = started_vm
+    wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
+    return vm
 
 @pytest.fixture(scope='module')
 def unix_vm(imported_vm):
