@@ -16,7 +16,6 @@ class State:
         self.tools_version = None
         self.vm_distro = None
 
-@pytest.mark.incremental # tests depend on each other. If one test fails, don't execute the others
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("unix_vm")
 class TestGuestToolsUnix:
@@ -34,7 +33,8 @@ class TestGuestToolsUnix:
         detected_distro = vm.distro()
         assert detected_distro == vm_distro
 
-    def test_install(self, running_vm, state):
+    @pytest.fixture(scope="class", autouse=True)
+    def vm_install(self, running_vm, state):
         vm = running_vm
 
         # skip test for some unixes
