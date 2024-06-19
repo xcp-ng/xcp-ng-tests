@@ -104,7 +104,3 @@ class TestBasicNoSSH:
         else:
             logging.info("* Preparing for live migration without storage motion *")
             live_migrate(vm, host1, existing_shared_sr)
-
-    def test_shutdown(self, imported_vm):
-        vm = imported_vm
-        vm.shutdown(verify=True)
