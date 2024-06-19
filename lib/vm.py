@@ -122,7 +122,7 @@ class VM(BaseVM):
         # waiting for the IP:
         # - allows to make sure the OS actually started (on VMs that have the management agent)
         # - allows to store the IP for future use in the VM object
-        wait_for(self.try_get_and_store_ip, "Wait for VM IP")
+        wait_for(self.try_get_and_store_ip, "Wait for VM IP", timeout_secs=5*60)
         # now wait also for the management agent to have started
         wait_for(self.is_management_agent_up, "Wait for management agent up")
 

@@ -339,7 +339,7 @@ def running_vm(imported_vm):
     if not vm.is_running():
         vm.start()
     wait_for(vm.is_running, '> Wait for VM running')
-    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")
+    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP", timeout_secs=5*60)
     wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
     # no teardown
