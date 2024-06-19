@@ -59,12 +59,6 @@ def _ellide_log_lines(log):
         reduced_message.append("(...)")
     return "\n{}".format("\n".join(reduced_message))
 
-OUPUT_LOGGER = logging.getLogger('output')
-OUPUT_LOGGER.propagate = False
-OUTPUT_HANDLER = logging.StreamHandler()
-OUPUT_LOGGER.addHandler(OUTPUT_HANDLER)
-OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
-
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
          background, target_os, decode, options):
     opts = list(options)
@@ -111,7 +105,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
     for line in iter(process.stdout.readline, b''):
         readable_line = line.decode(errors='replace').strip()
         stdout.append(line)
-        OUPUT_LOGGER.debug(readable_line)
+        logging.debug("> %s", readable_line)
     _, stderr = process.communicate()
     res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
 
