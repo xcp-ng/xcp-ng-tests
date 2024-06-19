@@ -3,7 +3,7 @@
 Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
-* python >= 3.5
+* python >= 3.8
 * packages as listed in requirements/base.txt
 * extra test-specific requirements are documented in the test file
   "Requirements" header
