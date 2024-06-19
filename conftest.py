@@ -19,21 +19,6 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-# *** Support for incremental tests in test classes ***
-# From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
-def pytest_runtest_makereport(item, call):
-    if "incremental" in item.keywords:
-        if call.excinfo is not None:
-            parent = item.parent
-            parent._previousfailed = item
-
-def pytest_runtest_setup(item):
-    previousfailed = getattr(item.parent, "_previousfailed", None)
-    if previousfailed is not None:
-        pytest.skip("previous test failed (%s)" % previousfailed.name)
-
-# *** End of: Support for incremental tests ***
-
 def pytest_addoption(parser):
     parser.addoption(
         "--hosts",
