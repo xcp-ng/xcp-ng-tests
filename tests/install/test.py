@@ -10,6 +10,9 @@ from lib.pool import Pool
 
 @pytest.mark.dependency()
 class TestNested:
+    @pytest.mark.parametrize("iso_version", (
+        "821.1", "83b2",
+    ))
     @pytest.mark.vm_definitions(
         dict(name="vm1",
              template="Other install media",
@@ -26,14 +29,19 @@ class TestNested:
              vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
              vifs=[dict(index=0, network_uuid="eabc1038-e40f-2ae5-0781-a3adbec1cae8")], # FIXME
              ))
+    @pytest.mark.installer_iso(
+        lambda version: {
+            "821.1": "xcpng-8.2.1-2023",
+            "83b2": "xcpng-8.3-beta2",
+        }[version],
+        param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(
         {
             "base": "INSTALL",
             "source": {"type": "local"},
             "primary-disk": {"text": "nvme0n1"},
         })
-    @pytest.mark.installer_iso("xcpng-8.2.1-2023")
-    def test_install(self, iso_remaster, create_vms):
+    def test_install(self, iso_remaster, create_vms, iso_version):
         assert len(create_vms) == 1
         host_vm = create_vms[0]
         # FIXME should be part of vm def
@@ -110,9 +118,15 @@ class TestNested:
 
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.continuation_of([dict(vm="vm1",
-                                       image_test="TestNested::test_install")])
-    def test_firstboot(self, create_vms):
+    @pytest.mark.parametrize("mode", (
+        "83b2",
+        "821.1",
+    ))
+    @pytest.mark.continuation_of(
+        lambda params: [dict(vm="vm1",
+                             image_test=f"TestNested::test_install[{params}]")],
+        param_mapping={"params": "mode"})
+    def test_firstboot(self, create_vms, mode):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
