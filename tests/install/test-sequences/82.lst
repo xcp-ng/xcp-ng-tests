@@ -1,0 +1,2 @@
+tests/install/test.py::TestNested::test_install[821.1]
+tests/install/test.py::TestNested::test_firstboot[821.1]
