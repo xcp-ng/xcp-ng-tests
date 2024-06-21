@@ -109,12 +109,10 @@ def test_install(iso_remaster, create_vms):
         host_vm.shutdown(force=True)
         raise
 
-@pytest.mark.dependency(depends=["test_install"])
-@pytest.mark.vm_definitions(
-    dict(name="vm1", image_test="test_install"))
+@pytest.mark.continuation_of([dict(vm="vm1", image_test="test_install")])
 class TestFirstboot:
     @pytest.fixture(autouse=True, scope="class")
-    def firstboot_host(self, create_vms):
+    def firstboot_host(self, xcpng_chained_class, create_vms):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
