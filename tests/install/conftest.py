@@ -2,6 +2,7 @@ from copy import deepcopy
 import logging
 import os
 import pytest
+import pytest_dependency
 import tempfile
 
 from lib.common import callable_marker
@@ -161,3 +162,22 @@ sed -i "${{SED_COMMANDS[@]}}" \
     finally:
         logging.info("Removing %s from ISO-SR server", os.path.basename(remote_iso))
         ssh(ISOSR_SRV, ["rm", remote_iso])
+
+@pytest.fixture(scope='function')
+def xcpng_chained(request):
+    # take test name from mark
+    marker = request.node.get_closest_marker("continuation_of")
+    assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
+    param_mapping = marker.kwargs.get("param_mapping", {})
+    continuation_of = callable_marker(marker.args[0], request, param_mapping=param_mapping)
+
+    vm_defs = [dict(name=vm_spec['vm'],
+                    image_test=vm_spec['image_test'],
+                    image_vm=vm_spec.get("image_vm", vm_spec['vm']),
+                    image_scope=vm_spec.get("scope", "module"),
+                    )
+               for vm_spec in continuation_of]
+
+    depends = [vm_spec['image_test'] for vm_spec in continuation_of]
+    pytest_dependency.depends(request, depends)
+    request.applymarker(pytest.mark.vm_definitions(*vm_defs))
