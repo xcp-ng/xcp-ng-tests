@@ -123,8 +123,8 @@ class TestNested:
             host_vm.shutdown(force=True)
             raise
 
-    @pytest.mark.dependency(depends=["TestNested::test_install"])
-    @pytest.mark.vm_definitions(
-        dict(name="vm1", image_test="TestNested::test_install"))
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.continuation_of([dict(vm="vm1",
+                                       image_test="TestNested::test_install")])
     def test_boot_inst(self, create_vms):
         self._test_firstboot(create_vms)
