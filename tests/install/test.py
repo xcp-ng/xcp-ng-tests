@@ -40,9 +40,9 @@ class TestNested:
         installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
 
 
-    @pytest.mark.dependency(depends=["TestNested::test_install"])
-    @pytest.mark.vm_definitions(
-        dict(name="vm1", image_test="TestNested::test_install"))
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.continuation_of([dict(vm="vm1",
+                                       image_test="TestNested::test_install")])
     def test_firstboot(self, create_vms):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
