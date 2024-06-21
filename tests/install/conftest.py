@@ -1,6 +1,7 @@
 import logging
 import os
 import pytest
+import pytest_dependency        # type: ignore
 import tempfile
 import xml.etree.ElementTree as ET
 
@@ -272,3 +273,21 @@ def vm_booted_with_installer(host, create_vms, remastered_iso):
     finally:
         if remote_iso:
             host.pool.remove_iso(remote_iso)
+
+@pytest.fixture(scope='function')
+def xcpng_chained(request):
+    # take test name from mark
+    marker = request.node.get_closest_marker("continuation_of")
+    assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
+    continuation_of = callable_marker(marker.args[0], request)
+
+    vm_defs = [dict(name=vm_spec['vm'],
+                    image_test=vm_spec['image_test'],
+                    image_vm=vm_spec.get("image_vm", vm_spec['vm']),
+                    image_scope=vm_spec.get("scope", "module"),
+                    )
+               for vm_spec in continuation_of]
+
+    depends = [vm_spec['image_test'] for vm_spec in continuation_of]
+    pytest_dependency.depends(request, depends)
+    request.applymarker(pytest.mark.vm_definitions(*vm_defs))
