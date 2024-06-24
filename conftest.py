@@ -419,6 +419,13 @@ def create_vms(request, host):
     >    ...
 
     """
+    # Do we cache VMs?
+    try:
+        from data import CACHE_IMPORTED_VM
+    except ImportError:
+        CACHE_IMPORTED_VM = False
+    assert CACHE_IMPORTED_VM in [True, False]
+
     marker = request.node.get_closest_marker("vm_definitions")
     if marker is None:
         raise Exception("No vm_definitions marker specified.")
@@ -443,7 +450,7 @@ def create_vms(request, host):
             if "template" in vm_def:
                 _create_vm(vm_def, host, vms, vdis, vbds)
             elif "image_test" in vm_def:
-                _import_vm(request, vm_def, host, vms)
+                _import_vm(request, vm_def, host, vms, use_cache=CACHE_IMPORTED_VM)
         yield vms
 
         # request.node is an "item" because this fixture has "function" scope
@@ -458,7 +465,7 @@ def create_vms(request, host):
                 # FIXME where to store?
                 xva_name = f"{shortened_nodeid(request.node.nodeid)}-{vm_def['name']}.xva"
                 host.ssh(["rm -f", xva_name])
-                vm.export(xva_name, "zstd")
+                vm.export(xva_name, "zstd", use_cache=CACHE_IMPORTED_VM)
 
     except Exception:
         logging.error("exception caught...")
@@ -505,9 +512,18 @@ def _create_vm(vm_def, host, vms, vdis, vbds):
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
 
-def _import_vm(request, vm_def, host, vms):
+def _import_vm(request, vm_def, host, vms, *, use_cache):
     vm_image = xva_name_from_def(vm_def, request.node.nodeid)
-    vm = host.import_vm(vm_image)
+    base_vm = host.import_vm(vm_image, sr_uuid=host.main_sr_uuid(), use_cache=use_cache)
+
+    if use_cache:
+        # Clone the VM before running tests, so that the original VM remains untouched
+        logging.info(">> Clone cached VM before running tests")
+        vm = base_vm.clone()
+        # Remove the description, which may contain a cache identifier
+        vm.param_set('name-description', "")
+    else:
+        vm = base_vm
     vms.append(vm)
 
 @pytest.fixture(scope="module")
