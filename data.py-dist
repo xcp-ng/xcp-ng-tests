@@ -131,6 +131,9 @@ BASE_ANSWERFILES = dict(
     UPGRADE={
         "root": {"tag": "installation", "mode": "upgrade"},
     },
+    RESTORE={
+        "root": {"tag": "restore"},
+    },
 )
 
 # compatibility settings for older tests
