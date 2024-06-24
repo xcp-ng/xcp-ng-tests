@@ -120,11 +120,19 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
         "83b2",
+        #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
+        "821.1-83b2",
         "821.1",
+        "821.1-821.1",
     ))
     @pytest.mark.continuation_of(
         lambda params: [dict(vm="vm1",
-                             image_test=f"TestNested::test_install[{params}]")],
+                             image_test=(f"TestNested::{{}}[{params}]".format(
+                                 {
+                                     1: "test_install",
+                                     2: "test_upgrade",
+                                 }[len(params.split("-"))]
+                             )))],
         param_mapping={"params": "mode"})
     def test_firstboot(self, create_vms, mode):
         host_vm = create_vms[0]
@@ -211,6 +219,105 @@ class TestNested:
                     raise
 
             wait_for(host_vm.is_halted, "Wait for host VM halted")
+
+        except Exception as e:
+            logging.critical("caught exception %s", e)
+            # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
+            host_vm.shutdown(force=True)
+            raise
+        except KeyboardInterrupt:
+            logging.warning("keyboard interrupt")
+            # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
+            host_vm.shutdown(force=True)
+            raise
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize(("orig_version", "iso_version"), [
+        ("821.1", "821.1"),
+        ("821.1", "83b2"),
+        #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
+    ])
+    @pytest.mark.continuation_of(
+        lambda params: [dict(vm="vm1",
+                             image_test=f"TestNested::test_firstboot[{params}]")],
+        param_mapping={"params": "orig_version"})
+    @pytest.mark.installer_iso(
+        lambda version: {
+            "821.1": "xcpng-8.2.1-2023",
+            "83b2": "xcpng-8.3-beta2",
+        }[version],
+        param_mapping={"version": "iso_version"})
+    @pytest.mark.answerfile(
+        {
+            "base": "UPGRADE",
+            "source": {"type": "local"},
+            "existing-installation": {"text": "nvme0n1"},
+        })
+    def test_upgrade(self, iso_remaster, create_vms, orig_version, iso_version):
+        host_vm = create_vms[0]
+        vif = host_vm.vifs()[0]
+        mac_address = vif.param_get('MAC')
+        logging.info("Host VM has MAC %s", mac_address)
+
+        host_vm.insert_cd(iso_remaster)
+
+        try:
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for host VM running")
+
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see Host VM in ARP tables",
+                     timeout_secs=10*60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Host VM has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+
+            # wait for "yum install" phase to start
+            wait_for(lambda: host_vm.ssh(["grep",
+                                          "'DISPATCH: NEW PHASE: Reading package information'",
+                                          "/tmp/install-log"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 0,
+                     "Wait for upgrade preparations to finish",
+                     timeout_secs=40*60) # FIXME too big
+
+            # wait for "yum install" phase to finish
+            wait_for(lambda: host_vm.ssh(["grep",
+                                          "'DISPATCH: NEW PHASE: Completing installation'",
+                                          "/tmp/install-log"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 0,
+                     "Wait for rpm installation to succeed",
+                     timeout_secs=40*60) # FIXME too big
+
+            # wait for install to finish
+            wait_for(lambda: host_vm.ssh(["grep",
+                                          "'The installation completed successfully'",
+                                          "/tmp/install-log"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 0,
+                     "Wait for system installation to succeed",
+                     timeout_secs=40*60) # FIXME too big
+
+            wait_for(lambda: host_vm.ssh(["ps a|grep '[0-9]. python /opt/xensource/installer/init'"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 1,
+                     "Wait for installer to terminate")
+
+            logging.info("Shutting down Host VM after successful upgrade")
+            try:
+                host_vm.ssh(["poweroff"])
+            except commands.SSHCommandFailed as e:
+                # ignore connection closed by reboot
+                if e.returncode == 255 and "closed by remote host" in e.stdout:
+                    logging.info("sshd closed the connection")
+                    pass
+                else:
+                    raise
+            wait_for(host_vm.is_halted, "Wait for host VM halted")
+            host_vm.eject_cd()
 
         except Exception as e:
             logging.critical("caught exception %s", e)
