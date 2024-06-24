@@ -67,11 +67,18 @@ class BaseVM:
         assert sr.attached_to_host(self.host)
         return sr
 
-    def export(self, filepath, compress='none'):
-        logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
-        params = {
-            'uuid': self.uuid,
-            'compress': compress,
-            'filename': filepath
-        }
-        self.host.xe('vm-export', params)
+    def export(self, filepath, compress='none', use_cache=False):
+
+        if use_cache:
+            logging.info("Export VM %s to cache for %r as a clone" % (self.uuid, filepath))
+            clone = self.clone()
+            logging.info(f"Marking VM {clone.uuid} as cached")
+            clone.param_set('name-description', self.host.vm_cache_key(filepath))
+        else:
+            logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
+            params = {
+                'uuid': self.uuid,
+                'compress': compress,
+                'filename': filepath
+            }
+            self.host.xe('vm-export', params)
