@@ -6,6 +6,7 @@ from lib import installer
 from data import NETWORKS
 assert "MGMT" in NETWORKS
 
+@pytest.mark.dependency()
 class TestNested:
     @pytest.mark.vm_definitions(
         dict(name="vm1",
