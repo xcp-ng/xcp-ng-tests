@@ -1,5 +1,6 @@
 import getpass
 import inspect
+import itertools
 import logging
 import os
 import sys
@@ -39,6 +40,32 @@ def prefix_object_name(label):
     if name_prefix is None:
         name_prefix = f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
+
+def shortened_nodeid(nodeid):
+    components = nodeid.split("::")
+    # module
+    components[0] = strip_prefix(components[0], "tests/")
+    components[0] = strip_suffix(components[0], ".py")
+    components[0] = components[0].replace("/", ".")
+    # function
+    components[-1] = strip_prefix(components[-1], "test_")
+    # class
+    if len(components) > 2:
+        components[1] = strip_prefix(components[1], "Test")
+
+    return "::".join(components)
+
+def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
+    if scope == 'session' or scope == 'package':
+        base = ()
+    elif scope == 'module':
+        base = ref_nodeid.split("::", 1)[:1]
+    elif scope == 'class':
+        base = ref_nodeid.split("::", 2)[:2]
+    else:
+        raise RuntimeError(f"Internal error: invalid scope {scope!r}")
+    logging.debug("scope: %r base: %r relative: %r", scope, base, scoped_nodeid)
+    return "::".join(itertools.chain(base, (scoped_nodeid,)))
 
 def callable_marker(value, request):
     """

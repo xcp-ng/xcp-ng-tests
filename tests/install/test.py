@@ -10,6 +10,7 @@ assert "MGMT" in NETWORKS
 # Requirements:
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
 
+@pytest.mark.dependency()
 class TestNested:
     @pytest.mark.iso_version("821.1")
     @pytest.mark.vm_definitions(
