@@ -13,7 +13,7 @@ def iso_remaster(request):
     param_mapping = marker.kwargs.get("param_mapping", {})
     iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
-    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, TEST_SSH_PUBKEY, TOOLS
+    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
@@ -36,6 +36,28 @@ INSTALLIMG="$1"
 
 mkdir -p "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+
+cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
+#! /bin/bash
+set -eE
+set -o pipefail
+
+ping -c1 "$1"
+EOF
+chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
+
+cat > "$INSTALLIMG/etc/systemd/system/test-pingpxe.service" <<EOF
+[Unit]
+Description=Ping pxe server to populate its ARP table
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done'
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --root="$INSTALLIMG" enable test-pingpxe.service
 
 cat > "$INSTALLIMG/root/postinstall.sh" <<EOF
 #!/bin/sh
