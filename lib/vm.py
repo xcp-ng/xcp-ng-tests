@@ -11,6 +11,7 @@ import lib.efi as efi
 
 from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool, wait_for, wait_for_not
+from lib.common import shortened_nodeid, expand_scope_relative_nodeid
 from lib.snapshot import Snapshot
 from lib.vbd import VBD
 from lib.vif import VIF
@@ -755,3 +756,26 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
             and not self.are_windows_services_present()
             and not self.are_windows_drivers_present()
         )
+
+    def save_to_cache(self, cache_id):
+        logging.info("Save VM %s to cache for %r as a clone" % (self.uuid, cache_id))
+
+        while True:
+            old_vm = self.host.cached_vm(cache_id, sr_uuid=self.host.main_sr_uuid())
+            if old_vm is None:
+                break
+            logging.info("Destroying old cache %s first", old_vm.uuid)
+            old_vm.destroy()
+
+        clone = self.clone(name=f"{self.name()} cache")
+        logging.info(f"Marking VM {clone.uuid} as cached")
+        clone.param_set('name-description', self.host.vm_cache_key(cache_id))
+
+
+def vm_cache_key_from_def(vm_def, ref_nodeid):
+    vm_name = vm_def["name"]
+    image_test = vm_def["image_test"]
+    image_vm = vm_def.get("image_vm", vm_name)
+    image_scope = vm_def.get("image_scope", "module")
+    nodeid = shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid))
+    return f"{nodeid}-{image_vm}"

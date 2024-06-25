@@ -8,13 +8,13 @@ from typing import Dict
 
 import lib.config as global_config
 
-from lib.common import callable_marker
+from lib.common import callable_marker, shortened_nodeid, prefix_object_name
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
-from lib.vm import VM
+from lib.vm import VM, vm_cache_key_from_def
 from lib.xo import xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
@@ -450,6 +450,13 @@ def create_vms(request, host):
     > def test_foo(create_vms):
     >    ...
 
+    Example:
+    -------
+    > @pytest.mark.dependency(depends=["test_foo"])
+    > @pytest.mark.vm_definitions(dict(name="vm1", image_test="test_foo", image_vm="vm2"))
+    > def test_bar(create_vms):
+    >    ...
+
     """
     marker = request.node.get_closest_marker("vm_definitions")
     if marker is None:
@@ -459,8 +466,10 @@ def create_vms(request, host):
     for vm_def in marker.args:
         vm_def = callable_marker(vm_def, request)
         assert "name" in vm_def
-        assert "template" in vm_def
-        # FIXME should check optional vdis contents
+        assert "template" in vm_def or "image_test" in vm_def
+        if "template" in vm_def:
+            assert "image_test" not in vm_def
+            # FIXME should check optional vdis contents
         # FIXME should check for extra args
         vm_defs.append(vm_def)
 
@@ -469,8 +478,26 @@ def create_vms(request, host):
         vdis = []
         vbds = []
         for vm_def in vm_defs:
-            _create_vm(request, vm_def, host, vms, vdis, vbds)
+            if "template" in vm_def:
+                _create_vm(request, vm_def, host, vms, vdis, vbds)
+            elif "image_test" in vm_def:
+                _vm_from_cache(request, vm_def, host, vms)
         yield vms
+
+        # request.node is an "item" because this fixture has "function" scope
+        report = request.node.stash.get(PHASE_REPORT_KEY, None)
+        if report is None:
+            # user interruption during setup
+            logging.warning("test setup result not available: not exporting VMs")
+        elif report["setup"].failed:
+            logging.warning("setting up a test failed or skipped: not exporting VMs")
+        elif ("call" not in report) or report["call"].failed:
+            logging.warning("executing test failed or skipped: not exporting VMs")
+        else:
+            # record this state
+            for vm_def, vm in zip(vm_defs, vms):
+                nodeid = shortened_nodeid(request.node.nodeid)
+                vm.save_to_cache(f"{nodeid}-{vm_def['name']}")
 
     except Exception:
         logging.error("exception caught...")
@@ -524,6 +551,18 @@ def _create_vm(request, vm_def, host, vms, vdis, vbds):
         for param_def in vm_def["params"]:
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
+
+def _vm_from_cache(request, vm_def, host, vms):
+    base_vm = host.cached_vm(vm_cache_key_from_def(vm_def, request.node.nodeid),
+                             sr_uuid=host.main_sr_uuid())
+
+    # Clone the VM before running tests, so that the original VM remains untouched
+    logging.info("Cloning VM from cache")
+    vm = base_vm.clone(name=prefix_object_name(_vm_name(request, vm_def)))
+    # Remove the description, which may contain a cache identifier
+    vm.param_set('name-description', "")
+
+    vms.append(vm)
 
 @pytest.fixture(scope="module")
 def started_vm(imported_vm):
