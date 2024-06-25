@@ -8,6 +8,7 @@ import lib.efi as efi
 
 from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, wait_for, wait_for_not
+from lib.common import shortened_nodeid, expand_scope_relative_nodeid
 from lib.snapshot import Snapshot
 from lib.vbd import VBD
 from lib.vif import VIF
@@ -622,3 +623,13 @@ class VM(BaseVM):
         res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
                           check=False, simple_output=False, decode=False)
         return res.returncode == 0
+
+
+def xva_name_from_def(vm_def, ref_nodeid):
+    vm_name = vm_def["name"]
+    image_test = vm_def["image_test"]
+    image_vm = vm_def.get("image_vm", vm_name)
+    image_scope = vm_def.get("image_scope", "module")
+    return "{}-{}.xva".format(shortened_nodeid(
+        expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid)),
+                              vm_name)

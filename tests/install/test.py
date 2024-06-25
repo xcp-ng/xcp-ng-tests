@@ -8,6 +8,7 @@ from lib.common import wait_for
 from lib.host import Host
 from lib.pool import Pool
 
+@pytest.mark.dependency()
 class TestNested:
     @pytest.mark.vm_definitions(
         dict(name="vm1",

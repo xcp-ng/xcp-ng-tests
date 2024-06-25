@@ -7,13 +7,13 @@ from packaging import version
 
 import lib.config as global_config
 
-from lib.common import callable_marker
+from lib.common import callable_marker, shortened_nodeid
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
-from lib.vm import VM
+from lib.vm import VM, xva_name_from_def
 from lib.xo import xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
@@ -411,6 +411,13 @@ def create_vms(request, host):
     > def test_foo(create_vms):
     >    ...
 
+    Example:
+    -------
+    > @pytest.mark.dependency(depends=["test_foo"])
+    > @pytest.mark.vm_definitions(dict(name="vm1", image_test="test_foo", image_vm="vm2"))
+    > def test_bar(create_vms):
+    >    ...
+
     """
     marker = request.node.get_closest_marker("vm_definitions")
     if marker is None:
@@ -421,8 +428,10 @@ def create_vms(request, host):
     for vm_def in marker.args:
         vm_def = callable_marker(vm_def, request, param_mapping=param_mapping)
         assert "name" in vm_def
-        assert "template" in vm_def
-        # FIXME should check optional vdis contents
+        assert "template" in vm_def or "image_test" in vm_def
+        if "template" in vm_def:
+            assert not "image_test" in vm_def
+            # FIXME should check optional vdis contents
         # FIXME should check for extra args
         vm_defs.append(vm_def)
 
@@ -431,8 +440,25 @@ def create_vms(request, host):
         vdis = []
         vbds = []
         for vm_def in vm_defs:
-            _create_vm(vm_def, host, vms, vdis, vbds)
+            if "template" in vm_def:
+                _create_vm(vm_def, host, vms, vdis, vbds)
+            elif "image_test" in vm_def:
+                _import_vm(request, vm_def, host, vms)
         yield vms
+
+        # request.node is an "item" because this fixture has "function" scope
+        report = request.node.stash[PHASE_REPORT_KEY]
+        if report["setup"].failed:
+            logging.warning("setting up a test failed or skipped: not exporting VMs")
+        elif ("call" not in report) or report["call"].failed:
+            logging.warning("executing test failed or skipped: not exporting VMs")
+        else:
+            # record this state
+            for vm_def, vm in zip(vm_defs, vms):
+                # FIXME where to store?
+                xva_name = f"{shortened_nodeid(request.node.nodeid)}-{vm_def['name']}.xva"
+                host.ssh(["rm -f", xva_name])
+                vm.export(xva_name, "zstd")
 
     except Exception:
         logging.error("exception caught...")
@@ -478,6 +504,11 @@ def _create_vm(vm_def, host, vms, vdis, vbds):
         for param_def in vm_def["params"]:
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
+
+def _import_vm(request, vm_def, host, vms):
+    vm_image = xva_name_from_def(vm_def, request.node.nodeid)
+    vm = host.import_vm(vm_image)
+    vms.append(vm)
 
 @pytest.fixture(scope="module")
 def running_vm(imported_vm):
