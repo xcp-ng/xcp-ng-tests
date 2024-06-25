@@ -8,7 +8,7 @@ from lib.common import callable_marker, url_download, wait_for
 from lib.commands import local_cmd
 
 from data import (ANSWERFILE_URL, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
-                  TEST_SSH_PUBKEY, TOOLS)
+                  PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS)
 
 @pytest.fixture(scope='function')
 def installer_iso(request):
@@ -32,6 +32,8 @@ def installer_iso(request):
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
 #   go probe installation process
+# - a test-pingpxe.service running in installer system, to make it possible
+#   for the test to determine the dynamic IP obtained during installation
 # - atexit=shell to prevent the system from spontaneously rebooting
 # - an answerfile to make the install process non-interactive (downloaded from URL)
 # - a postinstall script to modify the installed system with:
@@ -58,6 +60,49 @@ INSTALLIMG="$1"
 
 mkdir -p "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+
+mkdir -p "$INSTALLIMG/usr/local/sbin"
+cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
+#! /bin/bash
+set -eE
+set -o pipefail
+
+if [ $(readlink "/bin/ping") = busybox ]; then
+    # XS before 7.0
+    PINGARGS=""
+else
+    PINGARGS="-c1"
+fi
+
+ping $PINGARGS "$1"
+EOF
+chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
+
+if [ -d "$INSTALLIMG/etc/systemd/system" ]; then
+    cat > "$INSTALLIMG/etc/systemd/system/test-pingpxe.service" <<EOF
+[Unit]
+Description=Ping pxe server to populate its ARP table
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done'
+[Install]
+WantedBy=default.target
+EOF
+
+    systemctl --root="$INSTALLIMG" enable test-pingpxe.service
+else # sysv scripts for before XS 7.x
+    cat > "$INSTALLIMG/etc/init.d/S12test-pingpxe" <<'EOF'
+#!/bin/sh
+case "$1" in
+  start)
+    sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done' & ;;
+  stop) ;;
+esac
+EOF
+
+    chmod +x "$INSTALLIMG/etc/init.d/S12test-pingpxe"
+fi
 
 cat > "$INSTALLIMG/root/postinstall.sh" <<'EOF'
 #!/bin/sh
