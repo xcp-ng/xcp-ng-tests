@@ -17,10 +17,11 @@ import pytest
          vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
          vifs=[dict(index=0, network_uuid="eabc1038-e40f-2ae5-0781-a3adbec1cae8")], # FIXME
          ))
-def test_install(create_vms):
+@pytest.mark.installer_iso("xcpng-8.2.1-2023")
+def test_install(iso_remaster, create_vms):
     assert len(create_vms) == 1
     host_vm = create_vms[0]
     # FIXME should be part of vm def
     host_vm.create_cd_vbd(device="xvdd", userdevice="3")
 
-    host_vm.insert_cd("xcp-ng-8.2.1-20231130.iso")
+    host_vm.insert_cd(iso_remaster)
