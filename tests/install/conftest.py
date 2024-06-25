@@ -13,7 +13,7 @@ def iso_remaster(request):
     param_mapping = marker.kwargs.get("param_mapping", {})
     iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
-    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, TEST_SSH_PUBKEY, TOOLS
+    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
@@ -36,6 +36,55 @@ INSTALLIMG="$1"
 
 mkdir -p "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+
+cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
+#! /bin/bash
+set -eE
+set -o pipefail
+
+ether_of () {{
+    ifconfig "$1" | grep ether | sed 's/.*ether \\([^ ]*\\).*/\\1/'
+}}
+
+# on installed system, avoid xapi-project/xen-api#5799
+if ! [ -e /opt/xensource/installer ]; then
+    eth_mac=$(ether_of eth0)
+    br_mac=$(ether_of xenbr0)
+
+    # wait for bridge MAC to be fixed
+    test "$eth_mac" = "$br_mac"
+fi
+
+ping -c1 "$1"
+EOF
+chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
+
+cat > "$INSTALLIMG/etc/systemd/system/test-pingpxe.service" <<EOF
+[Unit]
+Description=Ping pxe server to populate its ARP table
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done'
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --root="$INSTALLIMG" enable test-pingpxe.service
+
+cat > "$INSTALLIMG/root/postinstall.sh" <<EOF
+#!/bin/sh
+set -ex
+
+ROOT="\\$1"
+
+cp /etc/systemd/system/test-pingpxe.service "\\$ROOT/etc/systemd/system/test-pingpxe.service"
+cp /usr/local/sbin/test-pingpxe.sh "\\$ROOT/usr/local/sbin/test-pingpxe.sh"
+systemctl --root="\\$ROOT" enable test-pingpxe.service
+
+mkdir -p "\\$ROOT/root/.ssh"
+echo "{TEST_SSH_PUBKEY}" >> "\\$ROOT/root/.ssh/authorized_keys"
+EOF
 """,
                   file=patcher_fd)
             os.chmod(patcher_fd.fileno(), 0o755)
