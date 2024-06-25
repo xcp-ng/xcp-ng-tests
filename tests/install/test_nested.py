@@ -8,6 +8,9 @@ from lib.common import wait_for
 from lib.host import Host
 from lib.pool import Pool
 
+# make sure all those tests are considered in the dependency graph
+pytestmark = pytest.mark.dependency()
+
 @pytest.mark.vm_definitions(
     dict(name="vm1",
          template="Other install media",
