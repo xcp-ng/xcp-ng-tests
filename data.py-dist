@@ -5,6 +5,7 @@
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
+HOST_DEFAULT_PASSWORD_HASH = "" # FIXME
 
 # Public key for a private key available to the test runner
 TEST_SSH_PUBKEY = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKz9uQOoxq6Q0SQ0XTzQHhDolvuo/7EyrDZsYQbRELhcPJG8MT/o5u3HyJFhIP2+HqBSXXgmqRPJUkwz9wUwb2sUwf44qZm/pyPUWOoxyVtrDXzokU/uiaNKUMhbnfaXMz6Ogovtjua63qld2+ZRXnIgrVtYKtYBeu/qKGVSnf4FTOUKl1w3uKkr59IUwwAO8ay3wVnxXIHI/iJgq6JBgQNHbn3C/SpYU++nqL9G7dMyqGD36QPFuqH/cayL8TjNZ67TgAzsPX8OvmRSqjrv3KFbeSlpS/R4enHkSemhgfc8Z2f49tE7qxWZ6x4Uyp5E6ur37FsRf/tEtKIUJGMRXN XCP-ng CI"
@@ -28,8 +29,6 @@ PXE_CONFIG_SERVER = 'pxe'
 
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
-
-ANSWERFILE_URL = f"http://{PXE_CONFIG_SERVER}/configs/custom/ydi/install-8.2-uefi-iso-ext.xml" # FIXME
 
 # Default shared ISO SR
 ISOSR_SRV = "nfs-server"
@@ -120,6 +119,16 @@ LVMOISCSI_DEVICE_CONFIG = {
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
 }
+
+BASE_ANSWERFILES = dict(
+    INSTALL={
+        "root": {"tag": "installation"},
+        "root-password": {"type": "hash", "text": HOST_DEFAULT_PASSWORD_HASH},
+        "admin-interface": {"name": "eth0", "proto": "dhcp"},
+        "timezone": {"text": "Europe/Paris"},
+        "keymap": {"text": "us"},
+    },
+)
 
 # compatibility settings for older tests
 DEFAULT_NFS_DEVICE_CONFIG = NFS_DEVICE_CONFIG

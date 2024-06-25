@@ -24,6 +24,12 @@ from lib.pool import Pool
          vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
          vifs=[dict(index=0, network_uuid="eabc1038-e40f-2ae5-0781-a3adbec1cae8")], # FIXME
          ))
+@pytest.mark.answerfile(
+    {
+        "base": "INSTALL",
+        "source": {"type": "local"},
+        "primary-disk": {"text": "nvme0n1"},
+    })
 @pytest.mark.installer_iso("xcpng-8.2.1-2023")
 def test_install(iso_remaster, create_vms):
     assert len(create_vms) == 1
