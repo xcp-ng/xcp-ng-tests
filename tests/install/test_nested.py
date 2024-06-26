@@ -120,7 +120,7 @@ def test_install(iso_remaster, create_vms, iso_version):
 @pytest.mark.parametrize("mode", (
     "83b2",
     "821.1",
-))
+), scope="class")
 @pytest.mark.continuation_of(
     lambda params: [dict(vm="vm1",
                          image_test=f"test_install[{params}]")],
