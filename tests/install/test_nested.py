@@ -11,6 +11,9 @@ from lib.pool import Pool
 # make sure all those tests are considered in the dependency graph
 pytestmark = pytest.mark.dependency()
 
+@pytest.mark.parametrize("iso_version", (
+    "821.1", "83b2",
+))
 @pytest.mark.vm_definitions(
     dict(name="vm1",
          template="Other install media",
@@ -33,8 +36,13 @@ pytestmark = pytest.mark.dependency()
         "source": {"type": "local"},
         "primary-disk": {"text": "nvme0n1"},
     })
-@pytest.mark.installer_iso("xcpng-8.2.1-2023")
-def test_install(iso_remaster, create_vms):
+@pytest.mark.installer_iso(
+    lambda version: {
+        "821.1": "xcpng-8.2.1-2023",
+        "83b2": "xcpng-8.3-beta2",
+    }[version],
+    param_mapping={"version": "iso_version"})
+def test_install(iso_remaster, create_vms, iso_version):
     assert len(create_vms) == 1
     host_vm = create_vms[0]
     # FIXME should be part of vm def
@@ -109,7 +117,14 @@ def test_install(iso_remaster, create_vms):
         host_vm.shutdown(force=True)
         raise
 
-@pytest.mark.continuation_of([dict(vm="vm1", image_test="test_install")])
+@pytest.mark.parametrize("mode", (
+    "83b2",
+    "821.1",
+))
+@pytest.mark.continuation_of(
+    lambda params: [dict(vm="vm1",
+                         image_test=f"test_install[{params}]")],
+    param_mapping={"params": "mode"})
 class TestFirstboot:
     @pytest.fixture(autouse=True, scope="class")
     def firstboot_host(self, xcpng_chained_class, create_vms):
@@ -195,7 +210,7 @@ class TestFirstboot:
     # run in any order, and an output cache VM will be produced even
     # if only one of the tests gets run (as long as it passes).
 
-    def test_firstboot_services(self, firstboot_host):
+    def test_firstboot_services(self, firstboot_host, mode):
         host = firstboot_host
 
         # check for firstboot issues
