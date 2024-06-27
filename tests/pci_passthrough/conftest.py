@@ -5,7 +5,7 @@ from lib.common import safe_split
 
 @pytest.fixture(scope="session")
 def enabled_pci_uuid(host):
-    pci_uuids = safe_split(host.xe("pci-list", {"host-uuid": host.uuid}, minimal=True), ',')
+    pci_uuids = safe_split(host.xe("pci-list", {"host-uuid": host.uuid, "dependencies": ""}, minimal=True), ',')
 
     pci_uuid = None
     for uuid in pci_uuids:
