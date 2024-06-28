@@ -432,6 +432,17 @@ def create_vms(request, host):
         CACHE_IMPORTED_VM = False
     assert CACHE_IMPORTED_VM in [True, False]
 
+    # workaround lack of paramset in class node id
+    from _pytest.python import name2pseudofixturedef_key
+    pseudofixturedefs = request.node.stash.get(name2pseudofixturedef_key, None)
+    nodeid = request.node.nodeid
+    if pseudofixturedefs: # class node with class parameter
+        assert len(pseudofixturedefs) == 1, "multiple params not sorted/tested yet"
+        paramset = "-".join(request.getfixturevalue(key) for key in pseudofixturedefs.keys())
+        if paramset:
+            nodeid = f"{request.node.nodeid}[{paramset}]"
+            logging.debug("extending nodeid with paramset: %r", nodeid)
+
     marker = request.node.get_closest_marker("vm_definitions")
     if marker is None:
         raise Exception("No vm_definitions marker specified.")
@@ -444,7 +455,7 @@ def create_vms(request, host):
         assert "template" in vm_def or "image_test" in vm_def
         if "template" in vm_def:
             assert not "image_test" in vm_def
-        # FIXME should check optional vdis contents
+            # FIXME should check optional vdis contents
         # FIXME should check for extra args
         vm_defs.append(vm_def)
 
@@ -490,7 +501,7 @@ def create_vms(request, host):
             # record this state
             for vm_def, vm in zip(vm_defs, vms):
                 # FIXME where to store?
-                xva_name = f"{shortened_nodeid(request.node.nodeid)}-{vm_def['name']}.xva"
+                xva_name = f"{shortened_nodeid(nodeid)}-{vm_def['name']}.xva"
                 host.ssh(["rm -f", xva_name])
                 vm.export(xva_name, "zstd", use_cache=CACHE_IMPORTED_VM)
 

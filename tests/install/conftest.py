@@ -184,7 +184,18 @@ def _xcpng_chained(request):
                     image_scope=vm_spec.get("scope", "module"),
                     )
                for vm_spec in continuation_of]
-
-    depends = [vm_spec['image_test'] for vm_spec in continuation_of]
-    pytest_dependency.depends(request, depends)
     request.applymarker(pytest.mark.vm_definitions(*vm_defs))
+
+    depends = [_anchored_test(vm_spec['image_test'], vm_spec.get('test_anchor', None))
+               for vm_spec in continuation_of]
+    pytest_dependency.depends(request, depends)
+
+def _anchored_test(parent_nodeid, test_anchor):
+    if not test_anchor:
+        return parent_nodeid
+    if not "[" in parent_nodeid:
+        return f"{parent_nodeid}::{test_anchor}"
+
+    # insert test_anchor between the class nodeid and the param set
+    parent_nodeid, rest = parent_nodeid.split("[")
+    return f"{parent_nodeid}::{test_anchor}[{rest}" # rest includes "]"
