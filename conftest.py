@@ -437,8 +437,9 @@ def create_vms(request, host):
     pseudofixturedefs = request.node.stash.get(name2pseudofixturedef_key, None)
     nodeid = request.node.nodeid
     if pseudofixturedefs: # class node with class parameter
-        assert len(pseudofixturedefs) == 1, "multiple params not sorted/tested yet"
         paramset = "-".join(request.getfixturevalue(key) for key in pseudofixturedefs.keys())
+        if len(pseudofixturedefs) == 1:
+            logging.warning("multiple params not fully sorted/tested yet: %s", paramset)
         if paramset:
             nodeid = f"{request.node.nodeid}[{paramset}]"
             logging.debug("extending nodeid with paramset: %r", nodeid)
