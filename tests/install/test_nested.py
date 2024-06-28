@@ -14,8 +14,9 @@ pytestmark = pytest.mark.dependency()
 @pytest.mark.parametrize("iso_version", (
     "821.1", "83b2",
 ))
-@pytest.mark.vm_definitions(
-    dict(name="vm1",
+@pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
+@pytest.mark.vm_definitions(lambda firmware: dict(
+    name="vm1",
          template="Other install media",
          params=(
              # dict(param_name="", value=""),
@@ -23,26 +24,33 @@ pytestmark = pytest.mark.dependency()
              dict(param_name="memory-dynamic-max", value="4GiB"),
              dict(param_name="memory-dynamic-min", value="4GiB"),
              dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
-             dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
              dict(param_name="HVM-boot-params", key="order", value="dc"),
+    ) + {
+        "uefi": (
+            dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
              dict(param_name="platform", key="device-model", value="qemu-upstream-uefi"),
          ),
+        "bios": (),
+    }[firmware],
          vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
          vifs=[dict(index=0, network_uuid="eabc1038-e40f-2ae5-0781-a3adbec1cae8")], # FIXME
-         ))
-@pytest.mark.answerfile(
-    {
+),
+                            param_mapping={"firmware": "firmware"})
+@pytest.mark.answerfile(lambda firmware: {
         "base": "INSTALL",
         "source": {"type": "local"},
-        "primary-disk": {"text": "nvme0n1"},
-    })
+    "primary-disk": {"text": {"uefi": "nvme0n1",
+                              "bios": "sda"}[firmware]
+                     },
+},
+                        param_mapping={"firmware": "firmware"})
 @pytest.mark.installer_iso(
     lambda version: {
         "821.1": "xcpng-8.2.1-2023",
         "83b2": "xcpng-8.3-beta2",
     }[version],
     param_mapping={"version": "iso_version"})
-def test_install(iso_remaster, create_vms, iso_version):
+def test_install(iso_remaster, create_vms, iso_version, firmware):
     assert len(create_vms) == 1
     host_vm = create_vms[0]
     # FIXME should be part of vm def
@@ -124,16 +132,18 @@ def test_install(iso_remaster, create_vms, iso_version):
     "821.1",
     "821.1-821.1",
 ), scope="class")
+@pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
 @pytest.mark.continuation_of(
-    lambda params: [dict(vm="vm1",
-                         image_test=("{parent}[{params}]".format(
-                             params=params,
-                             parent={
-                                 1: "test_install",
-                                 2: "test_upgrade",
-                             }[len(params.split("-"))]
-                         )))],
-    param_mapping={"params": "mode"})
+    lambda params, firmware: [dict(vm="vm1",
+                                   image_test=("{parent}[{firmware}-{params}]".format(
+                                       params=params,
+                                       firmware=firmware,
+                                       parent={
+                                           1: "test_install",
+                                           2: "test_upgrade",
+                                       }[len(params.split("-"))]
+                                   )))],
+    param_mapping={"params": "mode", "firmware": "firmware"})
 class TestFirstboot:
     @pytest.fixture(autouse=True, scope="class")
     def firstboot_host(self, xcpng_chained_class, create_vms):
@@ -219,7 +229,7 @@ class TestFirstboot:
     # run in any order, and an output cache VM will be produced even
     # if only one of the tests gets run (as long as it passes).
 
-    def test_firstboot_services(self, firstboot_host, mode):
+    def test_firstboot_services(self, firstboot_host, mode, firmware):
         host = firstboot_host
 
         # check for firstboot issues
@@ -243,7 +253,7 @@ class TestFirstboot:
                 logging.warning("in logs: %s", out)
                 raise
 
-    def test_product_version(self, firstboot_host, mode):
+    def test_product_version(self, firstboot_host, mode, firmware):
         host = firstboot_host
 
         # determine version info from `mode`
@@ -270,11 +280,13 @@ class TestFirstboot:
     ("821.1", "83b2"),
     #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
 ], scope="class")
+@pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
 @pytest.mark.continuation_of(
-    lambda params: [dict(vm="vm1",
-                         image_test=f"TestFirstboot[{params}]",
-                         test_anchor="test_firstboot_services")],
-    param_mapping={"params": "orig_version"})
+    lambda firmware, params: [dict(
+        vm="vm1",
+        image_test=f"TestFirstboot[{firmware}-{params}]",
+        test_anchor="test_firstboot_services")],
+    param_mapping={"params": "orig_version", "firmware": "firmware"})
 @pytest.mark.installer_iso(
     lambda version: {
         "821.1": "xcpng-8.2.1-2023",
@@ -282,12 +294,14 @@ class TestFirstboot:
     }[version],
     param_mapping={"version": "iso_version"})
 @pytest.mark.answerfile(
-    {
+    lambda firmware: {
         "base": "UPGRADE",
         "source": {"type": "local"},
-        "existing-installation": {"text": "nvme0n1"},
+        "existing-installation": {"text": {"uefi": "nvme0n1",
+                                           "bios": "sda"}[firmware]
+                                  },
     })
-def test_upgrade(xcpng_chained_class, iso_remaster, create_vms, orig_version, iso_version):
+def test_upgrade(xcpng_chained_class, iso_remaster, create_vms, orig_version, iso_version, firmware):
     host_vm = create_vms[0]
     vif = host_vm.vifs()[0]
     mac_address = vif.param_get('MAC')
