@@ -52,6 +52,7 @@ class TestNested:
             "xs8": "xs8-2024-03",
             "ch821.1": "ch-8.2.1-23",
         }[version],
+        gen_unique_uuid=True,
         param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware: AnswerFile("INSTALL") \
                             .top_append(
@@ -130,6 +131,7 @@ class TestNested:
 
             # pool master must be reachable here
             pool = Pool(host_vm.ip)
+            logging.info("Host uuid: %s", pool.master.uuid)
 
             # wait for XAPI
             wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
