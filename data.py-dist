@@ -5,6 +5,10 @@
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
+HOST_DEFAULT_PASSWORD_HASH = "" # FIXME
+
+# Public key for a private key available to the test runner
+TEST_SSH_PUBKEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI"
 
 # The following prefix will be added to the `name-label` parameter of XAPI objects
 # that the tests will create or import, such as VMs and SRs.
@@ -26,10 +30,30 @@ PXE_CONFIG_SERVER = 'pxe'
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
 
+# Default shared ISO SR
+ISOSR_SRV = "nfs-server"
+ISOSR_PATH = "/srv/iso-sr"
+
+# Tools
+TOOLS = {
+#    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
+}
+
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
 VM_IMAGES = {
     'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
     'mini-linux-x86_64-uefi': 'alpine-uefi-minimal-3.12.0.xva'
+}
+
+# FIXME: use URLs and an optional cache?
+ISO_IMAGES = {
+#    'xcpng-8.0': "/home/user/iso/xcp-ng-8.0.0.iso",
+#    'xcpng-8.1': "/home/user/iso/xcp-ng-8.1.0-2.iso",
+#    'xcpng-8.2.0': "/home/user/iso/xcp-ng-8.2.0.iso",
+#    'xcpng-8.2.1': "/home/user/iso/xcp-ng-8.2.1.iso",
+#    'xcpng-8.2.1-2023': "/home/user/iso/xcp-ng-8.2.1-20231130.iso",
+#    'xcpng-8.3-beta2': "/home/user/iso/xcp-ng-8.3.0-beta2.iso",
+#    'xcpng-8.3-beta2-net': "/home/user/iso/xcp-ng-8.3.0-beta2-netinstall.iso",
 }
 
 # In some cases, we may prefer to favour a local SR to store test VM disks,
@@ -97,6 +121,22 @@ LVMOISCSI_DEVICE_CONFIG = {
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
 }
+
+BASE_ANSWERFILES = dict(
+    INSTALL={
+        "root": {"tag": "installation"},
+        "root-password": {"type": "hash", "text": HOST_DEFAULT_PASSWORD_HASH},
+        "admin-interface": {"name": "eth0", "proto": "dhcp"},
+        "timezone": {"text": "Europe/Paris"},
+        "keymap": {"text": "us"},
+    },
+    UPGRADE={
+        "root": {"tag": "installation", "mode": "upgrade"},
+    },
+    RESTORE={
+        "root": {"tag": "restore"},
+    },
+)
 
 # compatibility settings for older tests
 DEFAULT_NFS_DEVICE_CONFIG = NFS_DEVICE_CONFIG

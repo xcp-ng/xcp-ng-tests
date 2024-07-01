@@ -7,11 +7,13 @@ from packaging import version
 
 import lib.config as global_config
 
+from lib.common import callable_marker, shortened_nodeid
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
-from lib.vm import VM
+from lib.sr import SR
+from lib.vm import VM, xva_name_from_def
 from lib.xo import xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
@@ -19,20 +21,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-# *** Support for incremental tests in test classes ***
-# From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
-def pytest_runtest_makereport(item, call):
-    if "incremental" in item.keywords:
-        if call.excinfo is not None:
-            parent = item.parent
-            parent._previousfailed = item
-
-def pytest_runtest_setup(item):
-    previousfailed = getattr(item.parent, "_previousfailed", None)
-    if previousfailed is not None:
-        pytest.skip("previous test failed (%s)" % previousfailed.name)
-
-# *** End of: Support for incremental tests ***
+### pytest hooks
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -84,6 +73,64 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
+
+def pytest_generate_tests(metafunc):
+    if "vm_ref" in metafunc.fixturenames:
+        vms = metafunc.config.getoption("vm")
+        if not vms:
+            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
+        metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
+
+def pytest_collection_modifyitems(items, config):
+    # Automatically mark tests based on fixtures they require.
+    # Check pytest.ini or pytest --markers for marker descriptions.
+
+    markable_fixtures = [
+        'uefi_vm',
+        'unix_vm',
+        'windows_vm',
+        'hostA2',
+        'hostB1',
+        'sr_disk',
+        'sr_disk_4k'
+    ]
+
+    for item in items:
+        fixturenames = getattr(item, 'fixturenames', ())
+        for fixturename in markable_fixtures:
+            if fixturename in fixturenames:
+                item.add_marker(fixturename)
+
+        if 'vm_ref' not in fixturenames:
+            item.add_marker('no_vm')
+
+        if item.get_closest_marker('multi_vms'):
+            # multi_vms implies small_vm
+            item.add_marker('small_vm')
+
+# BEGIN make test results visible from fixtures
+# from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+
+# FIXME we may have to move this into lib/ if fixtures in sub-packages
+# want to make use of this feature
+from pytest import StashKey, CollectReport
+PHASE_REPORT_KEY = StashKey[dict[str, CollectReport]]()
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item, call):
+    # execute all other hooks to obtain the report object
+    rep = yield
+
+    # store test results for each phase of a call, which can
+    # be "setup", "call", "teardown"
+    item.stash.setdefault(PHASE_REPORT_KEY, {})[rep.when] = rep
+
+    return rep
+
+# END make test results visible from fixtures
+
+
+### fixtures
 
 def setup_host(hostname_or_ip):
     pool = Pool(hostname_or_ip)
@@ -314,7 +361,7 @@ def imported_vm(host, vm_ref):
         name = vm_orig.name()
         logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
-        vm_orig = host.import_vm(vm_ref, host.main_sr(), use_cache=CACHE_IMPORTED_VM)
+        vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=CACHE_IMPORTED_VM)
 
     if CACHE_IMPORTED_VM:
         # Clone the VM before running tests, so that the original VM remains untouched
@@ -331,6 +378,154 @@ def imported_vm(host, vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
+@pytest.fixture(scope="function")
+def create_vms(request, host):
+    """
+    Returns list of VM objects created from `vm_definitions` marker.
+
+    `vm_definitions` marker test author to specify one or more VMs,
+    using one `dict` per VM.
+
+    Mandatory keys:
+    - `name`: name of the VM to create (str)
+    - `template`: name (or UUID) of template to use (str)
+
+    Optional keys:
+    - `vdis`: dict-specifications for VDIs (Iterable[dict[str, str]])
+      Mandatory keys:
+      - `name`
+      - `size`
+
+    Example:
+    -------
+    > @pytest.mark.vm_definitions(dict(name="vm1", template="Other install media"),
+    >                             dict(name="vm2",
+    >                                  template="CentOS 7",
+    >                                  vdis=[dict(name="vm 2 system disk",
+    >                                             size="100GiB",
+    >                                             device="xvda",
+    >                                             userdevice="0",
+    >                                             )],
+    >
+    >     ))
+    > def test_foo(create_vms):
+    >    ...
+
+    Example:
+    -------
+    > @pytest.mark.dependency(depends=["test_foo"])
+    > @pytest.mark.vm_definitions(dict(name="vm1", image_test="test_foo", image_vm="vm2"))
+    > def test_bar(create_vms):
+    >    ...
+
+    """
+    # Do we cache VMs?
+    try:
+        from data import CACHE_IMPORTED_VM
+    except ImportError:
+        CACHE_IMPORTED_VM = False
+    assert CACHE_IMPORTED_VM in [True, False]
+
+    marker = request.node.get_closest_marker("vm_definitions")
+    if marker is None:
+        raise Exception("No vm_definitions marker specified.")
+    param_mapping = marker.kwargs.get("param_mapping", {})
+
+    vm_defs = []
+    for vm_def in marker.args:
+        vm_def = callable_marker(vm_def, request, param_mapping=param_mapping)
+        assert "name" in vm_def
+        assert "template" in vm_def or "image_test" in vm_def
+        if "template" in vm_def:
+            assert not "image_test" in vm_def
+            # FIXME should check optional vdis contents
+        # FIXME should check for extra args
+        vm_defs.append(vm_def)
+
+    try:
+        vms = []
+        vdis = []
+        vbds = []
+        for vm_def in vm_defs:
+            if "template" in vm_def:
+                _create_vm(vm_def, host, vms, vdis, vbds)
+            elif "image_test" in vm_def:
+                _import_vm(request, vm_def, host, vms, use_cache=CACHE_IMPORTED_VM)
+        yield vms
+
+        # request.node is an "item" because this fixture has "function" scope
+        report = request.node.stash[PHASE_REPORT_KEY]
+        if report["setup"].failed:
+            logging.warning("setting up a test failed or skipped: not exporting VMs")
+        elif ("call" not in report) or report["call"].failed:
+            logging.warning("executing test failed or skipped: not exporting VMs")
+        else:
+            # record this state
+            for vm_def, vm in zip(vm_defs, vms):
+                # FIXME where to store?
+                xva_name = f"{shortened_nodeid(request.node.nodeid)}-{vm_def['name']}.xva"
+                host.ssh(["rm -f", xva_name])
+                vm.export(xva_name, "zstd", use_cache=CACHE_IMPORTED_VM)
+
+    except Exception:
+        logging.error("exception caught...")
+        raise
+
+    finally:
+        for vbd in vbds:
+            logging.info("<< Destroy VBD %s", vbd.uuid)
+            vbd.destroy()
+        for vdi in vdis:
+            logging.info("<< Destroy VDI %s", vdi.uuid)
+            vdi.destroy()
+        for vm in vms:
+            logging.info("<< Destroy VM %s", vm.uuid)
+            vm.destroy(verify=True)
+
+def _create_vm(vm_def, host, vms, vdis, vbds):
+    vm_name = vm_def["name"]
+    vm_template = vm_def["template"]
+
+    logging.info(">> Install VM %r from template %r", vm_name, vm_template)
+
+    vm = host.vm_from_template(vm_name, vm_template)
+
+    # VM is now created, make sure we clean it up on any subsequent failure
+    vms.append(vm)
+
+    if "vdis" in vm_def:
+        for vdi_def in vm_def["vdis"]:
+            sr = SR(host.main_sr_uuid(), host.pool)
+            vdi = sr.create_vdi(vdi_def["name"], vdi_def["size"])
+            vdis.append(vdi)
+            # connect to VM
+            vbd = vm.create_vbd(vdi_def["device"], vdi.uuid)
+            vbds.append(vbd)
+            vbd.param_set(param_name="userdevice", value=vdi_def["userdevice"])
+
+    if "vifs" in vm_def:
+        for vif_def in vm_def["vifs"]:
+            vm.create_vif(vif_def["index"], vif_def["network_uuid"])
+
+    if "params" in vm_def:
+        for param_def in vm_def["params"]:
+            logging.info("Setting param %s", param_def)
+            vm.param_set(**param_def)
+
+def _import_vm(request, vm_def, host, vms, *, use_cache):
+    vm_image = xva_name_from_def(vm_def, request.node.nodeid)
+    base_vm = host.import_vm(vm_image, sr_uuid=host.main_sr_uuid(), use_cache=use_cache)
+
+    if use_cache:
+        # Clone the VM before running tests, so that the original VM remains untouched
+        logging.info(">> Clone cached VM before running tests")
+        vm = base_vm.clone()
+        # Remove the description, which may contain a cache identifier
+        vm.param_set('name-description', "")
+    else:
+        vm = base_vm
+    vms.append(vm)
+
 @pytest.fixture(scope="module")
 def running_vm(imported_vm):
     vm = imported_vm
@@ -339,7 +534,7 @@ def running_vm(imported_vm):
     if not vm.is_running():
         vm.start()
     wait_for(vm.is_running, '> Wait for VM running')
-    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")
+    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP", timeout_secs=5*60)
     wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
     # no teardown
@@ -415,37 +610,3 @@ def second_network(pytestconfig, host):
     if network_uuid == host.management_network():
         pytest.fail("--second-network must NOT be the management network")
     return network_uuid
-
-def pytest_generate_tests(metafunc):
-    if "vm_ref" in metafunc.fixturenames:
-        vms = metafunc.config.getoption("vm")
-        if not vms:
-            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
-        metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
-
-def pytest_collection_modifyitems(items, config):
-    # Automatically mark tests based on fixtures they require.
-    # Check pytest.ini or pytest --markers for marker descriptions.
-
-    markable_fixtures = [
-        'uefi_vm',
-        'unix_vm',
-        'windows_vm',
-        'hostA2',
-        'hostB1',
-        'sr_disk',
-        'sr_disk_4k'
-    ]
-
-    for item in items:
-        fixturenames = getattr(item, 'fixturenames', ())
-        for fixturename in markable_fixtures:
-            if fixturename in fixturenames:
-                item.add_marker(fixturename)
-
-        if 'vm_ref' not in fixturenames:
-            item.add_marker('no_vm')
-
-        if item.get_closest_marker('multi_vms'):
-            # multi_vms implies small_vm
-            item.add_marker('small_vm')

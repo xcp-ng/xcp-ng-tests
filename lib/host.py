@@ -8,7 +8,7 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import _param_get, safe_split, to_xapi_bool, wait_for, wait_for_not
+from lib.common import _param_get, safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
@@ -200,21 +200,31 @@ class Host:
         # is not enough to guarantee that the host object exists yet.
         wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about HOST %s" % self.uuid)
 
+    @staticmethod
+    def vm_cache_key(uri):
+        return f"[Cache for {strip_suffix(uri, '.xva')}]"
+
+    def cached_vm(self, uri, sr_uuid):
+        assert sr_uuid, "A SR UUID is necessary to use import cache"
+        cache_key = self.vm_cache_key(uri)
+        # Look for an existing cache VM
+        vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
+
+        for vm_uuid in vm_uuids:
+            vm = VM(vm_uuid, self)
+            # Make sure the VM is on the wanted SR.
+            # Assumption: if the first disk is on the SR, the VM is.
+            # If there's no VDI at all, then it is virtually on any SR.
+            if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
+                logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
+                return vm
+        logging.info("Not found vm in cache with key %r", cache_key)
+
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
         if use_cache:
-            assert sr_uuid, "A SR UUID is necessary to use import cache"
-            cache_key = f"[Cache for {uri}]"
-            # Look for an existing cache VM
-            vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
-
-            for vm_uuid in vm_uuids:
-                vm = VM(vm_uuid, self)
-                # Make sure the VM is on the wanted SR.
-                # Assumption: if the first disk is on the SR, the VM is.
-                # If there's no VDI at all, then it is virtually on any SR.
-                if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
-                    logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
-                    return vm
+            vm = self.cached_vm(uri, sr_uuid)
+            if vm:
+                return vm
 
         params = {}
         msg = "Import VM %s" % uri
@@ -227,7 +237,6 @@ class Host:
             params['sr-uuid'] = sr_uuid
         logging.info(msg)
         vm_uuid = self.xe('vm-import', params)
-        logging.info("VM UUID: %s" % vm_uuid)
         vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
         vm = VM(vm_uuid, self)
         vm.param_set('name-label', vm_name)
@@ -235,9 +244,19 @@ class Host:
         for vif in vm.vifs():
             vif.move(self.management_network())
         if use_cache:
+            cache_key = self.vm_cache_key(uri)
             logging.info(f"Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
         return vm
+
+    def vm_from_template(self, name, template):
+        params = {
+            "new-name-label": name,
+            "template": template,
+            "sr-uuid": self.main_sr_uuid(),
+        }
+        vm_uuid = self.xe('vm-install', params)
+        return VM(vm_uuid, self)
 
     def pool_has_vm(self, vm_uuid, vm_type='vm'):
         if vm_type == 'snapshot':
@@ -460,7 +479,7 @@ class Host:
                 srs.append(sr)
         return srs
 
-    def main_sr(self):
+    def main_sr_uuid(self):
         """ Main SR is either the default SR, or the first local SR, depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
@@ -470,9 +489,11 @@ class Host:
 
         sr_uuid = None
         if DEFAULT_SR == 'local':
+            hostname = self.xe('host-param-get', {'uuid': self.uuid,
+                                                  'param-name': 'name-label'})
             local_sr_uuids = safe_split(
                 # xe sr-list doesn't support filtering by host UUID!
-                self.ssh(['xe sr-list host=$HOSTNAME content-type=user minimal=true']),
+                self.xe('sr-list', {'host': hostname, 'content-type': 'user', 'minimal': 'true'}),
                 ','
             )
             assert local_sr_uuids, f"DEFAULT_SR=='local' so there must be a local SR on host {self}"
@@ -480,6 +501,7 @@ class Host:
         else:
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
+        assert sr_uuid != "<not in database>"
         return sr_uuid
 
     def hostname(self):

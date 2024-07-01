@@ -8,7 +8,9 @@ import lib.efi as efi
 
 from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, wait_for, wait_for_not
+from lib.common import shortened_nodeid, expand_scope_relative_nodeid
 from lib.snapshot import Snapshot
+from lib.vbd import VBD
 from lib.vif import VIF
 
 class VM(BaseVM):
@@ -122,7 +124,7 @@ class VM(BaseVM):
         # waiting for the IP:
         # - allows to make sure the OS actually started (on VMs that have the management agent)
         # - allows to store the IP for future use in the VM object
-        wait_for(self.try_get_and_store_ip, "Wait for VM IP")
+        wait_for(self.try_get_and_store_ip, "Wait for VM IP", timeout_secs=5*60)
         # now wait also for the management agent to have started
         wait_for(self.is_management_agent_up, "Wait for management agent up")
 
@@ -247,6 +249,14 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
+    # FIXME: use network_name instead?
+    def create_vif(self, vif_num, network_uuid):
+        logging.info("Create VIF %d to network %r on VM %s", vif_num, network_uuid, self.uuid)
+        self.host.xe('vif-create', {'vm-uuid': self.uuid,
+                                    'device': str(vif_num),
+                                    'network-uuid': network_uuid,
+                                    })
+
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
@@ -334,10 +344,15 @@ class VM(BaseVM):
         else:
             return PackageManagerEnum.UNKNOWN
 
-    def mount_guest_tools_iso(self):
-        self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': 'guest-tools.iso'})
+    def insert_cd(self, vdi_name):
+        logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
+        self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': vdi_name})
 
-    def unmount_guest_tools_iso(self):
+    def insert_guest_tools_iso(self):
+        self.insert_cd('guest-tools.iso')
+
+    def eject_cd(self):
+        logging.info("Ejecting CD from VM %s", self.uuid)
         self.host.xe('vm-cd-eject', {'uuid': self.uuid})
 
     # *** Common reusable test fragments
@@ -472,11 +487,33 @@ class VM(BaseVM):
         logging.info("Destroying vTPM %s" % vtpm_uuid)
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
+    def create_vbd(self, device, vdi_uuid):
+        logging.info("Create VBD %r for VDI %r on VM %s", device, vdi_uuid, self.uuid)
+        vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
+                                               'device': device,
+                                               'vdi-uuid': vdi_uuid,
+                                               })
+        logging.info("New VBD %s", vbd_uuid)
+        return VBD(vbd_uuid, self, device)
+
+    def create_cd_vbd(self, device, userdevice):
+        logging.info("Create CD VBD %r on VM %s", device, self.uuid)
+        vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
+                                               'device': device,
+                                               'type': 'CD',
+                                               'mode': 'RO',
+                                               })
+        vbd = VBD(vbd_uuid, self, device)
+        vbd.param_set(param_name="userdevice", value=userdevice)
+        logging.info("New VBD %s", vbd_uuid)
+        return vbd
+
     def clone(self):
-        name = self.name() + '_clone_for_tests'
+        name = self.name()
+        if not name.endswith('_clone_for_tests'):
+            name += '_clone_for_tests'
         logging.info("Clone VM")
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
-        logging.info("New VM: %s (%s)" % (uuid, name))
         return VM(uuid, self.host)
 
     def install_uefi_certs(self, auths):
@@ -586,3 +623,13 @@ class VM(BaseVM):
         res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
                           check=False, simple_output=False, decode=False)
         return res.returncode == 0
+
+
+def xva_name_from_def(vm_def, ref_nodeid):
+    vm_name = vm_def["name"]
+    image_test = vm_def["image_test"]
+    image_vm = vm_def.get("image_vm", vm_name)
+    image_scope = vm_def.get("image_scope", "module")
+    return "{}-{}.xva".format(shortened_nodeid(
+        expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid)),
+                              vm_name)
