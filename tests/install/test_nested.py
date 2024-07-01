@@ -300,7 +300,8 @@ class TestFirstboot:
         "existing-installation": {"text": {"uefi": "nvme0n1",
                                            "bios": "sda"}[firmware]
                                   },
-    })
+    },
+    param_mapping={"firmware": "firmware"})
 def test_upgrade(xcpng_chained_class, iso_remaster, create_vms, orig_version, iso_version, firmware):
     host_vm = create_vms[0]
     vif = host_vm.vifs()[0]
