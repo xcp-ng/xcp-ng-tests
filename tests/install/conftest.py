@@ -52,6 +52,8 @@ def iso_remaster(request, answerfile):
     param_mapping = marker.kwargs.get("param_mapping", {})
     iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
+    gen_unique_uuid = marker.kwargs.get("gen_unique_uuid", False)
+
     from data import ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
@@ -103,6 +105,17 @@ EOF
 
 systemctl --root="$INSTALLIMG" enable test-pingpxe.service
 
+cat > "$INSTALLIMG/root/test-unique-uuids.service" <<EOF
+[Unit]
+Description=Assign a unique host UUID at first boot
+Before=xapi.service
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -ec 'DIR=/var/lib/misc; mkdir -p \\$DIR; if ! test -r \\$DIR/test-unique-uuids; then sed -i.installer -e "/^INSTALLATION_UUID=/ s/^.*\\$/INSTALLATION_UUID=\\\\'\\$(uuidgen)\\\\'/" -e "/^CONTROL_DOMAIN_UUID=/ s/^.*\\$/CONTROL_DOMAIN_UUID=\\\\'\\$(uuidgen)\\\\'/"  /etc/xensource-inventory; touch \\$DIR/test-unique-uuids; fi'
+[Install]
+RequiredBy=xapi.service
+EOF
+
 cat > "$INSTALLIMG/root/postinstall.sh" <<EOF
 #!/bin/sh
 set -ex
@@ -111,6 +124,11 @@ ROOT="\\$1"
 
 cp /etc/systemd/system/test-pingpxe.service "\\$ROOT/etc/systemd/system/test-pingpxe.service"
 systemctl --root="\\$ROOT" enable test-pingpxe.service
+
+if [ {gen_unique_uuid} = True ]; then
+    cp /root/test-unique-uuids.service "\\$ROOT/etc/systemd/system/test-unique-uuids.service"
+    systemctl --root="\\$ROOT" enable test-unique-uuids.service
+fi
 
 mkdir -p "\\$ROOT/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" >> "\\$ROOT/root/.ssh/authorized_keys"
