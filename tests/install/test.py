@@ -52,6 +52,7 @@ class TestNested:
             "xs8": "xs8-2024-03",
             "ch821.1": "ch-8.2.1-23",
         }[version],
+        gen_unique_uuid=True,
         param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware: {
         "base": "INSTALL",
@@ -138,6 +139,7 @@ class TestNested:
                 # it worked!
                 break
 
+            logging.info("Host uuid: %s", pool.master.uuid)
             logging.info("Checking installed version")
             lsb_dist = pool.master.ssh(["lsb_release", "-si"])
             lsb_rel = pool.master.ssh(["lsb_release", "-sr"])
