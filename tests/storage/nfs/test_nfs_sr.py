@@ -5,8 +5,6 @@ from tests.storage import vdi_is_open
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
 
-# Make sure this fixture is called before the parametrized one
-@pytest.mark.usefixtures('sr_device_config')
 class TestNFSSRCreateDestroy:
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_device_config', 'nfs4_device_config'], indirect=True)
     def test_create_and_destroy_sr(self, host, dispatch_nfs):
@@ -19,8 +17,6 @@ class TestNFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-# Make sure these fixtures are called before the parametrized one
-@pytest.mark.usefixtures('sr_device_config', 'hosts')
 class TestNFSSR:
     @pytest.mark.quicktest
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)

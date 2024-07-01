@@ -1,3 +1,4 @@
+import itertools
 import logging
 import pytest
 import tempfile
@@ -47,19 +48,6 @@ def pytest_addoption(parser):
         help="VM key or OVA URL for tests that require only one VM",
     )
     parser.addoption(
-        "--sr-device-config",
-        action="append",
-        default=[],
-        help="device-config keys and values for a remote SR. "
-             "Example: 'server:10.0.0.1,serverpath:/vms,nfsversion:4.1'.",
-    )
-    parser.addoption(
-        "--additional-repos",
-        action="append",
-        default=[],
-        help="Additional repo URLs added to the yum config"
-    )
-    parser.addoption(
         "--second-network",
         action="store",
         default=None,
@@ -103,10 +91,14 @@ def setup_host(hostname_or_ip):
     return h
 
 @pytest.fixture(scope='session')
-def hosts(request):
+def hosts(pytestconfig):
     # a list of master hosts, each from a different pool
-    hostname_list = request.param.split(',')
+    hosts_args = pytestconfig.getoption("hosts")
+    hosts_split = [hostlist.split(',') for hostlist in hosts_args]
+    hostname_list = list(itertools.chain(*hosts_split))
     host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
+    if not host_list:
+        pytest.fail("This test requires at least one --hosts parameter")
     yield host_list
 
 @pytest.fixture(scope='session')
@@ -221,8 +213,11 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def sr_disk(request, host):
-    disk = request.param
+def sr_disk(pytestconfig, host):
+    disks = pytestconfig.getoption("sr_disk")
+    if len(disks) != 1:
+        pytest.fail("This test requires exactly one --sr-disk parameter")
+    disk = disks[0]
     if disk == "auto":
         logging.info(">> Check for the presence of a free disk device on the master host")
         disks = host.available_disks()
@@ -236,8 +231,11 @@ def sr_disk(request, host):
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_4k(request, host):
-    disk = request.param
+def sr_disk_4k(pytestconfig, host):
+    disks = pytestconfig.getoption("sr_disk_4k")
+    if len(disks) != 1:
+        pytest.fail("This test requires exactly one --sr-disks-4k parameter")
+    disk = disks[0]
     if disk == "auto":
         logging.info(">> Check for the presence of a free 4KiB block device on the master host")
         disks = host.available_disks(4096)
@@ -251,8 +249,11 @@ def sr_disk_4k(request, host):
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_for_all_hosts(request, host):
-    disk = request.param
+def sr_disk_for_all_hosts(pytestconfig, request, host):
+    disks = pytestconfig.getoption("sr_disk")
+    if len(disks) != 1:
+        pytest.fail("This test requires exactly one --sr-disk parameter")
+    disk = disks[0]
     master_disks = host.available_disks()
     assert len(master_disks) > 0, "a free disk device is required on the master host"
 
@@ -370,21 +371,6 @@ def uefi_vm(imported_vm):
     yield vm
 
 @pytest.fixture(scope='session')
-def sr_device_config(request):
-    raw_config = request.param
-
-    if raw_config is None:
-        # Use defaults
-        return None
-
-    config = {}
-    for key_val in raw_config.split(','):
-        key = key_val.split(':')[0]
-        value = key_val[key_val.index(':') + 1:]
-        config[key] = value
-    return config
-
-@pytest.fixture(scope='session')
 def additional_repos(request, hosts):
     if request.param is None:
         yield []
@@ -414,10 +400,11 @@ gpgcheck=0
             host_.ssh(['rm', '-f', repo_file])
 
 @pytest.fixture(scope='session')
-def second_network(request, host):
-    if request.param is None:
-        pytest.fail("This test requires the --second-network parameter!")
-    network_uuid = request.param
+def second_network(pytestconfig, host):
+    network_uuids = pytestconfig.getoption("second_network")
+    if len(network_uuids) != 1:
+        pytest.fail("This test requires exactly one --second-network parameter!")
+    network_uuid = network_uuids[0]
     pif_uuid = host.xe('pif-list', {'host-uuid': host.uuid, 'network-uuid': network_uuid}, minimal=True)
     if not pif_uuid:
         pytest.fail("The provided --second-network UUID doesn't exist or doesn't have a PIF on master host")
@@ -430,40 +417,11 @@ def second_network(request, host):
     return network_uuid
 
 def pytest_generate_tests(metafunc):
-    if "hosts" in metafunc.fixturenames:
-        metafunc.parametrize("hosts", metafunc.config.getoption("hosts"), indirect=True, scope="session")
     if "vm_ref" in metafunc.fixturenames:
         vms = metafunc.config.getoption("vm")
         if not vms:
             vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
-    if "sr_device_config" in metafunc.fixturenames:
-        configs = metafunc.config.getoption("sr_device_config")
-        if not configs:
-            # No --sr-device-config parameter doesn't mean skip the test.
-            # For us it means use the defaults.
-            configs = [None]
-        metafunc.parametrize("sr_device_config", configs, indirect=True, scope="session")
-    if "additional_repos" in metafunc.fixturenames:
-        repos = metafunc.config.getoption("additional_repos")
-        if not repos:
-            # No --additional-repos parameter doesn't mean skip the test.
-            # It's an optional parameter, if missing we must execute additional_repos fixture
-            # without error.
-            repos = [None]
-        metafunc.parametrize("additional_repos", repos, indirect=True, scope="session")
-    if "second_network" in metafunc.fixturenames:
-        second_network = metafunc.config.getoption("second_network")
-        metafunc.parametrize("second_network", [second_network], indirect=True, scope="session")
-    if "sr_disk" in metafunc.fixturenames:
-        disk = metafunc.config.getoption("sr_disk")
-        metafunc.parametrize("sr_disk", disk, indirect=True, scope="session")
-    if "sr_disk_4k" in metafunc.fixturenames:
-        disk = metafunc.config.getoption("sr_disk_4k")
-        metafunc.parametrize("sr_disk_4k", disk, indirect=True, scope="session")
-    if "sr_disk_for_all_hosts" in metafunc.fixturenames:
-        disk = metafunc.config.getoption("sr_disk")
-        metafunc.parametrize("sr_disk_for_all_hosts", disk, indirect=True, scope="session")
 
 def pytest_collection_modifyitems(items, config):
     # Automatically mark tests based on fixtures they require.

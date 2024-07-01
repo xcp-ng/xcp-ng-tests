@@ -54,25 +54,25 @@ DEFAULT_SR = 'default'
 CACHE_IMPORTED_VM = False
 
 # Default NFS device config:
-DEFAULT_NFS_DEVICE_CONFIG = {
+NFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path/to/shared/mount' # Path to shared mountpoint
 }
 
 # Default NFS4+ only device config:
-DEFAULT_NFS4_DEVICE_CONFIG = {
+NFS4_DEVICE_CONFIG = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path_to_shared_mount' # Path to shared mountpoint
 #    'nfsversion': '4.1'
 }
 
 # Default NFS ISO device config:
-DEFAULT_NFS_ISO_DEVICE_CONFIG = {
+NFS_ISO_DEVICE_CONFIG = {
 #    'location': '10.0.0.2:/path/to/shared/mount' # URL/Hostname of NFS server and path to shared mountpoint
 }
 
 # Default CIFS ISO device config:
-DEFAULT_CIFS_ISO_DEVICE_CONFIG = {
+CIFS_ISO_DEVICE_CONFIG = {
 #    'location': r'\\10.0.0.2\<shared folder name>',
 #    'username': '<user>',
 #    'cifspassword': '<password>',
@@ -80,20 +80,29 @@ DEFAULT_CIFS_ISO_DEVICE_CONFIG = {
 #    'vers': '<1.0> or <3.0>'
 }
 
-DEFAULT_CEPHFS_DEVICE_CONFIG = {
+CEPHFS_DEVICE_CONFIG = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
 }
 
-DEFAULT_MOOSEFS_DEVICE_CONFIG = {
+MOOSEFS_DEVICE_CONFIG = {
 #    'masterhost': 'mfsmaster',
 #    'masterport': '9421',
 #    'rootpath': '/vms'
 }
 
-DEFAULT_LVMOISCSI_DEVICE_CONFIG = {
+LVMOISCSI_DEVICE_CONFIG = {
 #    'target': '192.168.1.1',
 #    'port': '3260',
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
 }
+
+# compatibility settings for older tests
+DEFAULT_NFS_DEVICE_CONFIG = NFS_DEVICE_CONFIG
+DEFAULT_NFS4_DEVICE_CONFIG = NFS4_DEVICE_CONFIG
+DEFAULT_NFS_ISO_DEVICE_CONFIG = NFS_ISO_DEVICE_CONFIG
+DEFAULT_CIFS_ISO_DEVICE_CONFIG = CIFS_ISO_DEVICE_CONFIG
+DEFAULT_CEPHFS_DEVICE_CONFIG = CEPHFS_DEVICE_CONFIG
+DEFAULT_MOOSEFS_DEVICE_CONFIG = MOOSEFS_DEVICE_CONFIG
+DEFAULT_LVMOISCSI_DEVICE_CONFIG = LVMOISCSI_DEVICE_CONFIG

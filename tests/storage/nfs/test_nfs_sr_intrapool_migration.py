@@ -12,7 +12,7 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
 @pytest.mark.usefixtures("hostA2", "local_sr_on_hostA2")
 # Make sure these fixtures are called before the parametrized one
-@pytest.mark.usefixtures('sr_device_config', 'vm_ref', 'hosts')
+@pytest.mark.usefixtures('vm_ref')
 class Test:
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_live_intrapool_shared_migration(self, host, hostA2, dispatch_nfs):

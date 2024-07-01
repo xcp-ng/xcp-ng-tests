@@ -1,6 +1,8 @@
 import logging
 import pytest
 
+from lib import config
+
 # --- Dispatch fixture for NFS versions ----------------------------------------
 
 @pytest.fixture
@@ -10,21 +12,8 @@ def dispatch_nfs(request):
 # --- NFS3 fixtures ------------------------------------------------------------
 
 @pytest.fixture(scope='package')
-def nfs_device_config(sr_device_config):
-    if sr_device_config is not None:
-        # SR device config from CLI param
-        config = sr_device_config
-    else:
-        # SR device config from data.py defaults
-        try:
-            from data import DEFAULT_NFS_DEVICE_CONFIG
-        except ImportError:
-            DEFAULT_NFS_DEVICE_CONFIG = {}
-        if DEFAULT_NFS_DEVICE_CONFIG:
-            config = DEFAULT_NFS_DEVICE_CONFIG
-        else:
-            raise Exception("No default NFS device-config found, neither in CLI nor in data.py defaults")
-    return config
+def nfs_device_config():
+    return config.sr_device_config("NFS_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
 def nfs_sr(host, nfs_device_config):
@@ -51,21 +40,8 @@ def vm_on_nfs_sr(host, nfs_sr, vm_ref):
 # --- NFS4+ only fixtures ------------------------------------------------------
 
 @pytest.fixture(scope='package')
-def nfs4_device_config(sr_device_config):
-    if sr_device_config is not None:
-        # SR device config from CLI param
-        config = sr_device_config
-    else:
-        # SR device config from data.py defaults
-        try:
-            from data import DEFAULT_NFS4_DEVICE_CONFIG
-        except ImportError:
-            DEFAULT_NFS4_DEVICE_CONFIG = {}
-        if DEFAULT_NFS4_DEVICE_CONFIG:
-            config = DEFAULT_NFS4_DEVICE_CONFIG
-        else:
-            raise Exception("No default NFS4+ device-config found, neither in CLI nor in data.py defaults")
-    return config
+def nfs4_device_config():
+    return config.sr_device_config("NFS4_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
 def nfs4_sr(host, nfs4_device_config):
