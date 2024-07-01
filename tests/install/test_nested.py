@@ -146,7 +146,7 @@ def test_install(iso_remaster, create_vms, iso_version, firmware):
     param_mapping={"params": "mode", "firmware": "firmware"})
 class TestFirstboot:
     @pytest.fixture(autouse=True, scope="class")
-    def firstboot_host(self, xcpng_chained_class, create_vms):
+    def firstboot_host(self, mode, xcpng_chained_class, create_vms):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
