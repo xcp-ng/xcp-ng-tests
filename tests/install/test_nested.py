@@ -13,6 +13,7 @@ pytestmark = pytest.mark.dependency()
 
 @pytest.mark.parametrize("iso_version", (
     "821.1", "83b2",
+    "ch821.1", "xs8",
 ))
 @pytest.mark.parametrize("firmware", ("uefi", "bios"), scope="class")
 @pytest.mark.vm_definitions(lambda firmware: dict(
@@ -36,14 +37,15 @@ pytestmark = pytest.mark.dependency()
          vifs=[dict(index=0, network_uuid="eabc1038-e40f-2ae5-0781-a3adbec1cae8")], # FIXME
 ),
                             param_mapping={"firmware": "firmware"})
-@pytest.mark.answerfile(lambda firmware: {
+@pytest.mark.answerfile(
+    lambda firmware: {
         "base": "INSTALL",
         "source": {"type": "local"},
-    "primary-disk": {"text": {"uefi": "nvme0n1",
-                              "bios": "sda"}[firmware]
-                     },
-},
-                        param_mapping={"firmware": "firmware"})
+        "primary-disk": {"text": {"uefi": "nvme0n1",
+                                  "bios": "sda"}[firmware]
+                         },
+    },
+    param_mapping={"firmware": "firmware"})
 @pytest.mark.installer_iso(
     lambda version: {
         "821.1": "xcpng-8.2.1-2023",
