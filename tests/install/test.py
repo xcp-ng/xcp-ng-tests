@@ -12,7 +12,7 @@ class TestNested:
     @pytest.mark.parametrize("iso_version", (
         "75", "76", "80", "81",
         "ch821.1", "xs8",
-        "821.1", "83b2",
+        "821.1", "83b2", "83rc1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(lambda firmware: dict(
@@ -44,6 +44,7 @@ class TestNested:
             "81": "xcpng-8.1",
             "821.1": "xcpng-8.2.1-2023",
             "83b2": "xcpng-8.3-beta2",
+            "83rc1": "xcpng-8.3-rc1",
             "ch821.1": "ch-8.2.1-23",
             "xs8": "xs8-2024-03",
         }[version],
@@ -161,6 +162,7 @@ class TestNested:
             "81": "8.1.0",
             "821.1": "8.2.1",
             "83b2": "8.3.0",
+            "83rc1": "8.3.0",
         }[expected_rel_id]
 
         try:
@@ -288,6 +290,7 @@ class TestNested:
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
+        "83rc1",
         "83b2",
         "821.1",
         "81", "80",
@@ -304,15 +307,15 @@ class TestNested:
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
-        #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
-        "821.1-83b2",
-        "821.1-83b2-83b2",
-        "81-83b2", "81-83b2-83b2",
-        "80-83b2", "80-83b2-83b2",
-        "76-83b2", "76-83b2-83b2",
-        "75-83b2", "75-83b2-83b2",
-        "ch821.1-83b2",
-        "ch821.1-83b2-83b2",
+        "83b2-83rc1",
+        "821.1-83rc1",
+        "821.1-83rc1-83rc1",
+        "81-83rc1", "81-83rc1-83rc1",
+        "80-83rc1", "80-83rc1-83rc1",
+        "76-83rc1", "76-83rc1-83rc1",
+        "75-83rc1", "75-83rc1-83rc1",
+        "ch821.1-83rc1",
+        "ch821.1-83rc1-83rc1",
         "821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -331,13 +334,14 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("821.1", "821.1"),
-        ("75", "83b2"),
-        ("76", "83b2"),
-        ("80", "83b2"),
-        ("81", "83b2"),
-        ("ch821.1", "83b2"),
-        ("821.1", "83b2"),
-        #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
+        ("75", "83rc1"),
+        ("76", "83rc1"),
+        ("80", "83rc1"),
+        ("81", "83rc1"),
+        ("ch821.1", "83rc1"),
+        ("821.1", "83rc1"),
+        ("83b2", "83rc1"),
+        ("83rc1", "83rc1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(lambda firmware, params: [dict(
@@ -347,7 +351,7 @@ class TestNested:
     @pytest.mark.installer_iso(
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
-            "83b2": "xcpng-8.3-beta2",
+            "83rc1": "xcpng-8.3-rc1",
         }[version],
         param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware: {
@@ -437,12 +441,12 @@ class TestNested:
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
-        ("821.1-83b2", "83b2"),
-        ("75-83b2", "83b2"),
-        ("76-83b2", "83b2"),
-        ("80-83b2", "83b2"),
-        ("81-83b2", "83b2"),
-        ("ch821.1-83b2", "83b2"),
+        ("821.1-83rc1", "83rc1"),
+        ("75-83rc1", "83rc1"),
+        ("76-83rc1", "83rc1"),
+        ("80-83rc1", "83rc1"),
+        ("81-83rc1", "83rc1"),
+        ("ch821.1-83rc1", "83rc1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(lambda firmware, params: [dict(
@@ -452,7 +456,7 @@ class TestNested:
     @pytest.mark.installer_iso(
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
-            "83b2": "xcpng-8.3-beta2",
+            "83rc1": "xcpng-8.3-rc1",
         }[version],
         param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware: {
