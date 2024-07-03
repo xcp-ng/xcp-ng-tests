@@ -632,4 +632,4 @@ def xva_name_from_def(vm_def, ref_nodeid):
     image_scope = vm_def.get("image_scope", "module")
     return "{}-{}.xva".format(shortened_nodeid(
         expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid)),
-                              vm_name)
+                              image_vm)
