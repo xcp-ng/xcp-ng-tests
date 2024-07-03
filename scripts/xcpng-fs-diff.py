@@ -192,15 +192,17 @@ def remote_diff(host1, host2, filename):
         if file2 is not None and os.path.exists(file2):
             os.remove(file2)
 
-def compare_data(ref, test, ignored_file_patterns, show_diff):
+def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
     ref_data = ref['data']
     ref_host = ref['host']
     test_data = test['data']
     test_host = test['host']
+    ignored_files = []
 
     for dtype in test_data:
         for file in test_data[dtype]:
             if ignore_file(file, ignored_file_patterns):
+                ignored_files.append(file)
                 continue
 
             if file not in ref_data[dtype]:
@@ -222,10 +224,16 @@ def compare_data(ref, test, ignored_file_patterns, show_diff):
     for dtype in ref_data:
         for file, val in ref_data[dtype].items():
             if ignore_file(file, ignored_file_patterns):
+                ignored_files.append(file)
                 continue
 
             if val is not None:
                 print(f"{dtype} doesn't exist on tested host: {file}")
+
+    if show_ignored and len(ignored_files) > 0:
+        print("\nIgnored files:")
+        for f in ignored_files:
+            print(f"{f}")
 
 # Load a previously saved json file containing a the reference files
 def load_reference_files(filename):
@@ -311,6 +319,8 @@ def main():
                         help='Load reference filesystem information from a file')
     parser.add_argument('--show-diff', '-d', action='store_true', dest='show_diff',
                         help='Show diff of text files that differ. A reference host must be supplied with -r')
+    parser.add_argument('--show-ignored', '-g', action='store_true', dest='show_ignored',
+                        help='Show files that have been ignored')
     parser.add_argument('--add-folder', '-f', action='append', dest='folders', default=folders,
                         help='Add folders to the default searched folders (/boot, /etc, /opt, and /usr). '
                              'Can be specified multiple times')
@@ -348,7 +358,7 @@ def main():
     test = dict([('data', test_data), ('host', args.test_host)])
 
     print("\nResults:")
-    compare_data(ref, test, args.ignored_file_patterns, args.show_diff)
+    compare_data(ref, test, args.ignored_file_patterns, args.show_diff, args.show_ignored)
 
     return 0
 
