@@ -229,6 +229,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
         "83rc1",
         "83b2",
@@ -238,12 +239,13 @@ class TestNested:
         "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda version, firmware: [dict(
+    @pytest.mark.continuation_of(lambda version, firmware, machine: [dict(
         vm="vm1",
         image_test=f"TestNested::test_install[{firmware}-{version}]")],
-                                 param_mapping={"version": "version", "firmware": "firmware"})
+                                 param_mapping={"version": "version", "firmware": "firmware",
+                                                "machine": "machine"})
     def test_firstboot_install(self, create_vms,
-                               firmware, version):
+                               firmware, version, machine):
         self._test_firstboot(create_vms, version)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -289,7 +291,7 @@ class TestNested:
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(lambda firmware, params: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_firstboot_install[{firmware}-{params}]")],
+        image_test=f"TestNested::test_firstboot_install[{firmware}-{params}-host1]")],
                                  param_mapping={"params": "orig_version", "firmware": "firmware"})
     @pytest.mark.installer_iso(
         lambda version: {
