@@ -410,6 +410,17 @@ class Host:
         self.saved_packages_list = None
         self.saved_rollback_id = None
 
+    def shutdown(self, verify=False):
+        logging.info("Shutdown host %s" % self)
+        try:
+            self.ssh(['shutdown'])
+        except commands.SSHCommandFailed as e:
+            # ssh connection may get killed by the shutdown and terminate with an error code
+            if "closed by remote host" not in e.stdout:
+                raise
+        if verify:
+            wait_for_not(self.is_enabled, "Wait for host down")
+
     def reboot(self, verify=False):
         logging.info("Reboot host %s" % self)
         try:
