@@ -271,10 +271,12 @@ JOBS = {
             "A pool >= 8.2.1. On 8.3+, it needs at least two hosts. On 8.2, one is enough but more is better.",
             "On 8.3+ only, a second pool, single-host, available for temporarily joining the first pool.",
             "A fast-booting unix UEFI VM with efitools.",
+            "An additional free disk on the first host.",
         ],
         # nb_pools left to 1 so that the job can run on XCP-ng 8.2 with just one pool, but 2 are required in 8.3+
         "nb_pools": 1,
         "params": {
+            "--sr-disk": "auto",
             "--vm": "single/small_vm_efitools",
         },
         "paths": ["tests/uefi_sb/test_uefistored_cert_flow.py", "tests/uefi_sb/test_varstored_cert_flow.py"],

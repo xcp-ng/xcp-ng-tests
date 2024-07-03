@@ -16,6 +16,8 @@ from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, 
 #   Master of a, at least, 2 hosts pool
 # - hostB1: XCP-ng host >= 8.3
 #   This host will be joined and ejected from pool A, it means its state will be completely reinitialized from scratch
+# From --sr-disk parameter:
+# - a free disk on the first host.
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
