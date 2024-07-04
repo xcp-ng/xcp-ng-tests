@@ -28,6 +28,15 @@ from lib.pool import Pool
         "83rc1": "xcpng-8.3-rc1",
     }[version],
     param_mapping={"version": "iso_version"})
+@pytest.mark.answerfile(
+    lambda firmware: {
+        "base": "UPGRADE",
+        "source": {"type": "local"},
+        "existing-installation": {"text": {"uefi": "nvme0n1",
+                                           "bios": "sda"}[firmware]
+                                  },
+    },
+    param_mapping={"firmware": "firmware"})
 def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms):
     (master_vm, slave_vm) = create_vms
     master_mac = master_vm.vifs()[0].param_get('MAC')
@@ -88,15 +97,18 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
 
     logging.info("VMs dispatched as %s", [vm.get_residence_host().uuid for vm in vms])
 
-    # do RPU
+    ## do RPU
 
+    # evacuate master
     vms_to_migrate = [vm for vm in vms if vm.get_residence_host().uuid == pool.master.uuid]
-    logging.info("Expecting migration of %s", (vms_to_migrate,))
+    logging.info("Expecting migration of %s", ([vm.uuid for vm in vms_to_migrate],))
     pool.master.xe("host-evacuate", {"host": pool.master.uuid})
-    wait_for(lambda: all(vm.get_residence_host().uuid != pool.master.uuid for vm in vms),
-             "Wait for management agent up")
+    wait_for(lambda: all(vm.get_residence_host().uuid != pool.master.uuid for vm in vms_to_migrate),
+             "Wait for VM migration")
 
+    # upgrade master
     pool.master.shutdown()
+    wait_for(lambda: master_vm.is_halted(), "Wait for Master VM to be halted", timeout_secs=5*60)
     installer.perform_upgrade(iso=iso_remaster, host_vm=master_vm)
     master_vm.start()
     wait_for(master_vm.is_running, "Wait for Master VM running")
@@ -104,13 +116,16 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
              "Wait for ssh back up on Master VM", retry_delay_secs=5)
     wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 
+    # evacuate slave
     vms_to_migrate = vms
-    logging.info("Expecting migration of %s", (vms_to_migrate,))
+    logging.info("Expecting migration of %s", ([vm.uuid for vm in vms_to_migrate],))
     pool.master.xe("host-evacuate", {"host": slave.uuid})
     wait_for(lambda: all(vm.get_residence_host().uuid != slave.uuid for vm in vms),
-             "Wait for management agent up")
+             "Wait for VM migration")
 
+    # upgrade slave
     slave.shutdown()
+    wait_for(lambda: slave_vm.is_halted(), "Wait for Master VM to be halted", timeout_secs=5*60)
     installer.perform_upgrade(iso=iso_remaster, host_vm=slave_vm)
     slave_vm.start()
     wait_for(slave_vm.is_running, "Wait for Slave VM running")
@@ -121,7 +136,8 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
     logging.info("Migrating a VM back to slave")
     vms[1].migrate(slave)
 
-    # cleanup
+    ## cleanup
+
     slave.shutdown()
     pool.master.shutdown()
     wait_for(lambda: slave_vm.is_halted(), "Wait for Slave VM to be halted", timeout_secs=5*60)
