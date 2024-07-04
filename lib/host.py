@@ -251,7 +251,7 @@ class Host:
 
     def vm_from_template(self, name, template):
         params = {
-            "new-name-label": name,
+            "new-name-label": prefix_object_name(name),
             "template": template,
             "sr-uuid": self.main_sr_uuid(),
         }
