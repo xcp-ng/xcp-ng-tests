@@ -73,6 +73,9 @@ class VM(BaseVM):
         return ret
 
     def try_get_and_store_ip(self):
+        if self.ip:
+            return True
+
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
         # An IP that starts with 169.254. is not a real routable IP.
