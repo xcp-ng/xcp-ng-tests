@@ -322,7 +322,7 @@ class VM(BaseVM):
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
     def file_exists(self, filepath):
-        """ Test that the file at filepath exists. """
+        """Returns True if the file exists, otherwise returns False."""
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
     def detect_package_manager(self):
@@ -433,10 +433,6 @@ class VM(BaseVM):
         Some VMs will not boot anymore after such an operation. Seen with debian VMs, for example.
         """
         self.param_remove('NVRAM', 'EFI-variables')
-
-    def file_exists(self, filepath):
-        """Returns True if the file exists, otherwise returns False."""
-        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
     def sign_bins(self):
         for f in self.get_all_efi_bins():
