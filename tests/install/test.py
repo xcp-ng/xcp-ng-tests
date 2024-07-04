@@ -33,7 +33,7 @@ class TestNested:
             "bios": (),
         }[firmware],
         vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
-        vifs=[dict(index=0, network_uuid="eabc1038-e40f-2ae5-0781-a3adbec1cae8")], # FIXME
+        vifs=[dict(index=0, network_uuid="0728b52e-c5f0-e212-50c9-9bfef9d10a31")], # FIXME
     ),
                                 param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
