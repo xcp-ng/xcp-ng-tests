@@ -2,16 +2,16 @@ import logging
 import os
 import pytest
 
-from lib import pxe
+from lib import installer, pxe
 from lib.common import wait_for, vm_image
 from lib.pool import Pool
 
 # FIXME without --ignore-unknown-dependency, SKIPPED
 # "because it depends on tests/install/test.py::TestNested::test_firstboot_install[uefi-821.1-host1]"
 @pytest.mark.usefixtures("xcpng_chained")
-@pytest.mark.parametrize("mode", (
-    "821.1",
-))
+@pytest.mark.parametrize(("orig_version", "iso_version"), [
+    ("821.1", "83rc1"),
+])
 @pytest.mark.parametrize("firmware", ("uefi", "bios"))
 @pytest.mark.continuation_of(lambda params, firmware: [
     dict(vm="vm1",
@@ -22,8 +22,13 @@ from lib.pool import Pool
          image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host2]",
          scope="package"),
 ],
-                             param_mapping={"params": "mode", "firmware": "firmware"})
-def test_pool_rpu(firmware, mode, create_vms):
+                             param_mapping={"params": "orig_version", "firmware": "firmware"})
+@pytest.mark.installer_iso(
+    lambda version: {
+        "83rc1": "xcpng-8.3-rc1",
+    }[version],
+    param_mapping={"version": "iso_version"})
+def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms):
     (master_vm, slave_vm) = create_vms
     master_mac = master_vm.vifs()[0].param_get('MAC')
     slave_mac = slave_vm.vifs()[0].param_get('MAC')
@@ -82,6 +87,39 @@ def test_pool_rpu(firmware, mode, create_vms):
              "Wait for management agent up")
 
     logging.info("VMs dispatched as %s", [vm.get_residence_host().uuid for vm in vms])
+
+    # do RPU
+
+    vms_to_migrate = [vm for vm in vms if vm.get_residence_host().uuid == pool.master.uuid]
+    logging.info("Expecting migration of %s", (vms_to_migrate,))
+    pool.master.xe("host-evacuate", {"host": pool.master.uuid})
+    wait_for(lambda: all(vm.get_residence_host().uuid != pool.master.uuid for vm in vms),
+             "Wait for management agent up")
+
+    pool.master.shutdown()
+    installer.perform_upgrade(iso=iso_remaster, host_vm=master_vm)
+    master_vm.start()
+    wait_for(master_vm.is_running, "Wait for Master VM running")
+    wait_for(lambda: not os.system(f"nc -zw5 {master_vm.ip} 22"),
+             "Wait for ssh back up on Master VM", retry_delay_secs=5)
+    wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
+
+    vms_to_migrate = vms
+    logging.info("Expecting migration of %s", (vms_to_migrate,))
+    pool.master.xe("host-evacuate", {"host": slave.uuid})
+    wait_for(lambda: all(vm.get_residence_host().uuid != slave.uuid for vm in vms),
+             "Wait for management agent up")
+
+    slave.shutdown()
+    installer.perform_upgrade(iso=iso_remaster, host_vm=slave_vm)
+    slave_vm.start()
+    wait_for(slave_vm.is_running, "Wait for Slave VM running")
+    wait_for(lambda: not os.system(f"nc -zw5 {slave_vm.ip} 22"),
+             "Wait for ssh back up on Slave VM", retry_delay_secs=5)
+    wait_for(slave.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
+
+    logging.info("Migrating a VM back to slave")
+    vms[1].migrate(slave)
 
     # cleanup
     slave.shutdown()
