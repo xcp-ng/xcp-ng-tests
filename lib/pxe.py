@@ -48,3 +48,10 @@ def arp_addresses_for(mac_address):
     )
     candidate_ips = output.splitlines()
     return candidate_ips
+
+def arp_clear_for(mac_address):
+    for stray_ip in arp_addresses_for(mac_address):
+        output = ssh(
+            PXE_CONFIG_SERVER,
+            ['arp', '-d', stray_ip]
+        )
