@@ -1,3 +1,4 @@
+import logging
 from lib import commands, pxe
 from lib.commands import ssh
 from lib.common import wait_for
@@ -51,7 +52,7 @@ def perform_upgrade(*, iso, host_vm):
     mac_address = vif.param_get('MAC')
     logging.info("Host VM has MAC %s", mac_address)
 
-    host_vm.insert_cd(iso_remaster)
+    host_vm.insert_cd(iso)
 
     try:
         host_vm.start()
