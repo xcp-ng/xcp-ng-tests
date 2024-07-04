@@ -5,7 +5,6 @@ import time
 
 from lib import commands, pxe
 from lib.common import wait_for
-from lib.host import Host
 from lib.pool import Pool
 
 @pytest.mark.dependency()
