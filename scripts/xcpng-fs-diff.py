@@ -357,7 +357,6 @@ def main():
     ref = dict([('data', ref_data), ('host', args.ref_host)])
     test = dict([('data', test_data), ('host', args.test_host)])
 
-    print("\nResults:")
     compare_data(ref, test, args.ignored_file_patterns, args.show_diff, args.show_ignored)
 
     return 0
