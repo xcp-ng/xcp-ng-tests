@@ -55,6 +55,8 @@ def perform_upgrade(*, iso, host_vm):
     host_vm.insert_cd(iso)
 
     try:
+        pxe.arp_clear_for(mac_address)
+
         host_vm.start()
         wait_for(host_vm.is_running, "Wait for host VM running")
 
