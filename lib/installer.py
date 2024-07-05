@@ -1,6 +1,7 @@
 import logging
+
 from lib import commands, pxe
-from lib.commands import ssh
+from lib.commands import local_cmd, ssh
 from lib.common import wait_for
 
 def poweroff(ip):
@@ -68,6 +69,12 @@ def perform_upgrade(*, iso, host_vm):
         logging.info("Host VM has IPs %s", ips)
         assert len(ips) == 1
         host_vm.ip = ips[0]
+
+        # host may not be up if ARP cache was filled
+        wait_for(lambda: local_cmd(f"ping -c1 {host_vm.ip} > /dev/null 2>&1", check=False),
+                 "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+        wait_for(lambda: local_cmd(f"nc -zw5 {host_vm.ip} 22", check=False),
+                 "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
 
         monitor_upgrade(ip=host_vm.ip)
 
