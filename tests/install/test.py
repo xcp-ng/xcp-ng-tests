@@ -134,7 +134,7 @@ class TestNested:
             raise
 
 
-    def _test_firstboot(self, create_vms, mode):
+    def _test_firstboot(self, create_vms, mode, *, set_hostname=None):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -208,6 +208,11 @@ class TestNested:
                 break
 
             logging.info("Host uuid: %s", pool.master.uuid)
+            if set_hostname:
+                pool.master.param_set("name-label", set_hostname)
+                pool.master.xe("host-set-hostname-live", {"host-uuid": pool.master.uuid,
+                                                          "host-name": set_hostname})
+
             logging.info("Checking installed version")
             lsb_dist = pool.master.ssh(["lsb_release", "-si"])
             lsb_rel = pool.master.ssh(["lsb_release", "-sr"])
@@ -307,7 +312,7 @@ class TestNested:
                                  param_mapping={"params": "mode", "firmware": "firmware",
                                                 "machine": "machine"})
     def test_firstboot_install(self, firmware, create_vms, mode, machine):
-        self._test_firstboot(create_vms, mode)
+        self._test_firstboot(create_vms, mode, set_hostname=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
