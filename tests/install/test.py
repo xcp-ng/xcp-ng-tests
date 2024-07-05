@@ -4,7 +4,8 @@ import pytest
 import time
 
 from lib import commands, installer, pxe
-from lib.common import wait_for
+from lib.common import safe_split, wait_for
+from lib.pif import PIF
 from lib.pool import Pool
 
 from data import NETWORKS
@@ -68,7 +69,7 @@ class TestNested:
         assert len(create_vms) == 1
         installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
 
-    def _test_firstboot(self, create_vms, mode):
+    def _test_firstboot(self, create_vms, mode, *, set_hostname=None):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -142,6 +143,7 @@ class TestNested:
                 break
 
             logging.info("Host uuid: %s", pool.master.uuid)
+
             logging.info("Checking installed version")
             lsb_dist = pool.master.ssh(["lsb_release", "-si"])
             lsb_rel = pool.master.ssh(["lsb_release", "-sr"])
@@ -200,6 +202,26 @@ class TestNested:
                     logging.warning("in logs: %s", out)
                     raise
 
+            if set_hostname:
+                pool.master.param_set("name-label", set_hostname)
+                pool.master.xe("host-set-hostname-live", {"host-uuid": pool.master.uuid,
+                                                          "host-name": set_hostname})
+                # mode IP to static - FIXME not really in a good place but hey
+                # FIXME management_network() -> PIF -> filter on host ?
+                mgmt_pif_uuids = safe_split(pool.master.xe("pif-list",
+                                                           {"host-uuid": pool.master.uuid},
+                                                           minimal=True))
+                assert len(mgmt_pif_uuids) == 1
+                mgmt_pif = PIF(uuid=mgmt_pif_uuids[0], host=pool.master)
+                ip = mgmt_pif.param_get("IP")
+                netmask = mgmt_pif.param_get("netmask")
+                gateway = mgmt_pif.param_get("gateway")
+                dns = mgmt_pif.param_get("DNS")
+                pool.master.xe("pif-reconfigure-ip", {"uuid": mgmt_pif.uuid,
+                                                      "mode": "static",
+                                                      "IP": ip, "netmask": netmask,
+                                                      "gateway": gateway, "DNS": dns})
+
             #wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
             logging.info("Powering off pool master")
             try:
@@ -246,7 +268,7 @@ class TestNested:
                                                 "machine": "machine"})
     def test_firstboot_install(self, create_vms,
                                firmware, version, machine):
-        self._test_firstboot(create_vms, version)
+        self._test_firstboot(create_vms, version, set_hostname=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
