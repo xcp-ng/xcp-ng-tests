@@ -4,7 +4,8 @@ import pytest
 import time
 
 from lib import commands, installer, pxe
-from lib.common import wait_for
+from lib.common import safe_split, wait_for
+from lib.pif import PIF
 from lib.pool import Pool
 
 @pytest.mark.dependency()
@@ -212,6 +213,21 @@ class TestNested:
                 pool.master.param_set("name-label", set_hostname)
                 pool.master.xe("host-set-hostname-live", {"host-uuid": pool.master.uuid,
                                                           "host-name": set_hostname})
+                # mode IP to static - FIXME not really in a good place but hey
+                # FIXME management_network() -> PIF -> filter on host ?
+                mgmt_pif_uuids = safe_split(pool.master.xe("pif-list",
+                                                           {"host-uuid": pool.master.uuid},
+                                                           minimal=True))
+                assert len(mgmt_pif_uuids) == 1
+                mgmt_pif = PIF(uuid=mgmt_pif_uuids[0], host=pool.master)
+                ip = mgmt_pif.param_get("IP")
+                netmask = mgmt_pif.param_get("netmask")
+                gateway = mgmt_pif.param_get("gateway")
+                dns = mgmt_pif.param_get("DNS")
+                pool.master.xe("pif-reconfigure-ip", {"uuid": mgmt_pif.uuid,
+                                                      "mode": "static",
+                                                      "IP": ip, "netmask": netmask,
+                                                      "gateway": gateway, "DNS": dns})
 
             logging.info("Checking installed version")
             lsb_dist = pool.master.ssh(["lsb_release", "-si"])

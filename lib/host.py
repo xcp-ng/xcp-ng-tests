@@ -8,7 +8,7 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import _param_get, safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
+from lib.common import _param_get, _param_set, safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
@@ -98,6 +98,9 @@ class Host:
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self, Host.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+
+    def param_set(self, param_name, value, key=None):
+        _param_set(self, Host.xe_prefix, self.uuid, param_name, value, key)
 
     def create_file(self, filename, text):
         with tempfile.NamedTemporaryFile('w') as file:
