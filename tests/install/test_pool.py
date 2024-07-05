@@ -40,7 +40,9 @@ from lib.pool import Pool
 def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms):
     (master_vm, slave_vm) = create_vms
     master_mac = master_vm.vifs()[0].param_get('MAC')
+    logging.info("Master VM has MAC %s", master_mac)
     slave_mac = slave_vm.vifs()[0].param_get('MAC')
+    logging.info("Slave VM has MAC %s", slave_mac)
 
     master_vm.start()
     slave_vm.start()
