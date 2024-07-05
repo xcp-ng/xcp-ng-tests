@@ -44,7 +44,9 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
     slave_mac = slave_vm.vifs()[0].param_get('MAC')
     logging.info("Slave VM has MAC %s", slave_mac)
 
+    pxe.arp_clear_for(master_mac)
     master_vm.start()
+    pxe.arp_clear_for(slave_mac)
     slave_vm.start()
     wait_for(master_vm.is_running, "Wait for master VM running")
     wait_for(slave_vm.is_running, "Wait for slave VM running")
@@ -112,8 +114,18 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
     pool.master.shutdown()
     wait_for(lambda: master_vm.is_halted(), "Wait for Master VM to be halted", timeout_secs=5*60)
     installer.perform_upgrade(iso=iso_remaster, host_vm=master_vm)
+    pxe.arp_clear_for(master_mac)
     master_vm.start()
     wait_for(master_vm.is_running, "Wait for Master VM running")
+
+    wait_for(lambda: pxe.arp_addresses_for(master_mac),
+             "Wait for DHCP server to see Master VM in ARP tables",
+             timeout_secs=10*60)
+    ips = pxe.arp_addresses_for(master_mac)
+    logging.info("Master VM has IPs %s", ips)
+    assert len(ips) == 1
+    master_vm.ip = ips[0]
+
     wait_for(lambda: not os.system(f"nc -zw5 {master_vm.ip} 22"),
              "Wait for ssh back up on Master VM", retry_delay_secs=5)
     wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
@@ -129,8 +141,18 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
     slave.shutdown()
     wait_for(lambda: slave_vm.is_halted(), "Wait for Master VM to be halted", timeout_secs=5*60)
     installer.perform_upgrade(iso=iso_remaster, host_vm=slave_vm)
+    pxe.arp_clear_for(slave_mac)
     slave_vm.start()
     wait_for(slave_vm.is_running, "Wait for Slave VM running")
+
+    wait_for(lambda: pxe.arp_addresses_for(slave_mac),
+             "Wait for DHCP server to see Slave VM in ARP tables",
+             timeout_secs=10*60)
+    ips = pxe.arp_addresses_for(slave_mac)
+    logging.info("Slave VM has IPs %s", ips)
+    assert len(ips) == 1
+    slave_vm.ip = ips[0]
+
     wait_for(lambda: not os.system(f"nc -zw5 {slave_vm.ip} 22"),
              "Wait for ssh back up on Slave VM", retry_delay_secs=5)
     wait_for(slave.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)

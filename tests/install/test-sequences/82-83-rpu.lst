@@ -1,4 +1,4 @@
 tests/install/test.py::TestNested::test_install[uefi-821.1]
 tests/install/test.py::TestNested::test_firstboot_install[uefi-821.1-host1]
 tests/install/test.py::TestNested::test_firstboot_install[uefi-821.1-host2]
-tests/install/test_pool.py::test_pool_rpu[uefi-821.1]
+tests/install/test_pool.py::test_pool_rpu[uefi-821.1-83rc1]
