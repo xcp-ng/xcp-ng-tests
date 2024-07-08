@@ -13,6 +13,7 @@ assert "MGMT" in NETWORKS
 
 @pytest.mark.dependency()
 class TestNested:
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("iso_version", (
         "83rc1", "83b2",
         "821.1",
@@ -56,16 +57,21 @@ class TestNested:
         }[version],
         gen_unique_uuid=True,
         param_mapping={"version": "iso_version"})
-    @pytest.mark.answerfile(lambda firmware: {
+    @pytest.mark.answerfile(lambda firmware, local_sr: {
         "base": "INSTALL",
+        # FIXME this overrides part of base data
+        "root": {"tag": "installation"} if local_sr == "nosr" else {
+            "tag": "installation", "sr-type": local_sr,
+        },
         "source": {"type": "local"},
         "primary-disk": {"text": {"uefi": "nvme0n1",
-                                  "bios": "sda"}[firmware]
+                                  "bios": "sda"}[firmware],
+                         "guest-storage": "no" if local_sr == "nosr" else "yes",
                          },
     },
-                            param_mapping={"firmware": "firmware"})
+                            param_mapping={"firmware": "firmware", "local_sr": "local_sr"})
     def test_install(self, create_vms, iso_remaster,
-                     firmware, iso_version):
+                     firmware, iso_version, local_sr):
         assert len(create_vms) == 1
         installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
 
@@ -125,7 +131,7 @@ class TestNested:
 
             # pool master must be reachable here
             # FIXME: not sure why we seem to need this, while port 22 has been seen open
-            tries = 5
+            tries = 7
             while True:
                 try:
                     pool = Pool(host_vm.ip)
@@ -135,7 +141,7 @@ class TestNested:
                     tries -= 1
                     if tries:
                         logging.warning("retrying connection to pool master")
-                        time.sleep(2)
+                        time.sleep(3)
                         continue
                     # retries failed
                     raise
@@ -251,6 +257,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
         "83rc1",
@@ -261,16 +268,17 @@ class TestNested:
         "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda version, firmware, machine: [dict(
+    @pytest.mark.continuation_of(lambda version, firmware, machine, local_sr: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_install[{firmware}-{version}]")],
+        image_test=f"TestNested::test_install[{firmware}-{version}-{local_sr}]")],
                                  param_mapping={"version": "version", "firmware": "firmware",
-                                                "machine": "machine"})
+                                                "machine": "machine", "local_sr": "local_sr"})
     def test_firstboot_install(self, create_vms,
-                               firmware, version, machine):
+                               firmware, version, machine, local_sr):
         self._test_firstboot(create_vms, version, set_hostname=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("mode", (
         "83rc1-83rc1", "83rc1-83rc1-83rc1",
         "83b2-83rc1",
@@ -285,20 +293,22 @@ class TestNested:
         "821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda params, firmware: [dict(
+    @pytest.mark.continuation_of(lambda params, firmware, local_sr: [dict(
         vm="vm1",
-        image_test=(f"TestNested::{{}}[{firmware}-{params}]".format(
+        image_test=(f"TestNested::{{}}[{firmware}-{params}-{local_sr}]".format(
             {
                 2: "test_upgrade",
                 3: "test_restore",
             }[len(params.split("-"))]
         )))],
-                                 param_mapping={"params": "mode", "firmware": "firmware"})
+                                 param_mapping={"params": "mode", "firmware": "firmware",
+                                                "local_sr": "local_sr"})
     def test_firstboot_noninst(self, create_vms,
-                               firmware, mode):
+                               firmware, mode, local_sr):
         self._test_firstboot(create_vms, mode)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83rc1", "83rc1"),
         ("83b2", "83rc1"),
@@ -311,10 +321,11 @@ class TestNested:
         ("821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda firmware, params: [dict(
+    @pytest.mark.continuation_of(lambda firmware, params, local_sr: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_firstboot_install[{firmware}-{params}-host1]")],
-                                 param_mapping={"params": "orig_version", "firmware": "firmware"})
+        image_test=f"TestNested::test_firstboot_install[{firmware}-{params}-host1-{local_sr}]")],
+                                 param_mapping={"params": "orig_version", "firmware": "firmware",
+                                                "local_sr": "local_sr"})
     @pytest.mark.installer_iso(
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
@@ -331,10 +342,11 @@ class TestNested:
         },
         param_mapping={"firmware": "firmware"})
     def test_upgrade(self, create_vms, iso_remaster,
-                     firmware, orig_version, iso_version):
+                     firmware, orig_version, iso_version, local_sr):
         installer.perform_upgrade(iso=iso_remaster, host_vm=create_vms[0])
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83rc1-83rc1", "83rc1"),
         ("821.1-83rc1", "83rc1"),
@@ -345,10 +357,11 @@ class TestNested:
         ("ch821.1-83rc1", "83rc1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda firmware, params: [dict(
+    @pytest.mark.continuation_of(lambda firmware, params, local_sr: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_firstboot_noninst[{firmware}-{params}]")],
-                                 param_mapping={"params": "orig_version", "firmware": "firmware"})
+        image_test=f"TestNested::test_firstboot_noninst[{firmware}-{params}-{local_sr}]")],
+                                 param_mapping={"params": "orig_version", "firmware": "firmware",
+                                                "local_sr": "local_sr"})
     @pytest.mark.installer_iso(
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
@@ -363,7 +376,7 @@ class TestNested:
     },
                             param_mapping={"firmware": "firmware"})
     def test_restore(self, create_vms, iso_remaster,
-                     firmware, orig_version, iso_version):
+                     firmware, orig_version, iso_version, local_sr):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
