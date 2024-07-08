@@ -426,6 +426,10 @@ def create_vms(request, host):
         CACHE_IMPORTED_VM = False
     assert CACHE_IMPORTED_VM in [True, False]
 
+    import git
+    test_repo = git.Repo(".")
+    assert not test_repo.is_dirty(), "test repo must not be dirty to cache images"
+
     marker = request.node.get_closest_marker("vm_definitions")
     if marker is None:
         raise Exception("No vm_definitions marker specified.")
@@ -450,7 +454,7 @@ def create_vms(request, host):
             if "template" in vm_def:
                 _create_vm(vm_def, host, vms, vdis, vbds)
             elif "image_test" in vm_def:
-                _import_vm(request, vm_def, host, vms, use_cache=CACHE_IMPORTED_VM)
+                _import_vm(request, vm_def, host, vms, test_repo, use_cache=CACHE_IMPORTED_VM)
         yield vms
 
         # request.node is an "item" because this fixture has "function" scope
@@ -463,7 +467,8 @@ def create_vms(request, host):
             # record this state
             for vm_def, vm in zip(vm_defs, vms):
                 # FIXME where to store?
-                xva_name = f"{shortened_nodeid(request.node.nodeid)}-{vm_def['name']}.xva"
+                gitref = test_repo.head.commit.hexsha
+                xva_name = f"{shortened_nodeid(request.node.nodeid)}-{vm_def['name']}-{gitref}.xva"
                 host.ssh(["rm -f", xva_name])
                 vm.export(xva_name, "zstd", use_cache=CACHE_IMPORTED_VM)
 
@@ -512,8 +517,8 @@ def _create_vm(vm_def, host, vms, vdis, vbds):
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
 
-def _import_vm(request, vm_def, host, vms, *, use_cache):
-    vm_image = xva_name_from_def(vm_def, request.node.nodeid)
+def _import_vm(request, vm_def, host, vms, test_repo, *, use_cache):
+    vm_image = xva_name_from_def(vm_def, request.node.nodeid, test_repo.head.commit.hexsha)
     base_vm = host.import_vm(vm_image, sr_uuid=host.main_sr_uuid(), use_cache=use_cache)
 
     if use_cache:

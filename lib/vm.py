@@ -621,11 +621,12 @@ class VM(BaseVM):
         return res.returncode == 0
 
 
-def xva_name_from_def(vm_def, ref_nodeid):
+def xva_name_from_def(vm_def, ref_nodeid, test_gitref):
     vm_name = vm_def["name"]
     image_test = vm_def["image_test"]
     image_vm = vm_def.get("image_vm", vm_name)
     image_scope = vm_def.get("image_scope", "module")
-    return "{}-{}.xva".format(shortened_nodeid(
-        expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid)),
-                              image_vm)
+    return "{}-{}-{}.xva".format(
+        shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid)),
+        image_vm,
+        test_gitref)
