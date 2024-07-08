@@ -139,7 +139,7 @@ def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms)
 
     # upgrade slave
     slave.shutdown()
-    wait_for(lambda: slave_vm.is_halted(), "Wait for Master VM to be halted", timeout_secs=5*60)
+    wait_for(lambda: slave_vm.is_halted(), "Wait for Slave VM to be halted", timeout_secs=5*60)
     installer.perform_upgrade(iso=iso_remaster, host_vm=slave_vm)
     pxe.arp_clear_for(slave_mac)
     slave_vm.start()
