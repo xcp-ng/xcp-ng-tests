@@ -520,6 +520,7 @@ class Host:
             lambda: master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}),
             f"Wait for pool {master} to see joined host {self} as enabled."
         )
+        self.pool = pool
 
     def activate_smapi_driver(self, driver):
         sm_plugins = self.ssh(['grep', '[[:space:]]*sm-plugins[[:space:]]*=[[:space:]]*', XAPI_CONF_FILE]).splitlines()
