@@ -316,7 +316,7 @@ class TestNested:
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("machine", ("host1", "host2"))
-    @pytest.mark.parametrize("mode", (
+    @pytest.mark.parametrize("version", (
         "83rc1",
         "83b2",
         "821.1",
@@ -325,13 +325,13 @@ class TestNested:
         "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda params, firmware, machine: [dict(
+    @pytest.mark.continuation_of(lambda version, firmware, machine: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_install[{firmware}-{params}]")],
-                                 param_mapping={"params": "mode", "firmware": "firmware",
+        image_test=f"TestNested::test_install[{firmware}-{version}]")],
+                                 param_mapping={"version": "version", "firmware": "firmware",
                                                 "machine": "machine"})
-    def test_firstboot_install(self, firmware, create_vms, mode, machine):
-        self._test_firstboot(create_vms, mode, set_hostname=machine)
+    def test_firstboot_install(self, firmware, create_vms, version, machine):
+        self._test_firstboot(create_vms, version, set_hostname=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
