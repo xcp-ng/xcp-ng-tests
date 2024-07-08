@@ -8,6 +8,9 @@ from lib.common import safe_split, wait_for
 from lib.pif import PIF
 from lib.pool import Pool
 
+from data import NETWORKS
+assert "MGMT" in NETWORKS
+
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("iso_version", (
@@ -34,7 +37,7 @@ class TestNested:
             "bios": (),
         }[firmware],
         vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
-        vifs=[dict(index=0, network_uuid="0728b52e-c5f0-e212-50c9-9bfef9d10a31")], # FIXME
+        vifs=[dict(index=0, network_uuid=NETWORKS["MGMT"])],
     ),
                                 param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
