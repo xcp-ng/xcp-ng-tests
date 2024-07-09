@@ -15,11 +15,11 @@ from lib.pool import Pool
 @pytest.mark.parametrize("firmware", ("uefi", "bios"))
 @pytest.mark.continuation_of(lambda params, firmware: [
     dict(vm="vm1",
-         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host1]",
+         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host1-nosr]",
          scope="package"),
     dict(vm="vm2",
          image_vm="vm1",
-         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host2]",
+         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host2-nosr]",
          scope="package"),
 ],
                              param_mapping={"params": "orig_version", "firmware": "firmware"})
