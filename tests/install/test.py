@@ -434,7 +434,7 @@ class TestNested:
                         },
     },
                             param_mapping={"firmware": "firmware"})
-    def test_restore(self, firmware, orig_version, iso_version, iso_remaster, create_vms):
+    def test_restore(self, firmware, orig_version, iso_version, create_vms, iso_remaster):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
