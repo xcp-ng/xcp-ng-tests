@@ -336,6 +336,7 @@ class TestNested:
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
+        "83rc1-83rc1", "83rc1-83rc1-83rc1",
         "83b2-83rc1",
         "821.1-83rc1",
         "821.1-83rc1-83rc1",
@@ -396,6 +397,7 @@ class TestNested:
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
+        ("83rc1-83rc1", "83rc1"),
         ("821.1-83rc1", "83rc1"),
         ("75-83rc1", "83rc1"),
         ("76-83rc1", "83rc1"),
