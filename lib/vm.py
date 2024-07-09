@@ -778,4 +778,7 @@ def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
     image_vm = vm_def.get("image_vm", vm_name)
     image_scope = vm_def.get("image_scope", "module")
     nodeid = shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid))
-    return f"{nodeid}-{image_vm}-{test_gitref}"
+    image_key = f"{nodeid}-{image_vm}-{test_gitref}"
+
+    from data import IMAGE_EQUIVS
+    return IMAGE_EQUIVS.get(image_key, image_key)
