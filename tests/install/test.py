@@ -391,7 +391,7 @@ class TestNested:
                                       },
         },
                             param_mapping={"firmware": "firmware"})
-    def test_upgrade(self, firmware, iso_remaster, create_vms, orig_version, iso_version):
+    def test_upgrade(self, firmware, create_vms, iso_remaster, orig_version, iso_version):
         installer.perform_upgrade(iso=iso_remaster, host_vm=create_vms[0])
 
     @pytest.mark.usefixtures("xcpng_chained")
