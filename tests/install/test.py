@@ -129,12 +129,12 @@ class TestNested:
         except Exception as e:
             logging.critical("caught exception %s", e)
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
-            host_vm.shutdown(force=True)
+            #host_vm.shutdown(force=True)
             raise
         except KeyboardInterrupt:
             logging.warning("keyboard interrupt")
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
-            host_vm.shutdown(force=True)
+            #host_vm.shutdown(force=True)
             raise
 
 
@@ -306,12 +306,12 @@ class TestNested:
         except Exception as e:
             logging.critical("caught exception %s", e)
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
-            host_vm.shutdown(force=True)
+            #host_vm.shutdown(force=True)
             raise
         except KeyboardInterrupt:
             logging.warning("keyboard interrupt")
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
-            host_vm.shutdown(force=True)
+            #host_vm.shutdown(force=True)
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -489,10 +489,10 @@ class TestNested:
         except Exception as e:
             logging.critical("caught exception %s", e)
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
-            host_vm.shutdown(force=True)
+            #host_vm.shutdown(force=True)
             raise
         except KeyboardInterrupt:
             logging.warning("keyboard interrupt")
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
-            host_vm.shutdown(force=True)
+            #host_vm.shutdown(force=True)
             raise
