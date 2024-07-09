@@ -626,7 +626,12 @@ def xva_name_from_def(vm_def, ref_nodeid, test_gitref):
     image_test = vm_def["image_test"]
     image_vm = vm_def.get("image_vm", vm_name)
     image_scope = vm_def.get("image_scope", "module")
-    return "{}-{}-{}.xva".format(
+
+    image_key = "{}-{}-{}".format(
         shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid)),
         image_vm,
         test_gitref)
+
+    from data import IMAGE_EQUIVS
+    image_key = IMAGE_EQUIVS.get(image_key, image_key)
+    return f"{image_key}.xva"
