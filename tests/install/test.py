@@ -407,6 +407,7 @@ class TestNested:
         installer.perform_upgrade(iso=iso_remaster, host_vm=create_vms[0])
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83rc1-83rc1", "83rc1"),
         ("821.1-83rc1", "83rc1"),
@@ -417,10 +418,11 @@ class TestNested:
         ("ch821.1-83rc1", "83rc1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda firmware, params: [dict(
+    @pytest.mark.continuation_of(lambda firmware, params, local_sr: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_firstboot_noninst[{firmware}-{params}]")],
-                                 param_mapping={"params": "orig_version", "firmware": "firmware"})
+        image_test=f"TestNested::test_firstboot_noninst[{firmware}-{params}-{local_sr}]")],
+                                 param_mapping={"params": "orig_version", "firmware": "firmware",
+                                                "local_sr": "local_sr"})
     @pytest.mark.installer_iso(
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
@@ -434,7 +436,7 @@ class TestNested:
                         },
     },
                             param_mapping={"firmware": "firmware"})
-    def test_restore(self, firmware, orig_version, iso_version, create_vms, iso_remaster):
+    def test_restore(self, firmware, orig_version, iso_version, create_vms, iso_remaster, local_sr):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
