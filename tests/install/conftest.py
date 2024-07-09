@@ -98,7 +98,7 @@ Description=Ping pxe server to populate its ARP table
 After=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'while ! ping -c1 {PXE_CONFIG_SERVER}; do sleep 1 ; done'
+ExecStart=/bin/sh -c 'while ! ( ifconfig -a && ping -c1 {PXE_CONFIG_SERVER} ); do sleep 1 ; done'
 [Install]
 WantedBy=default.target
 EOF
