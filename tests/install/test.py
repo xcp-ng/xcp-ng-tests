@@ -212,10 +212,6 @@ class TestNested:
                 break
 
             logging.info("Host uuid: %s", pool.master.uuid)
-            if set_hostname:
-                pool.master.param_set("name-label", set_hostname)
-                pool.master.xe("host-set-hostname-live", {"host-uuid": pool.master.uuid,
-                                                          "host-name": set_hostname})
                 # mode IP to static - FIXME not really in a good place but hey
                 # FIXME management_network() -> PIF -> filter on host ?
                 mgmt_pif_uuids = safe_split(pool.master.xe("pif-list",
@@ -287,6 +283,10 @@ class TestNested:
                     out = pool.master.ssh(["grep", "-r", service, "/var/log"], check=False)
                     logging.warning("in logs: %s", out)
 
+            if set_hostname:
+                pool.master.param_set("name-label", set_hostname)
+                pool.master.xe("host-set-hostname-live", {"host-uuid": pool.master.uuid,
+                                                          "host-name": set_hostname})
             logging.info("Powering off pool master")
             try:
                 # use "poweroff" because "reboot" would cause ARP and
