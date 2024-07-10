@@ -344,8 +344,14 @@ class VM(BaseVM):
         else:
             return PackageManagerEnum.UNKNOWN
 
-    def insert_cd(self, vdi_name):
+    def insert_cd(self, vdi_name, use_cache=False):
         logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
+        # FIXME: rescan only the right ISO
+        if not use_cache:
+            sr_iso_uuids = self.host.xe('sr-list', {'type': 'iso'}, minimal=True).split(',')
+            for uuid in sr_iso_uuids:
+                logging.info("scanning SR %s", uuid)
+                self.host.xe('sr-scan', {'uuid': uuid})
         self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': vdi_name})
 
     def insert_guest_tools_iso(self):
