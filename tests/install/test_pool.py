@@ -16,11 +16,11 @@ from lib.pool import Pool
 @pytest.mark.continuation_of(lambda params, firmware: [
     dict(vm="vm1",
          image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host1-nosr]",
-         scope="package"),
+         scope="session"),
     dict(vm="vm2",
          image_vm="vm1",
          image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host2-nosr]",
-         scope="package"),
+         scope="session"),
 ],
                              param_mapping={"params": "orig_version", "firmware": "firmware"})
 @pytest.mark.installer_iso(
