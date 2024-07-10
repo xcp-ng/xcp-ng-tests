@@ -92,13 +92,35 @@ echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
 
+cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
+#! /bin/bash
+set -eE
+set -o pipefail
+
+ether_of () {{
+    ifconfig "$1" | grep ether | sed 's/.*ether \\([^ ]*\\).*/\\1/'
+}}
+
+# on installed system, avoid xapi-project/xen-api#5799
+if ! [ -e /opt/xensource/installer ]; then
+    eth_mac=$(ether_of eth0)
+    br_mac=$(ether_of xenbr0)
+
+    # wait for bridge MAC to be fixed
+    test "$eth_mac" = "$br_mac"
+fi
+
+ping -c1 "$1"
+EOF
+chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
+
 cat > "$INSTALLIMG/etc/systemd/system/test-pingpxe.service" <<EOF
 [Unit]
 Description=Ping pxe server to populate its ARP table
 After=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'while ! ( ifconfig -a && ping -c1 {PXE_CONFIG_SERVER} ); do sleep 1 ; done'
+ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done'
 [Install]
 WantedBy=default.target
 EOF
@@ -123,6 +145,7 @@ set -ex
 ROOT="\\$1"
 
 cp /etc/systemd/system/test-pingpxe.service "\\$ROOT/etc/systemd/system/test-pingpxe.service"
+cp /usr/local/sbin/test-pingpxe.sh "\\$ROOT/usr/local/sbin/test-pingpxe.sh"
 systemctl --root="\\$ROOT" enable test-pingpxe.service
 
 if [ {gen_unique_uuid} = True ]; then
