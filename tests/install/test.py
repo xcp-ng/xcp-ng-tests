@@ -68,7 +68,7 @@ class TestNested:
                          },
     },
                             param_mapping={"firmware": "firmware", "local_sr": "local_sr"})
-    def test_install(self, firmware, iso_remaster, create_vms, iso_version, local_sr):
+    def test_install(self, firmware, create_vms, iso_remaster, iso_version, local_sr):
         assert len(create_vms) == 1
         host_vm = create_vms[0]
         # FIXME should be part of vm def
