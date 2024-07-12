@@ -1,4 +1,5 @@
 from copy import deepcopy
+import importlib
 import logging
 import os
 import pytest
@@ -7,6 +8,30 @@ import tempfile
 
 from lib.common import callable_marker
 from lib.commands import local_cmd, scp, ssh
+
+ISO_IMAGES = getattr(importlib.import_module('data', package=None), 'ISO_IMAGES', {})
+
+# Retrun true if the version of the ISO doesn't support the source type
+def skip_source_type(version, source_type):
+
+    if version not in ISO_IMAGES.keys():
+        return True, "version of ISO {} is unknown".format(version)
+
+    if source_type == "local":
+        if ISO_IMAGES[version].get('net-only', False):
+            return True, "ISO image is net-only while source_type is local"
+
+        return False, "do not skip"
+
+    if source_type == "netinstall":
+        # Net install is not valid if there is no netinstall URL
+        if 'net-url' not in ISO_IMAGES[version].keys():
+            return True, "net-url required for netinstall was not found for {}".format(version)
+
+        return False, "do not skip"
+
+    # If we don't knwow the source type then it is invalid
+    return True, "unknown source type {}".format(source_type)
 
 @pytest.fixture(scope='function')
 def answerfile(request):
@@ -47,20 +72,25 @@ def answerfile(request):
 
 @pytest.fixture(scope='function')
 def iso_remaster(request, answerfile):
+
     marker = request.node.get_closest_marker("installer_iso")
     assert marker is not None, "iso_remaster fixture requires 'installer_iso' marker"
     param_mapping = marker.kwargs.get("param_mapping", {})
-    iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
+    (iso_key, source_type) = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
     gen_unique_uuid = marker.kwargs.get("gen_unique_uuid", False)
 
-    from data import ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
+    skip, reason = skip_source_type(iso_key, source_type)
+    if skip:
+        pytest.skip(reason)
+
+    from data import ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
 
     assert iso_key in ISO_IMAGES, f"ISO_IMAGES does not have a value for {iso_key}"
-    SOURCE_ISO = ISO_IMAGES[iso_key]
+    SOURCE_ISO = ISO_IMAGES[iso_key]['path']
 
     with tempfile.TemporaryDirectory() as isotmp:
         remastered_iso = os.path.join(isotmp, "image.iso")
@@ -71,9 +101,26 @@ def iso_remaster(request, answerfile):
         if answerfile:
             logging.info("generating answerfile %s", answerfile_xml)
             import xml.etree.ElementTree as ET
-            ET.SubElement(answerfile.getroot(), "script",
+            root = answerfile.getroot()
+            ET.SubElement(root, "script",
                           stage="filesystem-populated",
                           type="url").text = "file:///root/postinstall.sh"
+            # source is not required when doing a restore so don't try to update it
+            if source_type == "netinstall" and not "test_restore" in request.node.nodeid:
+                source_elmt = root.find("source")
+                if source_elmt is None:
+                    pytest.skip("source not found in answerfile")
+                new_source_elmt = ET.Element('source', type='url')
+                try:
+                    new_source_elmt.text = ISO_IMAGES[iso_key]['net-url']
+                except KeyError:
+                    pytest.skip("URL not set for %s".format(iso_key))
+                parent = root
+                for elmt in parent:
+                    if elmt.tag == 'source':
+                        parent.remove(elmt)
+                        parent.append(new_source_elmt)
+                        break
             answerfile.write(answerfile_xml)
         else:
             logging.info("no answerfile")
