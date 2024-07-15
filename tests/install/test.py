@@ -18,7 +18,8 @@ class TestNested:
     @pytest.mark.parametrize("iso_version", (
         "75", "76", "80", "81",
         "ch821.1", "xs8",
-        "821.1", "83b2", "83rc1",
+        "821.1", "83b2",
+        "83rc1", "83rc1-net",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(lambda firmware: dict(
@@ -51,6 +52,7 @@ class TestNested:
             "821.1": "xcpng-8.2.1-2023",
             "83b2": "xcpng-8.3-beta2",
             "83rc1": "xcpng-8.3-rc1",
+            "83rc1-net": "xcpng-8.3-rc1-net",
             "ch821.1": "ch-8.2.1-23",
             "xs8": "xs8-2024-03",
         }[version], source_type),
