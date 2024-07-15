@@ -239,10 +239,25 @@ class Host:
         logging.info("Could not find a VM in cache with key %r", cache_key)
 
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
+        vm = None
         if use_cache:
-            vm = self.cached_vm(uri, sr_uuid)
+            if '://' in uri and uri.startswith("clone"):
+                protocol, rest = uri.split(":", 1)
+                assert rest.startswith("//")
+                filename = rest[2:] # strip "//"
+                base_vm = self.cached_vm(filename, sr_uuid)
+                if base_vm:
+                    vm = base_vm.clone()
+                    vm.param_clear('name-description')
+                    if uri.startswith("clone+start"):
+                        vm.start()
+                        wait_for(vm.is_running, "Wait for VM running")
+            else:
+                vm = self.cached_vm(uri, sr_uuid)
             if vm:
                 return vm
+        else:
+            assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
         params = {}
         msg = "Import VM %s" % uri
