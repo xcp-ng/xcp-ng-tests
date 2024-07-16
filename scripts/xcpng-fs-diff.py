@@ -154,27 +154,27 @@ def sftp_get(host, remote_file, local_file):
 
     return res
 
-def remote_diff(host1, host2, filename):
+def remote_diff(host_ref, host_test, filename):
     try:
-        file1 = None
-        file2 = None
+        file_ref = None
+        file_test = None
 
         # check remote files are text files
         cmd = f"file -b {shlex.quote(filename)}"
-        file_type = ssh_cmd(host1, cmd)
+        file_type = ssh_cmd(host_ref, cmd)
         if not file_type.lower().startswith("ascii"):
             print("Binary file. Not showing diff")
             return
 
-        fd, file1 = tempfile.mkstemp()
+        fd, file_ref = tempfile.mkstemp(suffix='_ref')
         os.close(fd)
-        sftp_get(host1, filename, file1)
+        sftp_get(host_ref, filename, file_ref)
 
-        fd, file2 = tempfile.mkstemp()
+        fd, file_test = tempfile.mkstemp(suffix='_test')
         os.close(fd)
-        sftp_get(host2, filename, file2)
+        sftp_get(host_test, filename, file_test)
 
-        args = ["diff", "-u", file1, file2]
+        args = ["diff", "-u", file_ref, file_test]
         diff_res = subprocess.run(args, capture_output=True, text=True)
 
         match diff_res.returncode:
@@ -188,10 +188,10 @@ def remote_diff(host1, host2, filename):
     except Exception as e:
         print(e, file=sys.stderr)
     finally:
-        if file1 is not None and os.path.exists(file1):
-            os.remove(file1)
-        if file2 is not None and os.path.exists(file2):
-            os.remove(file2)
+        if file_ref is not None and os.path.exists(file_ref):
+            os.remove(file_ref)
+        if file_test is not None and os.path.exists(file_test):
+            os.remove(file_test)
 
 def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
     ref_data = ref['data']
