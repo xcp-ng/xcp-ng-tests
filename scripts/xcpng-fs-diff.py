@@ -46,13 +46,14 @@ import tempfile
 import os
 import shlex
 from fnmatch import fnmatch
-from enum import Enum
+from enum import StrEnum, auto
 
-class FileType(Enum):
-    FILE = 0
-    FILE_SYMLINK = 1
-    DIR_SYMLINK = 2
-    BROKEN_SYMLINK = 3
+class DataType(StrEnum):
+    FILE = auto()
+    FILE_SYMLINK = auto()
+    DIR_SYMLINK = auto()
+    BROKEN_SYMLINK = auto()
+    PACKAGE = auto()
 
 def ignore_file(filename, ignored_files):
     for i in ignored_files:
@@ -76,16 +77,16 @@ def ssh_get_files(host, file_type, folders):
     folders = " ".join(folders)
 
     match file_type:
-        case FileType.FILE:
+        case DataType.FILE:
             find_type = "-type f"
             md5sum = True
-        case FileType.FILE_SYMLINK:
+        case DataType.FILE_SYMLINK:
             find_type = "-type l -xtype f"
             md5sum = True
-        case FileType.DIR_SYMLINK:
+        case DataType.DIR_SYMLINK:
             find_type = "-type l -xtype d"
             readlink = True
-        case FileType.BROKEN_SYMLINK:
+        case DataType.BROKEN_SYMLINK:
             find_type = "-xtype l"
             readlink = True
         case _:
@@ -123,11 +124,11 @@ def get_data(host, folders):
     ref_data = dict()
 
     try:
-        ref_data['file'] = ssh_get_files(host, FileType.FILE, folders)
-        ref_data['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
-        ref_data['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
-        ref_data['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
-        ref_data['package'] = ssh_get_packages(host)
+        ref_data[DataType.FILE] = ssh_get_files(host, DataType.FILE, folders)
+        ref_data[DataType.FILE_SYMLINK] = ssh_get_files(host, DataType.FILE_SYMLINK, folders)
+        ref_data[DataType.DIR_SYMLINK] = ssh_get_files(host, DataType.DIR_SYMLINK, folders)
+        ref_data[DataType.BROKEN_SYMLINK] = ssh_get_files(host, DataType.BROKEN_SYMLINK, folders)
+        ref_data[DataType.PACKAGE] = ssh_get_packages(host)
     except Exception as e:
         print(e, file=sys.stderr)
         exit(-1)
