@@ -193,31 +193,82 @@ def remote_diff(host_ref, host_test, filename):
         if file_test is not None and os.path.exists(file_test):
             os.remove(file_test)
 
-def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
+def print_results(results, show_diff, show_ignored):
+    # Print what differs
+    for dtype in DataType:
+        if dtype == DataType.PACKAGE:
+            for pkg, versions in results[dtype].items():
+                print(f"{dtype} differs: {pkg} (ref={versions['ref']}, test={versions['test']})")
+        else:
+            for file in results[dtype]:
+                print(f"{dtype} differs: {file}")
+                if show_diff:
+                    remote_diff(results['host']['ref'], results['host']['test'], file)
+
+    # Print orphans
+    for dtype in DataType:
+        for file in results['orphan']['ref'][dtype]:
+            print(f"{dtype} only exists on reference host: {file}")
+        for file in results['orphan']['test'][dtype]:
+            print(f"{dtype} only exists on tested host: {file}")
+
+    if show_ignored and len(results['ignored_files']) > 0:
+        print("\nIgnored files:")
+        for f in results['ignored_files']:
+            print(f"{f}")
+
+def compare_data(ref, test, ignored_file_patterns):
     ref_data = ref['data']
-    ref_host = ref['host']
     test_data = test['data']
-    test_host = test['host']
-    ignored_files = []
+    err = 0
+    results = {
+        'host': {
+            'ref': ref['host'],
+            'test': test['host']
+        },
+        DataType.FILE: [],
+        DataType.FILE_SYMLINK: [],
+        DataType.DIR_SYMLINK: [],
+        DataType.BROKEN_SYMLINK: [],
+        DataType.PACKAGE: {},
+        'orphan': {
+            'ref': {
+                DataType.FILE: [],
+                DataType.FILE_SYMLINK: [],
+                DataType.DIR_SYMLINK: [],
+                DataType.BROKEN_SYMLINK: [],
+                DataType.PACKAGE: []
+            },
+            'test': {
+                DataType.FILE: [],
+                DataType.FILE_SYMLINK: [],
+                DataType.DIR_SYMLINK: [],
+                DataType.BROKEN_SYMLINK: [],
+                DataType.PACKAGE: []
+            }
+        },
+        'ignored_files': []
+    }
 
     for dtype in test_data:
         for file in test_data[dtype]:
             if ignore_file(file, ignored_file_patterns):
-                ignored_files.append(file)
+                results['ignored_files'].append(file)
                 continue
 
             if file not in ref_data[dtype]:
-                print(f"{dtype} doesn't exist on reference host: {file}")
+                results['orphan']['test'][dtype].append(file)
+                err = 1
                 continue
 
             if ref_data[dtype][file] != test_data[dtype][file]:
-                print(f"{dtype} differs: {file}", end='')
-                if dtype == 'package':
-                    print(f" (ref={ref_data[dtype][file]}, test={test_data[dtype][file]})")
+                err = 1
+                if dtype == DataType.PACKAGE:
+                    # Store package versions for PACKAGE data type
+                    results[dtype][file] = {'ref': ref_data[dtype][file],
+                                            'test': test_data[dtype][file]}
                 else:
-                    print("")
-                    if show_diff:
-                        remote_diff(ref_host, test_host, file)
+                    results[dtype].append(file)
 
             ref_data[dtype][file] = None
 
@@ -225,16 +276,14 @@ def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
     for dtype in ref_data:
         for file, val in ref_data[dtype].items():
             if ignore_file(file, ignored_file_patterns):
-                ignored_files.append(file)
+                results['ignored_files'].append(file)
                 continue
 
             if val is not None:
-                print(f"{dtype} doesn't exist on tested host: {file}")
+                err = 1
+                results['orphan']['ref'][dtype].append(file)
 
-    if show_ignored and len(ignored_files) > 0:
-        print("\nIgnored files:")
-        for f in ignored_files:
-            print(f"{f}")
+    return results, err
 
 # Load a previously saved json file containing reference data
 def load_reference_files(filename):
@@ -358,9 +407,14 @@ def main():
     ref = dict([('data', ref_data), ('host', args.ref_host)])
     test = dict([('data', test_data), ('host', args.test_host)])
 
-    compare_data(ref, test, args.ignored_file_patterns, args.show_diff, args.show_ignored)
+    results, err = compare_data(ref, test, args.ignored_file_patterns)
 
-    return 0
+    if err != 0:
+        print_results(results, args.show_diff, args.show_ignored)
+    else:
+        print("No difference found.")
+
+    return err
 
 if __name__ == '__main__':
     exit(main())
