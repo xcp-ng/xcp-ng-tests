@@ -377,6 +377,8 @@ def main():
     parser.add_argument('--ignore-file', '-i', action='append', dest='ignored_file_patterns',
                         default=ignored_file_patterns,
                         help='Add file patterns to the default ignored files. Can be specified multiple times')
+    parser.add_argument('--json-output', '-j', action='store_true', dest='json_output',
+                        help='Output results in json format')
     args = parser.parse_args(sys.argv[1:])
 
     if args.ref_host is None and args.show_diff:
@@ -384,14 +386,17 @@ def main():
         return -1
 
     if args.load_ref:
-        print(f"Get reference data from {args.load_ref}")
+        if not args.json_output:
+            print(f"Get reference data from {args.load_ref}")
         ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
-        print(f"Get reference data from {args.ref_host}")
+        if not args.json_output:
+            print(f"Get reference data from {args.ref_host}")
         ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
-            print(f"Saving reference data to {args.save_ref}")
+            if not args.json_output:
+                print(f"Saving reference data to {args.save_ref}")
             save_reference_data(ref_data, args.save_ref)
 
     if ref_data is None or args.test_host is None:
@@ -401,7 +406,8 @@ def main():
         print("\nMissing parameters. Try --help", file=sys.stderr)
         return -1
 
-    print(f"Get test host data from {args.test_host}")
+    if not args.json_output:
+        print(f"Get test host data from {args.test_host}")
     test_data = get_data(args.test_host, args.folders)
 
     ref = dict([('data', ref_data), ('host', args.ref_host)])
@@ -409,10 +415,15 @@ def main():
 
     results, err = compare_data(ref, test, args.ignored_file_patterns)
 
-    if err != 0:
-        print_results(results, args.show_diff, args.show_ignored)
+    if args.json_output:
+        if not args.show_ignored:
+            results.pop('ignored_files')
+        print(json.dumps(results, indent=2))
     else:
-        print("No difference found.")
+        if err != 0:
+            print_results(results, args.show_diff, args.show_ignored)
+        else:
+            print("No difference found.")
 
     return err
 
