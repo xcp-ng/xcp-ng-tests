@@ -235,7 +235,7 @@ def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
         for f in ignored_files:
             print(f"{f}")
 
-# Load a previously saved json file containing a the reference files
+# Load a previously saved json file containing reference data
 def load_reference_files(filename):
     try:
         with open(filename, 'r') as fd:
