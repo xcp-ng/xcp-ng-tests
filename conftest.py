@@ -19,6 +19,13 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
+# Do we cache VMs?
+try:
+    from data import CACHE_IMPORTED_VM
+except ImportError:
+    CACHE_IMPORTED_VM = False
+assert CACHE_IMPORTED_VM in [True, False]
+
 # pytest hooks
 
 def pytest_addoption(parser):
@@ -325,13 +332,6 @@ def vm_ref(request):
 
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
-    # Do we cache VMs?
-    try:
-        from data import CACHE_IMPORTED_VM
-    except ImportError:
-        CACHE_IMPORTED_VM = False
-    assert CACHE_IMPORTED_VM in [True, False]
-
     if is_uuid(vm_ref):
         vm_orig = VM(vm_ref, host)
         name = vm_orig.name()
