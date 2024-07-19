@@ -16,6 +16,13 @@ from lib.sr import SR
 from lib.vm import VM, xva_name_from_def
 from lib.xo import xo_cli
 
+# Do we cache VMs?
+try:
+    from data import CACHE_IMPORTED_VM
+except ImportError:
+    CACHE_IMPORTED_VM = False
+assert CACHE_IMPORTED_VM in [True, False]
+
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
@@ -349,13 +356,6 @@ def vm_ref(request):
 
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
-    # Do we cache VMs?
-    try:
-        from data import CACHE_IMPORTED_VM
-    except ImportError:
-        CACHE_IMPORTED_VM = False
-    assert CACHE_IMPORTED_VM in [True, False]
-
     if is_uuid(vm_ref):
         vm_orig = VM(vm_ref, host)
         name = vm_orig.name()
