@@ -419,13 +419,6 @@ def create_vms(request, host):
     >    ...
 
     """
-    # Do we cache VMs?
-    try:
-        from data import CACHE_IMPORTED_VM
-    except ImportError:
-        CACHE_IMPORTED_VM = False
-    assert CACHE_IMPORTED_VM in [True, False]
-
     import git
     test_repo = git.Repo(".")
     assert not test_repo.is_dirty(), "test repo must not be dirty to cache images"
