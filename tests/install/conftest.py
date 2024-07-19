@@ -82,6 +82,13 @@ def iso_remaster(request, answerfile):
 
     gen_unique_uuid = marker.kwargs.get("gen_unique_uuid", False)
 
+    if source_type == "pxe":
+        # ISO remastering is not needed when booting with PXE so we just
+        # return
+        logging.info("iso_remaster not needed with PXE")
+        yield None
+        return
+
     skip, reason = skip_source_type(iso_key, source_type)
     if skip:
         pytest.skip(reason)

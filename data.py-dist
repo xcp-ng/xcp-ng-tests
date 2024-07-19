@@ -58,7 +58,10 @@ ISO_IMAGES = {
 #    'xcpng-8.1': {'path': "/home/user/iso/xcp-ng-8.1.0-2.iso"},
 #    'xcpng-8.2.0': {'path': "/home/user/iso/xcp-ng-8.2.0.iso"},
 #    'xcpng-8.2.1': {'path': "/home/user/iso/xcp-ng-8.2.1.iso"},
-#    'xcpng-8.2.1-2023': {'path': "/home/user/iso/xcp-ng-8.2.1-20231130.iso"},
+#    'xcpng-8.2.1-2023': {
+#       'path': "/home/user/iso/xcp-ng-8.2.1-20231130.iso",
+#       'pxe-url': "http://server/installers/xcp-ng/8.2.1",
+#    },
 #    'xcpng-8.3-beta2': {
 #       'path': "/home/user/iso/xcp-ng-8.3.0-beta2.iso"
 #       'net-url': "http://server/installers/xcp-ng/8.3-beta2",
@@ -67,6 +70,7 @@ ISO_IMAGES = {
 #       'path': "/home/user/iso/xcp-ng-8.3.0-beta2-netinstall.iso",
 #       'net-url': "http://server/installers/xcp-ng/8.3-beta2",
 #       'net-only': True,
+#       'pxe-url': "http://server/installers/xcp-ng/8.3-beta2",
 #    },
 }
 

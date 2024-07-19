@@ -26,7 +26,7 @@ is_default=1
 
 def server_push_config(mac_address, tmp_local_path):
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    clean_files_on_pxe(mac_address)
+    #clean_files_on_pxe(mac_address)
     ssh(PXE_CONFIG_SERVER, ['mkdir', '-p', remote_dir])
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
