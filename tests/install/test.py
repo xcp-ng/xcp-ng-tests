@@ -299,6 +299,7 @@ class TestNested:
                                                       "IP": ip, "netmask": netmask,
                                                       "gateway": gateway, "DNS": dns})
 
+            #wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
             logging.info("Powering off pool master")
             try:
                 # use "poweroff" because "reboot" would cause ARP and
