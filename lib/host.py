@@ -32,6 +32,7 @@ class Host:
     xe_prefix = "host"
 
     def __init__(self, pool, hostname_or_ip):
+        self.nested = None # if running nested, the VM object for this host
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
         self.inventory = None
