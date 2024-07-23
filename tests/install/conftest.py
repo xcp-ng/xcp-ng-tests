@@ -11,26 +11,28 @@ from lib.commands import local_cmd, scp, ssh
 
 ISO_IMAGES = getattr(importlib.import_module('data', package=None), 'ISO_IMAGES', {})
 
-# Retrun true if the version of the ISO doesn't support the source type
+# Return true if the version of the ISO doesn't support the source type.
+# Note: this is a quick-win hack, to avoid explicit enumeration of supported
+# source_type values for each ISO.
 def skip_source_type(version, source_type):
-
     if version not in ISO_IMAGES.keys():
         return True, "version of ISO {} is unknown".format(version)
 
-    if source_type == "local":
+    if source_type == "iso":
         if ISO_IMAGES[version].get('net-only', False):
             return True, "ISO image is net-only while source_type is local"
 
         return False, "do not skip"
 
-    if source_type == "netinstall":
+    if source_type == "net":
         # Net install is not valid if there is no netinstall URL
+        # FIXME: ISO includes a default URL so we should be able to omit net-url
         if 'net-url' not in ISO_IMAGES[version].keys():
             return True, "net-url required for netinstall was not found for {}".format(version)
 
         return False, "do not skip"
 
-    # If we don't knwow the source type then it is invalid
+    # If we don't know the source type then it is invalid
     return True, "unknown source type {}".format(source_type)
 
 @pytest.fixture(scope='function')
@@ -72,10 +74,10 @@ def answerfile(request):
 
 @pytest.fixture(scope='function')
 def iso_remaster(request, answerfile):
-
     marker = request.node.get_closest_marker("installer_iso")
     assert marker is not None, "iso_remaster fixture requires 'installer_iso' marker"
     param_mapping = marker.kwargs.get("param_mapping", {})
+    # FIXME take source_type directly from its own marker
     (iso_key, source_type) = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
     gen_unique_uuid = marker.kwargs.get("gen_unique_uuid", False)
@@ -106,7 +108,10 @@ def iso_remaster(request, answerfile):
                           stage="filesystem-populated",
                           type="url").text = "file:///root/postinstall.sh"
             # source is not required when doing a restore so don't try to update it
-            if source_type == "netinstall" and not "test_restore" in request.node.nodeid:
+            # FIXME: should know from answerfile data that we're restoring - which
+            # advocates for doing the change before conversion inside the answerfile
+            # callable marker
+            if source_type == "net" and not "test_restore" in request.node.nodeid:
                 source_elmt = root.find("source")
                 if source_elmt is None:
                     pytest.skip("source not found in answerfile")

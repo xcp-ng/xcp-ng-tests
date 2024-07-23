@@ -70,9 +70,6 @@ ISO_IMAGES = {
 #    },
 }
 
-#    'xcpng-8.3-beta2-net': "http://server/installers/xcp-ng/8.3-beta2",
-}
-
 # In some cases, we may prefer to favour a local SR to store test VM disks,
 # to avoid latency or unstabilities related to network or shared file servers.
 # However it's not good practice to make a local SR the default SR for a pool of several hosts.
