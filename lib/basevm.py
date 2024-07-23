@@ -2,7 +2,7 @@ import logging
 
 import lib.commands as commands
 
-from lib.common import _param_get, _param_remove, _param_set
+from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
 
 class BaseVM:
@@ -16,13 +16,24 @@ class BaseVM:
         self.host = host
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
-        return _param_get(self.host, BaseVM.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+        return _param_get(self.host, self.xe_prefix, self.uuid,
+                          param_name, key, accept_unknown_key)
 
     def param_set(self, param_name, value, key=None):
-        _param_set(self.host, BaseVM.xe_prefix, self.uuid, param_name, value, key)
+        _param_set(self.host, self.xe_prefix, self.uuid,
+                   param_name, value, key)
 
     def param_remove(self, param_name, key, accept_unknown_key=False):
-        _param_remove(self.host, BaseVM.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+        _param_remove(self.host, self.xe_prefix, self.uuid,
+                      param_name, key, accept_unknown_key)
+
+    def param_add(self, param_name, value, key=None):
+        _param_add(self.host, self.xe_prefix, self.uuid,
+                   param_name, value, key)
+
+    def param_clear(self, param_name):
+        _param_clear(self.host, self.xe_prefix, self.uuid,
+                     param_name)
 
     def name(self):
         return self.param_get('name-label')
