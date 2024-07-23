@@ -1,6 +1,7 @@
 import itertools
 import git
 import logging
+import os
 import pytest
 import tempfile
 
@@ -9,6 +10,7 @@ from typing import Dict
 
 import lib.config as global_config
 
+from lib import pxe
 from lib.common import callable_marker, shortened_nodeid, prefix_object_name
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
@@ -33,6 +35,12 @@ assert CACHE_IMPORTED_VM in [True, False]
 # pytest hooks
 
 def pytest_addoption(parser):
+    parser.addoption(
+        "--nest",
+        action="store",
+        default=None,
+        help="XCP-ng or XS master of pool to use for nesting hosts under test",
+    )
     parser.addoption(
         "--hosts",
         action="append",
@@ -142,19 +150,70 @@ def pytest_runtest_makereport(item, call):
 
 @pytest.fixture(scope='session')
 def hosts(pytestconfig):
-    def setup_host(hostname_or_ip):
+    nested_list = []
+
+    def setup_host(hostname_or_ip, *, config=None):
+        host_vm = None
+        if hostname_or_ip.startswith("cache://"):
+            if config is None:
+                raise RuntimeError("setup_host: a cache:// host requires --nest")
+            nest_hostname = config.getoption("nest")
+            if not nest_hostname:
+                pytest.fail("--hosts=cache://... requires --nest parameter")
+            nest = Pool(nest_hostname).master
+
+            protocol, rest = hostname_or_ip.split(":", 1)
+            host_vm = nest.import_vm(f"clone:{rest}", nest.main_sr_uuid(),
+                                     use_cache=True)
+            nested_list.append(host_vm)
+
+            vif = host_vm.vifs()[0]
+            mac_address = vif.param_get('MAC')
+            logging.info("Nested host has MAC %s", mac_address)
+
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for nested host VM running")
+
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see nested host in ARP tables",
+                     timeout_secs=10 * 60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Nested host has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+
+            wait_for(lambda: not os.system(f"nc -zw5 {host_vm.ip} 22"),
+                     "Wait for ssh up on nested host", retry_delay_secs=5)
+
+            hostname_or_ip = host_vm.ip
+
         pool = Pool(hostname_or_ip)
         h = pool.master
         return h
+
+    def cleanup_hosts():
+        for vm in nested_list:
+            logging.info("Destroying nested host VM %s", vm.uuid)
+            vm.destroy(verify=True)
 
     # a list of master hosts, each from a different pool
     hosts_args = pytestconfig.getoption("hosts")
     hosts_split = [hostlist.split(',') for hostlist in hosts_args]
     hostname_list = list(itertools.chain(*hosts_split))
-    host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
+
+    try:
+        host_list = [setup_host(hostname_or_ip, config=pytestconfig)
+                     for hostname_or_ip in hostname_list]
+    except Exception:
+        cleanup_hosts()
+        raise
+
     if not host_list:
         pytest.fail("This test requires at least one --hosts parameter")
     yield host_list
+
+    cleanup_hosts()
 
 @pytest.fixture(scope='session')
 def registered_xo_cli():
