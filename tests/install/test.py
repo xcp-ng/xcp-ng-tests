@@ -63,6 +63,7 @@ class TestNested:
         "83b2",
         #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
         "821.1-83b2",
+        "821.1-83b2-83b2",
         "821.1",
         "821.1-821.1",
     ))
@@ -73,6 +74,7 @@ class TestNested:
             {
                 1: "test_install",
                 2: "test_upgrade",
+                3: "test_restore",
             }[len(params.split("-"))]
         )))],
                                  param_mapping={"params": "mode", "firmware": "firmware"})
@@ -193,3 +195,101 @@ class TestNested:
     def test_upgrade(self, create_vms, iso_remaster,
                      firmware, orig_version, iso_version):
         installer.perform_upgrade(iso=iso_remaster, host_vm=create_vms[0])
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize(("orig_version", "iso_version"), [
+        ("821.1-83b2", "83b2"),
+    ])
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(lambda firmware, params: [dict(
+        vm="vm1",
+        image_test=f"TestNested::test_firstboot[{firmware}-{params}]")],
+                                 param_mapping={"params": "orig_version", "firmware": "firmware"})
+    @pytest.mark.installer_iso(
+        lambda version: {
+            "821.1": "xcpng-8.2.1-2023",
+            "83b2": "xcpng-8.3-beta2",
+        }[version],
+        param_mapping={"version": "iso_version"})
+    @pytest.mark.answerfile(lambda firmware: AnswerFile("RESTORE").top_append(
+        {"TAG": "backup-disk",
+         "CONTENTS": {"uefi": "nvme0n1", "bios": "sda"}[firmware]},
+    ),
+                            param_mapping={"firmware": "firmware"})
+    def test_restore(self, create_vms, iso_remaster,
+                     firmware, orig_version, iso_version):
+        host_vm = create_vms[0]
+        vif = host_vm.vifs()[0]
+        mac_address = vif.param_get('MAC')
+        logging.info("Host VM has MAC %s", mac_address)
+
+        host_vm.insert_cd(iso_remaster)
+
+        try:
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for host VM running")
+
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see Host VM in ARP tables",
+                     timeout_secs=10*60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Host VM has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+
+            # wait for "yum install" phase to start
+            wait_for(lambda: host_vm.ssh(["grep",
+                                          "'Restoring backup'",
+                                          "/tmp/install-log"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 0,
+                     "Wait for data restoration to start",
+                     timeout_secs=40*60) # FIXME too big
+
+            # wait for "yum install" phase to finish
+            wait_for(lambda: host_vm.ssh(["grep",
+                                          "'Data restoration complete.  About to re-install bootloader.'",
+                                          "/tmp/install-log"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 0,
+                     "Wait for data restoration to complete",
+                     timeout_secs=40*60) # FIXME too big
+
+            # The installer will not terminate in restore mode, it
+            # requires human interaction and does not even log it, so
+            # wait for last known action log (tested with 8.3b2)
+            wait_for(lambda: host_vm.ssh(["grep",
+                                          "'ran .*swaplabel.*rc 0'",
+                                          "/tmp/install-log"],
+                                         check=False, simple_output=False,
+                                         ).returncode == 0,
+                     "Wait for installer to hopefully finish",
+                     timeout_secs=40*60) # FIXME too big
+
+            # "wait a bit to be extra sure".  Yuck.
+            time.sleep(30)
+
+            logging.info("Shutting down Host VM after successful restore")
+            try:
+                host_vm.ssh(["poweroff"])
+            except commands.SSHCommandFailed as e:
+                # ignore connection closed by reboot
+                if e.returncode == 255 and "closed by remote host" in e.stdout:
+                    logging.info("sshd closed the connection")
+                    pass
+                else:
+                    raise
+            wait_for(host_vm.is_halted, "Wait for host VM halted")
+            host_vm.eject_cd()
+
+        except Exception as e:
+            logging.critical("caught exception %s", e)
+            # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
+            host_vm.shutdown(force=True)
+            raise
+        except KeyboardInterrupt:
+            logging.warning("keyboard interrupt")
+            # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
+            host_vm.shutdown(force=True)
+            raise
