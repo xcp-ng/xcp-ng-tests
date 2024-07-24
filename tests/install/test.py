@@ -19,7 +19,7 @@ class TestNested:
         "75", "76", "80", "81",
         "ch821.1", "xs8",
         "821.1", "83b2",
-        "83rc1", "83rc1-net",
+        "83rc1", "83rc1net",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(lambda firmware: dict(
@@ -52,7 +52,7 @@ class TestNested:
             "821.1": "xcpng-8.2.1-2023",
             "83b2": "xcpng-8.3-beta2",
             "83rc1": "xcpng-8.3-rc1",
-            "83rc1-net": "xcpng-8.3-rc1-net",
+            "83rc1net": "xcpng-8.3-rc1-net",
             "ch821.1": "ch-8.2.1-23",
             "xs8": "xs8-2024-03",
         }[version], source_type),
@@ -178,6 +178,7 @@ class TestNested:
             "821.1": "8.2.1",
             "83b2": "8.3.0",
             "83rc1": "8.3.0",
+            "83rc1net": "8.3.0",
         }[expected_rel_id]
 
         try:
@@ -330,7 +331,7 @@ class TestNested:
     @pytest.mark.parametrize("source_type", ("iso", "net"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
-        "83rc1",
+        "83rc1", "83rc1net",
         "83b2",
         "821.1",
         "81", "80",
@@ -352,6 +353,7 @@ class TestNested:
     @pytest.mark.parametrize("source_type", ("iso", "net"))
     @pytest.mark.parametrize("mode", (
         "83rc1-83rc1", "83rc1-83rc1-83rc1",
+        "83rc1net-83rc1net", "83rc1net-83rc1net-83rc1net",
         "83b2-83rc1",
         "821.1-83rc1",
         "821.1-83rc1-83rc1",
@@ -390,6 +392,7 @@ class TestNested:
         ("821.1", "83rc1"),
         ("83b2", "83rc1"),
         ("83rc1", "83rc1"),
+        ("83rc1net", "83rc1net"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(lambda firmware, params, local_sr, source_type: [dict(
@@ -401,6 +404,7 @@ class TestNested:
         lambda version, source_type: ({
             "821.1": "xcpng-8.2.1-2023",
             "83rc1": "xcpng-8.3-rc1",
+            "83rc1net": "xcpng-8.3-rc1-net",
         }[version], source_type),
         param_mapping={"version": "iso_version", "source_type": "source_type"})
     @pytest.mark.answerfile(lambda firmware: {
@@ -419,6 +423,7 @@ class TestNested:
     @pytest.mark.parametrize("source_type", ("iso", "net"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83rc1-83rc1", "83rc1"),
+        ("83rc1net-83rc1net", "83rc1net"),
         ("821.1-83rc1", "83rc1"),
         ("75-83rc1", "83rc1"),
         ("76-83rc1", "83rc1"),
@@ -436,6 +441,7 @@ class TestNested:
         lambda version, source_type: ({
             "821.1": "xcpng-8.2.1-2023",
             "83rc1": "xcpng-8.3-rc1",
+            "83rc1net": "xcpng-8.3-rc1-net",
         }[version], source_type),
         param_mapping={"version": "iso_version", "source_type": "source_type"})
     @pytest.mark.answerfile(lambda firmware: {
