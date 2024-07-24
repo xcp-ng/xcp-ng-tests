@@ -1,20 +1,67 @@
+import atexit
 import logging
 import os
 import pytest
+import tempfile
 import time
 
 from lib import commands, installer, pxe
-from lib.common import safe_split, wait_for
+from lib.common import safe_split, wait_for, callable_marker
 from lib.pif import PIF
 from lib.pool import Pool
 
 from data import NETWORKS
 assert "MGMT" in NETWORKS
 
+from data import HOST_DEFAULT_PASSWORD_HASH
+from data import ISO_IMAGES
+
+def clean_files_on_pxe(mac_address):
+    pxe.server_remove_config(mac_address)
+
+def setup_pxe_boot(vm, mac_address, version):
+    with tempfile.TemporaryDirectory(suffix=mac_address) as tmp_local_path:
+        logging.info('Generate answerfile.xml for {}'.format(mac_address))
+
+        hdd = 'nvme0n1' if vm.is_uefi else 'sda'
+        encrypted_password = HOST_DEFAULT_PASSWORD_HASH
+        try:
+            installer = ISO_IMAGES[version]['pxe-url']
+        except KeyError:
+           pytest.skip(f"cannot found pxe-url for {version}")
+        pxe_addr = pxe.PXE_CONFIG_SERVER
+
+        with open(f'{tmp_local_path}/answerfile.xml', 'w') as answerfile:
+            answerfile.write(f"""<?xml version="1.0"?>
+<installation>
+    <keymap>fr</keymap>
+    <primary-disk>{hdd}</primary-disk>
+    <guest-disk>{hdd}</guest-disk>
+    <root-password type="hash">{encrypted_password}</root-password>
+    <source type="url">{installer}</source>
+    <admin-interface name="eth0" proto="dhcp" />
+    <timezone>Europe/Paris</timezone>
+    <script stage="filesystem-populated" type="url">
+        http://{pxe_addr}/configs/presets/scripts/filesystem-populated.py
+    </script>
+</installation>
+            """)
+
+        logging.info('Generate boot.conf for {}'.format(mac_address))
+        pxe.generate_boot_conf(tmp_local_path, installer)
+
+        logging.info('Copy files to {}'.format(pxe_addr))
+        pxe.server_push_config(mac_address, tmp_local_path)
+
+        # FIXME: clean_files_on_pxe has been commented on lib/pxe.py
+        # Note: even commented the files are cleaned up on the PXE server???
+        logging.info('Register cleanup files for PXE')
+        atexit.register(lambda: clean_files_on_pxe(mac_address))
+
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
-    @pytest.mark.parametrize("source_type", ("iso", "net"))
+    @pytest.mark.parametrize("source_type", ("iso", "net", "pxe"))
     @pytest.mark.parametrize("iso_version", (
         "75", "76", "80", "81",
         "ch821.1", "xs8",
@@ -31,7 +78,7 @@ class TestNested:
             dict(param_name="memory-dynamic-max", value="4GiB"),
             dict(param_name="memory-dynamic-min", value="4GiB"),
             dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
-            dict(param_name="HVM-boot-params", key="order", value="dc"),
+            dict(param_name="HVM-boot-params", key="order", value="dcn"),
         ) + {
             "uefi": (
                 dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
@@ -72,7 +119,7 @@ class TestNested:
             },
         },
         param_mapping={"firmware": "firmware", "local_sr": "local_sr"})
-    def test_install(self, firmware, create_vms, iso_remaster, iso_version, local_sr, source_type):
+    def test_install(self, request, firmware, create_vms, iso_remaster, iso_version, local_sr, source_type):
         assert len(create_vms) == 1
         host_vm = create_vms[0]
         # FIXME should be part of vm def
@@ -82,7 +129,14 @@ class TestNested:
         mac_address = vif.param_get('MAC')
         logging.info("Host VM has MAC %s", mac_address)
 
-        host_vm.insert_cd(iso_remaster)
+        if source_type == "pxe":
+            marker = request.node.get_closest_marker("installer_iso")
+            param_mapping = marker.kwargs.get("param_mapping", {})
+            (iso_key, _) = callable_marker(marker.args[0], request, param_mapping=param_mapping)
+
+            setup_pxe_boot(host_vm, mac_address, iso_key)
+        else:
+            host_vm.insert_cd(iso_remaster)
 
         try:
             host_vm.start()
@@ -97,26 +151,42 @@ class TestNested:
             assert len(ips) == 1
             host_vm.ip = ips[0]
 
-            host_vm.ssh(["ls"])
-            logging.debug("ssh works")
+            if source_type == "pxe":
+                # When using PXE boot the IP is available but ssh is not so wait...
+                while True:
+                    try:
+                        host_vm.ssh(["ls"])
+                    except commands.SSHCommandFailed as e:
+                        if e.returncode == 255:
+                            logging.debug("ssh connexion refused, wait 10s ...")
+                            time.sleep(10)
+                        else:
+                            # Raise it again
+                            raise e
+                    else:
+                        logging.debug("ssh works")
+                        break
+            else:
+                host_vm.ssh(["ls"])
+                logging.debug("ssh works")
 
-            # wait for "yum install" phase to finish
-            wait_for(lambda: host_vm.ssh(["grep",
-                                          "'DISPATCH: NEW PHASE: Completing installation'",
-                                          "/tmp/install-log"],
-                                         check=False, simple_output=False,
-                                         ).returncode == 0,
-                     "Wait for rpm installation to succeed",
-                     timeout_secs=40*60) # FIXME too big
+                # wait for "yum install" phase to finish
+                wait_for(lambda: host_vm.ssh(["grep",
+                                              "'DISPATCH: NEW PHASE: Completing installation'",
+                                              "/tmp/install-log"],
+                                             check=False, simple_output=False,
+                                             ).returncode == 0,
+                         "Wait for rpm installation to succeed",
+                         timeout_secs=40*60) # FIXME too big
 
-            # wait for install to finish
-            wait_for(lambda: host_vm.ssh(["grep",
-                                          "'The installation completed successfully'",
-                                          "/tmp/install-log"],
-                                         check=False, simple_output=False,
-                                         ).returncode == 0,
-                     "Wait for system installation to succeed",
-                     timeout_secs=40*60) # FIXME too big
+                # wait for install to finish
+                wait_for(lambda: host_vm.ssh(["grep",
+                                              "'The installation completed successfully'",
+                                              "/tmp/install-log"],
+                                             check=False, simple_output=False,
+                                             ).returncode == 0,
+                         "Wait for system installation to succeed",
+                         timeout_secs=40*60) # FIXME too big
 
             wait_for(lambda: host_vm.ssh(["ps a|grep '[0-9]. python /opt/xensource/installer/init'"],
                                          check=False, simple_output=False,
@@ -134,7 +204,9 @@ class TestNested:
                 else:
                     raise
             wait_for(host_vm.is_halted, "Wait for host VM halted")
-            host_vm.eject_cd()
+
+            if source_type != "pxe":
+                host_vm.eject_cd()
 
         except Exception as e:
             logging.critical("caught exception %s", e)
