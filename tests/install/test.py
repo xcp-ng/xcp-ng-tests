@@ -16,37 +16,45 @@ class TestNested:
         "83b2",
         "821.1",
     ))
-    @pytest.mark.vm_definitions(
-        dict(name="vm1",
-             template="Other install media",
-             params=(
-                 # dict(param_name="", value=""),
-                 dict(param_name="memory-static-max", value="4GiB"),
-                 dict(param_name="memory-dynamic-max", value="4GiB"),
-                 dict(param_name="memory-dynamic-min", value="4GiB"),
-                 dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
-                 dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
-                 dict(param_name="HVM-boot-params", key="order", value="dc"),
-                 dict(param_name="platform", key="device-model", value="qemu-upstream-uefi"),
-             ),
-             vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
-             cd_vbd=dict(device="xvdd", userdevice="3"),
-             vifs=[dict(index=0, network_uuid=NETWORKS["MGMT"])],
-             ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.vm_definitions(lambda firmware: dict(
+        name="vm1",
+        template="Other install media",
+        params=(
+            # dict(param_name="", value=""),
+            dict(param_name="memory-static-max", value="4GiB"),
+            dict(param_name="memory-dynamic-max", value="4GiB"),
+            dict(param_name="memory-dynamic-min", value="4GiB"),
+            dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
+            dict(param_name="HVM-boot-params", key="order", value="dc"),
+        ) + {
+            "uefi": (
+                dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
+                dict(param_name="platform", key="device-model", value="qemu-upstream-uefi"),
+            ),
+            "bios": (),
+        }[firmware],
+        vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
+        cd_vbd=dict(device="xvdd", userdevice="3"),
+        vifs=[dict(index=0, network_uuid=NETWORKS["MGMT"])],
+    ),
+                                param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
         lambda version: {
             "83b2": "xcpng-8.3-beta2",
             "821.1": "xcpng-8.2.1-2023",
         }[version],
         param_mapping={"version": "iso_version"})
-    @pytest.mark.answerfile(
-        {
-            "base": "INSTALL",
-            "source": {"type": "local"},
-            "primary-disk": {"text": "nvme0n1"},
-        })
+    @pytest.mark.answerfile(lambda firmware: {
+        "base": "INSTALL",
+        "source": {"type": "local"},
+        "primary-disk": {"text": {"uefi": "nvme0n1",
+                                  "bios": "sda"}[firmware]
+                         },
+    },
+                            param_mapping={"firmware": "firmware"})
     def test_install(self, create_vms, iso_remaster,
-                     iso_version):
+                     firmware, iso_version):
         assert len(create_vms) == 1
         installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
 
@@ -59,17 +67,18 @@ class TestNested:
         "821.1",
         "821.1-821.1",
     ))
-    @pytest.mark.continuation_of(
-        lambda params: [dict(vm="vm1",
-                             image_test=(f"TestNested::{{}}[{params}]".format(
-                                 {
-                                     1: "test_install",
-                                     2: "test_upgrade",
-                                 }[len(params.split("-"))]
-                             )))],
-        param_mapping={"params": "mode"})
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(lambda params, firmware: [dict(
+        vm="vm1",
+        image_test=(f"TestNested::{{}}[{firmware}-{params}]".format(
+            {
+                1: "test_install",
+                2: "test_upgrade",
+            }[len(params.split("-"))]
+        )))],
+                                 param_mapping={"params": "mode", "firmware": "firmware"})
     def test_firstboot(self, create_vms,
-                       mode):
+                       firmware, mode):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -176,10 +185,11 @@ class TestNested:
         ("821.1", "83b2"),
         ("821.1", "821.1"),
     ])
-    @pytest.mark.continuation_of(
-        lambda params: [dict(vm="vm1",
-                             image_test=f"TestNested::test_firstboot[{params}]")],
-        param_mapping={"params": "orig_version"})
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(lambda firmware, params: [dict(
+        vm="vm1",
+        image_test=f"TestNested::test_firstboot[{firmware}-{params}]")],
+                                 param_mapping={"params": "orig_version", "firmware": "firmware"})
     @pytest.mark.installer_iso(
         lambda version: {
             "821.1": "xcpng-8.2.1-2023",
@@ -187,11 +197,14 @@ class TestNested:
         }[version],
         param_mapping={"version": "iso_version"})
     @pytest.mark.answerfile(
-        {
+        lambda firmware: {
             "base": "UPGRADE",
             "source": {"type": "local"},
-            "existing-installation": {"text": "nvme0n1"},
-        })
+            "existing-installation": {"text": {"uefi": "nvme0n1",
+                                               "bios": "sda"}[firmware]
+                                      },
+        },
+        param_mapping={"firmware": "firmware"})
     def test_upgrade(self, create_vms, iso_remaster,
-                     orig_version, iso_version):
+                     firmware, orig_version, iso_version):
         installer.perform_upgrade(iso=iso_remaster, host_vm=create_vms[0])

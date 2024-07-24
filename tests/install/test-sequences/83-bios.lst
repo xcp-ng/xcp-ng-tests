@@ -1,0 +1,2 @@
+tests/install/test.py::TestNested::test_install[bios-83b2]
+tests/install/test.py::TestNested::test_firstboot[bios-83b2]

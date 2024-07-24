@@ -1,0 +1,4 @@
+tests/install/test.py::TestNested::test_install[uefi-821.1]
+tests/install/test.py::TestNested::test_firstboot[uefi-821.1]
+tests/install/test.py::TestNested::test_upgrade[uefi-821.1-83b2]
+tests/install/test.py::TestNested::test_firstboot[uefi-821.1-83b2]
