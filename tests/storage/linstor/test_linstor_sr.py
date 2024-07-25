@@ -167,15 +167,39 @@ class TestLinstorDisklessResource:
 
         diskfuls = _get_diskful_hosts(host, controller_option, volume_name)
         diskless = []
+        tie_breaker = host.ssh([
+            "linstor", controller_option, "resource", "list",
+            "|", "grep", volume_name, "|", "grep", "TieBreaker"
+        ]).splitlines()[0].split('|')[2].strip()
+        tie_breaker_uuid = None
         for member in host.pool.hosts:
-            if member.param_get("name-label").lower() not in diskfuls:
+            name_label = member.param_get("name-label").lower()
+            if name_label not in diskfuls:
                 diskless += [member]
+                if name_label == tie_breaker:
+                    tie_breaker_uuid = member.uuid
         assert diskless
+        assert tie_breaker_uuid
 
         # Start VM on host with diskless resource
-        vm.start(on=diskless[0].uuid)
+        vm.start(on=tie_breaker_uuid)
         vm.wait_for_os_booted()
         _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless)
 
+        # check TieBreaker became diskless
+        # outputs: | {volume} | {name} | 7005 | InUse | Ok | Diskless | {date} |
+        res = host.ssh([
+            "linstor", controller_option, "resource", "list", "-n", tie_breaker,
+            "|", "grep", volume_name
+        ]).splitlines()[0].split('|')[6].strip()
+        assert "Diskless" in res
+
         vm.shutdown(verify=True)
         _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless)
+
+        # Ensure a diskless volume became a TieBreaker
+        res = host.ssh([
+            "linstor", controller_option, "resource", "list", "-n", tie_breaker,
+            "|", "grep", volume_name
+        ]).splitlines()[0].split('|')[6].strip()
+        assert "TieBreaker" in res
