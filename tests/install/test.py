@@ -53,11 +53,19 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
         "83b2",
+        #"83b2-83b2", # 8.3b2 disabled the upgrade from 8.3
+        "821.1-83b2",
         "821.1",
+        "821.1-821.1",
     ))
     @pytest.mark.continuation_of(
         lambda params: [dict(vm="vm1",
-                             image_test=f"TestNested::test_install[{params}]")],
+                             image_test=(f"TestNested::{{}}[{params}]".format(
+                                 {
+                                     1: "test_install",
+                                     2: "test_upgrade",
+                                 }[len(params.split("-"))]
+                             )))],
         param_mapping={"params": "mode"})
     def test_firstboot(self, create_vms,
                        mode):
@@ -148,3 +156,29 @@ class TestNested:
             # wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
             host_vm.shutdown(force=True)
             raise
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize(("orig_version", "iso_version"), [
+        #("83b2", "83b2"), # 8.3b2 disabled the upgrade from 8.3
+        ("821.1", "83b2"),
+        ("821.1", "821.1"),
+    ])
+    @pytest.mark.continuation_of(
+        lambda params: [dict(vm="vm1",
+                             image_test=f"TestNested::test_firstboot[{params}]")],
+        param_mapping={"params": "orig_version"})
+    @pytest.mark.installer_iso(
+        lambda version: {
+            "821.1": "xcpng-8.2.1-2023",
+            "83b2": "xcpng-8.3-beta2",
+        }[version],
+        param_mapping={"version": "iso_version"})
+    @pytest.mark.answerfile(
+        lambda firmware: AnswerFile("UPGRADE").top_append(
+            {"TAG": "source", "type": "local"},
+            {"TAG": "existing-installation", "CONTENTS": "nvme0n1"},
+        ),
+        param_mapping={"firmware": "firmware"})
+    def test_upgrade(self, create_vms, iso_remaster,
+                     orig_version, iso_version):
+        installer.perform_upgrade(iso=iso_remaster, host_vm=create_vms[0])

@@ -151,6 +151,10 @@ BASE_ANSWERFILES = dict(
              "CONTENTS": "us"},
         ),
     },
+    UPGRADE={
+        "TAG": "installation",
+        "mode": "upgrade",
+    },
 )
 
 IMAGE_EQUIVS = {
