@@ -24,6 +24,7 @@ class TestNested:
              cd_vbd=dict(device="xvdd", userdevice="3"),
              vifs=[dict(index=0, network_uuid=NETWORKS["MGMT"])],
              ))
-    def test_install(self, create_vms):
+    @pytest.mark.installer_iso("xcpng-8.2.1-2023")
+    def test_install(self, create_vms, iso_remaster):
         assert len(create_vms) == 1
-        installer.perform_install(iso="xcp-ng-8.2.1-20231130.iso", host_vm=create_vms[0])
+        installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
