@@ -281,6 +281,10 @@ class Host:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
+    def is_xapi_init_complete(self):
+        result = self.ssh(['xapi-wait-init-complete', '60'], simple_output=False)
+        return result.returncode == 0
+
     def has_updates(self):
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
