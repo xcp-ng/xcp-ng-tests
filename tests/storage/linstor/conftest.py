@@ -59,9 +59,12 @@ def pool_with_linstor(hostA2, lvm_disk, pool_with_saved_yum_state):
 
 @pytest.fixture(scope='package')
 def linstor_sr(pool_with_linstor):
+    import data
+
+    redundancy = getattr(data, 'LINSTOR_REDUNDANCY', min(len(pool_with_linstor.hosts), 3))
     sr = pool_with_linstor.master.sr_create('linstor', 'LINSTOR-SR-test', {
         'group-name': STORAGE_POOL_NAME,
-        'redundancy': str(min(len(pool_with_linstor.hosts), 3)),
+        'redundancy': str(redundancy),
         'provisioning': 'thin'
     }, shared=True)
     yield sr
