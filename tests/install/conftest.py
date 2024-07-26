@@ -1,4 +1,5 @@
 from copy import deepcopy
+import importlib
 import logging
 import os
 import pytest
@@ -7,6 +8,32 @@ import tempfile
 
 from lib.common import callable_marker
 from lib.commands import local_cmd, scp, ssh
+
+ISO_IMAGES = getattr(importlib.import_module('data', package=None), 'ISO_IMAGES', {})
+
+# Return true if the version of the ISO doesn't support the source type.
+# Note: this is a quick-win hack, to avoid explicit enumeration of supported
+# source_type values for each ISO.
+def skip_source_type(version, source_type):
+    if version not in ISO_IMAGES.keys():
+        return True, "version of ISO {} is unknown".format(version)
+
+    if source_type == "iso":
+        if ISO_IMAGES[version].get('net-only', False):
+            return True, "ISO image is net-only while source_type is local"
+
+        return False, "do not skip"
+
+    if source_type == "net":
+        # Net install is not valid if there is no netinstall URL
+        # FIXME: ISO includes a default URL so we should be able to omit net-url
+        if 'net-url' not in ISO_IMAGES[version].keys():
+            return True, "net-url required for netinstall was not found for {}".format(version)
+
+        return False, "do not skip"
+
+    # If we don't know the source type then it is invalid
+    return True, "unknown source type {}".format(source_type)
 
 @pytest.fixture(scope='function')
 def answerfile(request):
@@ -52,9 +79,18 @@ def iso_remaster(request, answerfile):
     param_mapping = marker.kwargs.get("param_mapping", {})
     iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
+    try:
+        source_type = request.getfixturevalue("source_type")
+    except pytest.FixtureLookupError as e:
+        raise RuntimeError("iso_remaster fixture requires 'source_type' parameter") from e
+
     gen_unique_uuid = marker.kwargs.get("gen_unique_uuid", False)
 
-    from data import ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
+    skip, reason = skip_source_type(iso_key, source_type)
+    if skip:
+        pytest.skip(reason)
+
+    from data import ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
@@ -71,9 +107,29 @@ def iso_remaster(request, answerfile):
         if answerfile:
             logging.info("generating answerfile %s", answerfile_xml)
             import xml.etree.ElementTree as ET
-            ET.SubElement(answerfile.getroot(), "script",
+            root = answerfile.getroot()
+            ET.SubElement(root, "script",
                           stage="filesystem-populated",
                           type="url").text = "file:///root/postinstall.sh"
+            # source is not required when doing a restore so don't try to update it
+            # FIXME: should know from answerfile data that we're restoring - which
+            # advocates for doing the change before conversion inside the answerfile
+            # callable marker
+            if source_type == "net" and not "test_restore" in request.node.nodeid:
+                source_elmt = root.find("source")
+                if source_elmt is None:
+                    pytest.skip("source not found in answerfile")
+                new_source_elmt = ET.Element('source', type='url')
+                try:
+                    new_source_elmt.text = ISO_IMAGES[iso_key]['net-url']
+                except KeyError:
+                    pytest.skip("URL not set for %s".format(iso_key))
+                parent = root
+                for elmt in parent:
+                    if elmt.tag == 'source':
+                        parent.remove(elmt)
+                        parent.append(new_source_elmt)
+                        break
             answerfile.write(answerfile_xml)
         else:
             logging.info("no answerfile")
