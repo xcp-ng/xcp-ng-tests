@@ -64,10 +64,17 @@ VM_IMAGES = {
 }
 
 # FIXME: use URLs and an optional cache?
+#
+# If 'net-only' is set to 'True' only source of type URL will be possible.
+# By default the parameter is set to False.
 ISO_IMAGES = {
-#    '83rc1': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1.iso"},
-#    '83rc1net': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1-netinstall.iso"},
-#    '83b2': {'path': "/home/user/iso/xcp-ng-8.3.0-beta2.iso"},
+#    '83rc1': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1.iso",
+#              'net-url': "http://server/installers/xcp-ng/8.3-rc1"},
+#    '83rc1net': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1-netinstall.iso",
+#                 'net-url': "http://server/installers/xcp-ng/8.3-rc1",
+#                 'net-only': True},
+#    '83b2': {'path': "/home/user/iso/xcp-ng-8.3.0-beta2.iso",
+#             'net-url': "http://server/installers/xcp-ng/8.3-beta2"},
 #    '821.1': {'path': "/home/user/iso/xcp-ng-8.2.1-20231130.iso"},
 #    '821': {'path': "/home/user/iso/xcp-ng-8.2.1.iso"},
 #    '820': {'path': "/home/user/iso/xcp-ng-8.2.0.iso"},

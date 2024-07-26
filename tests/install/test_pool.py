@@ -12,17 +12,18 @@ from data import HOSTS_IP_CONFIG, NFS_DEVICE_CONFIG
 # FIXME without --ignore-unknown-dependency, SKIPPED
 # "because it depends on tests/install/test.py::TestNested::test_firstboot_install[uefi-821.1-host1]"
 @pytest.mark.usefixtures("xcpng_chained")
+@pytest.mark.parametrize("source_type", ("iso", "net"))
 @pytest.mark.parametrize(("orig_version", "iso_version"), [
     ("821.1", "83rc1"),
 ])
 @pytest.mark.parametrize("firmware", ("uefi", "bios"))
 @pytest.mark.continuation_of(lambda params, firmware: [
     dict(vm="vm1",
-         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host1-nosr]",
+         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host1-iso-nosr]",
          scope="session"),
     dict(vm="vm2",
          image_vm="vm1",
-         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host2-nosr]",
+         image_test=f"tests/install/test.py::TestNested::test_firstboot_install[{firmware}-{params}-host2-iso-nosr]",
          scope="session"),
 ],
                              param_mapping={"params": "orig_version", "firmware": "firmware"})
@@ -37,7 +38,8 @@ from data import HOSTS_IP_CONFIG, NFS_DEVICE_CONFIG
         {"TAG": "existing-installation", "CONTENTS": {"uefi": "nvme0n1", "bios": "sda"}[firmware]},
     ),
     param_mapping={"firmware": "firmware"})
-def test_pool_rpu(firmware, orig_version, iso_version, iso_remaster, create_vms):
+def test_pool_rpu(create_vms, iso_remaster,
+                  firmware, orig_version, iso_version, source_type):
     (master_vm, slave_vm) = create_vms
     master_mac = master_vm.vifs()[0].param_get('MAC')
     logging.info("Master VM has MAC %s", master_mac)
