@@ -182,6 +182,8 @@ class TestNested:
             lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
             assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
+            lsb_rel_tuple = tuple(int(x) for x in lsb_rel.split("."))
+
             # wait for XAPI startup to be done, which avoids:
             # - waiting for XAPI to start listening to its socket
             # - waiting for host and pool objects to be populated after install
@@ -245,6 +247,20 @@ class TestNested:
                     out = pool.master.ssh(["grep", "-r", service, "/var/log"], check=False)
                     logging.warning("in logs: %s", out)
                 raise
+
+            if lsb_rel_tuple >= (8, 3):
+                # Those certs take time to get generated in install case,
+                # so make sure they are.  On upgrade they must be
+                # preserved (fails on 8.3.0-rc1).
+                for certfile in (
+                        "/etc/stunnel/xapi-stunnel-ca-bundle.pem",
+                        "/etc/stunnel/xapi-pool-ca-bundle.pem",
+                        "/etc/xensource/xapi-pool-tls.pem",
+                ):
+                    wait_for(lambda: pool.master.ssh(["test", "-e", certfile],
+                                                     check=False, simple_output=False,
+                                                     ).returncode == 0,
+                             f"Wait for {certfile} certificate file")
 
             #wait_for(lambda: False, 'Wait "forever"', timeout_secs=100*60)
             logging.info("Powering off pool master")
