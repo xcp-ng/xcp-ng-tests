@@ -128,43 +128,28 @@ class TestNested:
             wait_for(lambda: not os.system(f"nc -zw5 {host_vm.ip} 22"),
                      "Wait for ssh back up on Host VM", retry_delay_secs=5)
 
-            # FIXME "xe host-list" in there can fail with various
-            # errors until the XAPI DB is initialized enough for
-            # Pool.__init__(), which assumes the master XAPI is up and
-            # running.
-
-            # pool master must be reachable here
-            # FIXME: not sure why we seem to need this, while port 22 has been seen open
-            tries = 7
-            while True:
-                try:
-                    pool = Pool(host_vm.ip)
-                except commands.SSHCommandFailed as e:
-                    if "Connection refused" not in e.stdout:
-                        raise
-                    tries -= 1
-                    if tries:
-                        logging.warning("retrying connection to pool master")
-                        time.sleep(3)
-                        continue
-                    # retries failed
-                    raise
-                # it worked!
-                break
-
-            logging.info("Host uuid: %s", pool.master.uuid)
-
             logging.info("Checking installed version")
-            lsb_dist = pool.master.ssh(["lsb_release", "-si"])
-            lsb_rel = pool.master.ssh(["lsb_release", "-sr"])
+            lsb_dist = commands.ssh(host_vm.ip, ["lsb_release", "-si"])
+            lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
             assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
             lsb_rel_tuple = tuple(int(x) for x in lsb_rel.split("."))
 
+            # wait for XAPI startup to be done, which avoids:
+            # - waiting for XAPI to start listening to its socket
+            # - waiting for host and pool objects to be populated after install
+            wait_for(lambda: commands.ssh(host_vm.ip, ['xapi-wait-init-complete', '60'],
+                                          simple_output=False).returncode == 0,
+                     "Wait for XAPI init to be complete",
+                     timeout_secs=30 * 60)
+            # FIXME: after this all wait_for should be instant - replace with immediate tests?
+
+            # pool master must be reachable here
+            pool = Pool(host_vm.ip)
+            logging.info("Host uuid: %s", pool.master.uuid)
+
             # wait for XAPI
             wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
-            wait_for(pool.master.is_xapi_init_complete, "Wait for XAPI init to be complete",
-                     timeout_secs=30 * 60)
 
             if lsb_rel in ["8.2.1", "8.3.0", "8.4.0"]:
                 SERVICES =["control-domain-params-init",
