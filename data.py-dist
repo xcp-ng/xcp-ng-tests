@@ -5,6 +5,7 @@
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
+HOST_DEFAULT_PASSWORD_HASH = "" # FIXME
 
 # Public key for a private key available to the test runner
 TEST_SSH_PUBKEY = """ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI
@@ -35,11 +36,21 @@ PXE_CONFIG_SERVER = 'pxe'
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
 
-ANSWERFILE_URL = f"http://{PXE_CONFIG_SERVER}/configs/custom/ydi/install-8.2-uefi-iso-ext.xml" # FIXME
-
 # Default shared ISO SR
 ISOSR_SRV = "nfs-server"
 ISOSR_PATH = "/srv/iso-sr"
+
+# IP addresses for hosts to be installed
+# NOTE: do NOT set an IP for host1, it is assumed to use DEFAULT
+HOSTS_IP_CONFIG = {
+    'HOSTS': {
+#        'DEFAULT': '192.16.0.1',
+#        'host2': '192.16.0.2',
+    },
+#    'NETMASK': '255.255.0.0',
+#    'GATEWAY': '192.16.0.254',
+#    'DNS': '192.16.0.254',
+}
 
 # Tools
 TOOLS = {
@@ -126,6 +137,21 @@ LVMOISCSI_DEVICE_CONFIG = {
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
 }
+
+BASE_ANSWERFILES = dict(
+    INSTALL={
+        "TAG": "installation",
+        "CONTENTS": (
+            {"TAG": "root-password",
+             "type": "hash",
+             "CONTENTS": HOST_DEFAULT_PASSWORD_HASH},
+            {"TAG": "timezone",
+             "CONTENTS": "Europe/Paris"},
+            {"TAG": "keymap",
+             "CONTENTS": "us"},
+        ),
+    },
+)
 
 # compatibility settings for older tests
 DEFAULT_NFS_DEVICE_CONFIG = NFS_DEVICE_CONFIG

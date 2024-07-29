@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from lib import installer
+from lib.installer import AnswerFile
 
 from data import NETWORKS
 assert "MGMT" in NETWORKS
@@ -24,6 +25,11 @@ class TestNested:
              cd_vbd=dict(device="xvdd", userdevice="3"),
              vifs=[dict(index=0, network_uuid=NETWORKS["MGMT"])],
              ))
+    @pytest.mark.answerfile(lambda: AnswerFile("INSTALL") \
+                            .top_append(
+                                {"TAG": "source", "type": "local"},
+                                {"TAG": "primary-disk", "CONTENTS": "nvme0n1"},
+                            ))
     @pytest.mark.installer_iso("xcpng-8.2.1-2023")
     def test_install(self, create_vms, iso_remaster):
         assert len(create_vms) == 1

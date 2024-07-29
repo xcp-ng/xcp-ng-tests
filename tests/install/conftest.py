@@ -1,19 +1,51 @@
+from copy import deepcopy
 import logging
 import os
 import pytest
 import tempfile
+import xml.etree.ElementTree as ET
 
+from lib.installer import AnswerFile
 from lib.common import callable_marker
 from lib.commands import local_cmd, scp, ssh
 
 @pytest.fixture(scope='function')
-def iso_remaster(request):
+def answerfile(request):
+    marker = request.node.get_closest_marker("answerfile")
+
+    if marker is None:
+        yield None              # no answerfile to generate
+        return
+
+    # construct answerfile definition from option "base", and explicit bits
+    param_mapping = marker.kwargs.get("param_mapping", {})
+    answerfile_def = callable_marker(marker.args[0], request, param_mapping=param_mapping)
+    assert isinstance(answerfile_def, AnswerFile)
+
+    from data import HOSTS_IP_CONFIG
+    answerfile_def.top_append(
+        dict(TAG="admin-interface",
+             name="eth0",
+             proto="static",
+             CONTENTS=(
+                 dict(TAG='ipaddr', CONTENTS=HOSTS_IP_CONFIG['HOSTS']['DEFAULT']),
+                 dict(TAG='subnet', CONTENTS=HOSTS_IP_CONFIG['NETMASK']),
+                 dict(TAG='gateway', CONTENTS=HOSTS_IP_CONFIG['GATEWAY']),
+             )),
+        dict(TAG="name-server",
+             CONTENTS=HOSTS_IP_CONFIG['DNS']),
+    )
+
+    yield answerfile_def
+
+@pytest.fixture(scope='function')
+def iso_remaster(request, answerfile):
     marker = request.node.get_closest_marker("installer_iso")
     assert marker is not None, "iso_remaster fixture requires 'installer_iso' marker"
     param_mapping = marker.kwargs.get("param_mapping", {})
     iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
-    from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
+    from data import ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
@@ -25,6 +57,15 @@ def iso_remaster(request):
         remastered_iso = os.path.join(isotmp, "image.iso")
         img_patcher_script = os.path.join(isotmp, "img-patcher")
         iso_patcher_script = os.path.join(isotmp, "iso-patcher")
+        answerfile_xml = os.path.join(isotmp, "answerfile.xml")
+
+        if answerfile:
+            logging.info("generating answerfile %s", answerfile_xml)
+            answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
+                                       type="url", CONTENTS="file:///root/postinstall.sh"))
+            answerfile.write_xml(answerfile_xml)
+        else:
+            logging.info("no answerfile")
 
         logging.info("Remastering %s to %s", SOURCE_ISO, remastered_iso)
 
@@ -36,6 +77,9 @@ INSTALLIMG="$1"
 
 mkdir -p "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+
+test ! -e "{answerfile_xml}" ||
+    cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
 
 cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
 #! /bin/bash
@@ -95,8 +139,9 @@ EOF
             print(f"""#!/bin/bash
 set -ex
 ISODIR="$1"
-SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz sshpassword={passwd} atexit=shell@")
-SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile={ANSWERFILE_URL} network_device=all@")
+SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz sshpassword={passwd} atexit=shell network_device=all@")
+test ! -e "{answerfile_xml}" ||
+    SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile=file:///root/answerfile.xml@")
 
 sed -i "${{SED_COMMANDS[@]}}" \
     "$ISODIR"/*/*/grub*.cfg \

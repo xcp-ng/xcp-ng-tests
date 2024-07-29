@@ -1,7 +1,65 @@
 import logging
+import xml.etree.ElementTree as ET
+
 from lib import commands, pxe
 from lib.commands import ssh
 from lib.common import wait_for
+
+class AnswerFile:
+    def __init__(self, kind, /):
+        from data import BASE_ANSWERFILES
+        defn = BASE_ANSWERFILES[kind]
+        self.defn = self._normalize_structure(defn)
+
+    def write_xml(self, filename):
+        logging.info("generating answerfile %s", filename)
+        etree = ET.ElementTree(self._defn_to_xml_et(self.defn))
+        etree.write(filename)
+
+    # chainable mutators for lambdas
+
+    def top_append(self, *defs):
+        for defn in defs:
+            self.defn['CONTENTS'].append(self._normalize_structure(defn))
+        return self
+
+    def top_setattr(self, attrs):
+        assert 'CONTENTS' not in attrs
+        self.defn.update(attrs)
+        return self
+
+    # makes a mutable deep copy of all `contents`
+    @staticmethod
+    def _normalize_structure(defn):
+        assert isinstance(defn, dict)
+        assert 'TAG' in defn
+        defn = dict(defn)
+        if 'CONTENTS' not in defn:
+            defn['CONTENTS'] = []
+        if not isinstance(defn['CONTENTS'], str):
+            defn['CONTENTS'] = [AnswerFile._normalize_structure(item)
+                                for item in defn['CONTENTS']]
+        return defn
+
+    # convert to a ElementTree.Element tree suitable for further
+    # modification before we serialize it to XML
+    @staticmethod
+    def _defn_to_xml_et(defn, /, *, parent=None):
+        assert isinstance(defn, dict)
+        defn = dict(defn)
+        name = defn.pop('TAG')
+        assert isinstance(name, str)
+        contents = defn.pop('CONTENTS', ())
+        assert isinstance(contents, (str, list))
+        element = ET.Element(name, **defn)
+        if parent is not None:
+            parent.append(element)
+        if isinstance(contents, str):
+            element.text = contents
+        else:
+            for contents in contents:
+                AnswerFile._defn_to_xml_et(contents, parent=element)
+        return element
 
 def poweroff(ip):
     try:
