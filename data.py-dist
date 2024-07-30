@@ -5,6 +5,12 @@
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
+HOST_DEFAULT_PASSWORD_HASH = "" # FIXME
+
+# Public key for a private key available to the test runner
+TEST_SSH_PUBKEY = """ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKz9uQOoxq6Q0SQ0XTzQHhDolvuo/7EyrDZsYQbRELhcPJG8MT/o5u3HyJFhIP2+HqBSXXgmqRPJUkwz9wUwb2sUwf44qZm/pyPUWOoxyVtrDXzokU/uiaNKUMhbnfaXMz6Ogovtjua63qld2+ZRXnIgrVtYKtYBeu/qKGVSnf4FTOUKl1w3uKkr59IUwwAO8ay3wVnxXIHI/iJgq6JBgQNHbn3C/SpYU++nqL9G7dMyqGD36QPFuqH/cayL8TjNZ67TgAzsPX8OvmRSqjrv3KFbeSlpS/R4enHkSemhgfc8Z2f49tE7qxWZ6x4Uyp5E6ur37FsRf/tEtKIUJGMRXN XCP-ng CI
+"""
 
 # The following prefix will be added to the `name-label` parameter of XAPI objects
 # that the tests will create or import, such as VMs and SRs.
@@ -20,16 +26,53 @@ HOSTS = {
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
 
+NETWORKS = {
+#    "MGMT": "7a48464c-1e70-4e2e-a449-9f2514564381",
+}
+
 # PXE config server for automated XCP-ng installation
 PXE_CONFIG_SERVER = 'pxe'
 
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
 
+# Default shared ISO SR
+ISOSR_SRV = "nfs-server"
+ISOSR_PATH = "/srv/iso-sr"
+
+# Tools
+TOOLS = {
+#    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
+}
+
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
 VM_IMAGES = {
     'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
     'mini-linux-x86_64-uefi': 'alpine-uefi-minimal-3.12.0.xva'
+}
+
+# FIXME: use URLs and an optional cache?
+#
+# If 'net-only' is set to 'True' only source of type URL will be possible.
+# By default the parameter is set to False.
+ISO_IMAGES = {
+#    'xcpng-8.3-rc1': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1.iso",
+#                      'net-url': "http://server/installers/xcp-ng/8.3-rc1"},
+#    'xcpng-8.3-rc1-net': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1-netinstall.iso"
+#                          'net-url': "http://server/installers/xcp-ng/8.3-rc1",
+#                          'net-only': True},
+#    'xcpng-8.3-beta2': {'path': "/home/user/iso/xcp-ng-8.3.0-beta2.iso",
+#                        'net-url': "http://server/installers/xcp-ng/8.3-beta2"},
+#    'xcpng-8.2.1-2023': {'path': "/home/user/iso/xcp-ng-8.2.1-20231130.iso"},
+#    'xcpng-8.2.1': {'path': "/home/user/iso/xcp-ng-8.2.1.iso"},
+#    'xcpng-8.2.0': {'path': "/home/user/iso/xcp-ng-8.2.0.iso"},
+#    'xcpng-8.1': {'path': "/home/user/iso/xcp-ng-8.1.0-2.iso"},
+#    'xcpng-8.0': {'path': "/home/user/iso/xcp-ng-8.0.0.iso"},
+#    'xcpng-7.6': {'path': "/home/user/iso/xcp-ng-7.6.0.iso"},
+#    'xcpng-7.5': {'path': "/home/user/iso/xcp-ng-7.5.0-2.iso"},
+#    'ch-8.2.1': {'path': "/home/user/iso/CitrixHypervisor-8.2.1-install-cd.iso"},
+#    'ch-8.2.1-23': {'path': "/home/user/iso/CitrixHypervisor-8.2.1-2306-install-cd.iso"},
+#    'xs8-2024-03': {'path': "/home/user/iso/XenServer8_2024-03-18.iso"},
 }
 
 # In some cases, we may prefer to favour a local SR to store test VM disks,
@@ -96,6 +139,26 @@ LVMOISCSI_DEVICE_CONFIG = {
 #    'port': '3260',
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
+}
+
+BASE_ANSWERFILES = dict(
+    INSTALL={
+        "root": {"tag": "installation"},
+        "root-password": {"type": "hash", "text": HOST_DEFAULT_PASSWORD_HASH},
+        "admin-interface": {"name": "eth0", "proto": "dhcp"},
+        "timezone": {"text": "Europe/Paris"},
+        "keymap": {"text": "us"},
+    },
+    UPGRADE={
+        "root": {"tag": "installation", "mode": "upgrade"},
+    },
+    RESTORE={
+        "root": {"tag": "restore"},
+    },
+)
+
+IMAGE_EQUIVS = {
+#    'install.test::Nested::install[bios-83rc1-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb': 'install.test::Nested::install[bios-83rc1-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
 }
 
 # compatibility settings for older tests

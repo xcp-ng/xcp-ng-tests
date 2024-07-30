@@ -2,7 +2,7 @@ import logging
 
 import lib.commands as commands
 
-from lib.common import _param_get, _param_remove, _param_set
+from lib.common import _param_get, _param_remove, _param_set, _param_clear
 from lib.sr import SR
 
 class BaseVM:
@@ -23,6 +23,9 @@ class BaseVM:
 
     def param_remove(self, param_name, key, accept_unknown_key=False):
         _param_remove(self.host, BaseVM.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+
+    def param_clear(self, param_name):
+        _param_clear(self.host, BaseVM.xe_prefix, self.uuid, param_name)
 
     def name(self):
         return self.param_get('name-label')
@@ -75,11 +78,18 @@ class BaseVM:
         assert sr.attached_to_host(self.host)
         return sr
 
-    def export(self, filepath, compress='none'):
-        logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
-        params = {
-            'uuid': self.uuid,
-            'compress': compress,
-            'filename': filepath
-        }
-        self.host.xe('vm-export', params)
+    def export(self, filepath, compress='none', use_cache=False):
+
+        if use_cache:
+            logging.info("Export VM %s to cache for %r as a clone" % (self.uuid, filepath))
+            clone = self.clone()
+            logging.info(f"Marking VM {clone.uuid} as cached")
+            clone.param_set('name-description', self.host.vm_cache_key(filepath))
+        else:
+            logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
+            params = {
+                'uuid': self.uuid,
+                'compress': compress,
+                'filename': filepath
+            }
+            self.host.xe('vm-export', params)
