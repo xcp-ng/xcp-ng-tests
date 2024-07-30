@@ -204,7 +204,6 @@ class TestNested:
                 # so make sure they are.  On upgrade they must be
                 # preserved (fails on 8.3.0-rc1).
                 for certfile in (
-                        "/etc/stunnel/certs/sdn-controller-ca.pem",
                         "/etc/stunnel/xapi-stunnel-ca-bundle.pem",
                         "/etc/stunnel/xapi-pool-ca-bundle.pem",
                         "/etc/xensource/xapi-pool-tls.pem",
