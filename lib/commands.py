@@ -26,7 +26,7 @@ class SSHCommandFailed(BaseCommandFailed):
 class LocalCommandFailed(BaseCommandFailed):
     def __init__(self, returncode, stdout, cmd):
         msg_end = f": {stdout}" if stdout else "."
-        super(SSHCommandFailed, self).__init__(
+        super(LocalCommandFailed, self).__init__(
             returncode, stdout, cmd,
             f'Local command ({cmd}) failed with return code {returncode}{msg_end}'
         )
