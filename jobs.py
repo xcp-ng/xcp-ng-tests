@@ -26,6 +26,7 @@ JOBS = {
             "tests/migration",
             "tests/network",
             "tests/snapshot",
+            "tests/system",
             "tests/xapi",
             "tests/xapi-plugins",
         ],
