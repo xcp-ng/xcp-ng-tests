@@ -5,10 +5,17 @@ from lib.common import _param_add, _param_clear, _param_get, _param_remove, _par
 class VDI:
     xe_prefix = "vdi"
 
-    def __init__(self, sr, uuid):
+    def __init__(self, uuid, *, host=None, sr=None):
         self.uuid = uuid
         # TODO: use a different approach when migration is possible
-        self.sr = sr
+        if sr is None:
+            sr_uuid = host.get_vdi_sr_uuid(uuid)
+            # avoid circular import
+            # FIXME should get it from Host instead
+            from lib.sr import SR
+            self.sr = SR(sr_uuid, host.pool)
+        else:
+            self.sr = sr
 
     def destroy(self):
         logging.info("Destroy %s", self)

@@ -157,7 +157,7 @@ class SR:
             'virtual-size': str(virtual_size),
             'sr-uuid': self.uuid
         })
-        return VDI(self, vdi_uuid)
+        return VDI(vdi_uuid, sr=self)
 
     def run_quicktest(self):
         logging.info(f"Run quicktest on SR {self.uuid}")
