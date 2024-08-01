@@ -106,6 +106,9 @@ class Pool:
             return SR(uuids[0], self)
         return None
 
+    def get_vdi_sr_uuid(self, vdi_uuid):
+        return self.master.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
+
     def save_uefi_certs(self):
         """
         Save UEFI certificates in order to restore them later. XCP-ng 8.2 only.
