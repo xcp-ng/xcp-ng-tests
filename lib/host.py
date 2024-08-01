@@ -566,3 +566,6 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def get_vdi_sr_uuid(self, vdi_uuid):
+        return self.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
