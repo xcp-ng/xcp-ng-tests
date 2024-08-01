@@ -21,6 +21,13 @@ class VDI:
         logging.info("Destroy %s", self)
         self.sr.pool.master.xe('vdi-destroy', {'uuid': self.uuid})
 
+    def clone(self):
+        uuid = self.sr.pool.master.xe('vdi-clone', {'uuid': self.uuid})
+        return VDI(uuid, sr=self.sr)
+
+    def readonly(self):
+        return self.param_get("read-only") == "true"
+
     def __str__(self):
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 
