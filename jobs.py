@@ -407,6 +407,16 @@ JOBS = {
         "params": {},
         "paths": ["tests/pci_passthrough"],
     },
+    "fs-diff": {
+        "description": "Check for differences between 2 hosts file system",
+        "requirements": [
+            "2 XCP-ng host >= 8.2"
+        ],
+        # This test needs 2 hosts that can be from the same pool
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/fs-diff"],
+    },
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error

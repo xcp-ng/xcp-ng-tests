@@ -46,13 +46,14 @@ import tempfile
 import os
 import shlex
 from fnmatch import fnmatch
-from enum import Enum
+from enum import StrEnum, auto
 
-class FileType(Enum):
-    FILE = 0
-    FILE_SYMLINK = 1
-    DIR_SYMLINK = 2
-    BROKEN_SYMLINK = 3
+class DataType(StrEnum):
+    FILE = auto()
+    FILE_SYMLINK = auto()
+    DIR_SYMLINK = auto()
+    BROKEN_SYMLINK = auto()
+    PACKAGE = auto()
 
 def ignore_file(filename, ignored_files):
     for i in ignored_files:
@@ -76,16 +77,16 @@ def ssh_get_files(host, file_type, folders):
     folders = " ".join(folders)
 
     match file_type:
-        case FileType.FILE:
+        case DataType.FILE:
             find_type = "-type f"
             md5sum = True
-        case FileType.FILE_SYMLINK:
+        case DataType.FILE_SYMLINK:
             find_type = "-type l -xtype f"
             md5sum = True
-        case FileType.DIR_SYMLINK:
+        case DataType.DIR_SYMLINK:
             find_type = "-type l -xtype d"
             readlink = True
-        case FileType.BROKEN_SYMLINK:
+        case DataType.BROKEN_SYMLINK:
             find_type = "-xtype l"
             readlink = True
         case _:
@@ -123,11 +124,11 @@ def get_data(host, folders):
     ref_data = dict()
 
     try:
-        ref_data['file'] = ssh_get_files(host, FileType.FILE, folders)
-        ref_data['file_symlink'] = ssh_get_files(host, FileType.FILE_SYMLINK, folders)
-        ref_data['dir_symlink'] = ssh_get_files(host, FileType.DIR_SYMLINK, folders)
-        ref_data['broken_symlink'] = ssh_get_files(host, FileType.BROKEN_SYMLINK, folders)
-        ref_data['package'] = ssh_get_packages(host)
+        ref_data[DataType.FILE] = ssh_get_files(host, DataType.FILE, folders)
+        ref_data[DataType.FILE_SYMLINK] = ssh_get_files(host, DataType.FILE_SYMLINK, folders)
+        ref_data[DataType.DIR_SYMLINK] = ssh_get_files(host, DataType.DIR_SYMLINK, folders)
+        ref_data[DataType.BROKEN_SYMLINK] = ssh_get_files(host, DataType.BROKEN_SYMLINK, folders)
+        ref_data[DataType.PACKAGE] = ssh_get_packages(host)
     except Exception as e:
         print(e, file=sys.stderr)
         exit(-1)
@@ -153,27 +154,27 @@ def sftp_get(host, remote_file, local_file):
 
     return res
 
-def remote_diff(host1, host2, filename):
+def remote_diff(host_ref, host_test, filename):
     try:
-        file1 = None
-        file2 = None
+        file_ref = None
+        file_test = None
 
         # check remote files are text files
         cmd = f"file -b {shlex.quote(filename)}"
-        file_type = ssh_cmd(host1, cmd)
+        file_type = ssh_cmd(host_ref, cmd)
         if not file_type.lower().startswith("ascii"):
             print("Binary file. Not showing diff")
             return
 
-        fd, file1 = tempfile.mkstemp()
+        fd, file_ref = tempfile.mkstemp(suffix='_ref')
         os.close(fd)
-        sftp_get(host1, filename, file1)
+        sftp_get(host_ref, filename, file_ref)
 
-        fd, file2 = tempfile.mkstemp()
+        fd, file_test = tempfile.mkstemp(suffix='_test')
         os.close(fd)
-        sftp_get(host2, filename, file2)
+        sftp_get(host_test, filename, file_test)
 
-        args = ["diff", "-u", file1, file2]
+        args = ["diff", "-u", file_ref, file_test]
         diff_res = subprocess.run(args, capture_output=True, text=True)
 
         match diff_res.returncode:
@@ -187,36 +188,87 @@ def remote_diff(host1, host2, filename):
     except Exception as e:
         print(e, file=sys.stderr)
     finally:
-        if file1 is not None and os.path.exists(file1):
-            os.remove(file1)
-        if file2 is not None and os.path.exists(file2):
-            os.remove(file2)
+        if file_ref is not None and os.path.exists(file_ref):
+            os.remove(file_ref)
+        if file_test is not None and os.path.exists(file_test):
+            os.remove(file_test)
 
-def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
+def print_results(results, show_diff, show_ignored):
+    # Print what differs
+    for dtype in DataType:
+        if dtype == DataType.PACKAGE:
+            for pkg, versions in results[dtype].items():
+                print(f"{dtype} differs: {pkg} (ref={versions['ref']}, test={versions['test']})")
+        else:
+            for file in results[dtype]:
+                print(f"{dtype} differs: {file}")
+                if show_diff:
+                    remote_diff(results['host']['ref'], results['host']['test'], file)
+
+    # Print orphans
+    for dtype in DataType:
+        for file in results['orphan']['ref'][dtype]:
+            print(f"{dtype} only exists on reference host: {file}")
+        for file in results['orphan']['test'][dtype]:
+            print(f"{dtype} only exists on tested host: {file}")
+
+    if show_ignored and len(results['ignored_files']) > 0:
+        print("\nIgnored files:")
+        for f in results['ignored_files']:
+            print(f"{f}")
+
+def compare_data(ref, test, ignored_file_patterns):
     ref_data = ref['data']
-    ref_host = ref['host']
     test_data = test['data']
-    test_host = test['host']
-    ignored_files = []
+    err = 0
+    results = {
+        'host': {
+            'ref': ref['host'],
+            'test': test['host']
+        },
+        DataType.FILE: [],
+        DataType.FILE_SYMLINK: [],
+        DataType.DIR_SYMLINK: [],
+        DataType.BROKEN_SYMLINK: [],
+        DataType.PACKAGE: {},
+        'orphan': {
+            'ref': {
+                DataType.FILE: [],
+                DataType.FILE_SYMLINK: [],
+                DataType.DIR_SYMLINK: [],
+                DataType.BROKEN_SYMLINK: [],
+                DataType.PACKAGE: []
+            },
+            'test': {
+                DataType.FILE: [],
+                DataType.FILE_SYMLINK: [],
+                DataType.DIR_SYMLINK: [],
+                DataType.BROKEN_SYMLINK: [],
+                DataType.PACKAGE: []
+            }
+        },
+        'ignored_files': []
+    }
 
     for dtype in test_data:
         for file in test_data[dtype]:
             if ignore_file(file, ignored_file_patterns):
-                ignored_files.append(file)
+                results['ignored_files'].append(file)
                 continue
 
             if file not in ref_data[dtype]:
-                print(f"{dtype} doesn't exist on reference host: {file}")
+                results['orphan']['test'][dtype].append(file)
+                err = 1
                 continue
 
             if ref_data[dtype][file] != test_data[dtype][file]:
-                print(f"{dtype} differs: {file}", end='')
-                if dtype == 'package':
-                    print(f" (ref={ref_data[dtype][file]}, test={test_data[dtype][file]})")
+                err = 1
+                if dtype == DataType.PACKAGE:
+                    # Store package versions for PACKAGE data type
+                    results[dtype][file] = {'ref': ref_data[dtype][file],
+                                            'test': test_data[dtype][file]}
                 else:
-                    print("")
-                    if show_diff:
-                        remote_diff(ref_host, test_host, file)
+                    results[dtype].append(file)
 
             ref_data[dtype][file] = None
 
@@ -224,18 +276,16 @@ def compare_data(ref, test, ignored_file_patterns, show_diff, show_ignored):
     for dtype in ref_data:
         for file, val in ref_data[dtype].items():
             if ignore_file(file, ignored_file_patterns):
-                ignored_files.append(file)
+                results['ignored_files'].append(file)
                 continue
 
             if val is not None:
-                print(f"{dtype} doesn't exist on tested host: {file}")
+                err = 1
+                results['orphan']['ref'][dtype].append(file)
 
-    if show_ignored and len(ignored_files) > 0:
-        print("\nIgnored files:")
-        for f in ignored_files:
-            print(f"{f}")
+    return results, err
 
-# Load a previously saved json file containing a the reference files
+# Load a previously saved json file containing reference data
 def load_reference_files(filename):
     try:
         with open(filename, 'r') as fd:
@@ -327,6 +377,8 @@ def main():
     parser.add_argument('--ignore-file', '-i', action='append', dest='ignored_file_patterns',
                         default=ignored_file_patterns,
                         help='Add file patterns to the default ignored files. Can be specified multiple times')
+    parser.add_argument('--json-output', '-j', action='store_true', dest='json_output',
+                        help='Output results in json format')
     args = parser.parse_args(sys.argv[1:])
 
     if args.ref_host is None and args.show_diff:
@@ -334,14 +386,17 @@ def main():
         return -1
 
     if args.load_ref:
-        print(f"Get reference data from {args.load_ref}")
+        if not args.json_output:
+            print(f"Get reference data from {args.load_ref}")
         ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
-        print(f"Get reference data from {args.ref_host}")
+        if not args.json_output:
+            print(f"Get reference data from {args.ref_host}")
         ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
-            print(f"Saving reference data to {args.save_ref}")
+            if not args.json_output:
+                print(f"Saving reference data to {args.save_ref}")
             save_reference_data(ref_data, args.save_ref)
 
     if ref_data is None or args.test_host is None:
@@ -351,15 +406,26 @@ def main():
         print("\nMissing parameters. Try --help", file=sys.stderr)
         return -1
 
-    print(f"Get test host data from {args.test_host}")
+    if not args.json_output:
+        print(f"Get test host data from {args.test_host}")
     test_data = get_data(args.test_host, args.folders)
 
     ref = dict([('data', ref_data), ('host', args.ref_host)])
     test = dict([('data', test_data), ('host', args.test_host)])
 
-    compare_data(ref, test, args.ignored_file_patterns, args.show_diff, args.show_ignored)
+    results, err = compare_data(ref, test, args.ignored_file_patterns)
 
-    return 0
+    if args.json_output:
+        if not args.show_ignored:
+            results.pop('ignored_files')
+        print(json.dumps(results, indent=2))
+    else:
+        if err != 0:
+            print_results(results, args.show_diff, args.show_ignored)
+        else:
+            print("No difference found.")
+
+    return err
 
 if __name__ == '__main__':
     exit(main())
