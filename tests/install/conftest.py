@@ -42,6 +42,19 @@ cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
 set -eE
 set -o pipefail
 
+ether_of () {{
+    ifconfig "$1" | grep ether | sed 's/.*ether \\([^ ]*\\).*/\\1/'
+}}
+
+# on installed system, avoid xapi-project/xen-api#5799
+if ! [ -e /opt/xensource/installer ]; then
+    eth_mac=$(ether_of eth0)
+    br_mac=$(ether_of xenbr0)
+
+    # wait for bridge MAC to be fixed
+    test "$eth_mac" = "$br_mac"
+fi
+
 ping -c1 "$1"
 EOF
 chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
@@ -64,6 +77,10 @@ cat > "$INSTALLIMG/root/postinstall.sh" <<EOF
 set -ex
 
 ROOT="\\$1"
+
+cp /etc/systemd/system/test-pingpxe.service "\\$ROOT/etc/systemd/system/test-pingpxe.service"
+cp /usr/local/sbin/test-pingpxe.sh "\\$ROOT/usr/local/sbin/test-pingpxe.sh"
+systemctl --root="\\$ROOT" enable test-pingpxe.service
 
 mkdir -p "\\$ROOT/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" >> "\\$ROOT/root/.ssh/authorized_keys"
