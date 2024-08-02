@@ -38,6 +38,9 @@ def installer_iso(request):
 # - an answerfile to make the install process non-interactive (downloaded from URL)
 # - a postinstall script to modify the installed system with:
 #   - the same .ssh/authorized_key
+#   - the same test-pingpxe.service, which is also useful even with static IP,
+#     in contexts where the same IP is reused by successively different MACs
+#     (when cloning VMs from cache)
 @pytest.fixture(scope='function')
 def remastered_iso(installer_iso):
     iso_file = installer_iso['iso']
@@ -66,6 +69,19 @@ cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
 #! /bin/bash
 set -eE
 set -o pipefail
+
+ether_of () {{
+    ifconfig "$1" | grep ether | sed 's/.*ether \\([^ ]*\\).*/\\1/'
+}}
+
+# on installed system, avoid xapi-project/xen-api#5799
+if ! [ -e /opt/xensource/installer ]; then
+    eth_mac=$(ether_of eth0)
+    br_mac=$(ether_of xenbr0)
+
+    # wait for bridge MAC to be fixed
+    test "$eth_mac" = "$br_mac"
+fi
 
 if [ $(readlink "/bin/ping") = busybox ]; then
     # XS before 7.0
@@ -109,6 +125,16 @@ cat > "$INSTALLIMG/root/postinstall.sh" <<'EOF'
 set -ex
 
 ROOT="$1"
+
+mkdir -p "$ROOT/usr/local/sbin"
+cp /usr/local/sbin/test-pingpxe.sh "$ROOT/usr/local/sbin/test-pingpxe.sh"
+if [ -d "$ROOT/etc/systemd/system" ]; then
+    cp /etc/systemd/system/test-pingpxe.service "$ROOT/etc/systemd/system/test-pingpxe.service"
+    systemctl --root="$ROOT" enable test-pingpxe.service
+else
+    cp /etc/init.d/S12test-pingpxe "$ROOT/etc/init.d/test-pingpxe"
+    ln -s ../init.d/test-pingpxe "$ROOT/etc/rc3.d/S11test-pingpxe"
+fi
 
 mkdir -p "$ROOT/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" >> "$ROOT/root/.ssh/authorized_keys"
