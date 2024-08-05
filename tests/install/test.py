@@ -46,19 +46,9 @@ class TestNested:
     ),
                                 param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
-        lambda version: {
-            "83rc1": "xcpng-8.3-rc1",
-            "83b2": "xcpng-8.3-beta2",
-            "821.1": "xcpng-8.2.1-2023",
-            "81": "xcpng-8.1",
-            "80": "xcpng-8.0",
-            "76": "xcpng-7.6",
-            "75": "xcpng-7.5",
-            "xs8": "xs8-2024-03",
-            "ch821.1": "ch-8.2.1-23",
-        }[version],
+        lambda iso_version: iso_version,
         gen_unique_uuid=True,
-        param_mapping={"version": "iso_version"})
+        param_mapping={"iso_version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware, local_sr: AnswerFile("INSTALL") \
                             .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr}) \
                             .top_append(
@@ -364,11 +354,8 @@ class TestNested:
                                  param_mapping={"params": "orig_version", "firmware": "firmware",
                                                 "local_sr": "local_sr"})
     @pytest.mark.installer_iso(
-        lambda version: {
-            "821.1": "xcpng-8.2.1-2023",
-            "83rc1": "xcpng-8.3-rc1",
-        }[version],
-        param_mapping={"version": "iso_version"})
+        lambda iso_version: iso_version,
+        param_mapping={"iso_version": "iso_version"})
     @pytest.mark.answerfile(
         lambda firmware: AnswerFile("UPGRADE").top_append(
             {"TAG": "source", "type": "local"},
@@ -398,11 +385,8 @@ class TestNested:
                                  param_mapping={"params": "orig_version", "firmware": "firmware",
                                                 "local_sr": "local_sr"})
     @pytest.mark.installer_iso(
-        lambda version: {
-            "821.1": "xcpng-8.2.1-2023",
-            "83rc1": "xcpng-8.3-rc1",
-        }[version],
-        param_mapping={"version": "iso_version"})
+        lambda iso_version: iso_version,
+        param_mapping={"iso_version": "iso_version"})
     @pytest.mark.answerfile(lambda firmware: AnswerFile("RESTORE").top_append(
         {"TAG": "backup-disk",
          "CONTENTS": {"uefi": "nvme0n1", "bios": "sda"}[firmware]},

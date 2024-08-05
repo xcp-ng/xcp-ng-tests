@@ -65,19 +65,21 @@ VM_IMAGES = {
 
 # FIXME: use URLs and an optional cache?
 ISO_IMAGES = {
-#    'xcpng-8.3-rc1': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1.iso"},
-#    'xcpng-8.3-rc1-net': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1-netinstall.iso"},
-#    'xcpng-8.3-beta2': {'path': "/home/user/iso/xcp-ng-8.3.0-beta2.iso"},
-#    'xcpng-8.2.1-2023': {'path': "/home/user/iso/xcp-ng-8.2.1-20231130.iso"},
-#    'xcpng-8.2.1': {'path': "/home/user/iso/xcp-ng-8.2.1.iso"},
-#    'xcpng-8.2.0': {'path': "/home/user/iso/xcp-ng-8.2.0.iso"},
-#    'xcpng-8.1': {'path': "/home/user/iso/xcp-ng-8.1.0-2.iso"},
-#    'xcpng-8.0': {'path': "/home/user/iso/xcp-ng-8.0.0.iso"},
-#    'xcpng-7.6': {'path': "/home/user/iso/xcp-ng-7.6.0.iso"},
-#    'xcpng-7.5': {'path': "/home/user/iso/xcp-ng-7.5.0-2.iso"},
-#    'ch-8.2.1': {'path': "/home/user/iso/CitrixHypervisor-8.2.1-install-cd.iso"},
-#    'ch-8.2.1-23': {'path': "/home/user/iso/CitrixHypervisor-8.2.1-2306-install-cd.iso"},
-#    'xs8-2024-03': {'path': "/home/user/iso/XenServer8_2024-03-18.iso"},
+#    '83rc1': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1.iso"},
+#    '83rc1net': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1-netinstall.iso"},
+#    '83b2': {'path': "/home/user/iso/xcp-ng-8.3.0-beta2.iso"},
+#    '821.1': {'path': "/home/user/iso/xcp-ng-8.2.1-20231130.iso"},
+#    '821': {'path': "/home/user/iso/xcp-ng-8.2.1.iso"},
+#    '820': {'path': "/home/user/iso/xcp-ng-8.2.0.iso"},
+#    '81': {'path': "/home/user/iso/xcp-ng-8.1.0-2.iso"},
+#    '80': {'path': "/home/user/iso/xcp-ng-8.0.0.iso"},
+#    '76': {'path': "/home/user/iso/xcp-ng-7.6.0.iso"},
+#    '75': {'path': "/home/user/iso/xcp-ng-7.5.0-2.iso"},
+#
+#    'xs8': {'path': "/home/user/iso/XenServer8_2024-03-18.iso"},
+#    #'xs8': {'path': "/home/user/iso/XenServer8_2023-08-22.iso"},
+#    'ch821.1': {'path': "/home/user/iso/CitrixHypervisor-8.2.1-2306-install-cd.iso"},
+#    'ch821': {'path': "/home/user/iso/CitrixHypervisor-8.2.1-install-cd.iso"},
 }
 
 # In some cases, we may prefer to favour a local SR to store test VM disks,
