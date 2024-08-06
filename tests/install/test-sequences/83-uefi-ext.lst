@@ -1,0 +1,7 @@
+tests/install/test.py::TestNested::test_install[uefi-83rc1-ext]
+tests/install/test.py::TestNested::test_tune_firstboot[None-uefi-83rc1-host1-ext]
+tests/install/test.py::TestNested::test_firstboot_install[uefi-83rc1-host1-ext]
+tests/install/test.py::TestNested::test_upgrade[uefi-83rc1-83rc1-ext]
+tests/install/test.py::TestNested::test_firstboot_noninst[uefi-83rc1-83rc1-ext]
+tests/install/test.py::TestNested::test_restore[uefi-83rc1-83rc1-83rc1-ext]
+tests/install/test.py::TestNested::test_firstboot_noninst[uefi-83rc1-83rc1-83rc1-ext]

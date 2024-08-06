@@ -1,0 +1,7 @@
+tests/install/test.py::TestNested::test_install[bios-821.1-ext]
+tests/install/test.py::TestNested::test_tune_firstboot[None-bios-821.1-host1-ext]
+tests/install/test.py::TestNested::test_firstboot_install[bios-821.1-host1-ext]
+tests/install/test.py::TestNested::test_upgrade[bios-821.1-83rc1-ext]
+tests/install/test.py::TestNested::test_firstboot_noninst[bios-821.1-83rc1-ext]
+tests/install/test.py::TestNested::test_restore[bios-821.1-83rc1-83rc1-ext]
+tests/install/test.py::TestNested::test_firstboot_noninst[bios-821.1-83rc1-83rc1-ext]
