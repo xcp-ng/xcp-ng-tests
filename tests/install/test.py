@@ -3,12 +3,15 @@ import pytest
 import time
 
 from lib import commands, installer, pxe
-from lib.common import wait_for
+from lib.common import safe_split, wait_for
 from lib.installer import AnswerFile
+from lib.pif import PIF
 from lib.pool import Pool
+from lib.vdi import VDI
 
-from data import NETWORKS
+from data import HOSTS_IP_CONFIG, NETWORKS
 assert "MGMT" in NETWORKS
+assert "HOSTS" in HOSTS_IP_CONFIG
 
 @pytest.mark.dependency()
 class TestNested:
@@ -67,7 +70,67 @@ class TestNested:
         assert len(create_vms) == 1
         installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
 
-    def _test_firstboot(self, host_vm, mode):
+    @pytest.fixture
+    @staticmethod
+    def helper_vm_with_plugged_disk(imported_vm, create_vms):
+        helper_vm = imported_vm
+        host_vm, = create_vms
+
+        helper_vm.start()
+        helper_vm.wait_for_vm_running_and_ssh_up()
+
+        all_vdis = [VDI(uuid, host=host_vm.host) for uuid in host_vm.vdi_uuids()]
+        disk_vdis = [vdi for vdi in all_vdis if not vdi.readonly()]
+        vdi, = disk_vdis
+
+        vbd = helper_vm.create_vbd("1", vdi.uuid)
+        try:
+            vbd.plug()
+
+            yield helper_vm
+
+        finally:
+            vbd.unplug()
+            vbd.destroy()
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("version", (
+        "83rc1",
+        "83b2",
+        "821.1",
+        "81", "80",
+        "76", "75",
+        "ch821.1", "xs8",
+    ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(lambda version, firmware, local_sr: [dict(
+        vm="vm1",
+        image_test=f"TestNested::test_install[{firmware}-{version}-{local_sr}]")],
+                                 param_mapping={"version": "version", "firmware": "firmware",
+                                                "local_sr": "local_sr"})
+    @pytest.mark.small_vm
+    def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk,
+                            firmware, version, machine, local_sr):
+        helper_vm = helper_vm_with_plugged_disk
+
+        helper_vm.ssh(["mount /dev/xvdb1 /mnt"])
+        try:
+            # hostname
+            logging.info("Setting hostname to %r", machine)
+            helper_vm.ssh(["echo > /mnt/etc/hostname", machine])
+            # management IP
+            if machine in HOSTS_IP_CONFIG['HOSTS']:
+                ip = HOSTS_IP_CONFIG['HOSTS'][machine]
+                logging.info("Changing IP to %s", ip)
+
+                helper_vm.ssh([f"sed -i s/^IP=.*/IP='{ip}'/",
+                               "/mnt/etc/firstboot.d/data/management.conf"])
+        finally:
+            helper_vm.ssh(["umount /dev/xvdb1"])
+
+    def _test_firstboot(self, host_vm, mode, *, machine='DEFAULT'):
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
         logging.info("Host VM has MAC %s", mac_address)
@@ -99,18 +162,12 @@ class TestNested:
         }[expected_rel_id]
 
         try:
-            # FIXME: evict MAC from ARP cache first?
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
-            # catch host-vm IP address
-            wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                     "Wait for DHCP server to see Host VM in ARP tables",
-                     timeout_secs=10*60)
-            ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Host VM has IPs %s", ips)
-            assert len(ips) == 1
-            host_vm.ip = ips[0]
+            host_vm.ip = HOSTS_IP_CONFIG['HOSTS'].get(machine,
+                                                      HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])
+            logging.info("Expecting host VM to have IP %s", host_vm.ip)
 
             wait_for(
                 lambda: commands.local_cmd(
@@ -225,14 +282,16 @@ class TestNested:
         "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(lambda version, firmware: [dict(
+    @pytest.mark.continuation_of(lambda version, firmware, machine: [dict(
         vm="vm1",
-        image_test=f"TestNested::test_install[{firmware}-{version}]")],
-                                 param_mapping={"version": "version", "firmware": "firmware"})
+        image_test=f"TestNested::test_tune_firstboot[None-{firmware}-{version}-{machine}]")],
+                                 param_mapping={"version": "version", "firmware": "firmware",
+                                                "machine": "machine"})
     def test_firstboot_install(self, create_vms,
                                firmware, version, machine):
         host_vm = create_vms[0]
-        self._test_firstboot(host_vm, version)
+
+        self._test_firstboot(host_vm, version, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
