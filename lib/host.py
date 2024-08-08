@@ -8,7 +8,8 @@ from packaging import version
 
 import lib.commands as commands
 
-from lib.common import _param_get, safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
+from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
@@ -97,7 +98,24 @@ class Host:
         return result
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
-        return _param_get(self, Host.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+        return _param_get(self, self.xe_prefix, self.uuid,
+                          param_name, key, accept_unknown_key)
+
+    def param_set(self, param_name, value, key=None):
+        _param_set(self, self.xe_prefix, self.uuid,
+                   param_name, value, key)
+
+    def param_remove(self, param_name, key, accept_unknown_key=False):
+        _param_remove(self, self.xe_prefix, self.uuid,
+                      param_name, key, accept_unknown_key)
+
+    def param_add(self, param_name, value, key=None):
+        _param_add(self, self.xe_prefix, self.uuid,
+                   param_name, value, key)
+
+    def param_clear(self, param_name):
+        _param_clear(self, self.xe_prefix, self.uuid,
+                     param_name)
 
     def create_file(self, filename, text):
         with tempfile.NamedTemporaryFile('w') as file:
