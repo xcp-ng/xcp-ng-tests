@@ -9,8 +9,9 @@ from lib.common import wait_for
 # because the VM may not have SSH installed, which is needed for more advanced scenarios.
 #
 # Requirements:
-# - a two-host XCP-ng pool >= 8.1.
-# - the pool must have 1 shared SR
+# - XCP-ng >= 8.1.
+# - a two-host pool with 1 shared SR (for test_live_migrate)
+# - the pool must have `suspend-image-SR` set (for suspend and checkpoint)
 # - each host must have a local SR
 # - any VM with guest tools installed. No SSH required for this test suite.
 # - when using an existing VM, the VM can be on any host of the pool,
