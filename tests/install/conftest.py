@@ -1,10 +1,13 @@
 import logging
 import os
 import pytest
+import tempfile
 
 from lib.common import callable_marker, url_download
+from lib.commands import local_cmd
 
-from data import ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE
+from data import (ANSWERFILE_URL, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
+                  TOOLS)
 
 @pytest.fixture(scope='function')
 def installer_iso(request):
@@ -25,10 +28,53 @@ def installer_iso(request):
     return dict(iso=local_iso,
                 )
 
+# Remasters the ISO sepecified by `installer_iso` mark, with:
+# - network and ssh support activated so tests can go probe installation process
+# - atexit=shell to prevent the system from spontaneously rebooting
+# - an answerfile to make the install process non-interactive (downloaded from URL)
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host, create_vms, installer_iso):
+def remastered_iso(installer_iso):
+    iso_file = installer_iso['iso']
+    assert "iso-remaster" in TOOLS
+    iso_remaster = TOOLS["iso-remaster"]
+    assert os.access(iso_remaster, os.X_OK)
+
+    with tempfile.TemporaryDirectory() as isotmp:
+        remastered_iso = os.path.join(isotmp, "image.iso")
+        iso_patcher_script = os.path.join(isotmp, "iso-patcher")
+
+        logging.info("Remastering %s to %s", iso_file, remastered_iso)
+
+        # generate iso-patcher script
+        with open(iso_patcher_script, "xt") as patcher_fd:
+            passwd = "passw0rd" # FIXME use invalid hash?
+            script_contents = f"""#!/bin/bash
+set -ex
+ISODIR="$1"
+SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz network_device=all sshpassword={passwd} atexit=shell@")
+SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile={ANSWERFILE_URL}@")
+
+
+shopt -s nullglob # there may be no grub config, eg for XS 6.5 and earlier
+sed -i "${{SED_COMMANDS[@]}}" \
+    "$ISODIR"/*/*/grub*.cfg \
+    "$ISODIR"/boot/isolinux/isolinux.cfg
+"""
+            print(script_contents, file=patcher_fd)
+            os.chmod(patcher_fd.fileno(), 0o755)
+
+        # do remaster
+        local_cmd([iso_remaster,
+                   "--iso-patcher", iso_patcher_script,
+                   iso_file, remastered_iso
+                   ])
+
+        yield remastered_iso
+
+@pytest.fixture(scope='function')
+def vm_booted_with_installer(host, create_vms, remastered_iso):
     host_vm, = create_vms # one single VM
-    iso = installer_iso['iso']
+    iso = remastered_iso
 
     remote_iso = None
     try:
