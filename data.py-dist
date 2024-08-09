@@ -86,6 +86,13 @@ OTHER_GUEST_TOOLS = {
     },
 }
 
+ANSWERFILE_URL = f"http://{PXE_CONFIG_SERVER}/configs/custom/ydi/install-8.2-uefi-iso-ext.xml" # FIXME
+
+# Tools
+TOOLS: Dict[str, str] = {
+#    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
+}
+
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
 VM_IMAGES = {
     'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
