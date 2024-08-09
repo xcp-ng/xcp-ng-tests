@@ -1,11 +1,12 @@
 import logging
 import os
 import pytest
+import tempfile
 
 from lib.common import callable_marker
-from lib.commands import scp, ssh
+from lib.commands import local_cmd, scp, ssh
 
-from data import ISO_IMAGES, ISOSR_SRV, ISOSR_PATH
+from data import ANSWERFILE_URL, ISO_IMAGES, ISOSR_SRV, ISOSR_PATH, TOOLS
 
 @pytest.fixture(scope='function')
 def installer_iso(request):
@@ -19,6 +20,42 @@ def installer_iso(request):
     iso = ISO_IMAGES[iso_key]['path']
     logging.info("installer_iso: using %r", iso)
     return iso
+
+@pytest.fixture(scope='function')
+def iso_remaster(request, installer_iso):
+    assert "iso-remaster" in TOOLS
+    iso_remaster = TOOLS["iso-remaster"]
+    assert os.access(iso_remaster, os.X_OK)
+
+    with tempfile.TemporaryDirectory() as isotmp:
+        remastered_iso = os.path.join(isotmp, "image.iso")
+        iso_patcher_script = os.path.join(isotmp, "iso-patcher")
+
+        logging.info("Remastering %s to %s", installer_iso, remastered_iso)
+
+        # generate iso-patcher script
+        with open(iso_patcher_script, "xt") as patcher_fd:
+            passwd = "passw0rd" # FIXME use invalid hash?
+            print(f"""#!/bin/bash
+set -ex
+ISODIR="$1"
+SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz sshpassword={passwd} atexit=shell@")
+SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile={ANSWERFILE_URL} network_device=all@")
+
+sed -i "${{SED_COMMANDS[@]}}" \
+    "$ISODIR"/*/*/grub*.cfg \
+    "$ISODIR"/boot/isolinux/isolinux.cfg
+""",
+                  file=patcher_fd)
+            os.chmod(patcher_fd.fileno(), 0o755)
+
+        # do remaster
+        local_cmd([iso_remaster,
+                   "--iso-patcher", iso_patcher_script,
+                   installer_iso, remastered_iso
+                   ])
+
+        yield remastered_iso
 
 @pytest.fixture(scope='function')
 def vm_booted_with_installer(installer_iso, create_vms):
