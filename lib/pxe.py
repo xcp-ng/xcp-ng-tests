@@ -1,8 +1,7 @@
 from lib.commands import ssh, scp, SSHCommandFailed
+from data import PXE_CONFIG_SERVER
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
-
-from data import PXE_CONFIG_SERVER
 
 def generate_boot_conf(directory, installer, action):
     # in case of restore, we disable the text ui from the installer completely,
