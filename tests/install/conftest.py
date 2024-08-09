@@ -3,11 +3,12 @@ import os
 import pytest
 import tempfile
 
-from lib.common import callable_marker, url_download
+from lib import installer, pxe
+from lib.common import callable_marker, url_download, wait_for
 from lib.commands import local_cmd
 
 from data import (ANSWERFILE_URL, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
-                  TOOLS)
+                  TEST_SSH_PUBKEY, TOOLS)
 
 @pytest.fixture(scope='function')
 def installer_iso(request):
@@ -29,9 +30,12 @@ def installer_iso(request):
                 )
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
-# - network and ssh support activated so tests can go probe installation process
+# - network and ssh support activated, and .ssh/authorized_key so tests can
+#   go probe installation process
 # - atexit=shell to prevent the system from spontaneously rebooting
 # - an answerfile to make the install process non-interactive (downloaded from URL)
+# - a postinstall script to modify the installed system with:
+#   - the same .ssh/authorized_key
 @pytest.fixture(scope='function')
 def remastered_iso(installer_iso):
     iso_file = installer_iso['iso']
@@ -41,9 +45,32 @@ def remastered_iso(installer_iso):
 
     with tempfile.TemporaryDirectory() as isotmp:
         remastered_iso = os.path.join(isotmp, "image.iso")
+        img_patcher_script = os.path.join(isotmp, "img-patcher")
         iso_patcher_script = os.path.join(isotmp, "iso-patcher")
 
         logging.info("Remastering %s to %s", iso_file, remastered_iso)
+
+        # generate install.img-patcher script
+        with open(img_patcher_script, "xt") as patcher_fd:
+            script_contents = f"""#!/bin/bash
+set -ex
+INSTALLIMG="$1"
+
+mkdir -p "$INSTALLIMG/root/.ssh"
+echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+
+cat > "$INSTALLIMG/root/postinstall.sh" <<'EOF'
+#!/bin/sh
+set -ex
+
+ROOT="$1"
+
+mkdir -p "$ROOT/root/.ssh"
+echo "{TEST_SSH_PUBKEY}" >> "$ROOT/root/.ssh/authorized_keys"
+EOF
+"""
+            print(script_contents, file=patcher_fd)
+            os.chmod(patcher_fd.fileno(), 0o755)
 
         # generate iso-patcher script
         with open(iso_patcher_script, "xt") as patcher_fd:
@@ -65,6 +92,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
 
         # do remaster
         local_cmd([iso_remaster,
+                   "--install-patcher", img_patcher_script,
                    "--iso-patcher", iso_patcher_script,
                    iso_file, remastered_iso
                    ])
@@ -76,11 +104,43 @@ def vm_booted_with_installer(host, create_vms, remastered_iso):
     host_vm, = create_vms # one single VM
     iso = remastered_iso
 
+    vif = host_vm.vifs()[0]
+    mac_address = vif.param_get('MAC')
+    logging.info("Host VM has MAC %s", mac_address)
+
     remote_iso = None
     try:
         remote_iso = host.pool.push_iso(iso)
         host_vm.insert_cd(os.path.basename(remote_iso))
-        yield host_vm
+
+        try:
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for host VM running")
+
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see Host VM in ARP tables",
+                     timeout_secs=10 * 60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Host VM has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+
+            yield host_vm
+
+            logging.info("Shutting down Host VM")
+            installer.poweroff(host_vm.ip)
+            wait_for(host_vm.is_halted, "Wait for host VM halted")
+
+        except Exception as e:
+            logging.critical("caught exception %s", e)
+            host_vm.shutdown(force=True)
+            raise
+        except KeyboardInterrupt:
+            logging.warning("keyboard interrupt")
+            host_vm.shutdown(force=True)
+            raise
+
         host_vm.eject_cd()
     finally:
         if remote_iso:

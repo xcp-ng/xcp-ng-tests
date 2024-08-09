@@ -1,6 +1,8 @@
 import logging
 import pytest
 
+from lib import installer
+
 from data import NETWORKS
 assert "MGMT" in NETWORKS
 
@@ -30,4 +32,5 @@ class TestNested:
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
     def test_install(self, vm_booted_with_installer):
-        pass
+        host_vm = vm_booted_with_installer
+        installer.monitor_install(ip=host_vm.ip)
