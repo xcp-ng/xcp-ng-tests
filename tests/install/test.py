@@ -5,6 +5,7 @@ from data import NETWORKS
 assert "MGMT" in NETWORKS
 
 class TestNested:
+    @pytest.mark.installer_iso("xcpng-8.2.1-2023")
     @pytest.mark.vm_definitions(
         dict(name="vm1",
              template="Other install media",
@@ -22,5 +23,5 @@ class TestNested:
              cd_vbd=dict(device="xvdd", userdevice="3"),
              vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
              ))
-    def test_install(self, create_vms):
+    def test_install(self, vm_booted_with_installer):
         pass
