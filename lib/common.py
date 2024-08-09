@@ -1,6 +1,7 @@
 import getpass
 import inspect
 import logging
+import os
 import sys
 import time
 import traceback
@@ -8,6 +9,7 @@ from enum import Enum
 from uuid import UUID
 
 import pytest
+import requests
 
 import lib.commands as commands
 
@@ -174,6 +176,15 @@ def strtobool(str):
     if str in ('n', 'no', 'f', 'false', 'off', '0'):
         return False
     raise ValueError("invalid truth value '{}'".format(str))
+
+def url_download(url: str, filename: str) -> None:
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    tempfilename = filename + ".part"
+    with open(tempfilename, 'wb') as fd:
+        for chunk in r.iter_content(chunk_size=128):
+            fd.write(chunk)
+    os.rename(tempfilename, filename)
 
 def _param_get(host, xe_prefix, uuid, param_name, key=None, accept_unknown_key=False):
     """ Common implementation for param_get. """
