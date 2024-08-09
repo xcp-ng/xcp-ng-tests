@@ -8,6 +8,7 @@ assert "MGMT" in NETWORKS
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
 
 class TestNested:
+    @pytest.mark.iso_version("821.1")
     @pytest.mark.vm_definitions(
         dict(
             name="vm1",
@@ -28,5 +29,5 @@ class TestNested:
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
-    def test_install(self, create_vms):
+    def test_install(self, vm_booted_with_installer):
         pass

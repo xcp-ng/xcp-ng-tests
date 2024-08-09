@@ -1,6 +1,7 @@
 import getpass
 import inspect
 import logging
+import os
 import sys
 import time
 import traceback
@@ -9,6 +10,7 @@ from typing import Dict, Literal, Optional, overload, TYPE_CHECKING, Union
 from uuid import UUID
 
 import pytest
+import requests
 
 import lib.commands as commands
 if TYPE_CHECKING:
@@ -180,6 +182,15 @@ def strtobool(str):
     if str in ('n', 'no', 'f', 'false', 'off', '0'):
         return False
     raise ValueError("invalid truth value '{}'".format(str))
+
+def url_download(url: str, filename: str) -> None:
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    tempfilename = filename + ".part"
+    with open(tempfilename, 'wb') as fd:
+        for chunk in r.iter_content(chunk_size=128):
+            fd.write(chunk)
+    os.rename(tempfilename, filename)
 
 @overload
 def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
