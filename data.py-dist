@@ -69,6 +69,7 @@ VM_IMAGES = {
 # By default the parameter is set to False.
 ISO_IMAGES = {
 #    '83rc1': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1.iso",
+#              'pxe-url': "http://server/installers/xcp-ng/8.3-rc1",
 #              'net-url': "http://server/installers/xcp-ng/8.3-rc1"},
 #    '83rc1net': {'path': "/home/user/iso/xcp-ng-8.3.0-rc1-netinstall.iso",
 #                 'net-url': "http://server/installers/xcp-ng/8.3-rc1",
