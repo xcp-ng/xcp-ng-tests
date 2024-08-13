@@ -71,7 +71,7 @@ def iso_remaster(request, answerfile):
     marker = request.node.get_closest_marker("installer_iso")
     assert marker is not None, "iso_remaster fixture requires 'installer_iso' marker"
     param_mapping = marker.kwargs.get("param_mapping", {})
-    iso_key = callable_marker(marker.args[0], request, param_mapping=param_mapping)
+    (iso_key, source_type) = callable_marker(marker.args[0], request, param_mapping=param_mapping)
 
     try:
         source_type = request.getfixturevalue("source_type")
@@ -79,6 +79,12 @@ def iso_remaster(request, answerfile):
         raise RuntimeError("iso_remaster fixture requires 'source_type' parameter") from e
 
     gen_unique_uuid = marker.kwargs.get("gen_unique_uuid", False)
+
+    if source_type == "pxe":
+        # ISO remastering is not needed when booting with PXE so we just return
+        logging.info("iso_remaster not needed with PXE")
+        yield None
+        return
 
     skip, reason = skip_source_type(iso_key, source_type)
     if skip:

@@ -3,7 +3,7 @@ import pytest
 import time
 
 from lib import commands, installer, pxe
-from lib.common import safe_split, wait_for
+from lib.common import safe_split, wait_for, callable_marker
 from lib.installer import AnswerFile
 from lib.pif import PIF
 from lib.pool import Pool
@@ -16,7 +16,7 @@ assert "HOSTS" in HOSTS_IP_CONFIG
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
-    @pytest.mark.parametrize("source_type", ("iso", "net"))
+    @pytest.mark.parametrize("source_type", ("iso", "net", "pxe"))
     @pytest.mark.parametrize("iso_version", (
         "83rc1", "83rc1net", "83b2",
         "821.1",
@@ -33,7 +33,7 @@ class TestNested:
             dict(param_name="memory-dynamic-max", value="4GiB"),
             dict(param_name="memory-dynamic-min", value="4GiB"),
             dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
-            dict(param_name="HVM-boot-params", key="order", value="dc"),
+            dict(param_name="HVM-boot-params", key="order", value="dcn"),
         ) + {
             "uefi": (
                 dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
@@ -47,16 +47,19 @@ class TestNested:
     ),
                                 param_mapping={"firmware": "firmware"})
     @pytest.mark.installer_iso(
-        lambda iso_version: iso_version,
+        lambda iso_version, source_type: (iso_version, source_type),
         gen_unique_uuid=True,
-        param_mapping={"iso_version": "iso_version"})
+        param_mapping={"iso_version": "iso_version", "source_type": "source_type"})
     @pytest.mark.answerfile(lambda firmware, local_sr, source_type, version: AnswerFile("INSTALL") \
                             .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr}) \
                             .top_append(
                                 {'iso': {"TAG": "source", "type": "local"},
                                  'net': {"TAG": "source", "type": "url",
                                          # FIXME evaluation requires 'net-url' for every ISO
-                                         "CONTENTS": ISO_IMAGES[version]['net-url']}}[source_type],
+                                         "CONTENTS": ISO_IMAGES[version]['net-url']},
+                                 'pxe': {"TAG": "source", "type": "url",
+                                         # FIXME evaluation requires 'pxe-url' for every ISO
+                                         "CONTENTS": ISO_IMAGES[version]['pxe-url']}}[source_type],
                                 {"TAG": "primary-disk",
                                  "guest-storage": "no" if local_sr == "nosr" else "yes",
                                  "CONTENTS": {"uefi": "nvme0n1", "bios": "sda"}[firmware]},
@@ -67,7 +70,9 @@ class TestNested:
     def test_install(self, create_vms, iso_remaster,
                      firmware, iso_version, source_type, local_sr):
         assert len(create_vms) == 1
-        installer.perform_install(iso=iso_remaster, host_vm=create_vms[0])
+
+        iso_tool = iso_remaster if source_type != "pxe" else None
+        installer.perform_install(iso=iso_tool, host_vm=create_vms[0], version=iso_version)
 
     @pytest.fixture
     @staticmethod
@@ -368,8 +373,8 @@ class TestNested:
                                  param_mapping={"params": "orig_version", "firmware": "firmware",
                                                 "local_sr": "local_sr", "source_type": "source_type"})
     @pytest.mark.installer_iso(
-        lambda iso_version: iso_version,
-        param_mapping={"iso_version": "iso_version"})
+        lambda iso_version, source_type: (iso_version, source_type),
+        param_mapping={"iso_version": "iso_version", "source_type": "source_type"})
     @pytest.mark.answerfile(
         lambda firmware: AnswerFile("UPGRADE").top_append(
             {"TAG": "source", "type": "local"},
@@ -401,8 +406,8 @@ class TestNested:
                                  param_mapping={"params": "orig_version", "firmware": "firmware",
                                                 "local_sr": "local_sr", "source_type": "source_type"})
     @pytest.mark.installer_iso(
-        lambda iso_version: iso_version,
-        param_mapping={"iso_version": "iso_version"})
+        lambda iso_version, source_type: (iso_version, source_type),
+        param_mapping={"iso_version": "iso_version", "source_type": "source_type"})
     @pytest.mark.answerfile(lambda firmware: AnswerFile("RESTORE").top_append(
         {"TAG": "backup-disk",
          "CONTENTS": {"uefi": "nvme0n1", "bios": "sda"}[firmware]},
