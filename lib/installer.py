@@ -188,7 +188,8 @@ def perform_install(*, iso, host_vm, version=None):
         logging.info("Shutting down Host VM after successful installation")
         poweroff(host_vm.ip)
         wait_for(host_vm.is_halted, "Wait for host VM halted")
-        host_vm.eject_cd()
+        if iso:
+            host_vm.eject_cd()
 
     except Exception as e:
         logging.critical("caught exception %s", e)
