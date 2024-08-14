@@ -9,10 +9,8 @@ pytest.fixture(scope='module')
 def test_failed_units(host):
     failed_services = host.ssh(['systemctl', '--state=failed', '--full', '--all',
                                '--no-pager', '--no-legend'])
-    for unit in failed_services.splitlines():
-        logging.error(f"Unit {unit.split()[0]} failed")
-
-    assert not failed_services
+    if failed_services:
+        pytest.fail(failed_services)
 
 white_list_issues = [
     "Cannot add dependency job for unit getty@tty1.service, ignoring: Unit is masked.",
