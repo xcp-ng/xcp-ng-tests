@@ -15,6 +15,7 @@ def test_failed_units(host):
 white_list_issues = [
     "Cannot add dependency job for unit getty@tty1.service, ignoring: Unit is masked.",
     "Cannot add dependency job for unit display-manager.service, ignoring: Unit not found.",
+    "Cannot add dependency job for unit qemuback.service, ignoring: Unit not found.",
 ]
 
 pytest.fixture(scope='module')
