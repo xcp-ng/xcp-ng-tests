@@ -56,7 +56,7 @@ def answerfile(request):
 
 @pytest.fixture(scope='function')
 def installer_iso(request):
-    iso_key = request.node.get_closest_marker("iso_version").args[0]
+    iso_key = request.getfixturevalue("iso_version")
     assert iso_key in ISO_IMAGES, f"ISO_IMAGES does not have a value for {iso_key}"
     iso = ISO_IMAGES[iso_key]['path']
     if iso.startswith("/"):

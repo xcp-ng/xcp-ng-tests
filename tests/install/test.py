@@ -14,7 +14,11 @@ assert "MGMT" in NETWORKS
 
 @pytest.mark.dependency()
 class TestNested:
-    @pytest.mark.iso_version("821.1")
+    @pytest.mark.parametrize("iso_version", (
+        "83nightly",
+        "83rc1", "83b2", "83b1",
+        "821.1",
+    ))
     @pytest.mark.vm_definitions(
         dict(
             name="vm1",
@@ -40,11 +44,12 @@ class TestNested:
             {"TAG": "source", "type": "local"},
             {"TAG": "primary-disk", "CONTENTS": "nvme0n1"},
         ))
-    def test_install(self, vm_booted_with_installer):
+    def test_install(self, vm_booted_with_installer,
+                     iso_version):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
-    def _test_firstboot(self, create_vms):
+    def _test_firstboot(self, create_vms, mode):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -124,7 +129,14 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.continuation_of([dict(vm="vm1",
-                                       image_test="TestNested::test_install")])
-    def test_boot_inst(self, create_vms):
-        self._test_firstboot(create_vms)
+    @pytest.mark.parametrize("version", (
+        "83nightly",
+        "83rc1", "83b2", "83b1",
+        "821.1",
+    ))
+    @pytest.mark.continuation_of(
+        lambda version: [
+            dict(vm="vm1", image_test=f"TestNested::test_install[{version}]")])
+    def test_boot_inst(self, create_vms,
+                       version):
+        self._test_firstboot(create_vms, version)

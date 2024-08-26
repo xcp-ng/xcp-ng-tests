@@ -3,6 +3,7 @@
 from typing import Any, Dict, TYPE_CHECKING
 
 import legacycrypt as crypt     # type: ignore
+import os
 
 if TYPE_CHECKING:
     from lib.typing import IsoImageDef
@@ -122,6 +123,10 @@ ISO_IMAGES_CACHE = "/home/user/iso"
 # Note the dirname part is ignored when looking in ISO_IMAGES_CACHE, abuse this
 # for local-only ISO with things like "locally-built/my.iso" or "xs/8.3.iso"
 ISO_IMAGES: Dict[str, "IsoImageDef"] = {
+    '83nightly': {'path': os.environ.get("XCPNG83_NIGHTLY",
+                                         "http://unconfigured.iso"),
+                  'unsigned': True},
+    '83rc1': {'path': "8.3/xcp-ng-8.3.0-rc1.iso"},
     '83b2': {'path': "8.3/xcp-ng-8.3.0-beta2.iso"},
     '83b1': {'path': "8.3/xcp-ng-8.3.0-beta1.iso"},
     '821.1': {'path': "8.2/xcp-ng-8.2.1-20231130.iso"},
