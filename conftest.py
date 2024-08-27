@@ -171,6 +171,7 @@ def hosts(pytestconfig):
             vif = host_vm.vifs()[0]
             mac_address = vif.param_get('MAC')
             logging.info("Nested host has MAC %s", mac_address)
+            pxe.arp_clear_for(mac_address)
 
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for nested host VM running")

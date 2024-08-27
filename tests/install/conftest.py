@@ -291,6 +291,8 @@ def vm_booted_with_installer(host, create_vms, remastered_iso):
         host_vm.insert_cd(os.path.basename(remote_iso))
 
         try:
+            pxe.arp_clear_for(mac_address)
+
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
