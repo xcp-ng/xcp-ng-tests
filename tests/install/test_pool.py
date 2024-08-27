@@ -34,7 +34,9 @@ def test_join_pool(firmware, mode, create_vms):
     slave_mac = slave_vm.vifs()[0].param_get('MAC')
     logging.info("Slave VM has MAC %s", slave_mac)
 
+    pxe.arp_clear_for(master_mac)
     master_vm.start()
+    pxe.arp_clear_for(slave_mac)
     slave_vm.start()
     wait_for(master_vm.is_running, "Wait for master VM running")
     wait_for(slave_vm.is_running, "Wait for slave VM running")
