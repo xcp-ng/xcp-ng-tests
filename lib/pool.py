@@ -17,6 +17,14 @@ class Pool:
         assert master.is_master(), f"Host {master_hostname_or_ip} is not a master host. Aborting."
         self.master = master
         self.hosts = [master]
+
+        # wait for XAPI startup to be done, or we can get "Connection
+        # refused (calling connect )" when calling self.hosts_uuids()
+        wait_for(lambda: commands.ssh(master_hostname_or_ip, ['xapi-wait-init-complete', '60'],
+                                      check=False, simple_output=False).returncode == 0,
+                 f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
+                 timeout_secs=30 * 60)
+
         for host_uuid in self.hosts_uuids():
             if host_uuid != self.hosts[0].uuid:
                 host = Host(self, self.host_ip(host_uuid))
