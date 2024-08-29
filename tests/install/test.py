@@ -18,6 +18,7 @@ class TestNested:
         "83nightly",
         "83rc1", "83b2", "83b1",
         "821.1",
+        "81", "80",
         "xs8", "ch821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -71,6 +72,8 @@ class TestNested:
         expected_rel = {
             "ch821.1": "8.2.1",
             "xs8": "8.4.0",
+            "80": "8.0.0",
+            "81": "8.1.0",
             "821.1": "8.2.1",
             "83b1": "8.3.0",
             "83b2": "8.3.0",
@@ -117,26 +120,52 @@ class TestNested:
             # wait for XAPI
             wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 
-            # check for firstboot issues
-            # FIXME: flaky, must check logs extraction on failure
-            for service in ["control-domain-params-init",
+            if lsb_rel in ["8.2.1", "8.3.0", "8.4.0"]:
+                SERVICES = ["control-domain-params-init",
                             "network-init",
                             "storage-init",
                             "generate-iscsi-iqn",
                             "create-guest-templates",
-                            ]:
-                try:
-                    wait_for(lambda: pool.master.ssh(["test", "-e", f"/var/lib/misc/ran-{service}"],
+                            ]
+                STAMPS_DIR = "/var/lib/misc"
+                STAMPS = [f"ran-{service}" for service in SERVICES]
+            elif lsb_rel in ["8.0.0", "8.1.0"]:
+                SERVICES = ["xs-firstboot"]
+                STAMPS_DIR = "/etc/firstboot.d/state"
+                STAMPS = [
+                    "05-prepare-networking",
+                    "10-prepare-storage",
+                    "15-set-default-storage",
+                    "20-udev-storage",
+                    "25-multipath",
+                    "40-generate-iscsi-iqn",
+                    "50-prepare-control-domain-params",
+                    "60-import-keys",
+                    "60-upgrade-likewise-to-pbis",
+                    "62-create-guest-templates",
+                    "80-common-criteria",
+                    "90-flush-pool-db",
+                    "95-legacy-logrotate",
+                    "99-remove-firstboot-flag",
+                ]
+            else:
+                raise AssertionError(f"Unhandled LSB release {lsb_rel!r}")
+            # check for firstboot issues
+            # FIXME: flaky, must check logs extraction on failure
+            try:
+                for stamp in sorted(STAMPS):
+                    wait_for(lambda: pool.master.ssh(["test", "-e", f"{STAMPS_DIR}/{stamp}"],
                                                      check=False, simple_output=False,
                                                      ).returncode == 0,
-                             f"Wait for ran-{service} stamp")
-                except TimeoutError:
-                    logging.warning("investigating lack of %s service stamp", service)
+                             f"Wait for {stamp} stamp")
+            except TimeoutError:
+                logging.warning("investigating lack of %s service stamp", stamp)
+                for service in SERVICES:
                     out = pool.master.ssh(["systemctl", "status", service], check=False)
                     logging.warning("service status: %s", out)
                     out = pool.master.ssh(["grep", "-r", service, "/var/log"], check=False)
                     logging.warning("in logs: %s", out)
-                    raise
+                raise
 
             logging.info("Powering off pool master")
             try:
@@ -170,6 +199,7 @@ class TestNested:
         "83nightly",
         "83rc1", "83b2", "83b1",
         "821.1",
+        "81", "80",
         "xs8", "ch821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -187,6 +217,8 @@ class TestNested:
         "83b2-83nightly",
         "83b1-83nightly",
         "821.1-83nightly",
+        "81-83nightly",
+        "80-83nightly",
         "xs8-83nightly",
         "ch821.1-83nightly",
         "821.1-821.1",
@@ -207,6 +239,8 @@ class TestNested:
         "83b2-83nightly-83nightly",
         "83b1-83nightly-83nightly",
         "821.1-83nightly-83nightly",
+        "81-83nightly-83nightly",
+        "80-83nightly-83nightly",
         "xs8-83nightly-83nightly",
         "ch821.1-83nightly-83nightly",
         "821.1-821.1-821.1",
@@ -227,6 +261,8 @@ class TestNested:
         ("83b2", "83nightly"),
         ("83b1", "83nightly"),
         ("821.1", "83nightly"),
+        ("81", "83nightly"),
+        ("80", "83nightly"),
         ("xs8", "83nightly"),
         ("ch821.1", "83nightly"),
         ("821.1", "821.1"),
@@ -254,6 +290,8 @@ class TestNested:
         ("83b2-83nightly", "83nightly"),
         ("83b1-83nightly", "83nightly"),
         ("821.1-83nightly", "83nightly"),
+        ("81-83nightly", "83nightly"),
+        ("80-83nightly", "83nightly"),
         ("xs8-83nightly", "83nightly"),
         ("ch821.1-83nightly", "83nightly"),
         ("821.1-821.1", "821.1"),
