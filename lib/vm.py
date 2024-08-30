@@ -122,7 +122,7 @@ class VM(BaseVM):
         # waiting for the IP:
         # - allows to make sure the OS actually started (on VMs that have the management agent)
         # - allows to store the IP for future use in the VM object
-        wait_for(self.try_get_and_store_ip, "Wait for VM IP")
+        wait_for(self.try_get_and_store_ip, "Wait for VM IP", timeout_secs=5 * 60)
         # now wait also for the management agent to have started
         wait_for(self.is_management_agent_up, "Wait for management agent up")
 
@@ -322,7 +322,7 @@ class VM(BaseVM):
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
     def file_exists(self, filepath):
-        """ Test that the file at filepath exists. """
+        """Returns True if the file exists, otherwise returns False."""
         return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
 
     def detect_package_manager(self):
@@ -334,10 +334,15 @@ class VM(BaseVM):
         else:
             return PackageManagerEnum.UNKNOWN
 
-    def mount_guest_tools_iso(self):
-        self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': 'guest-tools.iso'})
+    def insert_cd(self, vdi_name):
+        logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
+        self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': vdi_name})
 
-    def unmount_guest_tools_iso(self):
+    def insert_guest_tools_iso(self):
+        self.insert_cd('guest-tools.iso')
+
+    def eject_cd(self):
+        logging.info("Ejecting CD from VM %s", self.uuid)
         self.host.xe('vm-cd-eject', {'uuid': self.uuid})
 
     # *** Common reusable test fragments
@@ -429,10 +434,6 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def file_exists(self, filepath):
-        """Returns True if the file exists, otherwise returns False."""
-        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
-
     def sign_bins(self):
         for f in self.get_all_efi_bins():
             self.sign(f)
@@ -476,7 +477,6 @@ class VM(BaseVM):
         name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
-        logging.info("New VM: %s (%s)" % (uuid, name))
         return VM(uuid, self.host)
 
     def install_uefi_certs(self, auths):

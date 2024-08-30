@@ -26,7 +26,7 @@ class SSHCommandFailed(BaseCommandFailed):
 class LocalCommandFailed(BaseCommandFailed):
     def __init__(self, returncode, stdout, cmd):
         msg_end = f": {stdout}" if stdout else "."
-        super(SSHCommandFailed, self).__init__(
+        super(LocalCommandFailed, self).__init__(
             returncode, stdout, cmd,
             f'Local command ({cmd}) failed with return code {returncode}{msg_end}'
         )
@@ -65,8 +65,8 @@ OUTPUT_HANDLER = logging.StreamHandler()
 OUPUT_LOGGER.addHandler(OUTPUT_HANDLER)
 OUTPUT_HANDLER.setFormatter(logging.Formatter('%(message)s'))
 
-def _ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-         background=False, target_os='linux', decode=True, options=[]):
+def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
+         background, target_os, decode, options):
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
@@ -205,6 +205,7 @@ def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
 
 def local_cmd(cmd, check=True, decode=True):
     """ Run a command locally on tester end. """
+    logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,

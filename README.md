@@ -4,8 +4,9 @@ Note: this is a perpertual work in progress. If you encounter any obstacles or b
 
 ## Main requirements
 * python >= 3.5
-* pytest >= 5.4 (python3 version)
-* xo-cli >= 0.17.0 installed, in the PATH, and registered to an instance of XO that will be used during the tests
+* packages as listed in requirements/base.txt
+* extra test-specific requirements are documented in the test file
+  "Requirements" header
 
 ### Quick install (python requirements)
 
@@ -13,14 +14,12 @@ Install the python requirements using pip:
 
 ```
 $ pip install -r requirements/base.txt
-
 ```
 
 Additionally, for dev dependencies (things like the linter / style checker):
 
 ```
 $ pip install -r requirements/dev.txt
-
 ```
 
 ## Other requirements

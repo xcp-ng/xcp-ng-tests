@@ -200,21 +200,31 @@ class Host:
         # is not enough to guarantee that the host object exists yet.
         wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about HOST %s" % self.uuid)
 
+    @staticmethod
+    def vm_cache_key(uri):
+        return f"[Cache for {uri}]"
+
+    def cached_vm(self, uri, sr_uuid):
+        assert sr_uuid, "A SR UUID is necessary to use import cache"
+        cache_key = self.vm_cache_key(uri)
+        # Look for an existing cache VM
+        vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
+
+        for vm_uuid in vm_uuids:
+            vm = VM(vm_uuid, self)
+            # Make sure the VM is on the wanted SR.
+            # Assumption: if the first disk is on the SR, the VM is.
+            # If there's no VDI at all, then it is virtually on any SR.
+            if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
+                logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
+                return vm
+        logging.info("Could not find a VM in cache with key %r", cache_key)
+
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
         if use_cache:
-            assert sr_uuid, "A SR UUID is necessary to use import cache"
-            cache_key = f"[Cache for {uri}]"
-            # Look for an existing cache VM
-            vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
-
-            for vm_uuid in vm_uuids:
-                vm = VM(vm_uuid, self)
-                # Make sure the VM is on the wanted SR.
-                # Assumption: if the first disk is on the SR, the VM is.
-                # If there's no VDI at all, then it is virtually on any SR.
-                if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
-                    logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
-                    return vm
+            vm = self.cached_vm(uri, sr_uuid)
+            if vm:
+                return vm
 
         params = {}
         msg = "Import VM %s" % uri
@@ -227,7 +237,6 @@ class Host:
             params['sr-uuid'] = sr_uuid
         logging.info(msg)
         vm_uuid = self.xe('vm-import', params)
-        logging.info("VM UUID: %s" % vm_uuid)
         vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
         vm = VM(vm_uuid, self)
         vm.param_set('name-label', vm_name)
@@ -235,6 +244,7 @@ class Host:
         for vif in vm.vifs():
             vif.move(self.management_network())
         if use_cache:
+            cache_key = self.vm_cache_key(uri)
             logging.info(f"Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
         return vm
@@ -460,7 +470,7 @@ class Host:
                 srs.append(sr)
         return srs
 
-    def main_sr(self):
+    def main_sr_uuid(self):
         """ Main SR is either the default SR, or the first local SR, depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
@@ -480,6 +490,7 @@ class Host:
         else:
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
+        assert sr_uuid != "<not in database>"
         return sr_uuid
 
     def hostname(self):
@@ -509,6 +520,7 @@ class Host:
             lambda: master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}),
             f"Wait for pool {master} to see joined host {self} as enabled."
         )
+        self.pool = pool
 
     def activate_smapi_driver(self, driver):
         sm_plugins = self.ssh(['grep', '[[:space:]]*sm-plugins[[:space:]]*=[[:space:]]*', XAPI_CONF_FILE]).splitlines()

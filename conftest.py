@@ -19,20 +19,14 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-# *** Support for incremental tests in test classes ***
-# From https://stackoverflow.com/questions/12411431/how-to-skip-the-rest-of-tests-in-the-class-if-one-has-failed
-def pytest_runtest_makereport(item, call):
-    if "incremental" in item.keywords:
-        if call.excinfo is not None:
-            parent = item.parent
-            parent._previousfailed = item
+# Do we cache VMs?
+try:
+    from data import CACHE_IMPORTED_VM
+except ImportError:
+    CACHE_IMPORTED_VM = False
+assert CACHE_IMPORTED_VM in [True, False]
 
-def pytest_runtest_setup(item):
-    previousfailed = getattr(item.parent, "_previousfailed", None)
-    if previousfailed is not None:
-        pytest.skip("previous test failed (%s)" % previousfailed.name)
-
-# *** End of: Support for incremental tests ***
+# pytest hooks
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -84,6 +78,42 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
+
+def pytest_generate_tests(metafunc):
+    if "vm_ref" in metafunc.fixturenames:
+        vms = metafunc.config.getoption("vm")
+        if not vms:
+            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
+        metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
+
+def pytest_collection_modifyitems(items, config):
+    # Automatically mark tests based on fixtures they require.
+    # Check pytest.ini or pytest --markers for marker descriptions.
+
+    markable_fixtures = [
+        'uefi_vm',
+        'unix_vm',
+        'windows_vm',
+        'hostA2',
+        'hostB1',
+        'sr_disk',
+        'sr_disk_4k'
+    ]
+
+    for item in items:
+        fixturenames = getattr(item, 'fixturenames', ())
+        for fixturename in markable_fixtures:
+            if fixturename in fixturenames:
+                item.add_marker(fixturename)
+
+        if 'vm_ref' not in fixturenames:
+            item.add_marker('no_vm')
+
+        if item.get_closest_marker('multi_vms'):
+            # multi_vms implies small_vm
+            item.add_marker('small_vm')
+
+# fixtures
 
 def setup_host(hostname_or_ip):
     pool = Pool(hostname_or_ip)
@@ -302,19 +332,12 @@ def vm_ref(request):
 
 @pytest.fixture(scope="module")
 def imported_vm(host, vm_ref):
-    # Do we cache VMs?
-    try:
-        from data import CACHE_IMPORTED_VM
-    except ImportError:
-        CACHE_IMPORTED_VM = False
-    assert CACHE_IMPORTED_VM in [True, False]
-
     if is_uuid(vm_ref):
         vm_orig = VM(vm_ref, host)
         name = vm_orig.name()
         logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
-        vm_orig = host.import_vm(vm_ref, host.main_sr(), use_cache=CACHE_IMPORTED_VM)
+        vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=CACHE_IMPORTED_VM)
 
     if CACHE_IMPORTED_VM:
         # Clone the VM before running tests, so that the original VM remains untouched
@@ -332,17 +355,21 @@ def imported_vm(host, vm_ref):
         vm.destroy(verify=True)
 
 @pytest.fixture(scope="module")
-def running_vm(imported_vm):
+def started_vm(imported_vm):
     vm = imported_vm
-
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
         vm.start()
     wait_for(vm.is_running, '> Wait for VM running')
-    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP")
-    wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
+    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP", timeout_secs=5 * 60)
     return vm
     # no teardown
+
+@pytest.fixture(scope="module")
+def running_vm(started_vm):
+    vm = started_vm
+    wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
+    return vm
 
 @pytest.fixture(scope='module')
 def unix_vm(imported_vm):
@@ -415,37 +442,3 @@ def second_network(pytestconfig, host):
     if network_uuid == host.management_network():
         pytest.fail("--second-network must NOT be the management network")
     return network_uuid
-
-def pytest_generate_tests(metafunc):
-    if "vm_ref" in metafunc.fixturenames:
-        vms = metafunc.config.getoption("vm")
-        if not vms:
-            vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
-        metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
-
-def pytest_collection_modifyitems(items, config):
-    # Automatically mark tests based on fixtures they require.
-    # Check pytest.ini or pytest --markers for marker descriptions.
-
-    markable_fixtures = [
-        'uefi_vm',
-        'unix_vm',
-        'windows_vm',
-        'hostA2',
-        'hostB1',
-        'sr_disk',
-        'sr_disk_4k'
-    ]
-
-    for item in items:
-        fixturenames = getattr(item, 'fixturenames', ())
-        for fixturename in markable_fixtures:
-            if fixturename in fixturenames:
-                item.add_marker(fixturename)
-
-        if 'vm_ref' not in fixturenames:
-            item.add_marker('no_vm')
-
-        if item.get_closest_marker('multi_vms'):
-            # multi_vms implies small_vm
-            item.add_marker('small_vm')
