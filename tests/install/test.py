@@ -97,7 +97,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
-    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("machine", ("host1", "host2", "host3"))
     @pytest.mark.parametrize("version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
@@ -288,7 +288,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
-    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("machine", ("host1", "host2", "host3"))
     @pytest.mark.parametrize("version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
