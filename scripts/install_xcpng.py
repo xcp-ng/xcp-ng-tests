@@ -107,7 +107,7 @@ def clean_bootconf_on_pxe(mac_address):
     except SSHCommandFailed as e:
         raise Exception('ERROR: failed to clean the boot.conf file.' + e)
 
-def get_candidate_ips(mac_address):
+def arp_addresses_for(mac_address):
     output = ssh(
         PXE_CONFIG_SERVER,
         ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
@@ -127,7 +127,7 @@ def is_ssh_up(ip):
         return False
 
 def get_new_host_ip(mac_address):
-    candidate_ips = get_candidate_ips(mac_address)
+    candidate_ips = arp_addresses_for(mac_address)
     logging.debug("Candidate IPs: " + ", ".join(candidate_ips))
     for ip in candidate_ips:
         if is_ip_active(ip) and is_ssh_up(ip):
