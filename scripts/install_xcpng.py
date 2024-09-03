@@ -89,12 +89,12 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
 def copy_files_to_pxe(mac_address, tmp_local_path):
     assert mac_address
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    clean_files_on_pxe(mac_address)
+    server_remove_config(mac_address)
     ssh(PXE_CONFIG_SERVER, ['mkdir', '-p', remote_dir])
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
 
-def clean_files_on_pxe(mac_address):
+def server_remove_config(mac_address):
     assert mac_address # protection against deleting the whole parent dir!
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     ssh(PXE_CONFIG_SERVER, ['rm', '-rf', remote_dir])
@@ -232,7 +232,7 @@ def main():
         generate_boot_conf(tmp_local_path, installer, args.action)
         logging.info('Copy files to the pxe server')
         copy_files_to_pxe(mac_address, tmp_local_path)
-        atexit.register(lambda: clean_files_on_pxe(mac_address))
+        atexit.register(lambda: server_remove_config(mac_address))
         if (vm.is_running()):
             try:
                 vm.shutdown(verify=True)
