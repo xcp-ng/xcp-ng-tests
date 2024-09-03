@@ -103,10 +103,7 @@ def server_remove_config(mac_address):
 def server_remove_bootconf(mac_address):
     assert mac_address
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
-    try:
-        ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
-    except SSHCommandFailed as e:
-        raise Exception('ERROR: failed to clean the boot.conf file.' + e)
+    ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
 
 def arp_addresses_for(mac_address):
     output = ssh(
