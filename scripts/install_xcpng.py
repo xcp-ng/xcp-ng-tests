@@ -99,7 +99,7 @@ def server_remove_config(mac_address):
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     ssh(PXE_CONFIG_SERVER, ['rm', '-rf', remote_dir])
 
-def clean_bootconf_on_pxe(mac_address):
+def server_remove_bootconf(mac_address):
     assert mac_address
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
     try:
@@ -241,7 +241,7 @@ def main():
         vm.start()
         # wait a bit to let the PXE server give the boot configuration to the VM, then disable the specific boot config
         time.sleep(20)
-        clean_bootconf_on_pxe(mac_address)
+        server_remove_bootconf(mac_address)
         wait_for(
             lambda: get_new_host_ip(mac_address) is not None,
             "Waiting for the installation process to complete and the VM to reboot and be up", 3600, 10
