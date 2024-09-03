@@ -36,7 +36,8 @@ def generate_boot_conf(directory, installer, action):
     # to workaround a bug that leaves us stuck on a confirmation dialog at the end of the operation.
     rt = 'rt=1' if action == 'restore' else ''
     with open(f'{directory}/boot.conf', 'w') as bootfile:
-        bootfile.write(f"""answerfile=custom
+        bootfile.write(f"""
+answerfile=custom
 installer={installer}
 is_default=1
 {rt}
