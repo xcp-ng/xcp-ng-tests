@@ -15,33 +15,14 @@ import time
 from packaging import version
 
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..") # noqa
+from lib import pxe
 from lib.commands import ssh, scp, SSHCommandFailed
 from lib.common import wait_for, is_uuid
 from lib.host import host_data
 from lib.pool import Pool
 from lib.vm import VM
 
-try:
-    from data import PXE_CONFIG_SERVER
-    assert PXE_CONFIG_SERVER
-except ImportError:
-    raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
-
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
-
-PXE_CONFIG_DIR = "/pxe/configs/custom"
-
-def generate_boot_conf(directory, installer, action):
-    # in case of restore, we disable the text ui from the installer completely,
-    # to workaround a bug that leaves us stuck on a confirmation dialog at the end of the operation.
-    rt = 'rt=1' if action == 'restore' else ''
-    with open(f'{directory}/boot.conf', 'w') as bootfile:
-        bootfile.write(f"""
-answerfile=custom
-installer={installer}
-is_default=1
-{rt}
-""")
 
 def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
     password = host_data(hostname_or_ip)['password']
@@ -65,7 +46,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
     <timezone>Europe/Paris</timezone>
     <hostname>{target_hostname}</hostname>
     <script stage="filesystem-populated" type="url">
-        http://{PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
+        http://{pxe.PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
     </script>
 </installation>
         """)
@@ -75,7 +56,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
     <existing-installation>{hdd}</existing-installation>
     <source type="url">{installer}</source>
     <script stage="filesystem-populated" type="url">
-        http://{PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
+        http://{pxe.PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
     </script>
 </installation>
         """)
@@ -86,32 +67,6 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
         """)
         else:
             raise Exception(f"Unknown action: `{action}`")
-
-def server_push_config(mac_address, tmp_local_path):
-    assert mac_address
-    remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    server_remove_config(mac_address)
-    ssh(PXE_CONFIG_SERVER, ['mkdir', '-p', remote_dir])
-    scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
-    scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
-
-def server_remove_config(mac_address):
-    assert mac_address # protection against deleting the whole parent dir!
-    remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    ssh(PXE_CONFIG_SERVER, ['rm', '-rf', remote_dir])
-
-def server_remove_bootconf(mac_address):
-    assert mac_address
-    distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
-    ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
-
-def arp_addresses_for(mac_address):
-    output = ssh(
-        PXE_CONFIG_SERVER,
-        ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
-    )
-    candidate_ips = output.splitlines()
-    return candidate_ips
 
 def is_ip_active(ip):
     return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
@@ -125,7 +80,7 @@ def is_ssh_up(ip):
         return False
 
 def get_new_host_ip(mac_address):
-    candidate_ips = arp_addresses_for(mac_address)
+    candidate_ips = pxe.arp_addresses_for(mac_address)
     logging.debug("Candidate IPs: " + ", ".join(candidate_ips))
     for ip in candidate_ips:
         if is_ip_active(ip) and is_ssh_up(ip):
@@ -210,7 +165,7 @@ def main():
     assert host.is_enabled()
 
     if not args.installer:
-        installer = f"http://{PXE_CONFIG_SERVER}/installers/xcp-ng/{xcp_version}/"
+        installer = f"http://{pxe.PXE_CONFIG_SERVER}/installers/xcp-ng/{xcp_version}/"
     else:
         installer = args.installer
 
@@ -227,10 +182,10 @@ def main():
         hdd = 'nvme0n1' if vm.is_uefi else 'sda'
         generate_answerfile(tmp_local_path, installer, args.host, args.target_hostname, args.action, hdd,
                             netinstall_gpg_check)
-        generate_boot_conf(tmp_local_path, installer, args.action)
+        pxe.generate_boot_conf(tmp_local_path, installer, args.action)
         logging.info('Copy files to the pxe server')
-        server_push_config(mac_address, tmp_local_path)
-        atexit.register(lambda: server_remove_config(mac_address))
+        pxe.server_push_config(mac_address, tmp_local_path)
+        atexit.register(lambda: pxe.server_remove_config(mac_address))
         if (vm.is_running()):
             try:
                 vm.shutdown(verify=True)
@@ -239,7 +194,7 @@ def main():
         vm.start()
         # wait a bit to let the PXE server give the boot configuration to the VM, then disable the specific boot config
         time.sleep(20)
-        server_remove_bootconf(mac_address)
+        pxe.server_remove_bootconf(mac_address)
         wait_for(
             lambda: get_new_host_ip(mac_address) is not None,
             "Waiting for the installation process to complete and the VM to reboot and be up", 3600, 10
