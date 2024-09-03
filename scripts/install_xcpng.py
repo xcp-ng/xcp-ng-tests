@@ -21,16 +21,15 @@ from lib.host import host_data
 from lib.pool import Pool
 from lib.vm import VM
 
+try:
+    from data import PXE_CONFIG_SERVER
+    assert PXE_CONFIG_SERVER
+except ImportError:
+    raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
+
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
-
-def pxe_address():
-    try:
-        from data import PXE_CONFIG_SERVER
-        return PXE_CONFIG_SERVER
-    except ImportError:
-        raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
 
 def generate_boot_conf(directory, installer, action):
     # in case of restore, we disable the text ui from the installer completely,
@@ -44,7 +43,6 @@ is_default=1
 """)
 
 def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
-    pxe = pxe_address()
     password = host_data(hostname_or_ip)['password']
     cmd = ['openssl', 'passwd', '-6', password]
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
@@ -66,7 +64,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
     <timezone>Europe/Paris</timezone>
     <hostname>{target_hostname}</hostname>
     <script stage="filesystem-populated" type="url">
-        http://{pxe}/configs/presets/scripts/filesystem-populated.py
+        http://{PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
     </script>
 </installation>
         """)
@@ -76,7 +74,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
     <existing-installation>{hdd}</existing-installation>
     <source type="url">{installer}</source>
     <script stage="filesystem-populated" type="url">
-        http://{pxe}/configs/presets/scripts/filesystem-populated.py
+        http://{PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
     </script>
 </installation>
         """)
@@ -90,32 +88,28 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
 
 def copy_files_to_pxe(mac_address, tmp_local_path):
     assert mac_address
-    pxe = pxe_address()
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     clean_files_on_pxe(mac_address)
-    ssh(pxe, ['mkdir', '-p', remote_dir])
-    scp(pxe, f'{tmp_local_path}/boot.conf', remote_dir)
-    scp(pxe, f'{tmp_local_path}/answerfile.xml', remote_dir)
+    ssh(PXE_CONFIG_SERVER, ['mkdir', '-p', remote_dir])
+    scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
+    scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
 
 def clean_files_on_pxe(mac_address):
     assert mac_address # protection against deleting the whole parent dir!
-    pxe = pxe_address()
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    ssh(pxe, ['rm', '-rf', remote_dir])
+    ssh(PXE_CONFIG_SERVER, ['rm', '-rf', remote_dir])
 
 def clean_bootconf_on_pxe(mac_address):
     assert mac_address
-    pxe = pxe_address()
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
     try:
-        ssh(pxe, ['rm', '-rf', distant_file])
+        ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
     except SSHCommandFailed as e:
         raise Exception('ERROR: failed to clean the boot.conf file.' + e)
 
 def get_candidate_ips(mac_address):
-    pxe = pxe_address()
     output = ssh(
-        pxe,
+        PXE_CONFIG_SERVER,
         ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
     )
     candidate_ips = output.splitlines()
@@ -191,8 +185,6 @@ def main():
 
     # *** "fail early" checks
 
-    pxe = pxe_address() # raises if not defined
-
     if not is_uuid(args.vm_uuid):
         raise Exception(f'The provided VM UUID is invalid: {args.vm_uuid}')
 
@@ -220,7 +212,7 @@ def main():
     assert host.is_enabled()
 
     if not args.installer:
-        installer = f"http://{pxe}/installers/xcp-ng/{xcp_version}/"
+        installer = f"http://{PXE_CONFIG_SERVER}/installers/xcp-ng/{xcp_version}/"
     else:
         installer = args.installer
 
