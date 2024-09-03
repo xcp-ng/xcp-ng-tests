@@ -86,7 +86,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
         else:
             raise Exception(f"Unknown action: `{action}`")
 
-def copy_files_to_pxe(mac_address, tmp_local_path):
+def server_push_config(mac_address, tmp_local_path):
     assert mac_address
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     server_remove_config(mac_address)
@@ -231,7 +231,7 @@ def main():
                             netinstall_gpg_check)
         generate_boot_conf(tmp_local_path, installer, args.action)
         logging.info('Copy files to the pxe server')
-        copy_files_to_pxe(mac_address, tmp_local_path)
+        server_push_config(mac_address, tmp_local_path)
         atexit.register(lambda: server_remove_config(mac_address))
         if (vm.is_running()):
             try:
