@@ -1,4 +1,5 @@
 import itertools
+import git
 import logging
 import pytest
 import tempfile
@@ -412,8 +413,20 @@ def imported_vm(host, vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
+@pytest.fixture(scope="session")
+def tests_git_revision():
+    """
+    Get the git revision string for this tests repo.
+
+    Use of this fixture means impacted tests cannot run unless all
+    modifications are commited.
+    """
+    test_repo = git.Repo(".")
+    assert not test_repo.is_dirty(), "test repo must not be dirty"
+    yield test_repo.head.commit.hexsha
+
 @pytest.fixture(scope="function")
-def create_vms(request, host):
+def create_vms(request, host, tests_git_revision):
     """
     Returns list of VM objects created from `vm_definitions` marker.
 
@@ -481,7 +494,7 @@ def create_vms(request, host):
             if "template" in vm_def:
                 _create_vm(request, vm_def, host, vms, vdis, vbds)
             elif "image_test" in vm_def:
-                _vm_from_cache(request, vm_def, host, vms)
+                _vm_from_cache(request, vm_def, host, vms, tests_git_revision)
         yield vms
 
         # request.node is an "item" because this fixture has "function" scope
@@ -497,7 +510,7 @@ def create_vms(request, host):
             # record this state
             for vm_def, vm in zip(vm_defs, vms):
                 nodeid = shortened_nodeid(request.node.nodeid)
-                vm.save_to_cache(f"{nodeid}-{vm_def['name']}")
+                vm.save_to_cache(f"{nodeid}-{vm_def['name']}-{tests_git_revision}")
 
     except Exception:
         logging.error("exception caught...")
@@ -552,9 +565,11 @@ def _create_vm(request, vm_def, host, vms, vdis, vbds):
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
 
-def _vm_from_cache(request, vm_def, host, vms):
-    base_vm = host.cached_vm(vm_cache_key_from_def(vm_def, request.node.nodeid),
+def _vm_from_cache(request, vm_def, host, vms, tests_hexsha):
+    base_vm = host.cached_vm(vm_cache_key_from_def(vm_def, request.node.nodeid, tests_hexsha),
                              sr_uuid=host.main_sr_uuid())
+    if base_vm is None:
+        raise RuntimeError("No cache found")
 
     # Clone the VM before running tests, so that the original VM remains untouched
     logging.info("Cloning VM from cache")

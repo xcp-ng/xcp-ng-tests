@@ -772,10 +772,10 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
 
-def vm_cache_key_from_def(vm_def, ref_nodeid):
+def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
     vm_name = vm_def["name"]
     image_test = vm_def["image_test"]
     image_vm = vm_def.get("image_vm", vm_name)
     image_scope = vm_def.get("image_scope", "module")
     nodeid = shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid))
-    return f"{nodeid}-{image_vm}"
+    return f"{nodeid}-{image_vm}-{test_gitref}"
