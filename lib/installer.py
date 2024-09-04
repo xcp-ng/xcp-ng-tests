@@ -93,3 +93,36 @@ def monitor_install(*, ip):
                          check=False, simple_output=False,
                          ).returncode == 1,
              "Wait for installer to terminate")
+
+def monitor_upgrade(*, ip):
+    # wait for "yum install" phase to start
+    wait_for(lambda: ssh(ip, ["grep",
+                              "'DISPATCH: NEW PHASE: Reading package information'",
+                              "/tmp/install-log"],
+                         check=False, simple_output=False,
+                         ).returncode == 0,
+             "Wait for upgrade preparations to finish",
+             timeout_secs=40 * 60) # FIXME too big
+
+    # wait for "yum install" phase to finish
+    wait_for(lambda: ssh(ip, ["grep",
+                              "'DISPATCH: NEW PHASE: Completing installation'",
+                              "/tmp/install-log"],
+                         check=False, simple_output=False,
+                         ).returncode == 0,
+             "Wait for rpm installation to succeed",
+             timeout_secs=40 * 60) # FIXME too big
+
+    # wait for install to finish
+    wait_for(lambda: ssh(ip, ["grep",
+                              "'The installation completed successfully'",
+                              "/tmp/install-log"],
+                         check=False, simple_output=False,
+                         ).returncode == 0,
+             "Wait for system installation to succeed",
+             timeout_secs=40 * 60) # FIXME too big
+
+    wait_for(lambda: ssh(ip, ["ps a|grep '[0-9]. python /opt/xensource/installer/init'"],
+                         check=False, simple_output=False,
+                         ).returncode == 1,
+             "Wait for installer to terminate")
