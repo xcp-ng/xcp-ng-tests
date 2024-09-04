@@ -21,7 +21,7 @@ from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
 from lib.vdi import VDI
-from lib.vm import VM
+from lib.vm import VM, vm_default_cache_key_from_key
 from lib.xo import xo_cli, xo_object_exists
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
@@ -301,12 +301,21 @@ class Host:
                 assert rest.startswith("//")
                 filename = rest[2:] # strip "//"
                 base_vm = self.cached_vm(filename, sr_uuid)
-                if base_vm:
-                    vm = base_vm.clone()
-                    vm.param_clear('name-description')
-                    if uri.startswith("clone+start"):
-                        vm.start()
-                        wait_for(vm.is_running, "Wait for VM running")
+                # FIXME duplicates _vm_from_cache
+                if base_vm is None:
+                    default_key = vm_default_cache_key_from_key(filename)
+                    if default_key is None:
+                        raise RuntimeError("No cache or IMAGE_DEFAULT_EQUIVS found")
+                    # default to an image from reference cache if any
+                    base_vm = self.cached_vm(default_key, sr_uuid=self.main_sr_uuid())
+                    if base_vm is None:
+                        raise RuntimeError(f"IMAGE_DEFAULT_EQUIVS points to non-existent {default_key!r}")
+
+                vm = base_vm.clone()
+                vm.param_clear('name-description')
+                if uri.startswith("clone+start"):
+                    vm.start()
+                    wait_for(vm.is_running, "Wait for VM running")
             else:
                 vm = self.cached_vm(uri, sr_uuid)
             if vm:
