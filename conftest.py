@@ -11,13 +11,14 @@ from typing import Dict
 import lib.config as global_config
 
 from lib import pxe
+from lib.commands import SSHCommandFailed
 from lib.common import callable_marker, shortened_nodeid, prefix_object_name
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
-from lib.vm import VM, vm_cache_key_from_def
+from lib.vm import VM, vm_cache_key_from_def, vm_default_cache_key_from_def
 from lib.xo import xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
@@ -625,10 +626,17 @@ def _create_vm(request, vm_def, host, vms, vdis, vbds):
             vm.param_set(**param_def)
 
 def _vm_from_cache(request, vm_def, host, vms, tests_hexsha):
+    # try get exact image or an equivalence from data.py
     base_vm = host.cached_vm(vm_cache_key_from_def(vm_def, request.node.nodeid, tests_hexsha),
                              sr_uuid=host.main_sr_uuid())
     if base_vm is None:
-        raise RuntimeError("No cache found")
+        default_key = vm_default_cache_key_from_def(vm_def, request.node.nodeid)
+        if default_key is None:
+            raise RuntimeError("No cache or IMAGE_DEFAULT_EQUIVS found")
+        # default to an image from reference cache if any
+        base_vm = host.cached_vm(default_key, sr_uuid=host.main_sr_uuid())
+        if base_vm is None:
+            raise RuntimeError(f"IMAGE_DEFAULT_EQUIVS points to non-existent {default_key!r}")
 
     # Clone the VM before running tests, so that the original VM remains untouched
     logging.info("Cloning VM from cache")
