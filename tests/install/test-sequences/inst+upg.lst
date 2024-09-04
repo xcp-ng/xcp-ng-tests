@@ -1,0 +1,2 @@
+tests/install/test.py::TestNested::test_upgrade[83nightly-83nightly]
+tests/install/test.py::TestNested::test_boot_upg[83nightly-83nightly]
