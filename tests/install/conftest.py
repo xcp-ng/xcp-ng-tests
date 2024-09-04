@@ -71,6 +71,7 @@ def installer_iso(request):
         local_iso = cached_iso
     logging.info("installer_iso: using %r", local_iso)
     return dict(iso=local_iso,
+                unsigned=ISO_IMAGES[iso_key].get('unsigned', False),
                 )
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
@@ -88,6 +89,8 @@ def installer_iso(request):
 @pytest.fixture(scope='function')
 def remastered_iso(installer_iso, answerfile):
     iso_file = installer_iso['iso']
+    unsigned = installer_iso['unsigned']
+
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
@@ -102,6 +105,10 @@ def remastered_iso(installer_iso, answerfile):
             logging.info("generating answerfile %s", answerfile_xml)
             answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
                                        type="url", CONTENTS="file:///root/postinstall.sh"))
+            if unsigned:
+                answerfile.top_setattr({'gpgcheck': "false",
+                                        'repo-gpgcheck': "false",
+                                        })
             answerfile.write_xml(answerfile_xml)
         else:
             logging.info("no answerfile")
@@ -208,6 +215,9 @@ ISODIR="$1"
 SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz network_device=all sshpassword={passwd} atexit=shell@")
 test ! -e "{answerfile_xml}" ||
     SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile=file:///root/answerfile.xml@")
+# assuming *gpgcheck only appear within unsigned ISO
+test "{unsigned}" = False ||
+    SED_COMMANDS+=(-e "s@ no-gpgcheck\\>@@" -e "s@ no-repo-gpgcheck\\>@@")
 
 
 shopt -s nullglob # there may be no grub config, eg for XS 6.5 and earlier
