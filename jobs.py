@@ -577,7 +577,11 @@ def action_check(args):
         tests = set()
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0 and res.returncode != 5: # 5 means no test found
-            print(f"ERROR: Command failed {cmd}: {res.stderr.decode().strip()}")
+            print(f"""ERROR: Command failed {cmd}:
+STDERR: {res.stderr.decode().strip()}
+STDOUT: ---
+{res.stdout.decode().strip()}
+---""")
             sys.exit(1)
         for line in res.stdout.decode().splitlines():
             if line.startswith("tests/"):
