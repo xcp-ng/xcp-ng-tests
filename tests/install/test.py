@@ -140,3 +140,42 @@ class TestNested:
     def test_boot_inst(self, create_vms,
                        version):
         self._test_firstboot(create_vms, version)
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("mode", (
+        "83nightly-83nightly",
+        "83rc1-83nightly",
+        "83b2-83nightly",
+        "83b1-83nightly",
+        "821.1-83nightly",
+        "821.1-821.1",
+    ))
+    @pytest.mark.continuation_of(
+        lambda mode: [dict(
+            vm="vm1",
+            image_test=(f"TestNested::test_upgrade[{mode}]"))])
+    def test_boot_upg(self, create_vms,
+                      mode):
+        self._test_firstboot(create_vms, mode)
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize(("orig_version", "iso_version"), [
+        ("83nightly", "83nightly"),
+        ("83rc1", "83nightly"),
+        ("83b2", "83nightly"),
+        ("83b1", "83nightly"),
+        ("821.1", "83nightly"),
+        ("821.1", "821.1"),
+    ])
+    @pytest.mark.continuation_of(
+        lambda orig_version: [dict(vm="vm1",
+                                   image_test=f"TestNested::test_boot_inst[{orig_version}]")])
+    @pytest.mark.answerfile(
+        lambda: AnswerFile("UPGRADE").top_append(
+            {"TAG": "source", "type": "local"},
+            {"TAG": "existing-installation", "CONTENTS": "nvme0n1"},
+        ))
+    def test_upgrade(self, vm_booted_with_installer,
+                     orig_version, iso_version):
+        host_vm = vm_booted_with_installer
+        installer.monitor_upgrade(ip=host_vm.ip)
