@@ -132,6 +132,9 @@ ISO_IMAGES: Dict[str, "IsoImageDef"] = {
     '821.1': {'path': "8.2/xcp-ng-8.2.1-20231130.iso"},
     '821': {'path': "8.2/xcp-ng-8.2.1.iso"},
     '820': {'path': "8.2/xcp-ng-8.2.0.iso"},
+    'xs8': {'path': "XenServer8_2024-03-18.iso"},
+    'ch821.1': {'path': "CitrixHypervisor-8.2.1-2306-install-cd.iso"},
+    'ch821': {'path': "CitrixHypervisor-8.2.1-install-cd.iso"},
 }
 
 # In some cases, we may prefer to favour a local SR to store test VM disks,
