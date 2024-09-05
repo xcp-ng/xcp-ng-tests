@@ -1,0 +1,2 @@
+tests/install/test.py::TestNested::test_restore[uefi-83nightly-83nightly-83nightly]
+tests/install/test.py::TestNested::test_boot_rst[uefi-83nightly-83nightly-83nightly]
