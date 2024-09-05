@@ -18,6 +18,7 @@ class TestNested:
         "83nightly",
         "83rc1", "83b2", "83b1",
         "821.1",
+        "xs8", "ch821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(
@@ -61,7 +62,12 @@ class TestNested:
         logging.info("Host VM has MAC %s", mac_address)
 
         # determine version info from `mode`
-        expected_dist = "XCP-ng"
+        if mode.startswith("xs"):
+            expected_dist = "XenServer"
+        elif mode.startswith("ch"):
+            expected_dist = "CitrixHypervisor"
+        else:
+            expected_dist = "XCP-ng"
         # succession of insta/upg/rst operations
         split_mode = mode.split("-")
         if len(split_mode) == 3:
@@ -70,6 +76,8 @@ class TestNested:
         else:
             expected_rel_id = split_mode[-1]
         expected_rel = {
+            "ch821.1": "8.2.1",
+            "xs8": "8.4.0",
             "821.1": "8.2.1",
             "83b1": "8.3.0",
             "83b2": "8.3.0",
@@ -160,6 +168,7 @@ class TestNested:
         "83nightly",
         "83rc1", "83b2", "83b1",
         "821.1",
+        "ch821.1", "xs8",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
@@ -176,6 +185,8 @@ class TestNested:
         "83b2-83nightly",
         "83b1-83nightly",
         "821.1-83nightly",
+        "ch821.1-83nightly",
+        "xs8-83nightly",
         "821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -194,6 +205,8 @@ class TestNested:
         "83b2-83nightly-83nightly",
         "83b1-83nightly-83nightly",
         "821.1-83nightly-83nightly",
+        "ch821.1-83nightly-83nightly",
+        "xs8-83nightly-83nightly",
         "821.1-821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -212,6 +225,8 @@ class TestNested:
         ("83b2", "83nightly"),
         ("83b1", "83nightly"),
         ("821.1", "83nightly"),
+        ("xs8", "83nightly"),
+        ("ch821.1", "83nightly"),
         ("821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -237,6 +252,8 @@ class TestNested:
         ("83b2-83nightly", "83nightly"),
         ("83b1-83nightly", "83nightly"),
         ("821.1-83nightly", "83nightly"),
+        ("ch821.1-83nightly", "83nightly"),
+        ("xs8-83nightly", "83nightly"),
         ("821.1-821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
