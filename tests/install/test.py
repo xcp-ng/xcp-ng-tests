@@ -166,6 +166,24 @@ class TestNested:
         self._test_firstboot(create_vms, mode)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("mode", (
+        "83nightly-83nightly-83nightly",
+        "83rc1-83nightly-83nightly",
+        "83b2-83nightly-83nightly",
+        "83b1-83nightly-83nightly",
+        "821.1-83nightly-83nightly",
+        "821.1-821.1-821.1",
+    ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(
+        lambda firmware, mode: [dict(
+            vm="vm1",
+            image_test=(f"TestNested::test_restore[{firmware}-{mode}]"))])
+    def test_boot_rst(self, create_vms,
+                      firmware, mode):
+        self._test_firstboot(create_vms, mode)
+
+    @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83nightly", "83nightly"),
         ("83rc1", "83nightly"),
@@ -189,3 +207,27 @@ class TestNested:
                      firmware, orig_version, iso_version):
         host_vm = vm_booted_with_installer
         installer.monitor_upgrade(ip=host_vm.ip)
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize(("orig_version", "iso_version"), [
+        ("83nightly-83nightly", "83nightly"),
+        ("83rc1-83nightly", "83nightly"),
+        ("83b2-83nightly", "83nightly"),
+        ("83b1-83nightly", "83nightly"),
+        ("821.1-83nightly", "83nightly"),
+        ("821.1-821.1", "821.1"),
+    ])
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(
+        lambda firmware, orig_version: [dict(
+            vm="vm1",
+            image_test=f"TestNested::test_boot_upg[{firmware}-{orig_version}]")])
+    @pytest.mark.answerfile(
+        lambda install_disk: AnswerFile("RESTORE").top_append(
+            {"TAG": "backup-disk",
+             "CONTENTS": install_disk},
+        ))
+    def test_restore(self, vm_booted_with_installer, install_disk,
+                     firmware, orig_version, iso_version):
+        host_vm = vm_booted_with_installer
+        installer.monitor_restore(ip=host_vm.ip)

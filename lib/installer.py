@@ -1,4 +1,5 @@
 import logging
+import time
 import xml.etree.ElementTree as ET
 
 from lib.commands import ssh, SSHCommandFailed
@@ -126,3 +127,38 @@ def monitor_upgrade(*, ip):
                          check=False, simple_output=False,
                          ).returncode == 1,
              "Wait for installer to terminate")
+
+def monitor_restore(*, ip):
+    # wait for "yum install" phase to start
+    wait_for(lambda: ssh(ip, ["grep",
+                              "'Restoring backup'",
+                              "/tmp/install-log"],
+                         check=False, simple_output=False,
+                         ).returncode == 0,
+             "Wait for data restoration to start",
+             timeout_secs=40 * 60) # FIXME too big
+
+    # wait for "yum install" phase to finish
+    wait_for(lambda: ssh(ip, ["grep",
+                              "'Data restoration complete.  About to re-install bootloader.'",
+                              "/tmp/install-log"],
+                         check=False, simple_output=False,
+                         ).returncode == 0,
+             "Wait for data restoration to complete",
+             timeout_secs=40 * 60) # FIXME too big
+
+    # The installer will not terminate in restore mode, it
+    # requires human interaction and does not even log it, so
+    # wait for last known action log (tested with 8.3b2)
+    wait_for(lambda: ssh(ip, ["grep",
+                              "'ran .*swaplabel.*rc 0'",
+                              "/tmp/install-log"],
+                         check=False, simple_output=False,
+                         ).returncode == 0,
+             "Wait for installer to hopefully finish",
+             timeout_secs=40 * 60) # FIXME too big
+
+    # "wait a bit to be extra sure".  Yuck.
+    time.sleep(30)
+
+    logging.info("Shutting down Host VM after successful restore")

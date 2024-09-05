@@ -218,6 +218,9 @@ BASE_ANSWERFILES = dict(
         "TAG": "installation",
         "mode": "upgrade",
     },
+    RESTORE={
+        "TAG": "restore",
+    },
 )
 
 IMAGE_EQUIVS: Dict[str, str] = {
