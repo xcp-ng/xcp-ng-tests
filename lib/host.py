@@ -291,7 +291,7 @@ class Host:
             if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
                 logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
                 return vm
-        logging.info("Could not find a VM in cache with key %r", cache_key)
+        logging.info("Could not find a VM in cache for %r", uri)
 
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
         if use_cache:
