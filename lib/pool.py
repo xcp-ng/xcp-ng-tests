@@ -26,6 +26,7 @@ class Pool:
                  f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
                  timeout_secs=30 * 60)
 
+        logging.info("Getting Pool info for %r", master_hostname_or_ip)
         for host_uuid in self.hosts_uuids():
             if host_uuid != self.hosts[0].uuid:
                 host = Host(self, self.host_ip(host_uuid))
