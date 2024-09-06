@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+# creation of reference installations to be used for basis of upgrade tests
+
+# * needs at least --hosts=$NEST
+# * ch821 and xs8 needs ISO in the cache
+
+. $(dirname $0)/lib.bash
+
+TESTCLASS="tests/install/test.py::TestNested"
+for conf in "${REFCONFS[@]}"; do
+    IFS=- read fw version media sr < <(echo "$conf")
+    TESTS=(
+        $TESTCLASS::test_install[$fw-$version-$media-$sr]
+        $TESTCLASS::test_tune_firstboot[None-$fw-$version-host1-$media-$sr]
+        $TESTCLASS::test_tune_firstboot[None-$fw-$version-host2-$media-$sr]
+        $TESTCLASS::test_boot_inst[$fw-$version-host1-$media-$sr]
+        $TESTCLASS::test_boot_inst[$fw-$version-host2-$media-$sr]
+    )
+    run_pytest "$conf" \
+        --log-file=test-genref-$conf.log \
+        --reruns=5 --only-rerun=TimeoutError \
+        "$@" \
+        "${TESTS[@]}"
+done
+
+report_failures
