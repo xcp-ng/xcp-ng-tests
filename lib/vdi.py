@@ -9,7 +9,7 @@ class VDI:
         self.uuid = uuid
         # TODO: use a different approach when migration is possible
         if sr is None:
-            sr_uuid = host.get_vdi_sr_uuid(uuid)
+            sr_uuid = host.pool.get_vdi_sr_uuid(uuid)
             # avoid circular import
             # FIXME should get it from Host instead
             from lib.sr import SR
