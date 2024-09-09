@@ -1,2 +1,2 @@
-tests/install/test.py::TestNested::test_upgrade[uefi-83nightly-83nightly-host1-ext]
-tests/install/test.py::TestNested::test_boot_upg[uefi-83nightly-83nightly-host1-ext]
+tests/install/test.py::TestNested::test_upgrade[uefi-83nightly-83nightly-host1-iso-ext]
+tests/install/test.py::TestNested::test_boot_upg[uefi-83nightly-83nightly-host1-iso-ext]
