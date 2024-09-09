@@ -1,3 +1,3 @@
-tests/install/test.py::TestNested::test_install[uefi-83nightly-ext]
-tests/install/test.py::TestNested::test_tune_firstboot[None-uefi-83nightly-host1-ext]
-tests/install/test.py::TestNested::test_boot_inst[uefi-83nightly-host1-ext]
+tests/install/test.py::TestNested::test_install[uefi-83nightly-iso-ext]
+tests/install/test.py::TestNested::test_tune_firstboot[None-uefi-83nightly-host1-iso-ext]
+tests/install/test.py::TestNested::test_boot_inst[uefi-83nightly-host1-iso-ext]
