@@ -1,10 +1,13 @@
 import logging
 import pytest
+from uuid import uuid4
 
 from lib import commands, installer, pxe
-from lib.common import wait_for
+from lib.common import safe_split, wait_for
 from lib.installer import AnswerFile
+from lib.pif import PIF
 from lib.pool import Pool
+from lib.vdi import VDI
 
 from data import NETWORKS
 assert "MGMT" in NETWORKS
@@ -15,6 +18,25 @@ assert "MGMT" in NETWORKS
 #   ssh server in the installed host version (7.x and earlier reject current
 #   ssh-rsa keys, a public ssh-ed25519 key listed in TEST_SSH_PUBKEY should be
 #   there)
+
+@pytest.fixture
+def helper_vm_with_plugged_disk(running_vm, create_vms):
+    helper_vm = running_vm
+    host_vm, = create_vms
+
+    all_vdis = [VDI(uuid, host=host_vm.host) for uuid in host_vm.vdi_uuids()]
+    disk_vdis = [vdi for vdi in all_vdis if not vdi.readonly()]
+    vdi, = disk_vdis
+
+    vbd = helper_vm.create_vbd("1", vdi.uuid)
+    try:
+        vbd.plug()
+
+        yield helper_vm
+
+    finally:
+        vbd.unplug()
+        vbd.destroy()
 
 @pytest.mark.dependency()
 class TestNested:
@@ -61,7 +83,44 @@ class TestNested:
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
-    def _test_firstboot(self, create_vms, mode, is_restore=False):
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("version", (
+        "83nightly",
+        "83rc1", "83b2", "83b1",
+        "821.1",
+        "81", "80",
+        "76", "75",
+        "xs8", "ch821.1",
+        "xs70",
+    ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(
+        lambda version, firmware: [dict(
+            vm="vm1",
+            image_test=f"TestNested::test_install[{firmware}-{version}]")])
+    @pytest.mark.small_vm
+    def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk,
+                            firmware, version, machine):
+        helper_vm = helper_vm_with_plugged_disk
+
+        helper_vm.ssh(["mount /dev/xvdb1 /mnt"])
+        try:
+            # hostname
+            logging.info("Setting hostname to %r", machine)
+            helper_vm.ssh(["echo > /mnt/etc/hostname", machine])
+            # UUIDs
+            logging.info("Randomizing UUIDs")
+            helper_vm.ssh(
+                ['sed -i',
+                 f'''-e "/^INSTALLATION_UUID=/ s/.*/INSTALLATION_UUID='{uuid4()}'/"''',
+                 f'''-e "/^CONTROL_DOMAIN_UUID=/ s/.*/CONTROL_DOMAIN_UUID='{uuid4()}'/"''',
+                 '/mnt/etc/xensource-inventory'])
+            helper_vm.ssh(["grep UUID /mnt/etc/xensource-inventory"])
+        finally:
+            helper_vm.ssh(["umount /dev/xvdb1"])
+
+    def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -98,7 +157,6 @@ class TestNested:
             expected_dist = "XCP-ng"
 
         try:
-            # FIXME: evict MAC from ARP cache first?
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
@@ -225,11 +283,12 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, version: [
-            dict(vm="vm1", image_test=f"TestNested::test_install[{firmware}-{version}]")])
+        lambda firmware, version, machine: [
+            dict(vm="vm1",
+                 image_test=f"TestNested::test_tune_firstboot[None-{firmware}-{version}-{machine}]")])
     def test_boot_inst(self, create_vms,
                        firmware, version, machine):
-        self._test_firstboot(create_vms, version)
+        self._test_firstboot(create_vms, version, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("machine", ("host1", "host2"))
@@ -252,7 +311,7 @@ class TestNested:
             image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}]"))])
     def test_boot_upg(self, create_vms,
                       firmware, mode, machine):
-        self._test_firstboot(create_vms, mode)
+        self._test_firstboot(create_vms, mode, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("mode", (
