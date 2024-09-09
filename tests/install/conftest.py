@@ -13,6 +13,30 @@ from lib.commands import local_cmd
 from data import (ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
                   PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS)
 
+# Return true if the version of the ISO doesn't support the source type.
+# Note: this is a quick-win hack, to avoid explicit enumeration of supported
+# package_source values for each ISO.
+def skip_package_source(version, package_source):
+    if version not in ISO_IMAGES:
+        return True, "version of ISO {} is unknown".format(version)
+
+    if package_source == "iso":
+        if ISO_IMAGES[version].get('net-only', False):
+            return True, "ISO image is net-only while package_source is local"
+
+        return False, "do not skip"
+
+    if package_source == "net":
+        # Net install is not valid if there is no netinstall URL
+        # FIXME: ISO includes a default URL so we should be able to omit net-url
+        if 'net-url' not in ISO_IMAGES[version].keys():
+            return True, "net-url required for netinstall was not found for {}".format(version)
+
+        return False, "do not skip"
+
+    # If we don't know the source type then it is invalid
+    return True, "unknown source type {}".format(package_source)
+
 @pytest.fixture(scope='function')
 def answerfile(request):
     """
@@ -57,6 +81,10 @@ def answerfile(request):
 @pytest.fixture(scope='function')
 def installer_iso(request):
     iso_key = request.getfixturevalue("iso_version")
+    package_source = request.getfixturevalue("package_source")
+    skip, reason = skip_package_source(iso_key, package_source)
+    if skip:
+        pytest.skip(reason)
     assert iso_key in ISO_IMAGES, f"ISO_IMAGES does not have a value for {iso_key}"
     iso = ISO_IMAGES[iso_key]['path']
     if iso.startswith("/"):
