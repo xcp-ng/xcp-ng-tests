@@ -401,7 +401,7 @@ JOBS = {
     "pci-passthrough": {
         "description": "Testing PCI passthrough functionalities",
         "requirements": [
-            "A XCP-ng host >= 8.3 with a PGPU and a PCI to passthrough.",
+            "A XCP-ng host >= 8.3 with a PGPU to passthrough.",
             "The host will be rebooted by the tests."
         ],
         "nb_pools": 1,
