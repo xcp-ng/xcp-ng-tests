@@ -65,3 +65,12 @@ init_refconfs() {
 }
 
 init_refconfs
+
+upgrade_should_work() {
+    case "$1" in
+        83b2)
+            echo >&2 "SKIP: no upgrade: '$1' needs 'yum update' for 'setup'"
+            return 1 ;;
+        *) return 0 ;;
+    esac
+}
