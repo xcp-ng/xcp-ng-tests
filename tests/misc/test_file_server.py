@@ -1,6 +1,7 @@
 import pytest
 import re
-import subprocess
+
+import lib.commands as commands
 
 from lib.netutil import wrap_ip
 
@@ -11,19 +12,14 @@ from lib.netutil import wrap_ip
 #   The host must be configured with `website-https-only` set to true (which is the default config).
 
 def _header_equal(header, name, value):
-    regex = fr"{name}:\s?{value}"
+    regex = fr"{name}:\s?{re.escape(value)}"
     return re.match(regex, header) is not None
 
 def test_fileserver_redirect_https(host):
     path = "/path/to/dir/file.txt"
     ip = wrap_ip(host.hostname_or_ip)
-    process = subprocess.Popen(
-        ["curl", "-i", "http://" + ip + path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    stdout, _ = process.communicate()
-    lines = stdout.decode().splitlines()
+    res = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
+    lines = res.stdout.splitlines()
     assert lines[0].strip() == "HTTP/1.1 301 Moved Permanently"
     assert _header_equal(lines[2], "location", "https://" + ip + path)
 
@@ -33,13 +29,10 @@ class TestHSTS:
     HSTS_HEADER_VALUE = "max-age=63072000"
 
     def __get_header(host):
-        process = subprocess.Popen(
-            ["curl", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+        res = commands.local_cmd(
+            ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
         )
-        stdout, _ = process.communicate()
-        return stdout.decode().splitlines()
+        return res.stdout.splitlines()
 
     def test_fileserver_hsts_default(self, host):
         # By default HSTS header should not be set
