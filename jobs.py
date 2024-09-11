@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 from lib.commands import ssh
@@ -753,6 +754,7 @@ def action_run(args):
         sys.exit(1)
 
 def main():
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
     parser = argparse.ArgumentParser(description="Manage test jobs")
     parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
     subparsers = parser.add_subparsers(dest="action", metavar="action")
