@@ -598,7 +598,7 @@ def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
     job_params = dict(job_data["params"])
 
     # Set/overwrite host_version with real host version if hosts are specified
-    if hosts is not None:
+    if hosts is not None and host_version is None:
         try:
             host = hosts.split(',')[0]
             cmd = ["lsb_release", "-sr"]
@@ -752,6 +752,7 @@ def action_run(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Manage test jobs")
+    parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
     subparsers = parser.add_subparsers(dest="action", metavar="action")
     subparsers.required = True
 
@@ -764,7 +765,6 @@ def main():
 
     run_parser = subparsers.add_parser("collect", help="show test collection based on the job definition.")
     run_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
-    run_parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
     run_parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
                             help="all additional arguments after the last positional argument will "
                                  "be passed to pytest and replace default job params if needed.")
