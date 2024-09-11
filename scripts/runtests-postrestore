@@ -1,0 +1,55 @@
+#!/bin/bash
+set -e
+
+# needs at least --nest=$NEST
+
+. $(dirname $0)/lib.bash
+
+# subject to EQUIVS
+REFSHA="$(git rev-parse HEAD)"
+
+for conf in "${REFCONFS[@]}"; do
+    IFS=- read fw version media sr < <(echo "$conf")
+    host1="install.test::Nested::boot_rst[$fw-$version-83nightly-83nightly-$media-$sr]-vm1-$REFSHA"
+    # FIXME no such conf
+    #host2="install.test::Nested::boot_rst[$fw-$version-83nightly-83nightly-$media-$sr]-vm1-$REFSHA"
+    hostorig="install.test::Nested::boot_inst[$fw-$version-host2-$media-$sr]-vm1-$REFSHA"
+
+    run_pytest "$conf" \
+        --runner "./jobs.py --host-version 8.3.0 run postinstall cache://${host1}" \
+        -m "not hostB1" \
+        --log-file=test-postrestore-$conf.log \
+        "$@"
+
+    run_pytest "$conf-tls" \
+        --hosts=cache://${host1} \
+        --log-file=test-postrestore-tls-$conf.log \
+        -m "not hostA2" \
+        "$@" \
+        tests/xapi/tls_verification
+
+    run_pytest "$conf-join" \
+        --hosts=cache://${host1},cache://${hostorig} \
+        --log-file=test-postrestore-tls-$conf.log --log-file-mode=a \
+        -m "not hostA2" \
+        "$@" \
+        tests/misc/test_pool.py::test_pool_join
+
+    run_pytest "$conf-join2" \
+        --hosts=cache://${hostorig},cache://${host1} \
+        --log-file=test-postrestore-tls-$conf.log --log-file-mode=a \
+        -m "not hostA2" \
+        "$@" \
+        tests/misc/test_pool.py::test_pool_join
+
+    # FIXME postinstall-intrapool-migrate needs a 2-host pool
+
+    # FIXME we would need to store fsdiff refs for old releases
+    #run_pytest "$conf" \
+    #    --hosts="cache://${host1}" \
+    #    --log-file=test-fsdiff-$conf.log \
+    #    "$@" \
+    #    tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_against_ref
+done
+
+report_failures
