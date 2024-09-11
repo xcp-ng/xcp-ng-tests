@@ -385,16 +385,16 @@ def main():
 
     if args.load_ref:
         if not args.json_output:
-            print(f"Get reference data from {args.load_ref}")
+            logging.info("Get reference data from %s", args.load_ref)
         ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
         if not args.json_output:
-            print(f"Get reference data from {args.ref_host}")
+            logging.info("Get reference data from %s", args.ref_host)
         ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
             if not args.json_output:
-                print(f"Saving reference data to {args.save_ref}")
+                logging.info("Saving reference data to %s", args.save_ref)
             save_reference_data(ref_data, args.save_ref)
 
     if ref_data is None or args.test_host is None:
@@ -405,7 +405,7 @@ def main():
         return 1
 
     if not args.json_output:
-        print(f"Get test host data from {args.test_host}")
+        logging.info("Get test host data from %s", args.test_host)
     test_data = get_data(args.test_host, args.folders)
 
     ref = dict([('data', ref_data), ('host', args.ref_host)])
