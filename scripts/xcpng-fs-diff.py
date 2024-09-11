@@ -125,7 +125,7 @@ def get_data(host, folders):
         ref_data[DataType.PACKAGE] = ssh_get_packages(host)
     except Exception as e:
         print(e, file=sys.stderr)
-        exit(-1)
+        exit(1)
 
     return ref_data
 
@@ -286,7 +286,7 @@ def load_reference_files(filename):
             return json.load(fd)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        exit(-1)
+        exit(1)
 
 # Save files from a reference host in json format
 def save_reference_data(files, filename):
@@ -295,7 +295,7 @@ def save_reference_data(files, filename):
             json.dump(files, fd, indent=4)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        exit(-1)
+        exit(1)
 
 def main():
     logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
@@ -381,7 +381,7 @@ def main():
 
     if args.ref_host is None and args.show_diff:
         print("Missing parameters. -d must be used with -r. Try --help", file=sys.stderr)
-        return -1
+        return 1
 
     if args.load_ref:
         if not args.json_output:
@@ -402,7 +402,7 @@ def main():
             return 0
 
         print("\nMissing parameters. Try --help", file=sys.stderr)
-        return -1
+        return 1
 
     if not args.json_output:
         print(f"Get test host data from {args.test_host}")
