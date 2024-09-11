@@ -74,3 +74,17 @@ upgrade_should_work() {
         *) return 0 ;;
     esac
 }
+
+# configurations to be tested on nightly
+
+TESTCONFS=()
+init_testconfs() {
+    local fw sr
+    for fw in uefi bios; do
+        for sr in ext lvm; do
+            TESTCONFS+=($fw-$sr)
+        done
+    done
+}
+
+init_testconfs
