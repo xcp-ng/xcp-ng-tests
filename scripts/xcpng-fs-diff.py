@@ -343,6 +343,7 @@ def main():
         '/etc/sysconfig/xencommons',
         '/etc/sysctl.d/91-net-ipv6.conf',
         '/etc/vconsole.conf',
+        '/etc/xapi.d/plugins/vmssc',
         '/etc/xsconsole/state.txt',
         '/etc/xensource-inventory',
         '/etc/xensource/boot_time_cpus',
