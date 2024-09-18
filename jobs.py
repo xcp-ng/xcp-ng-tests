@@ -17,7 +17,7 @@ JOBS = {
             "Config in data.py for a NFS SR.",
             "A VM (small and fast-booting).",
         ],
-        "nb_pools": 2,
+        "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
         },
