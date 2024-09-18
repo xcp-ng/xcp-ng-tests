@@ -7,6 +7,63 @@ import sys
 from lib.commands import ssh
 
 JOBS = {
+    "postinstall": {
+        "description":
+            "Minimal set of tests to run after an installation or an upgrade.",
+        "requirements": [
+            "A pool master with a local SR. Can be a single-host pool.",
+            "A second one-host pool with a SR to receive cross-pool migrated VMs.",
+            "(If you can't provide a second pool, add `-m 'not hostB1'`, and specify the pool master of the first pool twice.)"
+            "Config in data.py for a NFS SR.",
+            "A VM (small and fast-booting).",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": [
+            "tests/xapi/firstboot",
+            "tests/xo/test_xo_connection.py",
+            "tests/misc",
+            "tests/system",
+        ],
+        "markers": "not hostA2 and (small_vm or no_vm) and not reboot and not complex_prerequisites and not sr_disk",
+    },
+    "postinstall-intrapool-migrate": {
+        "description":
+            "Minimal intra-pool live-migrate tests to run after an installation or an upgrade.",
+        "requirements": [
+            "A pool with at least 2 hosts and a shared SR in addition to local SRs on hosts. The shared SR is the default SR of the pool.",
+            "A VM (small and fast-booting).",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": [
+            "tests/misc/test_basic_without_ssh.py::TestBasicNoSSH::test_live_migrate",
+        ],
+    },
+    "postinstall-with-tls": {
+        "description":
+            "Minimal set of tests to run after an installation or an upgrade, and after enabling TLS verification in the case of an upgrade. Includes a pool join test.",
+        "requirements": [
+            "A pool with at least 2 hosts.",
+            "(If the pool has only one host, you can add `-m 'not hostA2'` parameter but this will skip the TLS verification test.)",
+            "A second one-host pool, without any shared storage, which will be temporarily joined to the first pool.",
+            "(If you can't provide a second pool, which is too bad because this skips pool join tests, add `-m 'not hostB1'`, and specify the pool master of the first pool twice.)",
+            "TLS verification enabled on both pools.",
+            "A VM (small and fast-booting).",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": [
+            "tests/xapi/tls_verification",
+            "tests/uefi_sb/test_varstored_cert_flow.py::TestPoolToDiskCertInheritanceOnPoolJoin", # because we want to test a pool join
+        ],
+    },
     "main": {
         "description": "a group of not-too-long tests that run either without a VM, or with a single small one",
         "requirements": [
@@ -15,6 +72,7 @@ JOBS = {
             "An additional free disk on the first host.",
             "Config in data.py for another NFS SR.",
             "A VM (small and fast-booting).",
+            "On XCP-ng 8.3+: TLS verification must be enabled.",
         ],
         "nb_pools": 2,
         "params": {
