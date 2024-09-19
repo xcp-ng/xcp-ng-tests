@@ -140,13 +140,13 @@ def pytest_runtest_makereport(item, call):
 
 # fixtures
 
-def setup_host(hostname_or_ip):
-    pool = Pool(hostname_or_ip)
-    h = pool.master
-    return h
-
 @pytest.fixture(scope='session')
 def hosts(pytestconfig):
+    def setup_host(hostname_or_ip):
+        pool = Pool(hostname_or_ip)
+        h = pool.master
+        return h
+
     # a list of master hosts, each from a different pool
     hosts_args = pytestconfig.getoption("hosts")
     hosts_split = [hostlist.split(',') for hostlist in hosts_args]
