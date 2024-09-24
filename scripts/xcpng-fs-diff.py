@@ -332,6 +332,8 @@ def main():
         '/etc/lvm/backup/*',
         '/etc/mtab',
         '/etc/machine-id',
+        '/etc/nagios/nrpe.cfg',
+        '/etc/nrpe.d/xs.cfg',
         '/etc/openldap/certs/*',
         '/etc/passwd*',
         '/etc/pki/ca-trust/extracted/java/cacerts',
