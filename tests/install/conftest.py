@@ -154,6 +154,9 @@ def remastered_iso(installer_iso, answerfile):
 set -ex
 INSTALLIMG="$1"
 
+# bad permissions in XS 6.5 preventing ssh to use authorized_keys
+chmod g-w "$INSTALLIMG/root"
+
 mkdir -p "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
 
