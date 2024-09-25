@@ -258,7 +258,7 @@ def local_cmd(cmd, check=True, decode=True):
 
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
-    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+    logging.debug(f"[local] {command}{errorcode_msg}, output: {_ellide_log_lines(output_for_logs)}")
 
     if res.returncode and check:
         raise LocalCommandFailed(res.returncode, output_for_logs, command)
