@@ -5,6 +5,12 @@ import xml.etree.ElementTree as ET
 from lib.commands import ssh, SSHCommandFailed
 from lib.common import wait_for
 
+# FIXME should only be used for <7.0
+SSHOPTS = ("-o KexAlgorithms=+diffie-hellman-group1-sha1",
+           "-o HostKeyAlgorithms=+ssh-rsa",
+           "-o PubkeyAcceptedKeyTypes=+ssh-rsa",
+           "-c +aes256-cbc")
+
 class AnswerFile:
     def __init__(self, kind, /):
         from data import BASE_ANSWERFILES
@@ -62,7 +68,7 @@ class AnswerFile:
 
 def poweroff(ip):
     try:
-        ssh(ip, ["poweroff"])
+        ssh(ip, ["poweroff"], options=SSHOPTS)
     except SSHCommandFailed as e:
         # ignore connection closed by reboot
         if e.returncode == 255 and "closed by remote host" in e.stdout:
@@ -77,6 +83,7 @@ def monitor_install(*, ip):
                               "'DISPATCH: NEW PHASE: Completing installation'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for rpm installation to succeed",
              timeout_secs=40 * 60) # FIXME too big
@@ -86,12 +93,14 @@ def monitor_install(*, ip):
                               "'The installation completed successfully'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for system installation to succeed",
              timeout_secs=40 * 60) # FIXME too big
 
     wait_for(lambda: ssh(ip, ["ps a|grep '[0-9]. python /opt/xensource/installer/init'"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 1,
              "Wait for installer to terminate")
 
@@ -101,6 +110,7 @@ def monitor_upgrade(*, ip):
                               "'DISPATCH: NEW PHASE: Reading package information'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for upgrade preparations to finish",
              timeout_secs=40 * 60) # FIXME too big
@@ -110,6 +120,7 @@ def monitor_upgrade(*, ip):
                               "'DISPATCH: NEW PHASE: Completing installation'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for rpm installation to succeed",
              timeout_secs=40 * 60) # FIXME too big
@@ -119,12 +130,14 @@ def monitor_upgrade(*, ip):
                               "'The installation completed successfully'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for system installation to succeed",
              timeout_secs=40 * 60) # FIXME too big
 
     wait_for(lambda: ssh(ip, ["ps a|grep '[0-9]. python /opt/xensource/installer/init'"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 1,
              "Wait for installer to terminate")
 
@@ -134,6 +147,7 @@ def monitor_restore(*, ip):
                               "'Restoring backup'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for data restoration to start",
              timeout_secs=40 * 60) # FIXME too big
@@ -143,6 +157,7 @@ def monitor_restore(*, ip):
                               "'Data restoration complete.  About to re-install bootloader.'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for data restoration to complete",
              timeout_secs=40 * 60) # FIXME too big
@@ -154,6 +169,7 @@ def monitor_restore(*, ip):
                               "'ran .*swaplabel.*rc 0'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
+                         options=SSHOPTS,
                          ).returncode == 0,
              "Wait for installer to hopefully finish",
              timeout_secs=40 * 60) # FIXME too big
