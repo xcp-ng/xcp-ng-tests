@@ -29,7 +29,7 @@ class TestNested:
         "821.1",
         "81", "80", "76", "75",
         "xs8", "ch821.1",
-        "xs70",
+        "xs70", "xs65",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(
@@ -104,7 +104,7 @@ class TestNested:
         "81", "80",
         "76", "75",
         "ch821.1", "xs8",
-        "xs70",
+        "xs70", "xs65",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
@@ -209,7 +209,7 @@ class TestNested:
                             ]
                 STAMPS_DIR = "/var/lib/misc"
                 STAMPS = [f"ran-{service}" for service in SERVICES]
-            elif lsb_rel in ["7.0.0-125380c", "7.5.0", "7.6.0", "8.0.0", "8.1.0"]:
+            elif lsb_rel in ["6.5.0", "7.0.0-125380c", "7.5.0", "7.6.0", "8.0.0", "8.1.0"]:
                 SERVICES = ["xs-firstboot"]
                 STAMPS_DIR = "/etc/firstboot.d/state"
                 STAMPS = [
@@ -295,7 +295,7 @@ class TestNested:
         "81", "80",
         "76", "75",
         "ch821.1", "xs8",
-        "xs70",
+        "xs70", "xs65",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
