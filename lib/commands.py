@@ -114,9 +114,9 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
     # Get a decoded version of the output in any case, replacing potential errors
     output_for_errors = res.stdout.decode(errors='replace').strip()
 
-    # Even if check is False, we still raise in case of return code 255, which means a SSH error.
-    if res.returncode == 255:
-        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
+#    # Even if check is False, we still raise in case of return code 255, which means a SSH error.
+#    if res.returncode == 255:
+#        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
 
     output: Union[bytes, str] = res.stdout
     if banner_res:
@@ -128,7 +128,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         assert isinstance(output, bytes)
         output = output.decode()
 
-    if res.returncode and check:
+    if res.returncode not in (0, 255) and check:
         return SSHCommandFailed(res.returncode, output_for_errors, command)
 
     if simple_output:
