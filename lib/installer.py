@@ -68,33 +68,35 @@ class AnswerFile:
 
 def poweroff(ip):
     try:
-        ssh(ip, ["poweroff"], options=SSHOPTS)
+        ssh(ip, ["/sbin/poweroff"], options=SSHOPTS)
     except SSHCommandFailed as e:
         # ignore connection closed by reboot
         if e.returncode == 255 and "closed by remote host" in e.stdout:
             logging.info("sshd closed the connection")
             pass
+        elif e.returncode == 255:
+            logging.info("sshd misbehaving?")
         else:
             raise
 
 def monitor_install(*, ip):
     # wait for "yum install" phase to finish
-    wait_for(lambda: ssh(ip, ["grep",
+    wait_for(lambda: "DISPATCH: NEW PHASE: Completing installation" in ssh(ip, ["grep",
                               "'DISPATCH: NEW PHASE: Completing installation'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
                          options=SSHOPTS,
-                         ).returncode == 0,
+                         ).stdout,
              "Wait for rpm installation to succeed",
              timeout_secs=40 * 60) # FIXME too big
 
     # wait for install to finish
-    wait_for(lambda: ssh(ip, ["grep",
+    wait_for(lambda: "The installation completed successfully" in ssh(ip, ["grep",
                               "'The installation completed successfully'",
                               "/tmp/install-log"],
                          check=False, simple_output=False,
                          options=SSHOPTS,
-                         ).returncode == 0,
+                         ).stdout,
              "Wait for system installation to succeed",
              timeout_secs=40 * 60) # FIXME too big
 
