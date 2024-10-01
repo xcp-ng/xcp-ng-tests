@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+from lib.netutil import is_ipv6
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
@@ -14,12 +15,13 @@ def _setup_host_with_glusterfs(host):
 
     host.yum_install(['glusterfs-server', 'xfsprogs'])
 
+    iptables = 'ip6tables' if is_ipv6(host.hostname_or_ip) else 'iptables'
     for h in host.pool.hosts:
         hostname_or_ip = h.hostname_or_ip
         if hostname_or_ip != host.hostname_or_ip:
             for port, proto in GLUSTERFS_PORTS:
                 host.ssh(
-                    ['iptables', '-I', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT'])
+                    [iptables, '-I', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT'])
 
     # Make rules reboot-persistent
     for service in ['iptables', 'ip6tables']:
@@ -34,13 +36,14 @@ def _teardown_host_with_glusterfs(host):
     # Remove any remaining gluster-related data to avoid issues in future test runs
     errors += exec_nofail(lambda: host.ssh(['rm', '-rf', '/var/lib/glusterd']))
 
+    iptables = 'ip6tables' if is_ipv6(host.hostname_or_ip) else 'iptables'
     for h in host.pool.hosts:
         hostname_or_ip = h.hostname_or_ip
         if hostname_or_ip != host.hostname_or_ip:
             for port, proto in GLUSTERFS_PORTS:
                 errors += exec_nofail(
                     lambda: host.ssh(
-                        ['iptables', '-D', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT']
+                        [iptables, '-D', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT']
                     )
                 )
 
@@ -120,6 +123,18 @@ def _fallback_gluster_teardown(host):
 @pytest.fixture(scope='package')
 def gluster_volume_started(host, hostA2, gluster_disk):
     hosts = host.pool.hosts
+
+    if is_ipv6(host.hostname_or_ip):
+        # Configure gluster for IPv6 transport
+        for h in hosts:
+            h.ssh([
+                'sed',
+                '-i',
+                '"s/#   option transport.address-family inet6/    option transport.address-family inet6/"',
+                '/etc/glusterfs/glusterd.vol'
+            ])
+        for h in hosts:
+            h.ssh(['systemctl', 'restart', 'glusterd'])
 
     host.ssh(['mkdir', '-p', '/mnt/sr_disk/vol0/brick0'])
     hostA2.ssh(['gluster', 'peer', 'probe', host.hostname_or_ip])
