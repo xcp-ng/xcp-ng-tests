@@ -124,6 +124,18 @@ def _fallback_gluster_teardown(host):
 def gluster_volume_started(host, hostA2, gluster_disk):
     hosts = host.pool.hosts
 
+    if is_ipv6(host.hostname_or_ip):
+        # Configure gluster for IPv6 transport
+        for h in hosts:
+            h.ssh([
+                'sed',
+                '-i',
+                '"s/#   option transport.address-family inet6/    option transport.address-family inet6/"',
+                '/etc/glusterfs/glusterd.vol'
+            ])
+        for h in hosts:
+            h.ssh(['systemctl', 'restart', 'glusterd'])
+
     host.ssh(['mkdir', '-p', '/mnt/sr_disk/vol0/brick0'])
     hostA2.ssh(['gluster', 'peer', 'probe', host.hostname_or_ip])
     for h in hosts[1:]:
