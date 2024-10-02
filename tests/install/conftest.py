@@ -124,6 +124,9 @@ def answerfile_maybe_tweak_parttable(request, answerfile):
     if firmware.endswith("+dell"):
         answerfile.top_append(dict(TAG="script", stage="installation-start",
                                    type="url", CONTENTS="file:///root/preinstall-utilitypart.sh"))
+    if firmware.endswith("+mbr"):
+        answerfile.top_append(dict(TAG="script", stage="installation-start",
+                                   type="url", CONTENTS="file:///root/preinstall-mbrparttable.sh"))
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
@@ -243,6 +246,18 @@ sgdisk --zap-all /dev/{install_disk}
 sfdisk /dev/{install_disk} << 'EOP'
 unit: sectors
 p1 : start=     2048, size=    32768, Id=de
+EOP
+EOF
+
+cat > "$INSTALLIMG/root/preinstall-mbrparttable.sh" <<'EOF'
+#!/bin/sh
+set -ex
+
+# Dell utility partition
+sgdisk --zap-all /dev/{install_disk}
+sfdisk /dev/{install_disk} << 'EOP'
+unit: sectors
+p1 : start=     2048, size=    32768, Id=83
 EOP
 EOF
 
