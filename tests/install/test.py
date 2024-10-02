@@ -32,7 +32,7 @@ class TestNested:
         "xs8", "ch821.1",
         "xs70",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.vm_definitions(
         lambda firmware: dict(
             name="vm1",
@@ -53,6 +53,7 @@ class TestNested:
                 ),
                 "bios": (),
                 "bios+dell": (),
+                "bios+mbr": (),
             }[firmware],
             vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
             cd_vbd=dict(device="xvdd", userdevice="3"),
@@ -109,7 +110,7 @@ class TestNested:
         "ch821.1", "xs8",
         "xs70",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda version, firmware, local_sr, package_source: [dict(
             vm="vm1",
@@ -302,7 +303,7 @@ class TestNested:
         "ch821.1", "xs8",
         "xs70",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, version, machine, local_sr, package_source: [
             dict(vm="vm1",
@@ -331,7 +332,7 @@ class TestNested:
         ("821.1", "821.1"),
         ("75", "821.1"),
     ])
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, orig_version, machine, package_source, local_sr: [dict(
             vm="vm1",
@@ -366,7 +367,7 @@ class TestNested:
         "821.1-821.1",
         "75-821.1",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, mode, machine, package_source, local_sr: [dict(
             vm="vm1",
@@ -391,7 +392,7 @@ class TestNested:
         ("83rcnet-83rcnet", "83rcnet"), # FIXME
         ("821.1-821.1", "821.1"),
     ])
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, orig_version, local_sr, package_source: [dict(
             vm="vm1",
@@ -422,7 +423,7 @@ class TestNested:
         "83rcnet-83rcnet", "83rcnet-83rcnet-83rcnet", # FIXME
         "821.1-821.1-821.1",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, mode, package_source, local_sr: [dict(
             vm="vm1",
