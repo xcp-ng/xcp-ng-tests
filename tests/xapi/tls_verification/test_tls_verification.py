@@ -77,7 +77,13 @@ class TestTLSVerification:
         logging.info(f"Test connexion from host {hostA1} to host {hostA2} by running 'xe host-dmesg'")
         with pytest.raises(SSHCommandFailed) as excinfo:
             hostA1.xe('host-dmesg', {'host': hostA2.uuid})
-        assert "You attempted an operation which involves a host which could not be contacted." in excinfo.value.stdout
+        # These 2 errors can be raised depending on timing and whether the host is
+        # perceived as live or not after the toolstack restart
+        assert (
+            "You attempted an operation which involves a host which could not be contacted." in excinfo.value.stdout
+            or "Cannot forward messages because the server cannot be contacted. \
+The server may be switched off or there may be network connectivity problems." in excinfo.value.stdout
+        )
 
     def test_toolstack_restart(self, hostA1, hostA2):
         """
