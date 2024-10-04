@@ -5,7 +5,6 @@ import subprocess
 # Requirements:
 # - 2 XCP-ng host of same version
 
-pytest.fixture(scope='module')
 def test_fs_diff(hosts):
     assert len(hosts) == 2, "This test requires exactly 2 hosts"
 
