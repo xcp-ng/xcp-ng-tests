@@ -47,7 +47,7 @@ for conf in "${REFCONFS[@]}"; do
     # FIXME we would need to store fsdiff refs for old releases
     #run_pytest "$conf" \
     #    --hosts="cache://${host1}" \
-    #    --log-file=test-fsdiff-$conf.log \
+    #    --log-file=test-postrestore-fsdiff-$conf.log \
     #    "$@" \
     #    tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_against_ref
 done
