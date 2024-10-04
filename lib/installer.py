@@ -1,8 +1,10 @@
 import logging
+import os
 import time
 import xml.etree.ElementTree as ET
 
-from lib.commands import ssh, SSHCommandFailed
+from lib import pxe
+from lib.commands import local_cmd, scp, ssh, SSHCommandFailed
 from lib.common import wait_for
 
 # FIXME should only be used for <7.0
@@ -142,6 +144,56 @@ def monitor_upgrade(*, ip):
                          options=SSHOPTS,
                          ).returncode == 1,
              "Wait for installer to terminate")
+
+# FIXME essentially duplicates vm_booted_with_installer fixture
+def perform_upgrade(*, iso, host_vm, host):
+    vif = host_vm.vifs()[0]
+    mac_address = vif.param_get('MAC')
+    logging.info("Host VM has MAC %s", mac_address)
+
+    try:
+        remote_iso = host.pool.push_iso(iso)
+        host_vm.insert_cd(os.path.basename(remote_iso))
+
+        try:
+            pxe.arp_clear_for(mac_address)
+
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for host VM running")
+
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see Host VM in ARP tables",
+                     timeout_secs=10 * 60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Host VM has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+
+            # host may not be up if ARP cache was filled
+            wait_for(lambda: local_cmd(["ping", "-c1", host_vm.ip], check=False),
+                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+            wait_for(lambda: local_cmd(["nc", "-zw5", host_vm.ip, "22"], check=False),
+                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+
+            yield host_vm
+
+            logging.info("Shutting down Host VM")
+            poweroff(host_vm.ip)
+            wait_for(host_vm.is_halted, "Wait for host VM halted")
+
+        except Exception as e:
+            logging.critical("caught exception %s", e)
+            host_vm.shutdown(force=True)
+            raise
+        except KeyboardInterrupt:
+            logging.warning("keyboard interrupt")
+            host_vm.shutdown(force=True)
+            raise
+
+        host_vm.eject_cd()
+    finally:
+        host.pool.remove_iso(remote_iso)
 
 def monitor_restore(*, ip):
     # wait for "yum install" phase to start

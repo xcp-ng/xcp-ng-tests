@@ -46,6 +46,8 @@ run_pytest() {
 
 # reference configurations, to be upgraded to nightly
 
+# FIXME this is also where we take the list to create all ref
+# installs, 75/76 should be separated
 REFVERSIONS=(
     830
     821.1 81 80

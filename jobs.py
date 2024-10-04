@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 from lib.commands import ssh
@@ -528,6 +529,8 @@ BROKEN_TESTS = [
     # running quicktest on zfsvol generates dangling TAP devices that are hard to
     # cleanup. Bug needs to be fixed before enabling quicktest on zfsvol.
     "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
+    # not meant to be run from jobs.py (yet)
+    "tests/install/test_pool.py",
 ]
 
 # Returns the vm filename or None if a host_version is passed and matches the one specified
@@ -751,6 +754,7 @@ def action_run(args):
         sys.exit(1)
 
 def main():
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
     parser = argparse.ArgumentParser(description="Manage test jobs")
     parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
     subparsers = parser.add_subparsers(dest="action", metavar="action")
