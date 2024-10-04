@@ -9,8 +9,9 @@ from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
 
-from data import ISO_IMAGES, NETWORKS
+from data import HOSTS_IP_CONFIG, ISO_IMAGES, NETWORKS
 assert "MGMT" in NETWORKS
+assert "HOSTS" in HOSTS_IP_CONFIG
 
 # Requirements:
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
@@ -31,7 +32,7 @@ class TestNested:
         "xs8", "ch821.1",
         "xs70", "xs65",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.vm_definitions(
         lambda firmware: dict(
             name="vm1",
@@ -51,6 +52,8 @@ class TestNested:
                     dict(param_name="platform", key="device-model", value="qemu-upstream-uefi"),
                 ),
                 "bios": (),
+                "bios+dell": (),
+                "bios+mbr": (),
             }[firmware],
             vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
             cd_vbd=dict(device="xvdd", userdevice="3"),
@@ -68,7 +71,8 @@ class TestNested:
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": install_disk},
         ))
-    def test_install(self, vm_booted_with_installer, install_disk,
+    def test_install(self, answerfile_maybe_tweak_parttable,
+                     vm_booted_with_installer, install_disk,
                      firmware, iso_version, package_source, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
@@ -96,7 +100,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
-    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("machine", ("host1", "host2", "host3"))
     @pytest.mark.parametrize("version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
@@ -106,7 +110,7 @@ class TestNested:
         "ch821.1", "xs8",
         "xs70", "xs65",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda version, firmware, local_sr, package_source: [dict(
             vm="vm1",
@@ -116,11 +120,20 @@ class TestNested:
                             firmware, version, machine, local_sr, package_source):
         helper_vm = helper_vm_with_plugged_disk
 
-        helper_vm.ssh(["mount /dev/xvdb1 /mnt"])
+        main_part = "/dev/xvdb2" if firmware.endswith("+dell") else "/dev/xvdb1"
+
+        helper_vm.ssh(["mount", main_part, "/mnt"])
         try:
             # hostname
             logging.info("Setting hostname to %r", machine)
             helper_vm.ssh(["echo > /mnt/etc/hostname", machine])
+            # management IP
+            if machine in HOSTS_IP_CONFIG['HOSTS']:
+                ip = HOSTS_IP_CONFIG['HOSTS'][machine]
+                logging.info("Changing IP to %s", ip)
+
+                helper_vm.ssh([f"sed -i s/^IP=.*/IP='{ip}'/",
+                               "/mnt/etc/firstboot.d/data/management.conf"])
             # UUIDs
             logging.info("Randomizing UUIDs")
             helper_vm.ssh(
@@ -130,7 +143,7 @@ class TestNested:
                  '/mnt/etc/xensource-inventory'])
             helper_vm.ssh(["grep UUID /mnt/etc/xensource-inventory"])
         finally:
-            helper_vm.ssh(["umount /dev/xvdb1"])
+            helper_vm.ssh(["umount", main_part])
 
     def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
         host_vm = create_vms[0]
@@ -175,14 +188,9 @@ class TestNested:
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
-            # catch host-vm IP address
-            wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                     "Wait for DHCP server to see Host VM in ARP tables",
-                     timeout_secs=10 * 60)
-            ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Host VM has IPs %s", ips)
-            assert len(ips) == 1
-            host_vm.ip = ips[0]
+            host_vm.ip = HOSTS_IP_CONFIG['HOSTS'].get(machine,
+                                                      HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])
+            logging.info("Expecting host VM to have IP %s", host_vm.ip)
 
             wait_for(
                 lambda: commands.local_cmd(
@@ -296,7 +304,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
-    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("machine", ("host1", "host2", "host3"))
     @pytest.mark.parametrize("version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
@@ -306,7 +314,7 @@ class TestNested:
         "ch821.1", "xs8",
         "xs70", "xs65",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, version, machine, local_sr, package_source: [
             dict(vm="vm1",
@@ -335,7 +343,7 @@ class TestNested:
         ("821.1", "821.1"),
         ("75", "821.1"),
     ])
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, orig_version, machine, package_source, local_sr: [dict(
             vm="vm1",
@@ -370,7 +378,7 @@ class TestNested:
         "821.1-821.1",
         "75-821.1",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, mode, machine, package_source, local_sr: [dict(
             vm="vm1",
@@ -395,7 +403,7 @@ class TestNested:
         ("83rcnet-83rcnet", "83rcnet"), # FIXME
         ("821.1-821.1", "821.1"),
     ])
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, orig_version, local_sr, package_source: [dict(
             vm="vm1",
@@ -426,7 +434,7 @@ class TestNested:
         "83rcnet-83rcnet", "83rcnet-83rcnet-83rcnet", # FIXME
         "821.1-821.1-821.1",
     ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
         lambda firmware, mode, package_source, local_sr: [dict(
             vm="vm1",
