@@ -36,6 +36,14 @@ for conf in "${REFCONFS[@]}"; do
             # FIXME postinstall-intrapool-migrate (with TLS) needs a 2-host pool
             ;;
     esac
+
+    # FIXME: check fsdiff with TLS activated, since that's what the 8.3+ ref have
+
+    run_pytest "$conf-fsdiff" \
+        --hosts="cache://${host1}" \
+        --log-file=test-postupgrade-fsdiff-$conf.log \
+        tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_against_ref \
+        "$@"
 done
 
 report_failures
