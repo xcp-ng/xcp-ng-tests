@@ -1,0 +1,3 @@
+tests/install/test.py::TestNested::test_install[uefi-821.1-iso-nosr]
+tests/install/test.py::TestNested::test_tune_firstboot[None-uefi-821.1-host1-iso-nosr]
+tests/install/test.py::TestNested::test_boot_inst[uefi-821.1-host1-iso-nosr]

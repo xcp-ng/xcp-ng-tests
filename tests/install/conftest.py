@@ -112,7 +112,22 @@ def installer_iso(request):
 @pytest.fixture(scope='function')
 def install_disk(request):
     firmware = request.getfixturevalue("firmware")
-    yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    if firmware.startswith("uefi"):
+        yield "nvme0n1"
+    elif firmware.startswith("bios"):
+        yield "sda"
+    else:
+        assert False, f"unknown firmware {firmware!r}"
+
+@pytest.fixture(scope='function')
+def answerfile_maybe_tweak_parttable(request, answerfile):
+    firmware = request.getfixturevalue("firmware")
+    if firmware.endswith("+dell"):
+        answerfile.top_append(dict(TAG="script", stage="installation-start",
+                                   type="url", CONTENTS="file:///root/preinstall-utilitypart.sh"))
+    if firmware.endswith("+mbr"):
+        answerfile.top_append(dict(TAG="script", stage="installation-start",
+                                   type="url", CONTENTS="file:///root/preinstall-mbrparttable.sh"))
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
@@ -127,7 +142,7 @@ def install_disk(request):
 #     in contexts where the same IP is reused by successively different MACs
 #     (when cloning VMs from cache)
 @pytest.fixture(scope='function')
-def remastered_iso(installer_iso, answerfile):
+def remastered_iso(installer_iso, answerfile, install_disk):
     iso_file = installer_iso['iso']
     unsigned = installer_iso['unsigned']
 
@@ -226,6 +241,30 @@ EOF
     chmod +x "$INSTALLIMG/etc/init.d/S12test-pingpxe"
 fi
 
+cat > "$INSTALLIMG/root/preinstall-utilitypart.sh" <<'EOF'
+#!/bin/sh
+set -ex
+
+# Dell utility partition
+sgdisk --zap-all /dev/{install_disk}
+sfdisk /dev/{install_disk} << 'EOP'
+unit: sectors
+p1 : start=     2048, size=    32768, Id=de
+EOP
+EOF
+
+cat > "$INSTALLIMG/root/preinstall-mbrparttable.sh" <<'EOF'
+#!/bin/sh
+set -ex
+
+# Dell utility partition
+sgdisk --zap-all /dev/{install_disk}
+sfdisk /dev/{install_disk} << 'EOP'
+unit: sectors
+p1 : start=     2048, size=    32768, Id=83
+EOP
+EOF
+
 cat > "$INSTALLIMG/root/postinstall.sh" <<'EOF'
 #!/bin/sh
 set -ex
@@ -295,6 +334,8 @@ def vm_booted_with_installer(host, remastered_iso, create_vms):
         host_vm.insert_cd(os.path.basename(remote_iso))
 
         try:
+            pxe.arp_clear_for(mac_address)
+
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
