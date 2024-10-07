@@ -1,6 +1,9 @@
 # Configuration file, to be adapted to one's needs
 
 from typing import Any, Dict, TYPE_CHECKING
+
+import legacycrypt as crypt     # type: ignore
+
 if TYPE_CHECKING:
     from lib.typing import IsoImageDef
 
@@ -9,6 +12,13 @@ if TYPE_CHECKING:
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
+
+def hash_password(password):
+    """Hash password for /etc/password."""
+    salt = crypt.mksalt(crypt.METHOD_SHA512)
+    return crypt.crypt(password, salt)
+
+HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
 
 # Public key for a private key available to the test runner
 TEST_SSH_PUBKEY = """
@@ -91,8 +101,6 @@ OTHER_GUEST_TOOLS = {
         "upgradable": False,
     },
 }
-
-ANSWERFILE_URL = f"http://{PXE_CONFIG_SERVER}/configs/custom/ydi/install-8.2-uefi-iso-ext.xml" # FIXME
 
 # Tools
 TOOLS: Dict[str, str] = {
@@ -187,6 +195,21 @@ LVMOISCSI_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
 }
+
+BASE_ANSWERFILES = dict(
+    INSTALL={
+        "TAG": "installation",
+        "CONTENTS": (
+            {"TAG": "root-password",
+             "type": "hash",
+             "CONTENTS": HOST_DEFAULT_PASSWORD_HASH},
+            {"TAG": "timezone",
+             "CONTENTS": "Europe/Paris"},
+            {"TAG": "keymap",
+             "CONTENTS": "us"},
+        ),
+    },
+)
 
 # compatibility settings for older tests
 DEFAULT_NFS_DEVICE_CONFIG = NFS_DEVICE_CONFIG

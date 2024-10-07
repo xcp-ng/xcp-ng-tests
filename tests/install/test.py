@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from lib import installer
+from lib.installer import AnswerFile
 
 from data import NETWORKS
 assert "MGMT" in NETWORKS
@@ -30,6 +31,11 @@ class TestNested:
             vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
+        ))
+    @pytest.mark.answerfile(
+        lambda: AnswerFile("INSTALL").top_append(
+            {"TAG": "source", "type": "local"},
+            {"TAG": "primary-disk", "CONTENTS": "nvme0n1"},
         ))
     def test_install(self, vm_booted_with_installer):
         host_vm = vm_booted_with_installer

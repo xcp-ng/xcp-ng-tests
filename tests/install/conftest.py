@@ -2,13 +2,56 @@ import logging
 import os
 import pytest
 import tempfile
+import xml.etree.ElementTree as ET
 
 from lib import installer, pxe
 from lib.common import callable_marker, url_download, wait_for
+from lib.installer import AnswerFile
 from lib.commands import local_cmd
 
-from data import (ANSWERFILE_URL, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
+from data import (ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
                   PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS)
+
+@pytest.fixture(scope='function')
+def answerfile(request):
+    """
+    Makes an AnswerFile object available to test and other fixtures.
+
+    AnswerFile object are typically generated from a template
+    customizable in `data.py` specified to the ctor, and extended by:
+    - adding attributes to the top element
+    - appending new elements to the top element's children
+
+    > @pytest.mark.answerfile(lambda firmware: AnswerFile("INSTALL")
+    >                         .top_setattr({"sr-type": local_sr})
+    >                         .top_append(
+    >                             {"TAG": "source", "type": "local"},
+    >                             {"TAG": "primary-disk",
+    >                              "guest-storage": "yes",
+    >                              "CONTENTS": {"uefi": "nvme0n1", "bios": "sda"}[firmware]},
+    >                         ))
+    > def test_install(answerfile):
+    >     answerfile.write_xml("my-answers.xml")
+    """
+    marker = request.node.get_closest_marker("answerfile")
+
+    if marker is None:
+        yield None              # no answerfile to generate
+        return
+
+    # construct answerfile definition from option "base", and explicit bits
+    answerfile_def = callable_marker(marker.args[0], request)
+    assert isinstance(answerfile_def, AnswerFile)
+
+    answerfile_def.top_append(
+        dict(TAG="admin-interface",
+             name="eth0",
+             proto="dhcp",
+             ),
+    )
+
+    yield answerfile_def
+
 
 @pytest.fixture(scope='function')
 def installer_iso(request):
@@ -35,14 +78,14 @@ def installer_iso(request):
 # - a test-pingpxe.service running in installer system, to make it possible
 #   for the test to determine the dynamic IP obtained during installation
 # - atexit=shell to prevent the system from spontaneously rebooting
-# - an answerfile to make the install process non-interactive (downloaded from URL)
+# - a generated answerfile to make the install process non-interactive
 # - a postinstall script to modify the installed system with:
 #   - the same .ssh/authorized_key
 #   - the same test-pingpxe.service, which is also useful even with static IP,
 #     in contexts where the same IP is reused by successively different MACs
 #     (when cloning VMs from cache)
 @pytest.fixture(scope='function')
-def remastered_iso(installer_iso):
+def remastered_iso(installer_iso, answerfile):
     iso_file = installer_iso['iso']
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
@@ -52,6 +95,15 @@ def remastered_iso(installer_iso):
         remastered_iso = os.path.join(isotmp, "image.iso")
         img_patcher_script = os.path.join(isotmp, "img-patcher")
         iso_patcher_script = os.path.join(isotmp, "iso-patcher")
+        answerfile_xml = os.path.join(isotmp, "answerfile.xml")
+
+        if answerfile:
+            logging.info("generating answerfile %s", answerfile_xml)
+            answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
+                                       type="url", CONTENTS="file:///root/postinstall.sh"))
+            answerfile.write_xml(answerfile_xml)
+        else:
+            logging.info("no answerfile")
 
         logging.info("Remastering %s to %s", iso_file, remastered_iso)
 
@@ -63,6 +115,9 @@ INSTALLIMG="$1"
 
 mkdir -p "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+
+test ! -e "{answerfile_xml}" ||
+    cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
 
 mkdir -p "$INSTALLIMG/usr/local/sbin"
 cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
@@ -150,7 +205,8 @@ EOF
 set -ex
 ISODIR="$1"
 SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz network_device=all sshpassword={passwd} atexit=shell@")
-SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile={ANSWERFILE_URL}@")
+test ! -e "{answerfile_xml}" ||
+    SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile=file:///root/answerfile.xml@")
 
 
 shopt -s nullglob # there may be no grub config, eg for XS 6.5 and earlier
