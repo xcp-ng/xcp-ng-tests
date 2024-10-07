@@ -29,6 +29,7 @@ JOBS = {
             "tests/system",
             "tests/xapi",
             "tests/xapi_plugins",
+            "tests/install/test_fixtures.py",
         ],
         "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
     },
