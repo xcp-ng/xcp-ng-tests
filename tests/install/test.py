@@ -319,18 +319,21 @@ class TestNested:
         ("821.1", "83nightly"),
         ("81", "83nightly"),
         ("80", "83nightly"),
+        ("75-821.1", "83nightly"),
         ("xs8", "83nightly"),
         ("ch821.1", "83nightly"),
         ("830net", "830net"), # FIXME
         ("82nightly", "82nightly"),
         ("821.1", "82nightly"),
         ("821.1", "821.1"),
+        ("75", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
         lambda firmware, orig_version, machine, package_source, local_sr: [dict(
             vm="vm1",
-            image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}-{machine}-{package_source}-{local_sr}]")])
+            image_test=(f"TestNested::test_boot_{'upg' if '-' in orig_version else 'inst'}"
+                        f"[{firmware}-{orig_version}-{machine}-{package_source}-{local_sr}]"))])
     @pytest.mark.answerfile(
         lambda install_disk, package_source, iso_version: AnswerFile("UPGRADE").top_append(
             {"TAG": "source", "type": "local"} if package_source == "iso"
@@ -361,6 +364,7 @@ class TestNested:
         "82nightly-82nightly",
         "821.1-82nightly",
         "821.1-821.1",
+        "75-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
