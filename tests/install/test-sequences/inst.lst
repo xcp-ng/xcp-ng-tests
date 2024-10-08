@@ -1,2 +1,2 @@
 tests/install/test.py::TestNested::test_install[uefi-83nightly]
-tests/install/test.py::TestNested::test_boot_inst[uefi-83nightly]
+tests/install/test.py::TestNested::test_boot_inst[uefi-83nightly-host1]

@@ -212,6 +212,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
         "83nightly",
         "83rc1", "83b2", "83b1",
@@ -226,10 +227,11 @@ class TestNested:
         lambda firmware, version: [
             dict(vm="vm1", image_test=f"TestNested::test_install[{firmware}-{version}]")])
     def test_boot_inst(self, create_vms,
-                       firmware, version):
+                       firmware, version, machine):
         self._test_firstboot(create_vms, version)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("mode", (
         "83nightly-83nightly",
         "83rc1-83nightly",
@@ -244,11 +246,11 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, mode: [dict(
+        lambda firmware, mode, machine: [dict(
             vm="vm1",
-            image_test=(f"TestNested::test_upgrade[{firmware}-{mode}]"))])
+            image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}]"))])
     def test_boot_upg(self, create_vms,
-                      firmware, mode):
+                      firmware, mode, machine):
         self._test_firstboot(create_vms, mode)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -274,6 +276,7 @@ class TestNested:
         self._test_firstboot(create_vms, mode)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83nightly", "83nightly"),
         ("83rc1", "83nightly"),
@@ -288,9 +291,9 @@ class TestNested:
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, orig_version: [dict(
+        lambda firmware, orig_version, machine: [dict(
             vm="vm1",
-            image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}]")])
+            image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}-{machine}]")])
     @pytest.mark.answerfile(
         lambda install_disk: AnswerFile("UPGRADE").top_append(
             {"TAG": "source", "type": "local"},
@@ -298,7 +301,7 @@ class TestNested:
              "CONTENTS": install_disk},
         ))
     def test_upgrade(self, vm_booted_with_installer, install_disk,
-                     firmware, orig_version, iso_version):
+                     firmware, orig_version, iso_version, machine):
         host_vm = vm_booted_with_installer
         installer.monitor_upgrade(ip=host_vm.ip)
 
@@ -319,7 +322,7 @@ class TestNested:
     @pytest.mark.continuation_of(
         lambda firmware, orig_version: [dict(
             vm="vm1",
-            image_test=f"TestNested::test_boot_upg[{firmware}-{orig_version}]")])
+            image_test=f"TestNested::test_boot_upg[{firmware}-{orig_version}-host1]")])
     @pytest.mark.answerfile(
         lambda install_disk: AnswerFile("RESTORE").top_append(
             {"TAG": "backup-disk",
