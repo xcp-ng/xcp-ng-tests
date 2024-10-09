@@ -19,8 +19,9 @@ class TestNested:
         "83rc1", "83b2", "83b1",
         "821.1",
     ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(
-        dict(
+        lambda firmware: dict(
             name="vm1",
             template="Other install media",
             params=(
@@ -31,21 +32,25 @@ class TestNested:
                 dict(param_name="VCPUs-max", value="2"),
                 dict(param_name="VCPUs-at-startup", value="2"),
                 dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
-                dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
                 dict(param_name="HVM-boot-params", key="order", value="dc"),
-                dict(param_name="platform", key="device-model", value="qemu-upstream-uefi"),
-            ),
+            ) + {
+                "uefi": (
+                    dict(param_name="HVM-boot-params", key="firmware", value="uefi"),
+                    dict(param_name="platform", key="device-model", value="qemu-upstream-uefi"),
+                ),
+                "bios": (),
+            }[firmware],
             vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
     @pytest.mark.answerfile(
-        lambda: AnswerFile("INSTALL").top_append(
+        lambda install_disk: AnswerFile("INSTALL").top_append(
             {"TAG": "source", "type": "local"},
-            {"TAG": "primary-disk", "CONTENTS": "nvme0n1"},
+            {"TAG": "primary-disk", "CONTENTS": install_disk},
         ))
-    def test_install(self, vm_booted_with_installer,
-                     iso_version):
+    def test_install(self, vm_booted_with_installer, install_disk,
+                     firmware, iso_version):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
@@ -134,11 +139,12 @@ class TestNested:
         "83rc1", "83b2", "83b1",
         "821.1",
     ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda version: [
-            dict(vm="vm1", image_test=f"TestNested::test_install[{version}]")])
+        lambda firmware, version: [
+            dict(vm="vm1", image_test=f"TestNested::test_install[{firmware}-{version}]")])
     def test_boot_inst(self, create_vms,
-                       version):
+                       firmware, version):
         self._test_firstboot(create_vms, version)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -150,12 +156,13 @@ class TestNested:
         "821.1-83nightly",
         "821.1-821.1",
     ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda mode: [dict(
+        lambda firmware, mode: [dict(
             vm="vm1",
-            image_test=(f"TestNested::test_upgrade[{mode}]"))])
+            image_test=(f"TestNested::test_upgrade[{firmware}-{mode}]"))])
     def test_boot_upg(self, create_vms,
-                      mode):
+                      firmware, mode):
         self._test_firstboot(create_vms, mode)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -167,15 +174,18 @@ class TestNested:
         ("821.1", "83nightly"),
         ("821.1", "821.1"),
     ])
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda orig_version: [dict(vm="vm1",
-                                   image_test=f"TestNested::test_boot_inst[{orig_version}]")])
+        lambda firmware, orig_version: [dict(
+            vm="vm1",
+            image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}]")])
     @pytest.mark.answerfile(
-        lambda: AnswerFile("UPGRADE").top_append(
+        lambda install_disk: AnswerFile("UPGRADE").top_append(
             {"TAG": "source", "type": "local"},
-            {"TAG": "existing-installation", "CONTENTS": "nvme0n1"},
+            {"TAG": "existing-installation",
+             "CONTENTS": install_disk},
         ))
-    def test_upgrade(self, vm_booted_with_installer,
-                     orig_version, iso_version):
+    def test_upgrade(self, vm_booted_with_installer, install_disk,
+                     firmware, orig_version, iso_version):
         host_vm = vm_booted_with_installer
         installer.monitor_upgrade(ip=host_vm.ip)
