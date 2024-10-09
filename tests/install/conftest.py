@@ -74,6 +74,11 @@ def installer_iso(request):
                 unsigned=ISO_IMAGES[iso_key].get('unsigned', False),
                 )
 
+@pytest.fixture(scope='function')
+def install_disk(request):
+    firmware = request.getfixturevalue("firmware")
+    yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
 #   go probe installation process
