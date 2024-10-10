@@ -65,4 +65,8 @@ IMAGE_DEFAULT_EQUIVS = {
     install.test::Nested::boot_inst[uefi-xs8-host1-iso-ext]
     install.test::Nested::boot_inst[uefi-xs8-host2-iso-ext]
     """.split()
+} | {
+    f"{x}-vm1": f"{x}-vm1-72f98fabd4f5506cb5f2f8c0a59cbcf5af7a478f" for x in """
+    install.test::Nested::boot_inst[bios-xs65-host1-iso-nosr]
+    """.split()
 }
