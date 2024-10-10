@@ -13,7 +13,7 @@ from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_fo
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
-from lib.vm import VM
+from lib.vm import VM, vm_default_cache_key_from_key
 from lib.xo import xo_cli, xo_object_exists
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
@@ -236,13 +236,37 @@ class Host:
             if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
                 logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
                 return vm
-        logging.info("Could not find a VM in cache with key %r", cache_key)
+        logging.info("Could not find a VM in cache for %r", uri)
 
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
+        vm = None
         if use_cache:
-            vm = self.cached_vm(uri, sr_uuid)
+            if '://' in uri and uri.startswith("clone"):
+                protocol, rest = uri.split(":", 1)
+                assert rest.startswith("//")
+                filename = rest[2:] # strip "//"
+                base_vm = self.cached_vm(filename, sr_uuid)
+                # FIXME duplicates _vm_from_cache
+                if base_vm is None:
+                    default_key = vm_default_cache_key_from_key(filename)
+                    if default_key is None:
+                        raise RuntimeError("No cache or IMAGE_DEFAULT_EQUIVS found")
+                    # default to an image from reference cache if any
+                    base_vm = self.cached_vm(default_key, sr_uuid=self.main_sr_uuid())
+                    if base_vm is None:
+                        raise RuntimeError(f"IMAGE_DEFAULT_EQUIVS points to non-existent {default_key!r}")
+
+                vm = base_vm.clone()
+                vm.param_clear('name-description')
+                if uri.startswith("clone+start"):
+                    vm.start()
+                    wait_for(vm.is_running, "Wait for VM running")
+            else:
+                vm = self.cached_vm(uri, sr_uuid)
             if vm:
                 return vm
+        else:
+            assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
         params = {}
         msg = "Import VM %s" % uri
@@ -266,6 +290,15 @@ class Host:
             logging.info(f"Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
         return vm
+
+    def vm_from_template(self, name, template):
+        params = {
+            "new-name-label": prefix_object_name(name),
+            "template": template,
+            "sr-uuid": self.main_sr_uuid(),
+        }
+        vm_uuid = self.xe('vm-install', params)
+        return VM(vm_uuid, self)
 
     def pool_has_vm(self, vm_uuid, vm_type='vm'):
         if vm_type == 'snapshot':
@@ -400,6 +433,17 @@ class Host:
         # We can resave a new state after that.
         self.saved_packages_list = None
         self.saved_rollback_id = None
+
+    def shutdown(self, verify=False):
+        logging.info("Shutdown host %s" % self)
+        try:
+            self.ssh(['shutdown'])
+        except commands.SSHCommandFailed as e:
+            # ssh connection may get killed by the shutdown and terminate with an error code
+            if "closed by remote host" not in e.stdout:
+                raise
+        if verify:
+            wait_for_not(self.is_enabled, "Wait for host down")
 
     def reboot(self, verify=False):
         logging.info("Reboot host %s" % self)
@@ -566,3 +610,8 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def firmware_type(self):
+        retcode = self.ssh(['test', '-d', '/sys/firmware/efi/'],
+                           check=False, simple_output=False).returncode
+        return "uefi" if retcode == 0 else "bios"
