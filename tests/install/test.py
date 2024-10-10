@@ -337,11 +337,14 @@ class TestNested:
         ("81", "83nightly"),
         ("80", "83nightly"),
         ("75-821.1", "83nightly"),
+        ("xs65-75-821.1", "83nightly"),
         ("xs8", "83nightly"),
         ("ch821.1", "83nightly"),
         ("83rcnet", "83rcnet"), # FIXME
         ("821.1", "821.1"),
         ("75", "821.1"),
+        ("xs65-75", "821.1"),
+        ("xs65", "75"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
@@ -374,9 +377,12 @@ class TestNested:
         "80-83nightly",
         "ch821.1-83nightly",
         "xs8-83nightly",
+        "xs65-75-821.1-83nightly",
         "83rcnet-83rcnet",
         "821.1-821.1",
         "75-821.1",
+        "xs65-75-821.1",
+        "xs65-75",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios", "bios+dell", "bios+mbr"))
     @pytest.mark.continuation_of(
