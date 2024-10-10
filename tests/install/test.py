@@ -191,7 +191,8 @@ class TestNested:
                     ["nc", "-zw5", host_vm.ip, "22"], check=False).returncode == 0,
                 "Wait for ssh back up on Host VM", retry_delay_secs=5, timeout_secs=4 * 60)
 
-            logging.info("Checking installed version")
+            logging.info("Checking installed version (expecting %r %r)",
+                         expected_dist, expected_rel)
             lsb_dist = commands.ssh(host_vm.ip, ["lsb_release", "-si"])
             lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
             assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
