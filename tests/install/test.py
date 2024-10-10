@@ -245,7 +245,7 @@ class TestNested:
             # check for firstboot issues
             # FIXME: flaky, must check logs extraction on failure
             try:
-                for stamp in STAMPS:
+                for stamp in sorted(STAMPS):
                     wait_for(lambda: pool.master.ssh(["test", "-e", f"{STAMPS_DIR}/{stamp}"],
                                                      check=False, simple_output=False,
                                                      ).returncode == 0,
