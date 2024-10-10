@@ -140,7 +140,7 @@ class TestNested:
         finally:
             helper_vm.ssh(["umount /dev/xvdb1"])
 
-    def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT'):
+    def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -148,9 +148,9 @@ class TestNested:
 
         # succession of insta/upg/rst operations
         split_mode = mode.split("-")
-        if len(split_mode) == 3:
-            # restore: back to 1st installed version
-            expected_rel_id = split_mode[0]
+        if is_restore:
+            # restore: back to previous installed version
+            expected_rel_id = split_mode[-3]
         else:
             expected_rel_id = split_mode[-1]
         expected_rel = {
@@ -423,4 +423,4 @@ class TestNested:
             image_test=(f"TestNested::test_restore[{firmware}-{mode}-{package_source}-{local_sr}]"))])
     def test_boot_rst(self, create_vms,
                       firmware, mode, package_source, local_sr):
-        self._test_firstboot(create_vms, mode)
+        self._test_firstboot(create_vms, mode, is_restore=True)
