@@ -29,12 +29,21 @@ XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
 def host_data(hostname_or_ip):
     # read from data.py
-    from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS
+    from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS, HOSTS_IP_CONFIG
     if hostname_or_ip in HOSTS:
         h_data = HOSTS[hostname_or_ip]
-        return h_data
+        ret = h_data
     else:
-        return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
+        ret = {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
+    #
+    ip = HOSTS_IP_CONFIG.get('ip', None)
+    if ip:
+        ret.update(ip=ip,
+                   netmask=HOSTS_IP_CONFIG['NETMASK'],
+                   gw=HOSTS_IP_CONFIG['GATEWAY'],
+                   dns=HOSTS_IP_CONFIG['DNS'])
+
+    return ret
 
 class Host:
     xe_prefix = "host"

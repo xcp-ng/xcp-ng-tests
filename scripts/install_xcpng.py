@@ -25,7 +25,19 @@ from lib.vm import VM
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
 def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
-    password = host_data(hostname_or_ip)['password']
+    h_data = host_data(hostname_or_ip)
+    password = h_data['password']
+    if 'ip' in h_data:
+        iface = f"""
+            <admin-interface name="eth0" proto="static">
+                <ipaddr>{h_data['ip']}</ipaddr>
+                <subnet>{h_data['netmask']}</subnet>
+                <gateway>{h_data['gw']}</gateway>
+            </admin-interface>
+            <name-server>{h_data['dns']}</name-server>
+        """
+    else:
+        iface = '<admin-interface name="eth0" proto="dhcp" />'
     cmd = ['openssl', 'passwd', '-6', password]
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
     encrypted_password = res.stdout.decode().strip()
@@ -42,7 +54,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
     <guest-disk>{hdd}</guest-disk>
     <root-password type="hash">{encrypted_password}</root-password>
     <source type="url">{installer}</source>
-    <admin-interface name="eth0" proto="dhcp" />
+{iface}
     <timezone>Europe/Paris</timezone>
     <hostname>{target_hostname}</hostname>
     <script stage="filesystem-populated" type="url">
