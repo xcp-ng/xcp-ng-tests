@@ -68,18 +68,11 @@ def answerfile(request):
     answerfile_def = callable_marker(marker.args[0], request)
     assert isinstance(answerfile_def, AnswerFile)
 
-    from data import HOSTS_IP_CONFIG
     answerfile_def.top_append(
         dict(TAG="admin-interface",
              name="eth0",
-             proto="static",
-             CONTENTS=(
-                 dict(TAG='ipaddr', CONTENTS=HOSTS_IP_CONFIG['HOSTS']['DEFAULT']),
-                 dict(TAG='subnet', CONTENTS=HOSTS_IP_CONFIG['NETMASK']),
-                 dict(TAG='gateway', CONTENTS=HOSTS_IP_CONFIG['GATEWAY']),
-             )),
-        dict(TAG="name-server",
-             CONTENTS=HOSTS_IP_CONFIG['DNS']),
+             proto="dhcp",
+             ),
     )
 
     yield answerfile_def
