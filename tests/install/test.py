@@ -9,8 +9,9 @@ from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
 
-from data import ISO_IMAGES, NETWORKS
+from data import HOSTS_IP_CONFIG, ISO_IMAGES, NETWORKS
 assert "MGMT" in NETWORKS
+assert "HOSTS" in HOSTS_IP_CONFIG
 
 # Requirements:
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
@@ -123,6 +124,13 @@ class TestNested:
             # hostname
             logging.info("Setting hostname to %r", machine)
             helper_vm.ssh(["echo > /mnt/etc/hostname", machine])
+            # management IP
+            if machine in HOSTS_IP_CONFIG['HOSTS']:
+                ip = HOSTS_IP_CONFIG['HOSTS'][machine]
+                logging.info("Changing IP to %s", ip)
+
+                helper_vm.ssh([f"sed -i s/^IP=.*/IP='{ip}'/",
+                               "/mnt/etc/firstboot.d/data/management.conf"])
             # UUIDs
             logging.info("Randomizing UUIDs")
             helper_vm.ssh(
@@ -175,14 +183,9 @@ class TestNested:
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
-            # catch host-vm IP address
-            wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                     "Wait for DHCP server to see Host VM in ARP tables",
-                     timeout_secs=10 * 60)
-            ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Host VM has IPs %s", ips)
-            assert len(ips) == 1
-            host_vm.ip = ips[0]
+            host_vm.ip = HOSTS_IP_CONFIG['HOSTS'].get(machine,
+                                                      HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])
+            logging.info("Expecting host VM to have IP %s", host_vm.ip)
 
             wait_for(
                 lambda: commands.local_cmd(

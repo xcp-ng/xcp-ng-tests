@@ -106,6 +106,18 @@ OTHER_GUEST_TOOLS = {
     },
 }
 
+# IP addresses for hosts to be installed
+# NOTE: do NOT set an IP for host1, it is assumed to use DEFAULT
+HOSTS_IP_CONFIG: Dict[str, Dict[str, str]] = {
+    'HOSTS': {
+#        'DEFAULT': '192.16.0.1',
+#        'host2': '192.16.0.2',
+    },
+#    'NETMASK': '255.255.0.0',
+#    'GATEWAY': '192.16.0.254',
+#    'DNS': '192.16.0.254',
+}
+
 # Tools
 TOOLS: Dict[str, str] = {
 #    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",

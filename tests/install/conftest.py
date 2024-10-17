@@ -10,7 +10,7 @@ from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
 from lib.commands import local_cmd
 
-from data import (ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
+from data import (ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE, HOSTS_IP_CONFIG,
                   ARP_SERVER, TEST_SSH_PUBKEY, TOOLS)
 
 # Return true if the version of the ISO doesn't support the source type.
@@ -71,8 +71,14 @@ def answerfile(request):
     answerfile_def.top_append(
         dict(TAG="admin-interface",
              name="eth0",
-             proto="dhcp",
-             ),
+             proto="static",
+             CONTENTS=(
+                 dict(TAG='ipaddr', CONTENTS=HOSTS_IP_CONFIG['HOSTS']['DEFAULT']),
+                 dict(TAG='subnet', CONTENTS=HOSTS_IP_CONFIG['NETMASK']),
+                 dict(TAG='gateway', CONTENTS=HOSTS_IP_CONFIG['GATEWAY']),
+             )),
+        dict(TAG="name-server",
+             CONTENTS=HOSTS_IP_CONFIG['DNS']),
     )
 
     yield answerfile_def
