@@ -528,6 +528,8 @@ BROKEN_TESTS = [
     # running quicktest on zfsvol generates dangling TAP devices that are hard to
     # cleanup. Bug needs to be fixed before enabling quicktest on zfsvol.
     "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
+    # not meant to be run from jobs.py (yet)
+    "tests/install/test_pool.py",
 ]
 
 # Returns the vm filename or None if a host_version is passed and matches the one specified
