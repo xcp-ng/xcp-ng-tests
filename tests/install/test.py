@@ -19,6 +19,25 @@ assert "MGMT" in NETWORKS
 #   ssh-rsa keys, a public ssh-ed25519 key listed in TEST_SSH_PUBKEY should be
 #   there)
 
+@pytest.fixture
+def helper_vm_with_plugged_disk(running_vm, create_vms):
+    helper_vm = running_vm
+    host_vm, = create_vms
+
+    all_vdis = [VDI(uuid, host=host_vm.host) for uuid in host_vm.vdi_uuids()]
+    disk_vdis = [vdi for vdi in all_vdis if not vdi.readonly()]
+    vdi, = disk_vdis
+
+    vbd = helper_vm.create_vbd("1", vdi.uuid)
+    try:
+        vbd.plug()
+
+        yield helper_vm
+
+    finally:
+        vbd.unplug()
+        vbd.destroy()
+
 @pytest.mark.dependency()
 class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
@@ -72,26 +91,6 @@ class TestNested:
                      firmware, iso_version, package_source, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
-
-    @pytest.fixture
-    @staticmethod
-    def helper_vm_with_plugged_disk(running_vm, create_vms):
-        helper_vm = running_vm
-        host_vm, = create_vms
-
-        all_vdis = [VDI(uuid, host=host_vm.host) for uuid in host_vm.vdi_uuids()]
-        disk_vdis = [vdi for vdi in all_vdis if not vdi.readonly()]
-        vdi, = disk_vdis
-
-        vbd = helper_vm.create_vbd("1", vdi.uuid)
-        try:
-            vbd.plug()
-
-            yield helper_vm
-
-        finally:
-            vbd.unplug()
-            vbd.destroy()
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
