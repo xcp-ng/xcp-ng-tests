@@ -5,7 +5,14 @@
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
-HOST_DEFAULT_PASSWORD_HASH = "" # FIXME
+
+import crypt
+def hash_password(password):
+    "Hash passwod for /etc/password"
+    salt = crypt.mksalt(crypt.METHOD_SHA512)
+    return crypt.crypt(password, salt)
+
+HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
 
 # Public key for a private key available to the test runner
 TEST_SSH_PUBKEY = """
