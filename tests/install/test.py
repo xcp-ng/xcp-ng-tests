@@ -16,7 +16,7 @@ assert "MGMT" in NETWORKS
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
 # - the "small_vm" ISO must have in authorized_keys a SSH key accepted by the
 #   ssh server in the installed host version (7.x and earlier reject current
-#   ssh-rsa keys, a publix ssh-ed25519 key listed in TEST_SSH_PUBKEY should be
+#   ssh-rsa keys, a public ssh-ed25519 key listed in TEST_SSH_PUBKEY should be
 #   there)
 
 @pytest.mark.dependency()
