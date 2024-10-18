@@ -8,7 +8,7 @@ HOST_DEFAULT_PASSWORD = ""
 
 import crypt
 def hash_password(password):
-    "Hash passwod for /etc/password"
+    "Hash password for /etc/password"
     salt = crypt.mksalt(crypt.METHOD_SHA512)
     return crypt.crypt(password, salt)
 
