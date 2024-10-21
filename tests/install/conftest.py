@@ -271,7 +271,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
         yield remastered_iso
 
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host, remastered_iso, create_vms):
+def vm_booted_with_installer(host, create_vms, remastered_iso):
     host_vm, = create_vms # one single VM
     iso = remastered_iso
 
