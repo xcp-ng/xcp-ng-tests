@@ -254,7 +254,7 @@ class VM(BaseVM):
             "create_vif needs network_uuid XOR network_name"
         if network_name:
             network_uuid = self.host.pool.network_named(network_name)
-        assert network_uuid
+        assert network_uuid, f"No UUID given, and network name {network_name!r} not found"
         logging.info("Create VIF %d to network %r on VM %s", vif_num, network_uuid, self.uuid)
         self.host.xe('vif-create', {'vm-uuid': self.uuid,
                                     'device': str(vif_num),
