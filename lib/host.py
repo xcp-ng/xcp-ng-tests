@@ -7,6 +7,7 @@ import tempfile
 from packaging import version
 
 import lib.commands as commands
+import lib.pif as pif
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
@@ -419,6 +420,10 @@ class Host:
 
     def management_network(self):
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
+
+    def management_pif(self):
+        uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
+        return pif.PIF(uuid, self)
 
     def disks(self):
         """ List of SCSI disks, e.g ['sda', 'sdb', 'nvme0n1']. """
