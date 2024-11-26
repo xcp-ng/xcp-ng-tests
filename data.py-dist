@@ -29,6 +29,54 @@ DEF_VM_URL = 'http://pxe/images/'
 # Guest tools ISO download location
 ISO_DOWNLOAD_URL = 'http://pxe/isos/'
 
+# Definitions of Windows guest tool ISOs to be tested
+WIN_GUEST_TOOLS_ISOS = {
+    "stable": {
+        # ISO name on SR or subpath of ISO_DOWNLOAD_URL
+        "name": "guest-tools-win.iso",
+        # Whether ISO should be downloaded from ISO_DOWNLOAD_URL
+        "download": True,
+        # ISO-relative path of MSI file to be installed
+        "package": "package\\XenDrivers-x64.msi",
+        # ISO-relative path of XenClean script
+        "xenclean_path": "package\\XenClean\\x64\\Invoke-XenClean.ps1",
+        # ISO-relative path of root cert file to be installed before guest tools (optional)
+        "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
+    },
+    # Add more guest tool ISOs here as needed
+}
+
+# Definition of ISO containing other guest tools to be tested
+OTHER_GUEST_TOOLS_ISO = {
+    "name": "other-guest-tools-win.iso",
+    "download": False,
+}
+
+# Definitions of other guest tools contained in OTHER_GUEST_TOOLS_ISO
+OTHER_GUEST_TOOLS = {
+    "xcp-ng-9.0.9000": {
+        # Whether we are installing MSI files ("msi"), bare .inf drivers ("inf")
+        # or nothing in case of Windows Update (absent or null)
+        "type": "msi",
+        # ISO-relative path of this guest tool
+        "path": "xcp-ng-9.0.9000",
+        # "path"-relative path of MSI or driver files to be installed
+        "package": "package\\XenDrivers-x64.msi",
+        # Relative path of root cert file (optional)
+        "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
+        # Whether this guest tool version wants vendor device to be activated (optional, defaults to False)
+        # Note: other guest tools may not install correctly with this setting enabled
+        "vendor_device": False,
+
+        # Can we upgrade automatically from this guest tool to our tools?
+        "upgradable": True,
+    },
+    "vendor": {
+        "vendor_device": True,
+        "upgradable": False,
+    },
+}
+
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
 VM_IMAGES = {
     'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
