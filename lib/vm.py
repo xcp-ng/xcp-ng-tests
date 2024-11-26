@@ -321,9 +321,10 @@ class VM(BaseVM):
         version_dict = self.tools_version_dict()
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
-    def file_exists(self, filepath):
+    def file_exists(self, filepath, regular_file=True):
         """Returns True if the file exists, otherwise returns False."""
-        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+        option = '-f' if regular_file else '-e'
+        return self.ssh_with_result(['test', option, filepath]).returncode == 0
 
     def detect_package_manager(self):
         """ Heuristic to determine the package manager on a unix distro. """
