@@ -3,6 +3,7 @@ import logging
 import os
 import shlex
 import tempfile
+import uuid
 
 from packaging import version
 
@@ -14,6 +15,7 @@ from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_fo
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
+from lib.vdi import VDI
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
@@ -267,6 +269,37 @@ class Host:
             logging.info(f"Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
         return vm
+
+    def import_iso(self, uri, sr: SR):
+        random_name = str(uuid.uuid4())
+
+        vdi_uuid = self.xe(
+            "vdi-create",
+            {
+                "sr-uuid": sr.uuid,
+                "name-label": random_name,
+                "virtual-size": "0",
+            },
+        )
+
+        try:
+            params = {'uuid': vdi_uuid}
+            if '://' in uri:
+                logging.info(f"Download ISO {uri}")
+                download_path = f'/tmp/{vdi_uuid}'
+                self.ssh(f"curl -o '{download_path}' '{uri}'")
+                params['filename'] = download_path
+            else:
+                download_path = None
+                params['filename'] = uri
+            logging.info(f"Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
+
+            self.xe('vdi-import', params)
+        finally:
+            if download_path:
+                self.ssh(f"rm -f '{download_path}'")
+
+        return VDI(vdi_uuid, sr=sr)
 
     def pool_has_vm(self, vm_uuid, vm_type='vm'):
         if vm_type == 'snapshot':
