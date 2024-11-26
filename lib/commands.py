@@ -71,7 +71,10 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         opts.append('-o "LogLevel ERROR"')
         opts.append('-o "UserKnownHostsFile /dev/null"')
 
-    command = " ".join(cmd)
+    if isinstance(cmd, str):
+        command = cmd
+    else:
+        command = " ".join(cmd)
     if background and target_os != "windows":
         # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
         # ... and run the command through a bash shell so that output redirection both works on Linux and FreeBSD.
