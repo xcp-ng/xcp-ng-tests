@@ -1,3 +1,4 @@
+import base64
 import logging
 import shlex
 import subprocess
@@ -225,3 +226,6 @@ def local_cmd(cmd, check=True, decode=True):
         raise LocalCommandFailed(res.returncode, output_for_logs, command)
 
     return LocalCommandResult(res.returncode, output)
+
+def encode_powershell_command(cmd: str):
+    return base64.b64encode(cmd.encode("utf-16-le")).decode("ascii")
