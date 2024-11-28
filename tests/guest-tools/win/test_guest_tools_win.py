@@ -81,10 +81,10 @@ class TestGuestToolsWindowsDestructive:
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
         assert vm.are_windows_tools_uninstalled()
 
-    @pytest.mark.flaky # sometimes upgrades from an older version will break networking
     def test_install_with_other_tools(self, vm_install_other_drivers, guest_tools_iso):
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
+            pytest.xfail("Upgrades may require multiple reboots and are not testable yet")
             install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
             assert vm.are_windows_tools_working()
         else:
