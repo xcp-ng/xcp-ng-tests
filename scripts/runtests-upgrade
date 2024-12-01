@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e
+
+# upgrade of reference configs to nightly + restore
+
+# needs at least --hosts=$NEST
+
+. $(dirname $0)/lib.bash
+
+TESTCLASS="tests/install/test.py::TestNested"
+for conf in "${REFCONFS[@]}"; do
+    IFS=- read fw version media sr < <(echo "$conf")
+    upgrade_should_work "$version" || continue
+    TESTS=(
+        $TESTCLASS::test_upgrade[$fw-$version-83nightly-host1-$media-$sr]
+        $TESTCLASS::test_upgrade[$fw-$version-83nightly-host2-$media-$sr]
+        $TESTCLASS::test_boot_upg[$fw-$version-83nightly-host1-$media-$sr]
+        $TESTCLASS::test_boot_upg[$fw-$version-83nightly-host2-$media-$sr]
+
+        $TESTCLASS::test_restore[$fw-$version-83nightly-83nightly-$media-$sr]
+        $TESTCLASS::test_boot_rst[$fw-$version-83nightly-83nightly-$media-$sr]
+    )
+    run_pytest "$conf" \
+        --log-file=test-upgrade-$conf.log --ignore-unknown-dependency \
+        --reruns=5 --only-rerun=TimeoutError \
+        "$@" \
+        "${TESTS[@]}"
+done
+
+report_failures
