@@ -2,7 +2,7 @@ import logging
 import pytest
 
 from .utils import _test_key_exchanges, boot_and_check_no_sb_errors, boot_and_check_sb_failed, \
-    boot_and_check_sb_succeeded, generate_keys, revert_vm_state, sign_efi_bins
+    boot_and_check_sb_succeeded, generate_keys, revert_vm_state, sign_efi_bins, _test_uefi_var_lifecycle
 
 # These tests check the behaviour of XAPI and varstored as they are in XCP-ng 8.3
 # For XCP-ng 8.2, see test_uefistored_sb.py
@@ -153,3 +153,15 @@ class TestUEFIKeyExchange:
         vm.set_uefi_setup_mode()
 
         _test_key_exchanges(vm)
+
+@pytest.mark.small_vm
+@pytest.mark.usefixtures("host_at_least_8_3", "vm_on_shared_sr")
+class TestUEFIVarMigrate:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
+        yield
+        revert_vm_state(vm, snapshot)
+
+    def test_uefi_var_migrate(self, host, hostA2, uefi_vm):
+        _test_uefi_var_lifecycle(uefi_vm, host, hostA2)

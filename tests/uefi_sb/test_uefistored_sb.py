@@ -5,7 +5,8 @@ from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 
 from .utils import _test_key_exchanges, boot_and_check_no_sb_errors, boot_and_check_sb_failed, \
-    boot_and_check_sb_succeeded, generate_keys, revert_vm_state, sign_efi_bins, VM_SECURE_BOOT_FAILED
+    boot_and_check_sb_succeeded, generate_keys, revert_vm_state, sign_efi_bins, VM_SECURE_BOOT_FAILED, \
+    _test_uefi_var_lifecycle
 
 # These tests check the behaviour of XAPI and uefistored as they are in XCP-ng 8.2
 # For XCP-ng 8.3 or later, see test_varstored_sb.py
@@ -217,3 +218,16 @@ class TestUEFIKeyExchange:
         vm = uefi_vm
 
         _test_key_exchanges(vm)
+
+@pytest.mark.small_vm
+@pytest.mark.usefixtures("host_less_than_8_3", "vm_on_shared_sr")
+@pytest.mark.usefixtures("pool_without_uefi_certs")
+class TestUEFIVarMigrate:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
+        yield
+        revert_vm_state(vm, snapshot)
+
+    def test_uefi_var_migrate(self, host, hostA2, uefi_vm):
+        _test_uefi_var_lifecycle(uefi_vm, host, hostA2)
