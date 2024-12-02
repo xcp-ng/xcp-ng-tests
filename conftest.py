@@ -264,6 +264,12 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
+def existing_shared_sr(host):
+    sr = host.pool.first_shared_sr()
+    assert sr is not None, "A shared SR on the pool is required"
+    yield sr
+
+@pytest.fixture(scope='session')
 def sr_disk(pytestconfig, host):
     disks = pytestconfig.getoption("sr_disk")
     if len(disks) != 1:
