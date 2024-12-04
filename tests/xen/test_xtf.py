@@ -8,8 +8,7 @@ from lib.commands import SSHCommandFailed
 # - host: XCP-ng host >= 8.2, with Xen booted with the hvm_fep command line parameter
 #         See https://xenbits.xen.org/docs/xtf/
 
-# XTF git repo is not available in IPv6
-@pytest.mark.usefixtures("host_with_hvm_fep", "host_with_dynamically_disabled_ept_sp", "host_no_ipv6")
+@pytest.mark.usefixtures("host_with_hvm_fep", "host_with_dynamically_disabled_ept_sp")
 class TestXtf:
     _common_skips = [
         # UMIP requires hardware support, that is a recent enough CPU
