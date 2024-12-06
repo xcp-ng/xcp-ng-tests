@@ -1,3 +1,4 @@
+import base64
 import logging
 import shlex
 import subprocess
@@ -71,7 +72,10 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         opts.append('-o "LogLevel ERROR"')
         opts.append('-o "UserKnownHostsFile /dev/null"')
 
-    command = " ".join(cmd)
+    if isinstance(cmd, str):
+        command = cmd
+    else:
+        command = " ".join(cmd)
     if background and target_os != "windows":
         # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
         # ... and run the command through a bash shell so that output redirection both works on Linux and FreeBSD.
@@ -222,3 +226,6 @@ def local_cmd(cmd, check=True, decode=True):
         raise LocalCommandFailed(res.returncode, output_for_logs, command)
 
     return LocalCommandResult(res.returncode, output)
+
+def encode_powershell_command(cmd: str):
+    return base64.b64encode(cmd.encode("utf-16-le")).decode("ascii")
