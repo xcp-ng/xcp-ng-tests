@@ -2,3 +2,4 @@ __pycache__
 */__pycache__
 data.py
 vm_data.py
+/scripts/guests/windows/id_rsa.pub

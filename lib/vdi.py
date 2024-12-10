@@ -17,6 +17,9 @@ class VDI:
         else:
             self.sr = sr
 
+    def name(self):
+        return self.param_get('name-label')
+
     def destroy(self):
         logging.info("Destroy %s", self)
         self.sr.pool.master.xe('vdi-destroy', {'uuid': self.uuid})
