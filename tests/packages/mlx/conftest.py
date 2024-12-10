@@ -23,3 +23,10 @@ def host_without_mlx_compat_loaded(host_with_saved_yum_state):
     if mlx_compat_loaded:
         logging.info("test is done so reload mlx_compat")
         host.ssh(['modprobe', '-v', 'mlx_compat'])
+
+@pytest.fixture(scope="package")
+def host_without_mlx_card(host):
+    if host.ssh_with_result(["lspci", "|", "grep", "Mellanox"]).returncode == 0:
+        # Skip test to not mess with mellanox card
+        pytest.skip("This test can't be run on a host with a mellanox card")
+    yield host
