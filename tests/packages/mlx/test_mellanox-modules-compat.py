@@ -1,3 +1,5 @@
+import pytest
+
 # Requirements:
 # From --hosts parameter:
 # - host(A1): any master host of a pool, with access to XCP-ng RPM repositories.
@@ -8,6 +10,7 @@ def load_unload_mlx_module(host):
     host.ssh(['modprobe', '-v', MLX4_MODULE])
     host.ssh(['modprobe', '-r', '-v', MLX4_MODULE])
 
+@pytest.mark.usefixtures("host_without_mlx_card")
 def test_install_mlx_modules_alt(host_without_mlx_compat_loaded):
     host = host_without_mlx_compat_loaded
 
