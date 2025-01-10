@@ -96,8 +96,10 @@ fi
 PATHFOLDER=$(dirname "${XVA_NAME}")
 TMPFOLDER=$(mktemp -d "${PATHFOLDER}"/xvaXXXX)
 
+# extract and create the file list at the same time
+TMP_LIST=$(mktemp "${PATHFOLDER}"/SortedListXXXX.txt)
 if [ -f "${XVA_NAME}" ]; then
-    tar -xf $1 -C "${TMPFOLDER}"
+    tar -xvf "${XVA_NAME}" -C "${TMPFOLDER}" > "${TMP_LIST}"
 else
     echo "Error: ${XVA_NAME} not found."
     exit 1
@@ -120,8 +122,6 @@ mv "${XVA_NAME}" "${XVA_NAME}.save"
 cd "${TMPFOLDER}"
 
 # Create the new XVA
-TMP_LIST=$(mktemp /tmp/SortedListXXXX.txt)
-find . -print | cut -c3- | sort | grep -v "^Ref:[0-9]\+$" > ${TMP_LIST}
 sudo tar -cv --${COMPRESS_METHOD} -f ${XVA_NAME} --no-recursion -T ${TMP_LIST}
 rm -f "${TMP_LIST}"
 
