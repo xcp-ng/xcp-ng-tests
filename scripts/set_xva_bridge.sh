@@ -105,10 +105,10 @@ else
     exit 1
 fi
 
+chmod -R u+rX "${TMPFOLDER}"
+
 if [ -e "${TMPFOLDER}/ova.xml" ]; then
-    chmod +rw "${TMPFOLDER}/ova.xml"
-    sed -i "s/<member><name>bridge<\/name><value>[^<]*<\/value><\/member>/<member><name>bridge<\/name><value>${BRIDGE_VALUE}<\/value><\/member>/g" ${TMPFOLDER}/ova.xml
-    chmod -rw "${TMPFOLDER}/ova.xml"
+    sed -i "s/<member><name>bridge<\/name><value>[^<]*<\/value><\/member>/<member><name>bridge<\/name><value>${BRIDGE_VALUE}<\/value><\/member>/g" "${TMPFOLDER}/ova.xml"
 else
     echo "Error: File ova.xml not found during the sed."
     exit 1
@@ -118,15 +118,11 @@ fi
 # save first file
 mv "${XVA_NAME}" "${XVA_NAME}.save"
 
-# create xva
-cd "${TMPFOLDER}"
-
 # Create the new XVA
-sudo tar -cv --${COMPRESS_METHOD} -f ${XVA_NAME} --no-recursion -T ${TMP_LIST}
+tar -C "${TMPFOLDER}" --${COMPRESS_METHOD} -cf "${XVA_NAME}" --no-recursion -T "${TMP_LIST}" --numeric-owner --owner=:0 --group=:0 --mode=ugo= --mtime=@0
 rm -f "${TMP_LIST}"
 
 # clean TMPFOLDER
-cd ..
 if [ -d "${TMPFOLDER}" ]; then
     rm -Rf "${TMPFOLDER}"
 else
