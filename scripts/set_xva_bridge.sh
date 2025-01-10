@@ -87,7 +87,7 @@ else
 fi
 
 # we detect the compression method of the xva to uncompress it right
-OLD_COMPRESSION=$(file "${XVA_NAME}" | cut -f 2 -d :  | cut -f 2 -d " ")
+OLD_COMPRESSION=$(file -b "${XVA_NAME}" | cut -f 1 -d " ")
 if [ "${OLD_COMPRESSION}" != "Zstandard" ] && [ "${OLD_COMPRESSION}" != "gzip" ] && [ "${OLD_COMPRESSION}" != "tar" ]; then
             echo "Error: unknown compression type detected for ${XVA_NAME}: ${OLD_COMPRESSION}"
             exit 1
