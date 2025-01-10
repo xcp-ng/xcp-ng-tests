@@ -93,7 +93,7 @@ if [ "${OLD_COMPRESSION}" != "Zstandard" ] && [ "${OLD_COMPRESSION}" != "gzip" ]
             exit 1
 fi
 
-PATHFOLDER=$(dirname ${XVA_NAME})
+PATHFOLDER=$(dirname "${XVA_NAME}")
 TMPFOLDER=$(mktemp -d "${PATHFOLDER}"/xvaXXXX)
 
 if [ -f "${XVA_NAME}" ]; then
