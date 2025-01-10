@@ -12,23 +12,6 @@ usage()
     echo "----------------------------------------------------------------------------------------"
 }
 
-# extract and read ova.xml
-get_bridge()
-{
-    TMPFOLD=$(mktemp -d /tmp/xvaXXXX)
-    tar -xf "${XVA_NAME}" -C "${TMPFOLD}" ova.xml
-    chmod +r "${TMPFOLD}/ova.xml"
-    XML_VALUE=$(grep -oE "<member><name>bridge</name><value>[^<]*</value></member>" "${TMPFOLD}/ova.xml")
-    LENGTH=${#XML_VALUE}
-    PREFIX_LENGTH=$((${LENGTH}-17))
-    NETWORK_VALUE=$(cut -c 1-${PREFIX_LENGTH} <<< ${XML_VALUE})
-    echo $(cut -c 35-${#NETWORK_VALUE} <<< ${NETWORK_VALUE})
-
-    if [ -d "${TMPFOLD}" ]; then
-        rm -Rf "${TMPFOLD}"
-    fi
-}
-
 # check parameters and prompt the usage if needed
 if [ -z "${1+set}" ]
 then
@@ -68,22 +51,6 @@ then
     exit 1
 else
     BRIDGE_VALUE=$3
-fi
-
-# we want to know the value of the network bridge.
-# then we can decide if we need to change it or not.
-BRIDGE_READVALUE=$(get_bridge)
-
-if [ -z "${BRIDGE_READVALUE}" ]
-then
-    echo "No bridge value detected in the xml file!"
-    exit 1
-else
-    if [ "${BRIDGE_READVALUE}" == "${BRIDGE_VALUE}" ]
-    then
-        echo "The bridge is already ${BRIDGE_VALUE}. Nothing to do."
-        exit 0
-    fi
 fi
 
 # we detect the compression method of the xva to uncompress it right
