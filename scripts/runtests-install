@@ -1,0 +1,37 @@
+#!/bin/bash
+set -e
+
+# installation of nightly + self-upgrade + restore
+
+# needs at least --hosts=$NEST
+
+. $(dirname $0)/lib.bash
+
+VERSION="83nightly"
+
+TESTCLASS="tests/install/test.py::TestNested"
+for conf in "${TESTCONFS[@]}"; do
+    IFS=- read fw sr < <(echo "$conf")
+    TESTS=(
+        $TESTCLASS::test_install[$fw-$VERSION-iso-$sr]
+        $TESTCLASS::test_tune_firstboot[None-$fw-$VERSION-host1-iso-$sr]
+        $TESTCLASS::test_tune_firstboot[None-$fw-$VERSION-host2-iso-$sr]
+        $TESTCLASS::test_boot_inst[$fw-$VERSION-host1-iso-$sr]
+        $TESTCLASS::test_boot_inst[$fw-$VERSION-host2-iso-$sr]
+
+        $TESTCLASS::test_upgrade[$fw-$VERSION-83nightly-host1-iso-$sr]
+        $TESTCLASS::test_upgrade[$fw-$VERSION-83nightly-host2-iso-$sr]
+        $TESTCLASS::test_boot_upg[$fw-$VERSION-83nightly-host1-iso-$sr]
+        $TESTCLASS::test_boot_upg[$fw-$VERSION-83nightly-host2-iso-$sr]
+
+        $TESTCLASS::test_restore[$fw-$VERSION-83nightly-83nightly-iso-$sr]
+        $TESTCLASS::test_boot_rst[$fw-$VERSION-83nightly-83nightly-iso-$sr]
+    )
+    run_pytest "$conf" \
+        --log-file=test-install-$conf.log --ignore-unknown-dependency \
+        --reruns=5 --only-rerun=TimeoutError \
+        "$@" \
+        "${TESTS[@]}"
+done
+
+report_failures
