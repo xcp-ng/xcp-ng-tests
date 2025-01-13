@@ -2,8 +2,6 @@ import pytest
 import time
 import os
 
-from lib import config
-
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import formatted_and_mounted_ext4_disk
 
@@ -23,30 +21,6 @@ def local_iso_sr(host, formatted_and_mounted_ext4_disk):
     yield sr, location
     # teardown
     sr.destroy()
-
-@pytest.fixture(scope='module')
-def nfs_iso_device_config():
-    return config.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=['location'])
-
-@pytest.fixture(scope='module')
-def cifs_iso_device_config():
-    return config.sr_device_config("CIFS_ISO_DEVICE_CONFIG")
-
-@pytest.fixture(scope='module')
-def nfs_iso_sr(host, nfs_iso_device_config):
-    """ A NFS ISO SR. """
-    sr = host.sr_create('iso', "ISO-NFS-SR-test", nfs_iso_device_config, shared=True, verify=True)
-    yield sr
-    # teardown
-    sr.forget()
-
-@pytest.fixture(scope='module')
-def cifs_iso_sr(host, cifs_iso_device_config):
-    """ A Samba/CIFS SR. """
-    sr = host.sr_create('iso', "ISO-CIFS-SR-test", cifs_iso_device_config, shared=True, verify=True)
-    yield sr
-    # teardown
-    sr.forget()
 
 def copy_tools_iso_to_iso_sr(host, sr, location=None):
     # copy the ISO file to the right location
