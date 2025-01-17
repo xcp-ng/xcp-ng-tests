@@ -91,6 +91,7 @@ VM_IMAGES = {
 # Possible values:
 # - 'default': keep using the pool's default SR
 # - 'local': use the first local SR found instead
+# - A UUID of the SR to be used
 DEFAULT_SR = 'default'
 
 # Whether to cache VMs on the test host, that is import them only if not already

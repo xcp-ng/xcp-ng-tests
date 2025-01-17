@@ -527,12 +527,11 @@ class Host:
         return srs
 
     def main_sr_uuid(self):
-        """ Main SR is either the default SR, or the first local SR, depending on data.py's DEFAULT_SR. """
+        """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
         except ImportError:
             DEFAULT_SR = 'default'
-        assert DEFAULT_SR in ['default', 'local']
 
         sr_uuid = None
         if DEFAULT_SR == 'local':
@@ -545,9 +544,12 @@ class Host:
             )
             assert local_sr_uuids, f"DEFAULT_SR=='local' so there must be a local SR on host {self}"
             sr_uuid = local_sr_uuids[0]
-        else:
+        elif DEFAULT_SR == 'default':
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
+        else:
+            sr_uuid = DEFAULT_SR
+            assert self.xe('sr-list', {'uuid': sr_uuid}), f"cannot find SR with UUID {sr_uuid} on host {self}"
         assert sr_uuid != "<not in database>"
         return sr_uuid
 
