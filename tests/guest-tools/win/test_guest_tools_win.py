@@ -90,3 +90,15 @@ class TestGuestToolsWindowsDestructive:
         else:
             exitcode = install_guest_tools(vm, guest_tools_iso, PowerAction.Nothing, check=False)
             assert exitcode == ERROR_INSTALL_FAILURE
+
+    @pytest.mark.skip("manual only")
+    @pytest.mark.parametrize("count", range(100))
+    def test_install_with_other_tools_repeat(self, vm_install_other_drivers, guest_tools_iso, count):
+        logging.info(f"count {count}")
+        vm, param = vm_install_other_drivers
+        if param["upgradable"]:
+            install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
+            assert vm.are_windows_tools_working()
+        else:
+            exitcode = install_guest_tools(vm, guest_tools_iso, PowerAction.Nothing, check=False)
+            assert exitcode == ERROR_INSTALL_FAILURE
