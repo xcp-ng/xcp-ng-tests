@@ -29,6 +29,12 @@ def install_guest_tools(vm: VM, guest_tools_iso: dict[str, Any], action: PowerAc
         rootcert = PureWindowsPath("D:\\") / guest_tools_iso["testsign_cert"]
         enable_testsign(vm, rootcert)
 
+        # HACK: Sometimes after rebooting the CD drive just vanishes. Check for it again and
+        # reboot/reinsert CD if needed.
+        if not vm.file_exists("D:/", regular_file=False):
+            logging.warning("CD drive not detected, retrying")
+            insert_cd_safe(vm, guest_tools_iso["name"])
+
     logging.info("Copy Windows PV drivers to VM")
     package_path = PureWindowsPath("D:\\") / guest_tools_iso["package"]
     vm.execute_powershell_script(f"Copy-Item -Force '{package_path}' '{GUEST_TOOLS_COPY_PATH}'")

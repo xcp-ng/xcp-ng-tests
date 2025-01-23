@@ -24,6 +24,12 @@ def install_other_drivers(vm: VM, other_tools_iso_name: str, param: dict[str, An
             rootcert = PureWindowsPath("D:\\") / param["path"] / param["testsign_cert"]
             enable_testsign(vm, rootcert)
 
+            # HACK: Sometimes after rebooting the CD drive just vanishes. Check for it again and
+            # reboot/reinsert CD if needed.
+            if not vm.file_exists("D:/", regular_file=False):
+                logging.warning("CD drive not detected, retrying")
+                insert_cd_safe(vm, other_tools_iso_name)
+
         package_path = PureWindowsPath("D:\\") / param["path"] / param["package"]
         install_cmd = "D:\\install-drivers.ps1 "
         if driver_type == "msi":

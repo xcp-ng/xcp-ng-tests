@@ -1,9 +1,11 @@
 import enum
 import logging
 import re
+import time
 from typing import Any
 
 from data import ISO_DOWNLOAD_URL
+from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.host import Host
 from lib.sr import SR
@@ -77,10 +79,21 @@ def insert_cd_safe(vm: VM, vdi_name: str, cd_path="D:/", retries=2):
     If this happens, reboot the VM in hopes that it will be detected.
     """
     for _attempt in range(retries):
+        # Eject the existing CD just in case.
+        try:
+            vm.eject_cd()
+            # Leave some time for the guest to realize its CD got ejected.
+            time.sleep(5)
+        except SSHCommandFailed:
+            pass
+
         vm.insert_cd(vdi_name)
+        if not vm.is_running():
+            vm.start()
         # wait_for(vm.file_exists) doesn't handle SSHCommandFailed;
         # we need to check for it via wait_for(vm.is_ssh_up).
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+
         try:
             wait_for(lambda: vm.file_exists(cd_path, regular_file=False), timeout_secs=60)
             return
@@ -89,7 +102,5 @@ def insert_cd_safe(vm: VM, vdi_name: str, cd_path="D:/", retries=2):
             # There might be no VM tools so use SSH instead.
             vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
             wait_for(vm.is_halted, "Wait for VM halted")
-            vm.eject_cd()
-            vm.start()
-            wait_for_vm_running_and_ssh_up_without_tools(vm)
+
     raise TimeoutError(f"Waiting for CD at {cd_path} failed")
