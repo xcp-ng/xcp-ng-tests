@@ -49,7 +49,10 @@ class TestXenClean:
         assert vm.are_windows_tools_uninstalled()
 
     def test_xenclean_with_other_tools(self, vm_install_other_drivers: VM, guest_tools_iso):
-        vm, _ = vm_install_other_drivers
+        vm, param = vm_install_other_drivers
+        if param.get("vendor_device"):
+            pytest.skip("Skipping XenClean with vendor device present")
+            return
         logging.info(f"XenClean with other tools")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
