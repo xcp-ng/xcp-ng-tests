@@ -350,6 +350,19 @@ JOBS = {
         "paths": ["tests/guest-tools/unix"],
         "markers": "multi_vms",
     },
+    "tools-windows": {
+        "description": "tests our windows guest tools on a variety of VMs",
+        "requirements": [
+            "A pool >= 8.2. One host is enough.",
+            "A variety of windows VMs supported by our tools installer.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm[]": "multi/tools_windows",
+        },
+        "paths": ["tests/guest-tools/win"],
+        "markers": "multi_vms",
+    },
     "xen": {
         "description": "Testing of the Xen hypervisor itself",
         "requirements": [

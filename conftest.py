@@ -463,3 +463,27 @@ def second_network(pytestconfig, host):
     if network_uuid == host.management_network():
         pytest.fail("--second-network must NOT be the management network")
     return network_uuid
+
+@pytest.fixture(scope='module')
+def nfs_iso_device_config():
+    return global_config.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=['location'])
+
+@pytest.fixture(scope='module')
+def cifs_iso_device_config():
+    return global_config.sr_device_config("CIFS_ISO_DEVICE_CONFIG")
+
+@pytest.fixture(scope='module')
+def nfs_iso_sr(host, nfs_iso_device_config):
+    """ A NFS ISO SR. """
+    sr = host.sr_create('iso', "ISO-NFS-SR-test", nfs_iso_device_config, shared=True, verify=True)
+    yield sr
+    # teardown
+    sr.forget()
+
+@pytest.fixture(scope='module')
+def cifs_iso_sr(host, cifs_iso_device_config):
+    """ A Samba/CIFS SR. """
+    sr = host.sr_create('iso', "ISO-CIFS-SR-test", cifs_iso_device_config, shared=True, verify=True)
+    yield sr
+    # teardown
+    sr.forget()

@@ -7,7 +7,7 @@ import lib.commands as commands
 import lib.efi as efi
 
 from lib.basevm import BaseVM
-from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, wait_for, wait_for_not
+from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool, wait_for, wait_for_not
 from lib.snapshot import Snapshot
 from lib.vif import VIF
 
@@ -321,9 +321,10 @@ class VM(BaseVM):
         version_dict = self.tools_version_dict()
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
-    def file_exists(self, filepath):
+    def file_exists(self, filepath, regular_file=True):
         """Returns True if the file exists, otherwise returns False."""
-        return self.ssh_with_result(['test', '-f', filepath]).returncode == 0
+        option = '-f' if regular_file else '-e'
+        return self.ssh_with_result(['test', option, filepath]).returncode == 0
 
     def detect_package_manager(self):
         """ Heuristic to determine the package manager on a unix distro. """
@@ -587,3 +588,90 @@ class VM(BaseVM):
         res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
                           check=False, simple_output=False, decode=False)
         return res.returncode == 0
+
+    def execute_powershell_script(
+            self,
+            script_contents: str,
+            simple_output=True,
+            prepend="$ProgressPreference = 'SilentlyContinue';"):
+        # ProgressPreference is needed to suppress any clixml progress output,
+        # as it's not filtered away from stdout by default, and we're grabbing stdout.
+        assert self.is_windows
+        if prepend is not None:
+            script_contents = prepend + script_contents
+        cmd = commands.encode_powershell_command(script_contents)
+        return self.ssh(
+            f"powershell.exe -nologo -noprofile -noninteractive -encodedcommand {cmd}",
+            simple_output=simple_output,
+        )
+
+    def run_powershell_command(self, program: str, args: str):
+        """
+        Run command under powershell to retrieve exit codes higher than 255.
+
+        Backslash-safe.
+        """
+        assert self.is_windows
+        output = self.execute_powershell_script(
+            f"Write-Output (Start-Process -Wait -PassThru {program} -ArgumentList '{args}').ExitCode")
+        return int(output)
+
+    def start_background_powershell(self, cmd: str):
+        """
+        Run command under powershell in the background.
+
+        Backslash-safe.
+        """
+        assert self.is_windows
+        encoded_command = commands.encode_powershell_command(cmd)
+        self.ssh(
+            "powershell.exe -noprofile -noninteractive Invoke-WmiMethod -Class Win32_Process -Name Create "
+            f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\'"
+        )
+
+    def is_windows_pv_device_installed(self):
+        """Checks for the install state of **any** Xen/XenServer PV devices."""
+        output = self.execute_powershell_script(
+            r"""Get-PnpDevice -PresentOnly |
+Where-Object CompatibleID -icontains 'PCI\VEN_5853' |
+Select-Object -ExpandProperty Problem"""
+        )
+        # There may be multiple platform PCI devices (e.g. one default, one vendor).
+        # In some cases (e.g. installing our tools on VMs with vendor devices), the default and vendor
+        # devices may have different statuses (default = installed, vendor = not installed).
+        # For now, make sure all of them share the same status since our tools do not support vendor devices anyway.
+        statuses = output.splitlines()
+        logging.debug(f"Installed Xen device status: {statuses}")
+        if all(x == "CM_PROB_NONE" for x in statuses):
+            return True
+        elif all(x == "CM_PROB_FAILED_INSTALL" for x in statuses):
+            return False
+        else:
+            raise Exception(f"Unknown problem status {statuses}")
+
+    def are_windows_services_present(self):
+        """Checks for the presence of **any** Xen/XenServer PV services."""
+        output = self.execute_powershell_script(
+            r"""$null -ne (Get-Service xenagent,xenbus,xenbus_monitor,xencons,xencons_monitor,xendisk,xenfilt,xenhid,
+xeniface,XenInstall,xennet,XenSvc,xenvbd,xenvif,xenvkbd -ErrorAction SilentlyContinue)""")
+        return strtobool(output)
+
+    def are_windows_drivers_present(self):
+        """Checks for the presence of **any** installed PV drivers, activated or not."""
+        output = self.execute_powershell_script(
+            r"""$null -ne (Get-ChildItem $env:windir\INF\oem*.inf |
+ForEach-Object {Get-Content $_} |
+Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet|xenvbd|xenvif|xenvkbd)")""")
+        return strtobool(output)
+
+    def are_windows_tools_working(self):
+        assert self.is_windows
+        return self.is_windows_pv_device_installed() and self.param_get("PV-drivers-detected")
+
+    def are_windows_tools_uninstalled(self):
+        assert self.is_windows
+        return (
+            not self.is_windows_pv_device_installed()
+            and not self.are_windows_services_present()
+            and not self.are_windows_drivers_present()
+        )

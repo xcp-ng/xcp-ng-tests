@@ -3,6 +3,7 @@ import logging
 import os
 import shlex
 import tempfile
+import uuid
 
 from packaging import version
 
@@ -14,6 +15,7 @@ from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_fo
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
 from lib.sr import SR
+from lib.vdi import VDI
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
@@ -268,6 +270,37 @@ class Host:
             vm.param_set('name-description', cache_key)
         return vm
 
+    def import_iso(self, uri, sr: SR):
+        random_name = str(uuid.uuid4())
+
+        vdi_uuid = self.xe(
+            "vdi-create",
+            {
+                "sr-uuid": sr.uuid,
+                "name-label": random_name,
+                "virtual-size": "0",
+            },
+        )
+
+        try:
+            params = {'uuid': vdi_uuid}
+            if '://' in uri:
+                logging.info(f"Download ISO {uri}")
+                download_path = f'/tmp/{vdi_uuid}'
+                self.ssh(f"curl -o '{download_path}' '{uri}'")
+                params['filename'] = download_path
+            else:
+                download_path = None
+                params['filename'] = uri
+            logging.info(f"Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
+
+            self.xe('vdi-import', params)
+        finally:
+            if download_path:
+                self.ssh(f"rm -f '{download_path}'")
+
+        return VDI(vdi_uuid, sr=sr)
+
     def pool_has_vm(self, vm_uuid, vm_type='vm'):
         if vm_type == 'snapshot':
             return self.xe('snapshot-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
@@ -494,12 +527,11 @@ class Host:
         return srs
 
     def main_sr_uuid(self):
-        """ Main SR is either the default SR, or the first local SR, depending on data.py's DEFAULT_SR. """
+        """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
         except ImportError:
             DEFAULT_SR = 'default'
-        assert DEFAULT_SR in ['default', 'local']
 
         sr_uuid = None
         if DEFAULT_SR == 'local':
@@ -512,9 +544,12 @@ class Host:
             )
             assert local_sr_uuids, f"DEFAULT_SR=='local' so there must be a local SR on host {self}"
             sr_uuid = local_sr_uuids[0]
-        else:
+        elif DEFAULT_SR == 'default':
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
+        else:
+            sr_uuid = DEFAULT_SR
+            assert self.xe('sr-list', {'uuid': sr_uuid}), f"cannot find SR with UUID {sr_uuid} on host {self}"
         assert sr_uuid != "<not in database>"
         return sr_uuid
 
