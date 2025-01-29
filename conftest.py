@@ -4,6 +4,7 @@ import pytest
 import tempfile
 
 from packaging import version
+from typing import Dict
 
 import lib.config as global_config
 
@@ -119,7 +120,7 @@ def pytest_collection_modifyitems(items, config):
 # FIXME we may have to move this into lib/ if fixtures in sub-packages
 # want to make use of this feature
 
-PHASE_REPORT_KEY = pytest.StashKey[dict[str, pytest.CollectReport]]()
+PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.CollectReport]]()
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_makereport(item, call):
     # execute all other hooks to obtain the report object
