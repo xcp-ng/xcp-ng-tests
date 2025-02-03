@@ -18,12 +18,6 @@ from lib.common import wait_for
 #   the local SR or shared SR: the test will adapt itself.
 #   Note however that an existing VM will be left on a different SR after the tests.
 
-@pytest.fixture(scope='session')
-def existing_shared_sr(host):
-    sr = host.pool.first_shared_sr()
-    assert sr is not None, "A shared SR on the pool is required"
-    return sr
-
 @pytest.mark.multi_vms # run them on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
 def test_vm_start_stop(imported_vm):
