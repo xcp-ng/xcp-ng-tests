@@ -64,6 +64,7 @@ class TestNested:
                 dict(param_name="VCPUs-max", value="2"),
                 dict(param_name="VCPUs-at-startup", value="2"),
                 dict(param_name="platform", key="exp-nested-hvm", value="true"), # FIXME < 8.3 host?
+                dict(param_name="platform", key="nested-virt", value="true"), # FIXME >= 8.3 host?
                 dict(param_name="HVM-boot-params", key="order", value="dc"),
             ) + {
                 "uefi": (
