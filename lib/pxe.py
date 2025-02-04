@@ -36,7 +36,9 @@ def server_remove_bootconf(mac_address):
 def arp_addresses_for(mac_address):
     output = ssh(
         ARP_SERVER,
-        ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
+        ['ip', 'neigh', 'show', 'nud', 'reachable',
+         '|', 'grep', mac_address,
+         '|', 'awk', '\'{ print $1 }\'']
     )
     candidate_ips = output.splitlines()
     return candidate_ips
