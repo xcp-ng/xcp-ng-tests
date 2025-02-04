@@ -1,5 +1,5 @@
 from lib.commands import ssh, scp
-from data import PXE_CONFIG_SERVER
+from data import ARP_SERVER, PXE_CONFIG_SERVER
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
 
@@ -35,7 +35,7 @@ def server_remove_bootconf(mac_address):
 
 def arp_addresses_for(mac_address):
     output = ssh(
-        PXE_CONFIG_SERVER,
+        ARP_SERVER,
         ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
     )
     candidate_ips = output.splitlines()

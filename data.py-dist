@@ -49,6 +49,9 @@ NETWORKS = {
 # PXE config server for automated XCP-ng installation
 PXE_CONFIG_SERVER = 'pxe'
 
+# server on MGMT network, where ARP tables can reveal the MACs
+ARP_SERVER = PXE_CONFIG_SERVER
+
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
 
