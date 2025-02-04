@@ -11,7 +11,7 @@ from lib.installer import AnswerFile
 from lib.commands import local_cmd
 
 from data import (ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
-                  PXE_CONFIG_SERVER, TEST_SSH_PUBKEY, TOOLS)
+                  ARP_SERVER, TEST_SSH_PUBKEY, TOOLS)
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
@@ -197,7 +197,7 @@ Description=Ping pxe server to populate its ARP table
 After=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done'
+ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{ARP_SERVER}"; do sleep 1 ; done'
 [Install]
 WantedBy=default.target
 EOF
@@ -208,7 +208,7 @@ else # sysv scripts for before XS 7.x
 #!/bin/sh
 case "$1" in
   start)
-    sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{PXE_CONFIG_SERVER}"; do sleep 1 ; done' & ;;
+    sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{ARP_SERVER}"; do sleep 1 ; done' & ;;
   stop) ;;
 esac
 EOF
