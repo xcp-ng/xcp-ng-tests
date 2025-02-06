@@ -18,15 +18,15 @@ class TestLinstorSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_without_linstor(self, host, lvm_disk):
+    def test_create_sr_without_linstor(self, host, lvm_disk, provisioning_type, storage_pool_name):
         # This test must be the first in the series in this module
         assert not host.is_package_installed('python-linstor'), \
             "linstor must not be installed on the host at the beginning of the tests"
         try:
             sr = host.sr_create('linstor', 'LINSTOR-SR-test', {
-                'group-name': STORAGE_POOL_NAME,
-                'redundancy': '1',
-                'provisioning': 'thin'
+                'group-name': storage_pool_name,
+                'redundancy': '2',
+                'provisioning': provisioning_type
             }, shared=True)
             try:
                 sr.destroy()
@@ -36,13 +36,13 @@ class TestLinstorSRCreateDestroy:
         except SSHCommandFailed as e:
             logging.info("SR creation failed, as expected: {}".format(e))
 
-    def test_create_and_destroy_sr(self, pool_with_linstor):
+    def test_create_and_destroy_sr(self, pool_with_linstor, provisioning_type, storage_pool_name):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = pool_with_linstor.master
         sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
-            'group-name': STORAGE_POOL_NAME,
-            'redundancy': '1',
-            'provisioning': 'thin'
+            'group-name': storage_pool_name,
+            'redundancy': '2',
+            'provisioning': provisioning_type
         }, shared=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
@@ -147,7 +147,7 @@ def _ensure_resource_remain_diskless(host, controller_option, volume_name, diskl
 
 class TestLinstorDisklessResource:
     @pytest.mark.small_vm
-    def test_diskless_kept(self, host, linstor_sr, vm_on_linstor_sr):
+    def test_diskless_kept(self, host, linstor_sr, vm_on_linstor_sr, provisioning_type):
         vm = vm_on_linstor_sr
         vdi_uuids = vm.vdi_uuids(sr_uuid=linstor_sr.uuid)
         vdi_uuid = vdi_uuids[0]
@@ -157,10 +157,16 @@ class TestLinstorDisklessResource:
         for member in host.pool.hosts:
             controller_option += f"{member.hostname_or_ip},"
 
+        # Determine the correct group name based on provisioning type
+        if provisioning_type == "thick":
+            group_name = "xcp-sr-linstor_group_device"
+        else:
+            group_name = "xcp-sr-linstor_group_thin_device"
+
         # Get volume name from VDI uuid
         # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
         output = host.ssh([
-            "linstor-kv-tool", "--dump-volumes", "-g", "xcp-sr-linstor_group_thin_device",
+            "linstor-kv-tool", "--dump-volumes", "-g", group_name,
             "|", "grep", "volume-name", "|", "grep", vdi_uuid
         ])
         volume_name = output.split(': ')[1].split('"')[1]
