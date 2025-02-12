@@ -10,6 +10,7 @@ from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool, wait_for, wait_for_not
 from lib.snapshot import Snapshot
 from lib.vif import VIF
+from lib.vdi import VDI
 
 class VM(BaseVM):
     def __init__(self, uuid, host):
@@ -129,6 +130,9 @@ class VM(BaseVM):
     def wait_for_vm_running_and_ssh_up(self):
         self.wait_for_os_booted()
         wait_for(self.is_ssh_up, "Wait for SSH up")
+
+    def wait_for_vm_running(self):
+        wait_for(self.is_running)
 
     def ssh_touch_file(self, filepath):
         logging.info("Create file on VM (%s)" % filepath)
@@ -360,6 +364,25 @@ class VM(BaseVM):
             self.ssh(['test ! -f ' + filepath])
         finally:
             snapshot.destroy(verify=True)
+
+    def vdi_resize(self, vdi_uuid, new_size=None):
+        # Should MIN MAX be handled or let it throw exception?
+        MAX_VHD_SIZE = 2088960 * 1024 * 1024 # 2088960 MB
+        MIN_VHD_SIZE = 1 * 1024 * 1024 # 1MB
+        if self.is_running():
+            self.shutdown(verify=True, force_if_fails=True)
+
+        vdi_obj = VDI(vdi_uuid,sr=self.get_sr())
+        if new_size == None:
+            # Resize by double, ensure it's within min and max limits
+            vdi_size = int(vdi_obj.param_get("virtual-size"))
+            new_size = str(max(min(vdi_size * 2, MAX_VHD_SIZE), MIN_VHD_SIZE))
+        else:
+            new_size = str(max(min(int(new_size), MAX_VHD_SIZE), MIN_VHD_SIZE))
+
+        vdi_obj.resize(new_size)
+        resized_vdi_size = vdi_obj.param_get("virtual-size")
+        assert int(resized_vdi_size) == int(new_size), f"Expected {new_size}, got {resized_vdi_size}"
 
     def get_messages(self, name):
         args = {
