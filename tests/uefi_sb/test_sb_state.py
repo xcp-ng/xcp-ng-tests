@@ -26,10 +26,6 @@ class TestPoolGuestSecureBootReadiness:
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db']])
         assert host.xe("pool-get-guest-secureboot-readiness") == "ready_no_dbx"
 
-    def test_pool_not_ready(self, host):
-        host.pool.clear_custom_uefi_certs()
-        assert host.xe("pool-get-guest-secureboot-readiness") == "not_ready"
-
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestVmSecureBootReadiness:

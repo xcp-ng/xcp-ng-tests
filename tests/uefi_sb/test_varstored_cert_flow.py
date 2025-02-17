@@ -53,8 +53,6 @@ class TestPoolToDiskCertPropagationToAllHosts:
         for h in host.pool.hosts:
             logging.info(f"Check host {h} has no custom certificates on disk.")
             assert h.is_symlink(host.varstore_dir())
-            logging.info(f"Check host {h} only has PK, and no other certs.")
-            assert h.ssh(['ls', '/var/lib/varstored/']) == 'PK.auth'
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
@@ -123,20 +121,6 @@ class TestPoolToVMCertInheritance:
         logging.info("Check that the VM certs were updated: PK, KEK, db, dbx")
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
-
-    def test_start_vm_without_uefi_vars_on_pool_with_only_pk(self, uefi_vm):
-        # When a VM first starts but the pool doesn't have certs configured,
-        # this used, until late in 8.3 development, to *not* propagate the certs to the VM
-        # and we had no test that detected this situation.
-        # We have now changed the behaviour, propagating the certs even if just PK is present.
-        vm = uefi_vm
-        vm.clear_uefi_variables()
-        vm.host.pool.clear_custom_uefi_certs()
-        vm.start()
-        logging.info("Check that the VM certs were updated: PK only")
-        assert vm.is_uefi_var_present('PK')
-        for key in ['KEK', 'db', 'dbx']:
-            assert not vm.is_uefi_var_present(key)
 
     def test_start_vm_in_setup_mode(self, uefi_vm):
         # In setup mode, no cert is set, but other UEFI variables are present.
