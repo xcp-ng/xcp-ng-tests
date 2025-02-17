@@ -53,8 +53,6 @@ class TestPoolToDiskCertPropagationToAllHosts:
         for h in host.pool.hosts:
             logging.info(f"Check host {h} has no custom certificates on disk.")
             assert h.is_symlink(host.varstore_dir())
-            logging.info(f"Check host {h} only has PK, and no other certs.")
-            assert h.ssh(['ls', '/var/lib/varstored/']) == 'PK.auth'
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
@@ -124,6 +122,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
 
+    @pytest.mark.skip(reason="No longer applicable since varstored now ships most SB keys")
     def test_start_vm_without_uefi_vars_on_pool_with_only_pk(self, uefi_vm):
         # When a VM first starts but the pool doesn't have certs configured,
         # this used, until late in 8.3 development, to *not* propagate the certs to the VM
