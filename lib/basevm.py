@@ -40,9 +40,9 @@ class BaseVM:
 
     def vdi_uuids(self, sr_uuid=None):
         output = self._disk_list()
-        vdis = []
-        for line in output.splitlines():
-            vdis.append(line.split(',')[0])
+        all_uuids = output.split(',')  # Split based on commas
+        # Select only every alternate UUID (even index positions)
+        vdis = all_uuids[0::2]  # Start at 0, step by 2
 
         if sr_uuid is None:
             return vdis
