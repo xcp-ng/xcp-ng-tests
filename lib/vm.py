@@ -644,13 +644,13 @@ class VM(BaseVM):
         if not self.is_uefi:
             return False
         if self.is_windows:
-            output = self.ssh(['powershell.exe', 'Confirm-SecureBootUEFI'])
+            output = self.execute_powershell_script("Confirm-SecureBootUEFI")
             if output == 'True':
                 return True
             if output == 'False':
                 return False
             raise Exception(
-                "Output of powershell.exe Confirm-SecureBootUEFI should be either True or False. "
+                "Output of Confirm-SecureBootUEFI should be either True or False. "
                 "Got: %s" % output
             )
         else:
