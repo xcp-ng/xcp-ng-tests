@@ -1,6 +1,6 @@
 import logging
 from pathlib import PureWindowsPath
-from typing import Any
+from typing import Any, Dict
 
 from lib.common import wait_for
 from lib.vm import VM
@@ -21,7 +21,7 @@ ERROR_SUCCESS_REBOOT_REQUIRED = 3010
 GUEST_TOOLS_COPY_PATH = "C:\\package.msi"
 
 
-def install_guest_tools(vm: VM, guest_tools_iso: dict[str, Any], action: PowerAction, check: bool = True):
+def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAction, check: bool = True):
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     if guest_tools_iso.get("testsign_cert"):

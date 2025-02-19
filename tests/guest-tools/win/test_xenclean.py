@@ -1,6 +1,6 @@
 import logging
 from pathlib import PureWindowsPath
-from typing import Any
+from typing import Any, Dict
 import pytest
 from lib.common import wait_for
 from lib.vm import VM
@@ -8,7 +8,7 @@ from lib.vm import VM
 from . import WINDOWS_SHUTDOWN_COMMAND, insert_cd_safe, wait_for_vm_running_and_ssh_up_without_tools
 
 
-def run_xenclean(vm: VM, guest_tools_iso: dict[str, Any]):
+def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     logging.info("Run XenClean")

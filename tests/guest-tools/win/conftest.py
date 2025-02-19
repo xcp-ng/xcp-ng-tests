@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Dict, Tuple
 import pytest
 
 from data import OTHER_GUEST_TOOLS, OTHER_GUEST_TOOLS_ISO, WIN_GUEST_TOOLS_ISOS
@@ -47,7 +47,7 @@ def unsealed_windows_vm_and_snapshot(running_windows_vm_without_tools: VM):
 
 
 @pytest.fixture
-def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: tuple[VM, Snapshot]):
+def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: Tuple[VM, Snapshot]):
     vm, snapshot = unsealed_windows_vm_and_snapshot
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -56,7 +56,7 @@ def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: tuple[VM, Snap
 
 
 @pytest.fixture(scope="class")
-def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest_tools_iso: dict[str, Any]):
+def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest_tools_iso: Dict[str, Any]):
     vm, snapshot = unsealed_windows_vm_and_snapshot
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -66,7 +66,7 @@ def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest
 
 
 @pytest.fixture
-def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]):
+def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]):
     install_guest_tools(running_unsealed_windows_vm, guest_tools_iso, PowerAction.Nothing)
     return running_unsealed_windows_vm
 
@@ -87,8 +87,8 @@ def other_tools_iso(host: Host, nfs_iso_sr: SR):
 
 @pytest.fixture(ids=list(OTHER_GUEST_TOOLS.keys()), params=list(OTHER_GUEST_TOOLS.values()))
 def vm_install_other_drivers(
-    unsealed_windows_vm_and_snapshot: tuple[VM, Snapshot],
-    other_tools_iso: dict[str, Any],
+    unsealed_windows_vm_and_snapshot: Tuple[VM, Snapshot],
+    other_tools_iso: Dict[str, Any],
     request: pytest.FixtureRequest,
 ):
     vm, snapshot = unsealed_windows_vm_and_snapshot
