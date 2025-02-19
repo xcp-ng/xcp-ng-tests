@@ -1,13 +1,13 @@
 import logging
 from pathlib import PureWindowsPath
-from typing import Any
+from typing import Any, Dict
 
 from lib.common import wait_for
 from lib.vm import VM
 from . import WINDOWS_SHUTDOWN_COMMAND, enable_testsign, insert_cd_safe, wait_for_vm_running_and_ssh_up_without_tools
 
 
-def install_other_drivers(vm: VM, other_tools_iso_name: str, param: dict[str, Any]):
+def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]):
     if param.get("vendor_device"):
         assert not vm.param_get("has-vendor-device")
         vm.param_set("has-vendor-device", True)

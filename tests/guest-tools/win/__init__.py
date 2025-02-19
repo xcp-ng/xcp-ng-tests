@@ -2,7 +2,7 @@ import enum
 import logging
 import re
 import time
-from typing import Any
+from typing import Any, Dict, Union
 
 from data import ISO_DOWNLOAD_URL
 from lib.commands import SSHCommandFailed
@@ -23,7 +23,7 @@ class PowerAction(enum.Enum):
     Reboot = "reboot"
 
 
-def iso_create(host: Host, sr: SR, param: dict[str, Any]):
+def iso_create(host: Host, sr: SR, param: Dict[str, Any]):
     if param["download"]:
         vdi = host.import_iso(ISO_DOWNLOAD_URL + param["name"], sr)
         new_param = param.copy()
@@ -55,7 +55,7 @@ def wait_for_vm_running_and_ssh_up_without_tools(vm: VM):
     wait_for(vm.is_ssh_up, "Wait for SSH up")
 
 
-def enable_testsign(vm: VM, rootcert: str | None):
+def enable_testsign(vm: VM, rootcert: Union[str, None]):
     if rootcert is not None:
         vm.execute_powershell_script(
             f"""certutil -addstore -f Root '{rootcert}';
