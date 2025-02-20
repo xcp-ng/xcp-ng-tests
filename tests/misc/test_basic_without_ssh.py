@@ -75,6 +75,22 @@ class TestBasicNoSSH:
         finally:
             snapshot.destroy(verify=True)
 
+    def test_resize_vdi(self, imported_vm):
+        from lib.vdi import VDI
+
+        vm = imported_vm
+        if vm.is_running():
+            vm.shutdown(verify=True, force_if_fails=True)
+
+        logging.info("* VDI Resize started *")
+        for vdi_uuid in vm.vdi_uuids():
+            vm.vdi_resize(vdi_uuid)
+        logging.info("* VDI Resize completed *")
+
+        vm.start()
+        vm.wait_for_vm_running() # early decision to check if VDI was ok and VM is able to start
+        vm.shutdown(verify=True, force_if_fails=True)
+
     # Live migration tests
     # We want to test storage migration (memory+disks) and live migration without storage migration (memory only).
     # The order will depend on the initial location of the VM: a local SR or a shared SR.
