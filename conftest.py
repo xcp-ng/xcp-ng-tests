@@ -361,7 +361,7 @@ def imported_vm(host, vm_ref):
     else:
         vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=CACHE_IMPORTED_VM)
 
-    if CACHE_IMPORTED_VM:
+    if CACHE_IMPORTED_VM or is_uuid(vm_ref):
         # Clone the VM before running tests, so that the original VM remains untouched
         logging.info(">> Clone cached VM before running tests")
         vm = vm_orig.clone()
@@ -372,7 +372,7 @@ def imported_vm(host, vm_ref):
 
     yield vm
     # teardown
-    if not is_uuid(vm_ref):
+    if CACHE_IMPORTED_VM or is_uuid(vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
