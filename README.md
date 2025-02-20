@@ -7,6 +7,7 @@ Note: this is a perpertual work in progress. If you encounter any obstacles or b
 * packages as listed in requirements/base.txt
 * extra test-specific requirements are documented in the test file
   "Requirements" header
+  * `netcat` is required on the machine running the tests.
 
 ### Quick install (python requirements)
 
