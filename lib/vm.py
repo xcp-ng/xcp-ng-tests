@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import tempfile
+from typing import Iterable
 
 import lib.commands as commands
 import lib.efi as efi
@@ -481,7 +482,7 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
-    def install_uefi_certs(self, auths):
+    def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
         Install UEFI certs to the VM's NVRAM store.
 
@@ -495,12 +496,14 @@ class VM(BaseVM):
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
             dest = self.host.ssh(['mktemp'])
-            self.host.scp(auth.auth, dest)
-            self.host.ssh([
-                'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
-                str(efi.EFI_AT_ATTRS), dest
-            ])
-            self.host.ssh(['rm', '-f', dest])
+            try:
+                self.host.scp(auth.auth(), dest)
+                self.host.ssh([
+                    'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
+                    str(efi.EFI_AT_ATTRS), dest
+                ])
+            finally:
+                self.host.ssh(['rm', '-f', dest])
 
     def booted_with_secureboot(self):
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
@@ -584,9 +587,16 @@ class VM(BaseVM):
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
 
-    def is_cert_present(vm, key):
-        res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
-                          check=False, simple_output=False, decode=False)
+    def is_uefi_var_present(self, varname):
+        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(varname).as_str(), varname],
+                            check=False, simple_output=False, decode=False)
+        return res.returncode == 0
+
+    def does_uefi_var_match(self, varname: str, value: str):
+        res = self.host.ssh(
+            f"""varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname} |
+grep --binary -q '{value}'""",
+            check=True, simple_output=False, decode=False)
         return res.returncode == 0
 
     def execute_powershell_script(
