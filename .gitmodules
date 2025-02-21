@@ -1,0 +1,3 @@
+[submodule "contrib/secureboot_objects"]
+	path = contrib/secureboot_objects
+	url = https://github.com/microsoft/secureboot_objects.git
