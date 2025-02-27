@@ -173,3 +173,30 @@ def check_vm_cert_md5sum(vm, key, reference_file):
     assert res.returncode == 0, f"Cert {key} must be present"
     reference_md5 = get_md5sum_from_auth(reference_file)
     assert hashlib.md5(res.stdout).hexdigest() == reference_md5
+
+def _test_uefi_var_lifecycle(vm, source_host, dest_host):
+    shared_sr = source_host.pool.first_shared_sr()
+    vm.start(on=source_host.uuid)
+    vm.wait_for_os_booted()
+
+    res = vm.host.ssh(['varstore-ls', vm.uuid], simple_output=False)
+    reference = {}
+    for line in res.stdout.splitlines():
+        splitted_line = line.split(' ')
+        assert len(splitted_line) == 2
+        guid, name = splitted_line[0], splitted_line[1]
+        returned_res = vm.host.ssh(['varstore-get', vm.uuid, guid, name],
+                                   simple_output=False, decode=False)
+        md5 = hashlib.md5(returned_res.stdout).hexdigest()
+        reference[(guid, name)] = md5
+
+    vm.shutdown(verify=True)
+    vm.start(on=dest_host.uuid)
+
+    # Check UEFI var are kept
+    for key, value in reference.items():
+        guid, name = key[0], key[1]
+        returned_res = vm.host.ssh(['varstore-get', vm.uuid, guid, name],
+                                   simple_output=False, decode=False)
+        md5 = hashlib.md5(returned_res.stdout).hexdigest()
+        assert md5 == value
