@@ -21,16 +21,20 @@ def vdis(host, local_sr_on_hostA1):
 
 @pytest.fixture(scope='module')
 def vm_with_vbds(host, vdis, imported_vm):
-    def _make_vbd(host, device, vdi):
-        host.xe('vbd-create', {
-            'vm-uuid': vm.uuid, 'mode': 'RW', 'type': 'Disk', 'device': device, 'vdi-uuid': vdi
-        })
-
+    vbds = []
     vm = imported_vm
     vdi_A, vdi_B, vdi_C = vdis
 
-    for name, vdi in [("xvdn", vdi_A), ("xvdo", vdi_B), ("xvdp", vdi_C)]:
-        _make_vbd(host, name, vdi)
+    for device, vdi in [("xvdn", vdi_A), ("xvdo", vdi_B), ("xvdp", vdi_C)]:
+        vbd_uuid = host.xe('vbd-create', {
+            'vm-uuid': vm.uuid, 'mode': 'RW', 'type': 'Disk', 'device': device, 'vdi-uuid': vdi
+        })
+        vbds.append(vbd_uuid)
 
     vm.start()
+
     yield vm
+
+    vm.shutdown(verify=True)
+    for vbd_uuid in vbds:
+        host.xe("vbd-destroy", {"uuid": vbd_uuid})
