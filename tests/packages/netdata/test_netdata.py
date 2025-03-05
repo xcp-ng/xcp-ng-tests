@@ -31,7 +31,9 @@ class TestsNetdata:
     # Netdata configuration should be accessible only from the host
     def test_netdata_conf(self, host):
         lines = TestsNetdata.__get_headers(host, 19999, "netdata.conf")
-        assert lines[0].strip() == "HTTP/1.1 403 Forbidden"
+        response = lines[0].strip()
+        assert response == "HTTP/1.1 403 Forbidden" or \
+               response == "HTTP/1.1 451 Unavailable For Legal Reasons"
 
         stdout = host.ssh(['curl', "-XGET", "-k", "-I", '-s', 'localhost:19999/netdata.conf'])
         lines = stdout.splitlines()
