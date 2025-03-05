@@ -41,6 +41,14 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
         for device in devices:
             host.ssh(['pvremove', device])
 
+@pytest.fixture(scope="package")
+def storage_pool_name(provisioning_type):
+    return GROUP_NAME if provisioning_type == "thick" else STORAGE_POOL_NAME
+
+@pytest.fixture(params=["thin", "thick"], scope="session")
+def provisioning_type(request):
+    return request.param
+
 @pytest.fixture(scope='package')
 def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
     import concurrent.futures
@@ -79,11 +87,11 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
         executor.map(remove_linstor, pool.hosts)
 
 @pytest.fixture(scope='package')
-def linstor_sr(pool_with_linstor):
+def linstor_sr(pool_with_linstor, provisioning_type, storage_pool_name):
     sr = pool_with_linstor.master.sr_create('linstor', 'LINSTOR-SR-test', {
-        'group-name': STORAGE_POOL_NAME,
+        'group-name': storage_pool_name,
         'redundancy': str(min(len(pool_with_linstor.hosts), 3)),
-        'provisioning': 'thin'
+        'provisioning': provisioning_type
     }, shared=True)
     yield sr
     sr.destroy()
