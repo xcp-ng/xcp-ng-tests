@@ -12,31 +12,34 @@ LINSTOR_RELEASE_PACKAGE = 'xcp-ng-release-linstor'
 LINSTOR_PACKAGE = 'xcp-ng-linstor'
 
 @pytest.fixture(scope='package')
-def lvm_disk(host, sr_disk_for_all_hosts):
-    device = '/dev/' + sr_disk_for_all_hosts
+def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
+    devices = [f"/dev/{disk}" for disk in sr_disks_for_all_hosts]
     hosts = host.pool.hosts
 
     for host in hosts:
-        try:
-            host.ssh(['pvcreate', '-ff', '-y', device])
-        except commands.SSHCommandFailed as e:
-            if e.stdout.endswith('Mounted filesystem?'):
-                host.ssh(['vgremove', '-f', GROUP_NAME, '-y'])
+        for device in devices:
+            try:
                 host.ssh(['pvcreate', '-ff', '-y', device])
-            elif e.stdout.endswith('excluded by a filter.'):
-                host.ssh(['wipefs', '-a', device])
-                host.ssh(['pvcreate', '-ff', '-y', device])
-            else:
-                raise e
+            except commands.SSHCommandFailed as e:
+                if e.stdout.endswith('Mounted filesystem?'):
+                    host.ssh(['vgremove', '-f', GROUP_NAME, '-y'])
+                    host.ssh(['pvcreate', '-ff', '-y', device])
+                elif e.stdout.endswith('excluded by a filter.'):
+                    host.ssh(['wipefs', '-a', device])
+                    host.ssh(['pvcreate', '-ff', '-y', device])
+                else:
+                    raise e
 
-        host.ssh(['vgcreate', GROUP_NAME, device])
-        host.ssh(['lvcreate', '-l', '100%FREE', '-T', STORAGE_POOL_NAME])
+        host.ssh(['vgcreate', GROUP_NAME] + devices)
+        if provisioning_type == 'thin':
+            host.ssh(['lvcreate', '-l', '100%FREE', '-T', STORAGE_POOL_NAME])
 
-    yield device
+    yield devices
 
     for host in hosts:
         host.ssh(['vgremove', '-f', GROUP_NAME])
-        host.ssh(['pvremove', device])
+        for device in devices:
+            host.ssh(['pvremove', device])
 
 @pytest.fixture(scope='package')
 def pool_with_linstor(hostA2, lvm_disk, pool_with_saved_yum_state):
