@@ -42,15 +42,21 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
             host.ssh(['pvremove', device])
 
 @pytest.fixture(scope='package')
-def pool_with_linstor(hostA2, lvm_disk, pool_with_saved_yum_state):
+def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
+    import concurrent.futures
     pool = pool_with_saved_yum_state
-    for host in pool.hosts:
+
+    def check_linstor_installed(host):
         if host.is_package_installed(LINSTOR_PACKAGE):
             raise Exception(
                 f'{LINSTOR_PACKAGE} is already installed on host {host}. This should not be the case.'
             )
 
-    for host in pool.hosts:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(check_linstor_installed, pool.hosts)
+
+    def install_linstor(host):
+        logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
         host.yum_install([LINSTOR_RELEASE_PACKAGE])
         host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
         # Needed because the linstor driver is not in the xapi sm-plugins list
@@ -58,7 +64,19 @@ def pool_with_linstor(hostA2, lvm_disk, pool_with_saved_yum_state):
         host.ssh(["systemctl", "restart", "multipathd"])
         host.restart_toolstack(verify=True)
 
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(install_linstor, pool.hosts)
+
     yield pool
+
+    # Need to remove this package as we have separate run of `test_create_sr_without_linstor`
+    # for `thin` and `thick` `provisioning_type`.
+    def remove_linstor(host):
+        logging.info(f"Cleaning up python-linstor from host {host}...")
+        host.yum_remove(["python-linstor"])
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(remove_linstor, pool.hosts)
 
 @pytest.fixture(scope='package')
 def linstor_sr(pool_with_linstor):
