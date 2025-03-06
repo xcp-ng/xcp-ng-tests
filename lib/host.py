@@ -86,8 +86,14 @@ class Host:
                 return ret.rstrip()
             return "{}={}".format(key, shlex.quote(value))
 
-        command = ['xe', action] + maybe_param_minimal + maybe_param_force + \
-                  [stringify(key, value) for key, value in args.items()]
+        # Handle scenarios like config:key=value
+        # device-config:redundancy=2 device-config:provisioning=thin
+        command = ['xe', action] + maybe_param_minimal + maybe_param_force
+        if isinstance(args, dict):
+            command += [stringify(key, value) for key, value in args.items()]
+        elif isinstance(args, list):
+            command += [stringify(key, value) for key, value in args]
+
         result = self.ssh(
             command,
             check=check,
