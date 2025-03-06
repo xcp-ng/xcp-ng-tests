@@ -40,6 +40,7 @@ class SR:
 
     def all_pbds_attached(self):
         all_attached = True
+        # TBD: handle sr that does not have PBD, following will return all_attached=True
         for pbd_uuid in self.pbd_uuids():
             all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid,
                                                                 'param-name': 'currently-attached'})
@@ -144,6 +145,20 @@ class SR:
 
     def content_type(self):
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
+
+    def param_get(self, param):
+        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': param})
+
+    def type(self):
+        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'type'})
+
+    def forget(self):
+        return self.pool.master.xe('sr-forget', {'uuid': self.uuid})
+
+    def introduce(self, type, shared, name_label, uuid):
+        return self.pool.master.xe('sr-introduce', {'uuid': self.uuid, 'type': type,
+                                                    'shared': shared, 'content-type': 'user',
+                                                    'name-label': name_label, 'uuid': uuid})
 
     def is_shared(self):
         if self._is_shared is None:
