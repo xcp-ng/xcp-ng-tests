@@ -4,7 +4,7 @@ import time
 
 from .conftest import LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
-from lib.common import wait_for, vm_image
+from lib.common import wait_for, vm_image, safe_split
 from tests.storage import vdi_is_open
 
 # Requirements:
@@ -85,6 +85,54 @@ class TestLinstorSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    def test_forget_and_introduce_sr(self, linstor_sr):
+        from lib.sr import SR
+
+        sr = linstor_sr
+        sr_name = sr.param_get('name-label')
+        all_pbds = sr.pbd_uuids()
+        pbd_config_hosts = []
+        pbd_config_devices = []
+        # TBD: Move the pbd-param-get to either sr.py or introduce pbd.py
+        for pbd in all_pbds:
+            pbd_config_hosts.append(
+                safe_split(sr.pool.master.xe('pbd-param-get', {'uuid': pbd, 'param-name': 'host-uuid'})))
+            pbd_config_devices.append(
+                safe_split(sr.pool.master.xe('pbd-param-get', {'uuid': pbd, 'param-name': 'device-config'})))
+
+        sr.forget()
+        logging.info("Forgot SR %s successfully", sr.uuid)
+
+        with pytest.raises(Exception):
+            sr_type = sr.param_get('type') # Expecting exception as sr should not exist
+            sr.plug_pbds() # Plug back pbds and let teardown handle SR destroy
+            pytest.fail(f"SR still exists; returned type: {sr_type}")
+
+        logging.info("Introducing SR %s back", sr.uuid)
+        new_sr = sr.introduce(type='linstor', shared='true', name_label=sr_name, uuid=sr.uuid)
+
+        # Example pbd_config_device
+        # {provisioning: thin; redundancy: 3; group-name: linstor_group/thin_device}
+        for pbd_config_host, pbd_config_device in zip(pbd_config_hosts, pbd_config_devices):
+            pbd_config_dict = dict(
+                (kv.split(": ")[0].strip(), kv.split(": ")[1].strip())
+                for kv in pbd_config_device[0].split(";") if ": " in kv # Ensure key-value pair
+            )
+            device_config_entries = [('device-config:' + k, v) for k, v in pbd_config_dict.items()]
+
+            sr.pool.master.xe(
+                'pbd-create',
+                [
+                    ('sr-uuid', new_sr),
+                    ('host-uuid', pbd_config_host[0]),
+                    ('content-type', 'user'),
+                ] + device_config_entries
+            )
+
+        restored_sr = SR(new_sr, sr.pool)
+        restored_sr.plug_pbds(verify=True)
+        logging.info("Introduced SR %s successfully", sr.uuid)
 
     # *** tests with reboots (longer tests).
 
