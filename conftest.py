@@ -75,6 +75,13 @@ def pytest_addoption(parser):
              "4KiB blocksize to be formatted and used in storage tests. "
              "Set it to 'auto' to let the fixtures auto-detect available disks."
     )
+    parser.addoption(
+        "--sr-type",
+        action="append",
+        default=[],
+        help="Name of SR type to run on generic SR tests. "
+        "Set it to 'all' to run on all generic SR types."
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
