@@ -37,9 +37,10 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
     yield devices
 
     for host in hosts:
+        devices = host.ssh('vgs ' + GROUP_NAME + ' -o pv_name --no-headings').split("\n")
         host.ssh(['vgremove', '-f', GROUP_NAME])
         for device in devices:
-            host.ssh(['pvremove', device])
+            host.ssh(['pvremove', '-ff', '-y', device.strip()])
 
 @pytest.fixture(scope="package")
 def storage_pool_name(provisioning_type):
