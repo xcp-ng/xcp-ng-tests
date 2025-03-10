@@ -70,6 +70,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm",
             "--sr-disk": "auto",
+            "--sr-type": "all",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not sr_disk_4k",
@@ -88,6 +89,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm",
             "--sr-disk": "auto",
+            "--sr-type": "all",
         },
         "paths": ["tests/storage"],
         "markers": "not sr_disk_4k",
@@ -105,6 +107,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm",
             "--sr-disk": "auto",
+            "--sr-type": "all",
         },
         "paths": ["tests/storage"],
         "markers": "reboot and not flaky and not sr_disk_4k",
@@ -120,6 +123,7 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--sr-disk": "auto",
+            "--sr-type": "all",
         },
         "paths": ["tests/storage"],
         "markers": "quicktest and not sr_disk_4k",
