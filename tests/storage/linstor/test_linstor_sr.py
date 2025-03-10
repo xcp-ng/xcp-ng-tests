@@ -2,7 +2,7 @@ import logging
 import pytest
 import time
 
-from .conftest import LINSTOR_PACKAGE
+from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 from tests.storage import vdi_is_open
@@ -86,6 +86,29 @@ class TestLinstorSR:
         finally:
             vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    def test_linstor_sr_expand_disk(self, linstor_sr, provisioning_type, storage_pool_name,
+                                    pytestconfig, vm_with_reboot_check):
+        """
+        This test demonstrates online expansion of a LINSTOR SR while a VM is actively running on it.
+
+        It identifies hosts within the same pool, detects free raw disks, and expands the LVM to grow the SR.
+        A VM is started before the expansion, and its functionality is verified through a shutdown and restart
+        after the expansion completes successfully.
+        """
+        sr = linstor_sr
+        sr_size = sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'})
+
+        resized = _expand_lvm_on_hosts(sr, provisioning_type, storage_pool_name, pytestconfig)
+
+        # Need to ensure that linstor is healthy/up-to-date before moving ahead.
+        time.sleep(30) # Wait time for Linstor node communications to restore.
+        sr.scan()
+        new_sr_size = sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'})
+        assert int(new_sr_size) > int(sr_size) and resized is True, \
+            f"Expected SR size to increase but got old size: {sr_size}, new size: {new_sr_size}"
+        logging.info("SR expansion completed")
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
@@ -132,6 +155,40 @@ class TestLinstorSR:
                 host.yum_install([LINSTOR_PACKAGE])
 
     # *** End of tests with reboots
+
+def _expand_lvm_on_hosts(sr, provisioning_type, storage_pool_name, pytestconfig):
+    from lib.commands import SSHCommandFailed
+    resized = False
+    for h in sr.pool.hosts:
+        logging.info(f"Checking for available disks on host: {h.hostname_or_ip}")
+        available_disks = [d for d in h.available_disks() if h.raw_disk_is_available(d)]
+
+        disks = []
+        expansion_sr_disk = pytestconfig.getoption("expansion_sr_disk")
+        if expansion_sr_disk:
+            assert len(expansion_sr_disk) == 1, "Only one --expansion-sr-disk should be provided"
+            if expansion_sr_disk[0] == "auto":
+                disks = available_disks
+            else:
+                assert expansion_sr_disk[0] in available_disks, "The specified expansion disk is unavailable"
+                disks = expansion_sr_disk
+        else:
+            disks = available_disks
+
+        for disk in disks:
+            device = f"/dev/{disk}"
+            try:
+                h.ssh(['pvcreate', device])
+                h.ssh(['vgextend', GROUP_NAME, device])
+                if provisioning_type == "thin":
+                    h.ssh(['lvextend', '-l', '+100%FREE', storage_pool_name])
+                else:
+                    h.ssh(['systemctl', 'restart', 'linstor-satellite.service'])
+                resized = True
+                logging.info("LVM extended on host %s using device %s", h.hostname_or_ip, device)
+            except SSHCommandFailed as e:
+                raise RuntimeError(f"Disk expansion failed on {h.hostname_or_ip}: {e}")
+    return resized
 
 # --- Test diskless resources --------------------------------------------------
 
