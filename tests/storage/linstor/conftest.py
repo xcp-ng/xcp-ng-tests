@@ -159,3 +159,70 @@ def vm_with_reboot_check(vm_on_linstor_sr):
     vm.start()
     vm.wait_for_os_booted()
     vm.shutdown(verify=True)
+
+@pytest.fixture(scope='module')
+def evacuate_host_and_prepare_removal(host, hostA2, vm_with_reboot_check):
+    assert len(host.pool.hosts) >= 3, "This test requires Pool to have more than 3 hosts"
+
+    vm = vm_with_reboot_check
+    try:
+        host.ssh(f'xe host-evacuate uuid={hostA2.uuid}')
+    except Exception as e:
+        logging.warning("Host evacuation failed: %s", e)
+        if "lacks the feature" in getattr(e, "stdout", ""):
+            vm.shutdown(verify=True, force_if_fails=True)
+            host.ssh(f'xe host-evacuate uuid={hostA2.uuid}')
+            available_hosts = [h.uuid for h in host.pool.hosts if h.uuid != hostA2.uuid]
+            if available_hosts:
+                vm.start(on=available_hosts[0])
+    yield
+
+@pytest.fixture(scope='module')
+def remove_host_from_linstor(host, hostA2, linstor_sr, evacuate_host_and_prepare_removal):
+    import time
+    # Select a host that is not running the LINSTOR controller (port 3370)
+    linstor_controller_host = None
+    for h in host.pool.hosts:
+        if h.ssh_with_result(["ss -tuln | grep :3370"]).returncode == 0:
+            linstor_controller_host = h
+            break
+
+    # If the controller is running on the host to be ejected (hostA2), stop the services first
+    if linstor_controller_host and linstor_controller_host.uuid == hostA2.uuid:
+        logging.info("Ejecting host is running LINSTOR controller, stopping services first.")
+        hostA2.ssh("systemctl stop linstor-controller.service")
+        hostA2.ssh("systemctl stop drbd-reactor.service")
+        hostA2.ssh("systemctl stop drbd-graceful-shutdown.service")
+        time.sleep(30)  # Give time for services to stop
+
+    ejecting_host = hostA2.xe('host-param-get', {'uuid': hostA2.uuid, 'param-name': 'name-label'})
+    controller_option = "--controllers=" + ",".join([m.hostname_or_ip for m in host.pool.hosts])
+
+    hostA2.ssh("systemctl stop linstor-satellite.service")
+
+    pbd = host.xe('pbd-list', {'sr-uuid': linstor_sr.uuid, 'host-uuid': hostA2.uuid}, minimal=True)
+    host.xe('pbd-unplug', {'uuid': pbd})
+
+    logging.info(host.ssh_with_result(["linstor", controller_option, "node", "delete", ejecting_host]).stdout)
+    host.pool.eject_host(hostA2)
+
+    yield
+
+    logging.info("Rejoining hostA2 to the pool after test")
+    hostA2.join_pool(host.pool)
+    # We dont want linstor services to be running on a deleted node
+    hostA2.ssh("systemctl stop linstor-satellite.service")
+    hostA2.ssh("systemctl stop drbd-graceful-shutdown.service")
+    # TODO: Package list is not retained in teardown
+    # hostA2.saved_packages_list = hostA2.packages()
+    # hostA2.saved_rollback_id = hostA2.get_last_yum_history_tid()
+
+@pytest.fixture(scope='module')
+def get_sr_size(linstor_sr):
+    sr = linstor_sr
+    sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+    logging.info("SR Size: %s", sr_size)
+    yield
+    new_sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+    logging.info("New SR Size vs Old SR Size: %s vs %s", new_sr_size, sr_size)
+    assert new_sr_size != sr_size, "SR size did not change"
