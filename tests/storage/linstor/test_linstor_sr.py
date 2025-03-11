@@ -171,6 +171,47 @@ class TestLinstorSR:
         # Cleanup
         host.ssh(["linstor", controller_option, "node", "delete", hostname])
 
+    @pytest.mark.small_vm
+    def test_linstor_sr_reduce_disk(self, linstor_sr, vm_with_reboot_check, provisioning_type):
+        """
+        Identify hosts within the same pool, detect used disks, modify LVM, and rescan LINSTOR SR.
+        """
+        if provisioning_type == "thin":
+            logging.info(f"* SR reductoin by removing device is not supported for {provisioning_type} type *")
+            return
+        sr = linstor_sr
+        sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+        resized = False
+
+        for h in sr.pool.hosts:
+            logging.info("Working on %s", h.hostname_or_ip)
+            devices = h.ssh('vgs ' + GROUP_NAME + ' -o pv_name --no-headings').split("\n")
+            assert len(devices) > 1, "This test requires {GROUP_NAME} to have more than 1 disk or parition"
+            eject_device = devices[-1].strip()
+            logging.info("Attempting to remove device: %s", eject_device)
+            try:
+                h.ssh(['pvmove', eject_device]) # Choosing last device from list, assuming its least filled
+                h.ssh(['vgreduce', GROUP_NAME, eject_device])
+                h.ssh(['pvremove', eject_device])
+            except SSHCommandFailed as e:
+                if "No data to move for" in e.stdout:
+                    h.ssh(['vgreduce', GROUP_NAME, eject_device])
+                    h.ssh(['pvremove', eject_device])
+                else:
+                    pytest.fail("Failed to empty device")
+            h.ssh('systemctl restart linstor-satellite.service')
+            resized = True
+
+        # Need to ensure that linstor is healthy/up-to-date before moving ahead.
+        time.sleep(30) # Wait time for Linstor node communications to restore after service restart.
+
+        sr.scan()
+
+        new_sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+        assert new_sr_size < sr_size and resized, \
+            f"Expected SR size to decrease but got old size: {sr_size}, new size: {new_sr_size}"
+        logging.info("SR reduction by removing disk is completed from %s to %s", sr_size, new_sr_size)
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
