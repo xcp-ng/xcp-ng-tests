@@ -1,13 +1,14 @@
 import logging
 import traceback
+from typing import Optional
 
 from packaging import version
 
 import lib.commands as commands
-
-from lib.common import safe_split, wait_for, wait_for_not, _param_get, _param_set
+from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
+
 
 class Pool:
     xe_prefix = "pool"
@@ -20,8 +21,8 @@ class Pool:
 
         # wait for XAPI startup to be done, or we can get "Connection
         # refused (calling connect )" when calling self.hosts_uuids()
-        wait_for(lambda: commands.ssh(master_hostname_or_ip, ['xapi-wait-init-complete', '60'],
-                                      check=False, simple_output=False).returncode == 0,
+        wait_for(lambda: commands.ssh_with_result(master_hostname_or_ip,
+                                                  ['xapi-wait-init-complete', '60']).returncode == 0,
                  f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
                  timeout_secs=30 * 60)
 
@@ -108,7 +109,7 @@ class Pool:
                 return h
         return None
 
-    def first_shared_sr(self):
+    def first_shared_sr(self) -> Optional[SR]:
         uuids = safe_split(self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True))
         if len(uuids) > 0:
             return SR(uuids[0], self)
@@ -138,7 +139,7 @@ class Pool:
         assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
         logging.info('Saving pool UEFI certificates')
 
-        if int(self.master.ssh(["secureboot-certs", "--version"]).split(".")[0]) < 1:
+        if int(self.master.ssh_str(["secureboot-certs", "--version"]).split(".")[0]) < 1:
             raise RuntimeError("The host must have secureboot-certs version >= 1.0.0")
 
         saved_certs = {
