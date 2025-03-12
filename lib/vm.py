@@ -159,7 +159,7 @@ class VM(BaseVM):
         self.host.xe('vm-unpause', {'uuid': self.uuid})
 
     def _disk_list(self):
-        return self.host.xe('vm-disk-list', {'uuid': self.uuid}, minimal=True)
+        return self.host.xe('vm-disk-list', {'uuid': self.uuid, 'vbd-params': ''}, minimal=True)
 
     def _destroy(self):
         self.host.xe('vm-destroy', {'uuid': self.uuid})
