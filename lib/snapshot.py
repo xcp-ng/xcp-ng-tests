@@ -4,7 +4,8 @@ from lib.basevm import BaseVM
 
 class Snapshot(BaseVM):
     def _disk_list(self):
-        return self.host.xe('snapshot-disk-list', {'uuid': self.uuid}, minimal=True)
+        return self.host.xe('snapshot-disk-list', {'uuid': self.uuid, 'vbd-params': ''},
+                            minimal=True)
 
     def destroy(self, verify=False):
         logging.info("Delete snapshot " + self.uuid)
