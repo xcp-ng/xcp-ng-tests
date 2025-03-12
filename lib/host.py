@@ -1,14 +1,17 @@
-import json
 import logging
 import os
 import shlex
+import subprocess
 import tempfile
 import uuid
 
 from packaging import version
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
 
 import lib.commands as commands
 import lib.pif as pif
+if TYPE_CHECKING:
+    import lib.pool
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
@@ -34,12 +37,10 @@ def host_data(hostname_or_ip):
 class Host:
     xe_prefix = "host"
 
-    def __init__(self, pool, hostname_or_ip):
+    def __init__(self, pool: 'lib.pool.Pool', hostname_or_ip):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
-        self.inventory = None
-        self.uuid = None
-        self.xo_srv_id = None
+        self.xo_srv_id: Optional[str] = None
 
         h_data = host_data(self.hostname_or_ip)
         self.user = h_data['user']
@@ -56,15 +57,45 @@ class Host:
     def __str__(self):
         return self.hostname_or_ip
 
-    def ssh(self, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            decode: Literal[True] = True) -> str:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            decode: Literal[False]) -> bytes:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            decode: bool) -> commands.SSHResult:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+            suppress_fingerprint_warnings: bool = True, background: Literal[True],
+            decode: bool = True) -> None:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True) \
+            -> Union[str, bytes, commands.SSHResult, None]:
+        ...
+
+    def ssh(self, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
             background=False, decode=True):
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
-                            suppress_fingerprint_warnings=suppress_fingerprint_warnings, background=background,
-                            decode=decode)
+                            suppress_fingerprint_warnings=suppress_fingerprint_warnings,
+                            background=background, decode=decode)
 
-    def ssh_with_result(self, cmd):
+    def ssh_with_result(self, cmd) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return self.ssh(cmd, check=False, simple_output=False)
+        return commands.ssh_with_result(self.hostname_or_ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         return commands.scp(
@@ -72,7 +103,18 @@ class Host:
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
-    def xe(self, action, args={}, check=True, simple_output=True, minimal=False, force=False):
+    @overload
+    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = True,
+           simple_output: Literal[True] = True, minimal: bool = False, force: bool = False) -> Union[bool, str]:
+        ...
+
+    @overload
+    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = True,
+           simple_output: Literal[False], minimal: bool = False, force: bool = False) -> commands.SSHResult:
+        ...
+
+    def xe(self, action, args={}, *, check=True, simple_output=True, minimal=False, force=False) \
+            -> Union[bool, str, commands.SSHResult]:
         maybe_param_minimal = ['--minimal'] if minimal else []
         maybe_param_force = ['--force'] if force else []
 
@@ -86,13 +128,14 @@ class Host:
                 return ret.rstrip()
             return "{}={}".format(key, shlex.quote(value))
 
-        command = ['xe', action] + maybe_param_minimal + maybe_param_force + \
-                  [stringify(key, value) for key, value in args.items()]
+        command: List[str] = ['xe', action] + maybe_param_minimal + maybe_param_force + \
+                             [stringify(key, value) for key, value in args.items()]
         result = self.ssh(
             command,
             check=check,
             simple_output=simple_output
         )
+        assert isinstance(result, (str, commands.SSHResult))
 
         if result == 'true':
             return True
@@ -160,7 +203,7 @@ class Host:
 
     def _get_xensource_inventory(self):
         output = self.ssh(['cat', '/etc/xensource-inventory'])
-        inventory = {}
+        inventory: dict[str, str] = {}
         for line in output.splitlines():
             key, raw_value = line.split('=')
             inventory[key] = raw_value.strip('\'')
@@ -199,7 +242,7 @@ class Host:
                 'allowUnauthorized': 'true',
                 'label': label
             }
-        )
+        ).decode()
         self.xo_srv_id = xo_srv_id
 
     def xo_server_status(self):
@@ -213,6 +256,7 @@ class Host:
         return self.xo_server_status() == "connected"
 
     def xo_server_reconnect(self):
+        assert self.xo_srv_id is not None
         logging.info("Reconnect XO to host %s" % self)
         xo_cli('server.disable', {'id': self.xo_srv_id})
         xo_cli('server.enable', {'id': self.xo_srv_id})
@@ -282,6 +326,7 @@ class Host:
             },
         )
 
+        download_path = None
         try:
             params = {'uuid': vdi_uuid}
             if '://' in uri:
@@ -290,7 +335,6 @@ class Host:
                 self.ssh(f"curl -o '{download_path}' '{uri}'")
                 params['filename'] = download_path
             else:
-                download_path = None
                 params['filename'] = uri
             logging.info(f"Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
 
@@ -352,7 +396,7 @@ class Host:
         """
         try:
             history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
-        except commands.SSHCommandFailed as e:
+        except commands.SSHCommandFailed:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
             # To workaround this, create transactions: install and remove a small package.

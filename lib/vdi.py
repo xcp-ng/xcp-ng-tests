@@ -1,14 +1,28 @@
 import logging
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from typing import Literal, Optional, overload, TYPE_CHECKING
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.sr import SR
 
 class VDI:
     xe_prefix = "vdi"
+    sr: "SR"
+
+    @overload
+    def __init__(self, uuid: str, *, host: "Host", sr: Literal[None] = None):
+        ...
+
+    @overload
+    def __init__(self, uuid, *, host: Literal[None] = None, sr: "SR"):
+        ...
 
     def __init__(self, uuid, *, host=None, sr=None):
         self.uuid = uuid
         # TODO: use a different approach when migration is possible
         if sr is None:
+            assert host
             sr_uuid = host.pool.get_vdi_sr_uuid(uuid)
             # avoid circular import
             # FIXME should get it from Host instead

@@ -5,9 +5,12 @@ import sys
 import time
 import traceback
 from enum import Enum
+from typing import TYPE_CHECKING, Dict, Optional, Union
 from uuid import UUID
 
 import lib.commands as commands
+if TYPE_CHECKING:
+    import lib.host
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
@@ -154,9 +157,10 @@ def strtobool(str):
         return False
     raise ValueError("invalid truth value '{}'".format(str))
 
-def _param_get(host, xe_prefix, uuid, param_name, key=None, accept_unknown_key=False):
+def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
+               accept_unknown_key=False) -> Optional[str]:
     """ Common implementation for param_get. """
-    args = {'uuid': uuid, 'param-name': param_name}
+    args: Dict[str, Union[str, bool]] = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
     try:

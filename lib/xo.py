@@ -1,6 +1,24 @@
 import json
 import subprocess
+from typing import Any, Dict, Literal, Union, overload
 
+
+@overload
+def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[True] = True,
+           use_json: Literal[False] = False) -> bytes:
+    ...
+@overload
+def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[True] = True,
+           use_json: Literal[True]) -> Any:
+    ...
+@overload
+def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[False],
+           use_json: bool = False) -> subprocess.CompletedProcess:
+    ...
+@overload
+def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: bool = True,
+           use_json: bool = False) -> Union[subprocess.CompletedProcess, Any, bytes]:
+    ...
 def xo_cli(action, args={}, check=True, simple_output=True, use_json=False):
     run_array = ['xo-cli', action]
     if use_json:

@@ -2,29 +2,30 @@ import logging
 import pytest
 
 from lib.common import wait_for_not
+from lib.vm import VM
 
 @pytest.mark.multi_vms
 class Test:
-    def test_pause(self, running_vm):
+    def test_pause(self, running_vm: VM):
         vm = running_vm
         vm.pause(verify=True)
         vm.unpause()
         vm.wait_for_vm_running_and_ssh_up()
 
-    def test_suspend(self, running_vm):
+    def test_suspend(self, running_vm: VM):
         vm = running_vm
         vm.suspend(verify=True)
         vm.resume()
         vm.wait_for_vm_running_and_ssh_up()
 
-    def test_snapshot(self, running_vm):
+    def test_snapshot(self, running_vm: VM):
         vm = running_vm
         vm.test_snapshot_on_running_vm()
 
     # When using a windows VM the background ssh process is never terminated
     # This results in a ResourceWarning
     @pytest.mark.filterwarnings("ignore::ResourceWarning")
-    def test_checkpoint(self, running_vm):
+    def test_checkpoint(self, running_vm: VM):
         vm = running_vm
         logging.info("Start a 'sleep' process on VM through SSH")
         pid = vm.start_background_process('sleep 10000')
