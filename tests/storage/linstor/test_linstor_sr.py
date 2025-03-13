@@ -2,13 +2,13 @@ import logging
 import pytest
 import time
 
-from .conftest import STORAGE_POOL_NAME, LINSTOR_PACKAGE
+from .conftest import LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
-from lib.common import wait_for, vm_image
+from lib.common import wait_for, vm_image, safe_split
 from tests.storage import vdi_is_open
 
 # Requirements:
-# - one XCP-ng host >= 8.2 with an additional unused disk for the SR
+# - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
 # - access to XCP-ng RPM repository from the host
 
 class TestLinstorSRCreateDestroy:
@@ -18,15 +18,15 @@ class TestLinstorSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_without_linstor(self, host, lvm_disk):
+    def test_create_sr_without_linstor(self, host, lvm_disks, provisioning_type, storage_pool_name):
         # This test must be the first in the series in this module
         assert not host.is_package_installed('python-linstor'), \
             "linstor must not be installed on the host at the beginning of the tests"
         try:
             sr = host.sr_create('linstor', 'LINSTOR-SR-test', {
-                'group-name': STORAGE_POOL_NAME,
+                'group-name': storage_pool_name,
                 'redundancy': '1',
-                'provisioning': 'thin'
+                'provisioning': provisioning_type
             }, shared=True)
             try:
                 sr.destroy()
@@ -36,13 +36,13 @@ class TestLinstorSRCreateDestroy:
         except SSHCommandFailed as e:
             logging.info("SR creation failed, as expected: {}".format(e))
 
-    def test_create_and_destroy_sr(self, pool_with_linstor):
+    def test_create_and_destroy_sr(self, pool_with_linstor, provisioning_type, storage_pool_name):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = pool_with_linstor.master
         sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
-            'group-name': STORAGE_POOL_NAME,
+            'group-name': storage_pool_name,
             'redundancy': '1',
-            'provisioning': 'thin'
+            'provisioning': provisioning_type
         }, shared=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_linstor_sr fixture used in
         # the next tests, because errors in fixtures break teardown
@@ -77,6 +77,57 @@ class TestLinstorSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    def test_forget_and_introduce_sr(self, linstor_sr):
+        from lib.sr import SR
+
+        sr = linstor_sr
+        sr_name = sr.param_get('name-label')
+        all_pbds = sr.pbd_uuids()
+        pbd_config_hosts = []
+        pbd_config_devices = []
+        # TBD: Move the pbd-param-get to either sr.py or introduce pbd.py
+        for pbd in all_pbds:
+            pbd_config_hosts.append(
+                safe_split(sr.pool.master.xe('pbd-param-get', {'uuid': pbd, 'param-name': 'host-uuid'})))
+            pbd_config_devices.append(
+                safe_split(sr.pool.master.xe('pbd-param-get', {'uuid': pbd, 'param-name': 'device-config'})))
+
+        if sr.all_pbds_attached():
+            sr.unplug_pbds()
+
+        sr.forget()
+        logging.info(f"Forgot SR {sr.uuid} successfully.")
+
+        with pytest.raises(Exception):
+            sr_type = sr.param_get('type') # Expecting exception as sr should not exist
+            sr.plug_pbds() # Plug back pbds and let teardown handle SR destroy
+            pytest.fail(f"SR still exists; returned type: {sr_type}")
+
+        logging.info(f"Introducing SR {sr.uuid} back.")
+        new_sr = sr.introduce(type='linstor', shared='true', name_label=sr_name, uuid=sr.uuid)
+
+        # Example pbd_config_device
+        # {provisioning: thin; redundancy: 3; group-name: linstor_group/thin_device}
+        for pbd_config_host, pbd_config_device in zip(pbd_config_hosts, pbd_config_devices):
+            pbd_config_dict = dict(
+                (kv.split(": ")[0].strip(), kv.split(": ")[1].strip())
+                for kv in pbd_config_device[0].split(";") if ": " in kv # Ensure key-value pair
+            )
+            device_config_entries = [('device-config:' + k, v) for k, v in pbd_config_dict.items()]
+
+            sr.pool.master.xe(
+                'pbd-create',
+                [
+                    ('sr-uuid', new_sr),
+                    ('host-uuid', pbd_config_host[0]),
+                    ('content-type', 'user'),
+                ] + device_config_entries
+            )
+
+        restored_sr = SR(new_sr, sr.pool)
+        restored_sr.plug_pbds(verify=True)
+        logging.info(f"Introduced SR {sr.uuid} successfully.")
 
     # *** tests with reboots (longer tests).
 
@@ -147,7 +198,7 @@ def _ensure_resource_remain_diskless(host, controller_option, volume_name, diskl
 
 class TestLinstorDisklessResource:
     @pytest.mark.small_vm
-    def test_diskless_kept(self, host, linstor_sr, vm_on_linstor_sr):
+    def test_diskless_kept(self, host, linstor_sr, vm_on_linstor_sr, storage_pool_name):
         vm = vm_on_linstor_sr
         vdi_uuids = vm.vdi_uuids(sr_uuid=linstor_sr.uuid)
         vdi_uuid = vdi_uuids[0]
@@ -157,10 +208,12 @@ class TestLinstorDisklessResource:
         for member in host.pool.hosts:
             controller_option += f"{member.hostname_or_ip},"
 
+        sr_group_name = "xcp-sr-" + storage_pool_name.replace("/", "_")
+
         # Get volume name from VDI uuid
         # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
         output = host.ssh([
-            "linstor-kv-tool", "--dump-volumes", "-g", "xcp-sr-linstor_group_thin_device",
+            "linstor-kv-tool", "--dump-volumes", "-g", sr_group_name,
             "|", "grep", "volume-name", "|", "grep", vdi_uuid
         ])
         volume_name = output.split(': ')[1].split('"')[1]
