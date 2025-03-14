@@ -122,7 +122,7 @@ def get_secure_boot_guid(variable: str) -> GUID:
         'KEK': global_variable_guid,
         'db': image_security_database_guid,
         'dbx': image_security_database_guid,
-    }.get(variable)
+    }[variable]
 
 
 def cert_to_efi_sig_list(cert):
@@ -149,7 +149,7 @@ def cert_to_efi_sig_list(cert):
     )
 
 
-def certs_to_sig_db(certs):
+def certs_to_sig_db(certs) -> bytes:
     """Returns a signature database from a list cert file paths."""
     if isinstance(certs, str):
         certs = [certs]
@@ -380,7 +380,7 @@ class EFIAuth:
 
         return obj
 
-    def _get_efi_signature_list(self) -> str:
+    def _get_efi_signature_list(self) -> bytes:
         if self.is_null:
             return b''
 

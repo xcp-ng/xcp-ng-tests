@@ -387,7 +387,7 @@ class VM(BaseVM):
                 signed = db.sign_image(local_bin)
                 self.scp(signed, remote_bin)
 
-    def set_efi_var(self, var: str, guid: str, attrs: bytes, data: bytes):
+    def set_efi_var(self, var: str, guid: efi.GUID, attrs: bytes, data: bytes):
         """Sets the data and attrs for an EFI variable and GUID."""
         assert len(attrs) == 4
 

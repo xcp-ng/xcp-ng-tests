@@ -1,6 +1,6 @@
 import logging
 from pathlib import PureWindowsPath
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 import pytest
 from lib.common import wait_for
 from lib.vm import VM
@@ -48,7 +48,7 @@ class TestXenClean:
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_with_other_tools(self, vm_install_other_drivers: VM, guest_tools_iso):
+    def test_xenclean_with_other_tools(self, vm_install_other_drivers: Tuple[VM, Dict], guest_tools_iso):
         vm, param = vm_install_other_drivers
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
