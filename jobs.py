@@ -429,7 +429,7 @@ JOBS = {
         # This test needs 2 hosts that can be from the same pool
         "nb_pools": 1,
         "params": {},
-        "paths": ["tests/fs-diff"],
+        "paths": ["tests/fs_diff"],
     },
 }
 
