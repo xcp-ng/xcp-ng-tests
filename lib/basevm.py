@@ -1,6 +1,10 @@
 import logging
 
+from typing import TYPE_CHECKING
+
 import lib.commands as commands
+if TYPE_CHECKING:
+    import lib.host
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
@@ -10,7 +14,7 @@ class BaseVM:
 
     xe_prefix = "vm"
 
-    def __init__(self, uuid, host):
+    def __init__(self, uuid, host: 'lib.host.Host'):
         logging.info("New %s: %s", type(self).__name__, uuid)
         self.uuid = uuid
         self.host = host
@@ -36,7 +40,9 @@ class BaseVM:
                      param_name)
 
     def name(self):
-        return self.param_get('name-label')
+        n = self.param_get('name-label')
+        assert isinstance(n, str)
+        return n
 
     def vdi_uuids(self, sr_uuid=None):
         output = self._disk_list()
