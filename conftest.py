@@ -307,7 +307,7 @@ def sr_disk_for_all_hosts(pytestconfig, request, host):
         pytest.fail("This test requires exactly one --sr-disk parameter")
     disk = disks[0]
     master_disks = host.available_disks()
-    assert len(master_disks) > 0, "A free disk device is required on the master host"
+    assert len(master_disks) > 0, "a free disk device is required on the master host"
 
     if disk != "auto":
         assert disk in master_disks, \
@@ -335,16 +335,16 @@ def sr_disks_for_all_hosts(pytestconfig, request, host):
     assert len(disks) > 0, "This test requires at least one --sr-disk parameter"
     # Fetch available disks on the master host
     master_disks = host.available_disks()
-    assert len(master_disks) > 0, "A free disk device is required on the master host"
+    assert len(master_disks) > 0, "a free disk device is required on the master host"
 
-    if "auto" not in disks:
+    if "auto" in disks:
+        candidates = list(master_disks)
+    else:
         # Validate that all specified disks exist on the master host
         for disk in disks:
             assert disk in master_disks, \
                 f"Disk or block device {disk} is either not present or already used on the master host"
-        master_disks = [disk for disk in disks if disk in master_disks]
-
-    candidates = list(master_disks)
+        candidates = list(disks)
 
     # Check if all disks are available on all hosts in the pool
     for h in host.pool.hosts[1:]:
@@ -355,13 +355,12 @@ def sr_disks_for_all_hosts(pytestconfig, request, host):
         # Automatically select disks if "auto" is passed
         assert len(candidates) > 0, \
             f"Free disk devices are required on all pool members. Pool master has: {' '.join(master_disks)}."
-        logging.info(f">> Found free disk device(s) on all pool hosts: {' '.join(candidates)}. "
-                     f"Using: {', '.join(candidates)}")
+        logging.info(">> Using free disk device(s) on all pool hosts: %s.", candidates)
     else:
         # Ensure specified disks are free on all hosts
         assert len(candidates) == len(disks), \
             f"Some specified disks ({', '.join(disks)}) are not free or available on all hosts."
-        logging.info(f">> Disk(s) {', '.join(candidates)} are present and free on all pool members")
+        logging.info(">> Disk(s) %s are present and free on all pool members", candidates)
     yield candidates
 
 @pytest.fixture(scope='module')

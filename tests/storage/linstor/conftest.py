@@ -30,7 +30,6 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
                 else:
                     raise e
 
-        device_list = " ".join(devices)
         host.ssh(['vgcreate', GROUP_NAME] + devices)
         if provisioning_type == 'thin':
             host.ssh(['lvcreate', '-l', '100%FREE', '-T', STORAGE_POOL_NAME])
@@ -55,14 +54,14 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
     import concurrent.futures
     pool = pool_with_saved_yum_state
 
-    def is_linstor_installed(host):
+    def check_linstor_installed(host):
         if host.is_package_installed(LINSTOR_PACKAGE):
             raise Exception(
                 f'{LINSTOR_PACKAGE} is already installed on host {host}. This should not be the case.'
             )
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(is_linstor_installed, pool.hosts)
+        executor.map(check_linstor_installed, pool.hosts)
 
     def install_linstor(host):
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
@@ -78,6 +77,8 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
 
     yield pool
 
+    # Need to remove this package as we have separate run of `test_create_sr_without_linstor`
+    # for `thin` and `thick` `provisioning_type`.
     def remove_linstor(host):
         logging.info(f"Cleaning up python-linstor from host {host}...")
         host.yum_remove(["python-linstor"])
