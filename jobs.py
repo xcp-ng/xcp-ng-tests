@@ -333,7 +333,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm_unix_tools",
         },
-        "paths": ["tests/guest-tools/unix"],
+        "paths": ["tests/guest_tools/unix"],
         "markers": "",
     },
     "tools-unix-multi": {
@@ -347,7 +347,7 @@ JOBS = {
         "params": {
             "--vm[]": "multi/tools_unix",
         },
-        "paths": ["tests/guest-tools/unix"],
+        "paths": ["tests/guest_tools/unix"],
         "markers": "multi_vms",
     },
     "tools-windows": {
@@ -360,7 +360,7 @@ JOBS = {
         "params": {
             "--vm[]": "multi/tools_windows",
         },
-        "paths": ["tests/guest-tools/win"],
+        "paths": ["tests/guest_tools/win"],
         "markers": "multi_vms",
     },
     "xen": {
