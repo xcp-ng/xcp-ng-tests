@@ -132,19 +132,13 @@ ISO_IMAGES: Dict[str, "IsoImageDef"] = {
     #'83nightlynet': {'path': "http://pxe/isos/xcp-ng-8.3-ci-netinstall-latest"},
     #                 'net-url': 'fake",
     #                 'net-only': True},
-    '83rc1': {'path': "8.3/xcp-ng-8.3.0-rc1.iso",
-              #'net-url': "http://server/installers/xcp-ng/8.3-rc1",
-              },
+    '830': {'path': "8.3/xcp-ng-8.3.0.iso",
+            #'net-url': "http://server/installers/xcp-ng/8.3.0",
+            },
     ## FIXME: only a compensation for the lack of 83nightlynet
-    #'83rcnet': {'path': "8.3/xcp-ng-8.3.0-rc1-netinstall.iso",
-    #            'net-url': "http://server/installers/xcp-ng/8.3-rc1",
-    #            'net-only': True},
-    '83b2': {'path': "8.3/xcp-ng-8.3.0-beta2.iso",
-             #'net-url': "http://server/installers/xcp-ng/8.3-beta2",
-             },
-    '83b1': {'path': "8.3/xcp-ng-8.3.0-beta1.iso",
-             #'net-url': "http://server/installers/xcp-ng/8.3-beta1",
-             },
+    #'830net': {'path': "8.3/xcp-ng-8.3.0-netinstall.iso",
+    #           'net-url': "http://server/installers/xcp-ng/8.3.0",
+    #           'net-only': True},
     '82nightly': {'path': os.environ.get("XCPNG82_NIGHTLY",
                                          "http://unconfigured.iso"),
                   'unsigned': True},
@@ -252,8 +246,8 @@ BASE_ANSWERFILES = dict(
 )
 
 IMAGE_EQUIVS: Dict[str, str] = {
-#    'install.test::Nested::install[bios-83rc1-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb':
-#    'install.test::Nested::install[bios-83rc1-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
+#    'install.test::Nested::install[bios-830-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb':
+#    'install.test::Nested::install[bios-830-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
 }
 
 # compatibility settings for older tests
