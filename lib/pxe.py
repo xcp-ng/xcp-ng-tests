@@ -8,6 +8,12 @@ try:
 except ImportError:
     raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
 
+try:
+    from data import ARP_SERVER
+    assert ARP_SERVER
+except ImportError:
+    raise Exception('No address for the ARP server found in data.py (`ARP_SERVER`)')
+
 def generate_boot_conf(directory, installer, action):
     # in case of restore, we disable the text ui from the installer completely,
     # to workaround a bug that leaves us stuck on a confirmation dialog at the end of the operation.
@@ -40,8 +46,17 @@ def server_remove_bootconf(mac_address):
 
 def arp_addresses_for(mac_address):
     output = ssh(
-        PXE_CONFIG_SERVER,
-        ['arp', '-n', '|', 'grep', mac_address, '|', 'awk', '\'{ print $1 }\'']
+        ARP_SERVER,
+        ['ip', 'neigh', 'show', 'nud', 'reachable',
+         '|', 'grep', mac_address,
+         '|', 'awk', '\'{ print $1 }\'']
     )
     candidate_ips = output.splitlines()
     return candidate_ips
+
+def arp_clear_for(mac_address):
+    for stray_ip in arp_addresses_for(mac_address):
+        output = ssh(
+            PXE_CONFIG_SERVER,
+            ['arp', '-d', stray_ip]
+        )
