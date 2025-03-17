@@ -43,8 +43,8 @@ class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("iso_version", (
-        "83nightly", "83rcnet",
-        "83rc1", "83b2", "83b1",
+        "83nightly", "830net",
+        "830",
         "82nightly",
         "821.1",
         "81", "80", "76", "75",
@@ -98,8 +98,8 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
-        "83nightly", "83rcnet",
-        "83rc1", "83b2", "83b1",
+        "83nightly", "830net",
+        "830",
         "82nightly",
         "821.1",
         "81", "80",
@@ -148,10 +148,8 @@ class TestNested:
             expected_rel_id = split_mode[-1]
         expected_rel = {
             "83nightly": "8.3.0",
-            "83rcnet": "8.3.0",
-            "83rc1": "8.3.0",
-            "83b2": "8.3.0",
-            "83b1": "8.3.0",
+            "830net": "8.3.0",
+            "830": "8.3.0",
             "82nightly": "8.2.1",
             "821.1": "8.2.1",
             "81": "8.1.0",
@@ -291,8 +289,8 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
-        "83nightly", "83rcnet",
-        "83rc1", "83b2", "83b1",
+        "83nightly", "830net",
+        "830",
         "82nightly",
         "821.1",
         "81", "80",
@@ -316,15 +314,13 @@ class TestNested:
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83nightly", "83nightly"),
-        ("83rc1", "83nightly"),
-        ("83b2", "83nightly"),
-        ("83b1", "83nightly"),
+        ("830", "83nightly"),
         ("821.1", "83nightly"),
         ("81", "83nightly"),
         ("80", "83nightly"),
         ("xs8", "83nightly"),
         ("ch821.1", "83nightly"),
-        ("83rcnet", "83rcnet"), # FIXME
+        ("830net", "830net"), # FIXME
         ("82nightly", "82nightly"),
         ("821.1", "82nightly"),
         ("821.1", "821.1"),
@@ -354,15 +350,13 @@ class TestNested:
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("mode", (
         "83nightly-83nightly",
-        "83rc1-83nightly",
-        "83b2-83nightly",
-        "83b1-83nightly",
+        "830-83nightly",
         "821.1-83nightly",
         "81-83nightly",
         "80-83nightly",
         "xs8-83nightly",
         "ch821.1-83nightly",
-        "83rcnet-83rcnet",
+        "830net-830net",
         "82nightly-82nightly",
         "821.1-82nightly",
         "821.1-821.1",
@@ -381,15 +375,13 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83nightly-83nightly", "83nightly"),
-        ("83rc1-83nightly", "83nightly"),
-        ("83b2-83nightly", "83nightly"),
-        ("83b1-83nightly", "83nightly"),
+        ("830-83nightly", "83nightly"),
         ("821.1-83nightly", "83nightly"),
         ("81-83nightly", "83nightly"),
         ("80-83nightly", "83nightly"),
         ("xs8-83nightly", "83nightly"),
         ("ch821.1-83nightly", "83nightly"),
-        ("83rcnet-83rcnet", "83rcnet"), # FIXME
+        ("830net-830net", "830net"), # FIXME
         ("82nightly-82nightly", "82nightly"),
         ("821.1-82nightly", "82nightly"),
         ("821.1-821.1", "821.1"),
@@ -414,15 +406,13 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("mode", (
         "83nightly-83nightly-83nightly",
-        "83rc1-83nightly-83nightly",
-        "83b2-83nightly-83nightly",
-        "83b1-83nightly-83nightly",
+        "830-83nightly-83nightly",
         "821.1-83nightly-83nightly",
         "81-83nightly-83nightly",
         "80-83nightly-83nightly",
         "xs8-83nightly-83nightly",
         "ch821.1-83nightly-83nightly",
-        "83rcnet-83rcnet-83rcnet", # FIXME
+        "830net-830net-830net", # FIXME
         "82nightly-82nightly-82nightly",
         "821.1-82nightly-82nightly",
         "821.1-821.1-821.1",
