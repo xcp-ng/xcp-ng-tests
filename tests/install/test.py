@@ -45,6 +45,7 @@ class TestNested:
     @pytest.mark.parametrize("iso_version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
+        "82nightly",
         "821.1",
         "81", "80", "76", "75",
         "xs8", "ch821.1",
@@ -99,6 +100,7 @@ class TestNested:
     @pytest.mark.parametrize("version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
+        "82nightly",
         "821.1",
         "81", "80",
         "76", "75",
@@ -150,6 +152,7 @@ class TestNested:
             "83rc1": "8.3.0",
             "83b2": "8.3.0",
             "83b1": "8.3.0",
+            "82nightly": "8.2.1",
             "821.1": "8.2.1",
             "81": "8.1.0",
             "80": "8.0.0",
@@ -290,6 +293,7 @@ class TestNested:
     @pytest.mark.parametrize("version", (
         "83nightly", "83rcnet",
         "83rc1", "83b2", "83b1",
+        "82nightly",
         "821.1",
         "81", "80",
         "76", "75",
@@ -321,6 +325,8 @@ class TestNested:
         ("xs8", "83nightly"),
         ("ch821.1", "83nightly"),
         ("83rcnet", "83rcnet"), # FIXME
+        ("82nightly", "82nightly"),
+        ("821.1", "82nightly"),
         ("821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -357,6 +363,8 @@ class TestNested:
         "xs8-83nightly",
         "ch821.1-83nightly",
         "83rcnet-83rcnet",
+        "82nightly-82nightly",
+        "821.1-82nightly",
         "821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -382,6 +390,8 @@ class TestNested:
         ("xs8-83nightly", "83nightly"),
         ("ch821.1-83nightly", "83nightly"),
         ("83rcnet-83rcnet", "83rcnet"), # FIXME
+        ("82nightly-82nightly", "82nightly"),
+        ("821.1-82nightly", "82nightly"),
         ("821.1-821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -413,6 +423,8 @@ class TestNested:
         "xs8-83nightly-83nightly",
         "ch821.1-83nightly-83nightly",
         "83rcnet-83rcnet-83rcnet", # FIXME
+        "82nightly-82nightly-82nightly",
+        "821.1-82nightly-82nightly",
         "821.1-821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
