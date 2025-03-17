@@ -265,6 +265,12 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
+def existing_shared_sr(host):
+    sr = host.pool.first_shared_sr()
+    assert sr is not None, "A shared SR on the pool is required"
+    yield sr
+
+@pytest.fixture(scope='session')
 def sr_disk(pytestconfig, host):
     disks = pytestconfig.getoption("sr_disk")
     if len(disks) != 1:
@@ -375,6 +381,12 @@ def imported_vm(host, vm_ref):
     if not is_uuid(vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def vm_on_shared_sr(imported_vm, existing_shared_sr):
+    vm = imported_vm
+    vm.migrate(vm.host, existing_shared_sr)
+    yield vm
 
 @pytest.fixture(scope="module")
 def started_vm(imported_vm):
