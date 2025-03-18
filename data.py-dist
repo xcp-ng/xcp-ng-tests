@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 # Configuration file, to be adapted to one's needs
 
 # Default user and password to connect to a host through XAPI
@@ -15,7 +17,7 @@ HOST_DEFAULT_PASSWORD = ""
 # skip_xo_config allows to not touch XO's configuration regarding the host
 # Else the default behaviour is to add the host to XO servers at the beginning
 # of the testing session and remove it at the end.
-HOSTS = {
+HOSTS: Dict[str, Dict[str, Any]] = {
 #    "10.0.0.1": {"user": "root", "password": ""},
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
@@ -106,25 +108,25 @@ DEFAULT_SR = 'default'
 CACHE_IMPORTED_VM = False
 
 # Default NFS device config:
-NFS_DEVICE_CONFIG = {
+NFS_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path/to/shared/mount' # Path to shared mountpoint
 }
 
 # Default NFS4+ only device config:
-NFS4_DEVICE_CONFIG = {
+NFS4_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path_to_shared_mount' # Path to shared mountpoint
 #    'nfsversion': '4.1'
 }
 
 # Default NFS ISO device config:
-NFS_ISO_DEVICE_CONFIG = {
+NFS_ISO_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'location': '10.0.0.2:/path/to/shared/mount' # URL/Hostname of NFS server and path to shared mountpoint
 }
 
 # Default CIFS ISO device config:
-CIFS_ISO_DEVICE_CONFIG = {
+CIFS_ISO_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'location': r'\\10.0.0.2\<shared folder name>',
 #    'username': '<user>',
 #    'cifspassword': '<password>',
@@ -132,18 +134,18 @@ CIFS_ISO_DEVICE_CONFIG = {
 #    'vers': '<1.0> or <3.0>'
 }
 
-CEPHFS_DEVICE_CONFIG = {
+CEPHFS_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
 }
 
-MOOSEFS_DEVICE_CONFIG = {
+MOOSEFS_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'masterhost': 'mfsmaster',
 #    'masterport': '9421',
 #    'rootpath': '/vms'
 }
 
-LVMOISCSI_DEVICE_CONFIG = {
+LVMOISCSI_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'target': '192.168.1.1',
 #    'port': '3260',
 #    'targetIQN': 'target.example',
