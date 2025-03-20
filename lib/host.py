@@ -6,9 +6,12 @@ import tempfile
 import uuid
 
 from packaging import version
+from typing import TYPE_CHECKING
 
 import lib.commands as commands
 import lib.pif as pif
+if TYPE_CHECKING:
+    import lib.pool
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
@@ -34,7 +37,7 @@ def host_data(hostname_or_ip):
 class Host:
     xe_prefix = "host"
 
-    def __init__(self, pool, hostname_or_ip):
+    def __init__(self, pool: 'lib.pool.Pool', hostname_or_ip):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
         self.inventory = None
@@ -62,9 +65,13 @@ class Host:
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings, background=background,
                             decode=decode)
 
-    def ssh_with_result(self, cmd):
+    def ssh_str(self, cmd, check=True, background=False) -> str:
+        # raises by default for any nonzero return code
+        return commands.ssh_str(self.hostname_or_ip, cmd, check=check, background=background)
+
+    def ssh_with_result(self, cmd) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return self.ssh(cmd, check=False, simple_output=False)
+        return commands.ssh_with_result(self.hostname_or_ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         return commands.scp(

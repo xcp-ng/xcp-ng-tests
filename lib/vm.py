@@ -88,9 +88,15 @@ class VM(BaseVM):
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
                             target_os=target_os, decode=decode)
 
-    def ssh_with_result(self, cmd):
+    def ssh_str(self, cmd, check=True, background=False) -> str:
+        # raises by default for any nonzero return code
+        target_os = "windows" if self.is_windows else "linux"
+        return commands.ssh_str(self.ip, cmd, check=check, background=background,
+                                target_os=target_os)
+
+    def ssh_with_result(self, cmd) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return self.ssh(cmd, check=False, simple_output=False)
+        return commands.ssh_with_result(self.ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         # Stop execution if scp() is used on Windows VMs as some OpenSSH releases for Windows don't
@@ -235,7 +241,7 @@ class VM(BaseVM):
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         return Snapshot(self.host.xe('vm-snapshot', args), self.host)
 
-    def checkpoint(self):
+    def checkpoint(self) -> Snapshot:
         logging.info("Checkpoint VM")
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
                                                        'new-name-label': 'Checkpoint of %s' % self.uuid}),
@@ -255,7 +261,7 @@ class VM(BaseVM):
         host_uuid = self.param_get('resident-on')
         return self.host.pool.get_host_by_uuid(host_uuid)
 
-    def start_background_process(self, cmd):
+    def start_background_process(self, cmd) -> str:
         script = "/tmp/bg_process.sh"
         pidfile = "/tmp/bg_process.pid"
         with tempfile.NamedTemporaryFile('w') as f:
@@ -276,7 +282,7 @@ class VM(BaseVM):
             self.ssh(['bash', script], background=True)
             wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]),
                      "wait for pid file %s to exist" % pidfile)
-            pid = self.ssh(['cat', pidfile])
+            pid = self.ssh_str(['cat', pidfile])
             self.ssh(['rm', '-f', script])
             self.ssh(['rm', '-f', pidfile])
             return pid
