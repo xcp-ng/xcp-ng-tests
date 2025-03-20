@@ -1,6 +1,7 @@
 import pytest
 
 import logging
+import random
 import time
 
 from lib.commands import SSHCommandFailed
@@ -132,6 +133,47 @@ class TestLinstorSR:
         finally:
             if not linstor_installed:
                 host.yum_install([LINSTOR_PACKAGE])
+
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
+    def test_linstor_sr_fail_host(self, linstor_sr, host, vm_on_linstor_sr):
+        """
+        Fail non master host from the same pool Linstor SR.
+        Ensure that VM is able to boot and shutdown on all hosts.
+        """
+        sr = linstor_sr
+        vm = vm_on_linstor_sr
+        # Ensure that its a single host pool and not multi host pool
+        assert len(host.pool.hosts) > 2, "This test requires Pool to have more than 2 hosts"
+
+        # Remove master from hosts list to avoid xapi calls failure
+        hosts = list(sr.pool.hosts)
+        hosts.remove(sr.pool.master)
+        # Evacuate the node to be deleted
+        try:
+            random_host = random.choice(hosts) # TBD: Choose Linstor Diskful node
+            logging.info("Working on %s", random_host.hostname_or_ip)
+            random_host.ssh(['echo', 'c', '>', '/proc/sysrq-trigger'])
+        except Exception as e:
+            logging.info("Host %s could be crashed with output %s.", random_host.hostname_or_ip, e.stdout)
+
+        # Ensure that VM is able to start on all hosts except failed one
+        for h in sr.pool.hosts:
+            logging.info("Checking VM on host %s", h.hostname_or_ip)
+            if h.hostname_or_ip != random_host.hostname_or_ip:
+                vm.start(on=h.uuid)
+                vm.wait_for_os_booted()
+                vm.shutdown(verify=True)
+
+        # Wait for radom_host to come online
+        wait_for(random_host.is_enabled, "Wait for crashed host enabled", timeout_secs=30 * 60)
+
+        # Ensure that the VM is able to run on crashed host as well.
+        vm.start(on=random_host.uuid)
+        vm.wait_for_os_booted()
+        vm.shutdown(verify=True)
+
+        sr.scan()
 
     # *** End of tests with reboots
 
