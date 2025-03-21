@@ -1,12 +1,7 @@
 from lib.commands import ssh, scp
+from data import PXE_CONFIG_SERVER
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
-
-try:
-    from data import PXE_CONFIG_SERVER
-    assert PXE_CONFIG_SERVER
-except ImportError:
-    raise Exception('No address for the PXE server found in data.py (`PXE_CONFIG_SERVER`)')
 
 def generate_boot_conf(directory, installer, action):
     # in case of restore, we disable the text ui from the installer completely,
