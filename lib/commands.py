@@ -61,7 +61,7 @@ def _ellide_log_lines(log):
     return "\n{}".format("\n".join(reduced_message))
 
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-         background, target_os, decode, options):
+         background, decode, options):
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
@@ -134,9 +134,9 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-        background=False, target_os='linux', decode=True, options=[]):
+        background=False, decode=True, options=[]):
     success, result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                                  background, target_os, decode, options)
+                                  background, decode, options)
     if not success:
         raise result_or_exc
     return result_or_exc

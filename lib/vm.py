@@ -84,9 +84,8 @@ class VM(BaseVM):
 
     def ssh(self, cmd, check=True, simple_output=True, background=False, decode=True):
         # raises by default for any nonzero return code
-        target_os = "windows" if self.is_windows else "linux"
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
-                            target_os=target_os, decode=decode)
+                            decode=decode)
 
     def ssh_with_result(self, cmd):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
