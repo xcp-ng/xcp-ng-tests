@@ -133,7 +133,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 # The actual code is in _ssh().
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
-def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+def ssh(hostname_or_ip, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
         background=False, decode=True, options=[]):
     success, result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
                                   background, decode, options)
