@@ -590,9 +590,9 @@ class VM(BaseVM):
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
 
-    def is_cert_present(vm, key):
-        res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
-                          check=False, simple_output=False, decode=False)
+    def is_cert_present(self, key):
+        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(key).as_str(), key],
+                            check=False, simple_output=False, decode=False)
         return res.returncode == 0
 
     def execute_powershell_script(
