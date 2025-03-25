@@ -95,13 +95,13 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
             check=False
         )
 
+    logging.debug(f"[{hostname_or_ip}] {command}")
     process = subprocess.Popen(
         ssh_cmd,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
     )
-    logging.debug(f"[{hostname_or_ip}] {command}")
     if windows_background:
         return True, process
 
