@@ -57,12 +57,6 @@ class BaseVM:
     def destroy_vdi(self, vdi_uuid):
         self.host.xe('vdi-destroy', {'uuid': vdi_uuid})
 
-    # FIXME: move this method and the above back to class VM if not useful in Snapshot class?
-    def destroy(self):
-        for vdi_uuid in self.vdi_uuids():
-            self.destroy_vdi(vdi_uuid)
-        self._destroy()
-
     def all_vdis_on_host(self, host):
         for vdi_uuid in self.vdi_uuids():
             sr = SR(self.host.pool.get_vdi_sr_uuid(vdi_uuid), self.host.pool)

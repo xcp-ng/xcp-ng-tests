@@ -160,15 +160,16 @@ class VM(BaseVM):
     def _disk_list(self):
         return self.host.xe('vm-disk-list', {'uuid': self.uuid, 'vbd-params': ''}, minimal=True)
 
-    def _destroy(self):
-        self.host.xe('vm-destroy', {'uuid': self.uuid})
-
     def destroy(self, verify=False):
-        # Note: not using xe vm-uninstall (which would be convenient) because it leaves a VDI behind
-        # See https://github.com/xapi-project/xen-api/issues/4145
         if not self.is_halted():
             self.shutdown(force=True)
-        super().destroy()
+
+        # Note: not using xe vm-uninstall (which would be convenient) because it leaves a VDI behind
+        # See https://github.com/xapi-project/xen-api/issues/4145
+        for vdi_uuid in self.vdi_uuids():
+            self.destroy_vdi(vdi_uuid)
+        self.host.xe('vm-destroy', {'uuid': self.uuid})
+
         if verify:
             wait_for_not(self.exists, "Wait for VM destroyed")
 
