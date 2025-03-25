@@ -97,7 +97,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         stderr=subprocess.STDOUT
     )
     if background:
-        return True, process
+        return True, None
 
     stdout = []
     for line in iter(process.stdout.readline, b''):
