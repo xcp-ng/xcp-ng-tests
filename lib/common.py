@@ -158,7 +158,7 @@ def strtobool(str):
     raise ValueError("invalid truth value '{}'".format(str))
 
 def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
-               accept_unknown_key=False) -> Optional[str]:
+               accept_unknown_key=False) -> Union[str, bool, None]:
     """ Common implementation for param_get. """
     args: Dict[str, Union[str, bool]] = {'uuid': uuid, 'param-name': param_name}
     if key is not None:

@@ -1,6 +1,6 @@
 import logging
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING, Union
 
 import lib.commands as commands
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ class BaseVM:
         self.host = host
 
     def param_get(self, param_name: str, key: Optional[str] = None,
-                  accept_unknown_key: bool = False) -> Optional[str]:
+                  accept_unknown_key: bool = False) -> Union[str, bool, None]:
         return _param_get(self.host, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
