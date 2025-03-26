@@ -1,0 +1,20 @@
+[tools]
+node = "22"
+"npm:xo-cli" = "0.32.2"
+# python = "3.8"
+uv = "0.7"
+
+[settings]
+idiomatic_version_file_enable_tools = ["python"]
+
+[tasks.xo-cli]
+description = "run xo-cli"
+run = "xo-cli"
+
+[tasks.pytest]
+description = "run tests"
+run = "uv run pytest"
+
+[tasks.jobs]
+description = "manage test jobs"
+run = "uv run ./jobs.py"
