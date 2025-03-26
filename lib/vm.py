@@ -469,10 +469,6 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def sign_bins(self):
-        for f in self.get_all_efi_bins():
-            self.sign(f)
-
     def get_all_efi_bins(self):
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
