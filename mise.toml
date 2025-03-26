@@ -1,0 +1,21 @@
+[tools]
+"npm:xo-cli" = "0.32.2"
+python = "3.8"
+uv = "0.6"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.pytest]
+description = "run tests"
+run = "uv run pytest"
+
+# same as the previous one, but with a shorter name, and more oriented on what
+# it does than on the tool it runs
+[tasks.test]
+description = "run tests"
+run = "uv run pytest"
+
+[tasks.jobs]
+description = "manage test jobs"
+run = "uv run ./jobs.py"
