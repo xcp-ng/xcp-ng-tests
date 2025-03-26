@@ -1,2 +1,18 @@
 [tool.pyright]
 typeCheckingMode = "standard"
+
+[tool.ruff]
+preview = true
+line-length = 120
+exclude = ["data.py", "vm_data.py", ".git"]
+
+[tool.ruff.format]
+quote-style = "preserve"
+
+[tool.ruff.lint]
+select = ["F", "SLF", "SIM"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+# pytest requires some import and function arguments to match, but
+# the linter doesn't know that
+"tests/**/*.py" = ["F401", "F811"]
