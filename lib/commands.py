@@ -61,7 +61,7 @@ def _ellide_log_lines(log):
     return "\n{}".format("\n".join(reduced_message))
 
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-         background, target_os, decode, options):
+         background, decode, options):
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
@@ -76,17 +76,11 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         command = cmd
     else:
         command = " ".join(cmd)
-    if background and target_os != "windows":
-        # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
-        # ... and run the command through a bash shell so that output redirection both works on Linux and FreeBSD.
-        # Bash being available on VMs is a documented requirement.
-        command = "nohup bash -c \"%s &>/dev/null &\"" % command
 
     ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(opts)} {shlex.quote(command)}"
 
-    windows_background = background and target_os == "windows"
     # Fetch banner and remove it to avoid stdout/stderr pollution.
-    if config.ignore_ssh_banner and not windows_background:
+    if config.ignore_ssh_banner:
         banner_res = subprocess.run(
             "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(opts), '\n'),
             shell=True,
@@ -95,15 +89,15 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
             check=False
         )
 
+    logging.debug(f"[{hostname_or_ip}] {command}")
     process = subprocess.Popen(
         ssh_cmd,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
     )
-    logging.debug(f"[{hostname_or_ip}] {command}")
-    if windows_background:
-        return True, process
+    if background:
+        return True, None
 
     stdout = []
     for line in iter(process.stdout.readline, b''):
@@ -140,9 +134,9 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
 def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-        background=False, target_os='linux', decode=True, options=[]):
+        background=False, decode=True, options=[]):
     success, result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                                  background, target_os, decode, options)
+                                  background, decode, options)
     if not success:
         raise result_or_exc
     return result_or_exc

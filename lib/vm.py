@@ -84,9 +84,8 @@ class VM(BaseVM):
 
     def ssh(self, cmd, check=True, simple_output=True, background=False, decode=True):
         # raises by default for any nonzero return code
-        target_os = "windows" if self.is_windows else "linux"
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
-                            target_os=target_os, decode=decode)
+                            decode=decode)
 
     def ssh_with_result(self, cmd):
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
@@ -271,9 +270,15 @@ class VM(BaseVM):
                 self.sftp_put(f.name, script.replace("/tmp/", "/Users/root/AppData/Local/Temp/"))
             else:
                 self.scp(f.name, script)
-            # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
+
+            # https://stackoverflow.com/questions/29142/getting-ssh-to-execute-a-command-in-the-background-on-target-machine
+            # ... and run the command through a bash shell so that output redirection both works on Linux and FreeBSD.
             # It is a documented requirement that bash is present on all test VMs.
-            self.ssh(['bash', script], background=True)
+            remote_cmd = f"bash {script}"
+            if not self.is_windows:
+                remote_cmd = f'nohup bash -c "{remote_cmd} &>/dev/null &"'
+            self.ssh(remote_cmd, background=True)
+
             wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]),
                      "wait for pid file %s to exist" % pidfile)
             pid = self.ssh(['cat', pidfile])
