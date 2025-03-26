@@ -1,0 +1,25 @@
+[project]
+name = "xcp-ng-tests"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cryptography>=3.3.1",
+    "legacycrypt>=0.3",
+    "packaging>=20.7",
+    "pluggy>=1.1.0",
+    "pytest>=8.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "ansible>=5.0.1",
+    "bs4>=0.0.1",
+    "cryptography>=3.3.1",
+    "packaging>=20.7",
+    "pluggy>=1.1.0",
+    "pycodestyle>=2.6.0",
+    "pytest>=8.0.0",
+    "pyyaml>=6.0",
+]
