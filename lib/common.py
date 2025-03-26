@@ -26,10 +26,13 @@ def vm_image(vm_key):
     return url
 
 def prefix_object_name(label):
+    name_prefix = None
     try:
         from data import OBJECTS_NAME_PREFIX
         name_prefix = OBJECTS_NAME_PREFIX
     except ImportError:
+        pass
+    if name_prefix is None:
         name_prefix = f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
 
