@@ -6,6 +6,7 @@ flake8
 pydocstyle
 pyright
 pyyaml>=6.0
+ruff
 types-requests
 typing-extensions
 -r base.txt
