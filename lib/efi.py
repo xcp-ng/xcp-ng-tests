@@ -218,6 +218,7 @@ def sign(payload, key_file, cert_file):
     """Returns a signed PKCS7 of payload signed by key and cert."""
     with open(key_file, 'rb') as f:
         priv_key = serialization.load_pem_private_key(f.read(), password=None)
+        assert isinstance(priv_key, (pkcs7.PKCS7PrivateKeyTypes))
 
     with open(cert_file, 'rb') as f:
         cert = x509.load_pem_x509_certificate(f.read())

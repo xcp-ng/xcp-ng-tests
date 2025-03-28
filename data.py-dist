@@ -12,6 +12,7 @@ HOST_DEFAULT_PASSWORD = ""
 # that the tests will create or import, such as VMs and SRs.
 # Default value: [your login/user]
 # OBJECTS_NAME_PREFIX = "[TEST]"
+OBJECTS_NAME_PREFIX = None
 
 # Override settings for specific hosts
 # skip_xo_config allows to not touch XO's configuration regarding the host

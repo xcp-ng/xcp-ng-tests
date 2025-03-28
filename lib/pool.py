@@ -1,18 +1,19 @@
 import logging
 import traceback
+from typing import Any, Dict, Optional, cast
 
 from packaging import version
 
 import lib.commands as commands
-
-from lib.common import safe_split, wait_for, wait_for_not, _param_get, _param_set
+from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
+
 
 class Pool:
     xe_prefix = "pool"
 
-    def __init__(self, master_hostname_or_ip):
+    def __init__(self, master_hostname_or_ip: str) -> None:
         master = Host(self, master_hostname_or_ip)
         assert master.is_master(), f"Host {master_hostname_or_ip} is not a master host. Aborting."
         self.master = master
@@ -20,8 +21,8 @@ class Pool:
 
         # wait for XAPI startup to be done, or we can get "Connection
         # refused (calling connect )" when calling self.hosts_uuids()
-        wait_for(lambda: commands.ssh(master_hostname_or_ip, ['xapi-wait-init-complete', '60'],
-                                      check=False, simple_output=False).returncode == 0,
+        wait_for(lambda: commands.ssh_with_result(master_hostname_or_ip,
+                                                  ['xapi-wait-init-complete', '60']).returncode == 0,
                  f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
                  timeout_secs=30 * 60)
 
@@ -29,8 +30,8 @@ class Pool:
             if host_uuid != self.hosts[0].uuid:
                 host = Host(self, self.host_ip(host_uuid))
                 self.hosts.append(host)
-        self.uuid = self.master.xe('pool-list', minimal=True)
-        self.saved_uefi_certs = None
+        self.uuid = cast(str, self.master.xe('pool-list', minimal=True))
+        self.saved_uefi_certs: Optional[Dict[str, Any]] = None
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self.master, Pool.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
@@ -108,7 +109,7 @@ class Pool:
                 return h
         return None
 
-    def first_shared_sr(self):
+    def first_shared_sr(self) -> Optional[SR]:
         uuids = safe_split(self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True))
         if len(uuids) > 0:
             return SR(uuids[0], self)
@@ -117,7 +118,7 @@ class Pool:
     def get_vdi_sr_uuid(self, vdi_uuid):
         return self.master.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
 
-    def save_uefi_certs(self):
+    def save_uefi_certs(self) -> None:
         """
         Save UEFI certificates in order to restore them later. XCP-ng 8.2 only.
 

@@ -2,6 +2,9 @@ import logging
 import pytest
 
 from lib.common import wait_for
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
 
 # These tests are basic tests meant to be run to check that a VM performs
 # well, without obvious issues.
@@ -19,14 +22,14 @@ from lib.common import wait_for
 #   Note however that an existing VM will be left on a different SR after the tests.
 
 @pytest.fixture(scope='session')
-def existing_shared_sr(host):
+def existing_shared_sr(host: Host) -> SR:
     sr = host.pool.first_shared_sr()
     assert sr is not None, "A shared SR on the pool is required"
     return sr
 
 @pytest.mark.multi_vms # run them on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
-def test_vm_start_stop(imported_vm):
+def test_vm_start_stop(imported_vm: VM):
     vm = imported_vm
     # if VM already running, stop it
     if (vm.is_running()):
@@ -43,19 +46,19 @@ def test_vm_start_stop(imported_vm):
 @pytest.mark.big_vm # and also on a really big VM ideally
 @pytest.mark.usefixtures("started_vm")
 class TestBasicNoSSH:
-    def test_pause(self, imported_vm):
+    def test_pause(self, imported_vm: VM):
         vm = imported_vm
         vm.pause(verify=True)
         vm.unpause()
         vm.wait_for_os_booted()
 
-    def test_suspend(self, imported_vm):
+    def test_suspend(self, imported_vm: VM):
         vm = imported_vm
         vm.suspend(verify=True)
         vm.resume()
         vm.wait_for_os_booted()
 
-    def test_snapshot(self, imported_vm):
+    def test_snapshot(self, imported_vm: VM):
         vm = imported_vm
         snapshot = vm.snapshot()
         try:
@@ -65,7 +68,7 @@ class TestBasicNoSSH:
         finally:
             snapshot.destroy(verify=True)
 
-    def test_checkpoint(self, imported_vm):
+    def test_checkpoint(self, imported_vm: VM):
         vm = imported_vm
         snapshot = vm.checkpoint()
         try:
@@ -79,7 +82,7 @@ class TestBasicNoSSH:
     # We want to test storage migration (memory+disks) and live migration without storage migration (memory only).
     # The order will depend on the initial location of the VM: a local SR or a shared SR.
     @pytest.mark.usefixtures("hostA2")
-    def test_live_migrate(self, imported_vm, existing_shared_sr):
+    def test_live_migrate(self, imported_vm: VM, existing_shared_sr: SR):
         def live_migrate(vm, dest_host, dest_sr, check_vdis=False):
             vm.migrate(dest_host, dest_sr)
             if check_vdis:

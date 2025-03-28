@@ -5,9 +5,12 @@ import sys
 import time
 import traceback
 from enum import Enum
+from typing import TYPE_CHECKING, Dict, Optional, Union
 from uuid import UUID
 
 import lib.commands as commands
+if TYPE_CHECKING:
+    import lib.host
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
@@ -23,10 +26,13 @@ def vm_image(vm_key):
     return url
 
 def prefix_object_name(label):
+    name_prefix = None
     try:
         from data import OBJECTS_NAME_PREFIX
         name_prefix = OBJECTS_NAME_PREFIX
     except ImportError:
+        pass
+    if name_prefix is None:
         name_prefix = f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
 
@@ -154,9 +160,10 @@ def strtobool(str):
         return False
     raise ValueError("invalid truth value '{}'".format(str))
 
-def _param_get(host, xe_prefix, uuid, param_name, key=None, accept_unknown_key=False):
+def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
+               accept_unknown_key=False) -> Union[str, bool, None]:
     """ Common implementation for param_get. """
-    args = {'uuid': uuid, 'param-name': param_name}
+    args: Dict[str, Union[str, bool]] = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
     try:

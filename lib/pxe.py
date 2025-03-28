@@ -1,4 +1,4 @@
-from lib.commands import ssh, scp, SSHCommandFailed
+from lib.commands import ssh, scp
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
 
