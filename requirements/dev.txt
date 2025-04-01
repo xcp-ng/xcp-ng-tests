@@ -3,4 +3,6 @@ ansible>=5.0.1
 bs4>=0.0.1
 pycodestyle>=2.6.0
 PyYAML>=6.0
+mypy
+typing_extensions
 -r base.txt
