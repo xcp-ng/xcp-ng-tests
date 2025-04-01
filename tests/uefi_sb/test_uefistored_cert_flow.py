@@ -144,7 +144,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM still has no certs")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_pool_certs_present_and_vm_certs_absent(self, uefi_vm):
         vm = uefi_vm

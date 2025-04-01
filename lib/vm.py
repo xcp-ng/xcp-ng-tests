@@ -721,8 +721,8 @@ class VM(BaseVM):
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
 
-    def is_cert_present(self, key):
-        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(key).as_str(), key],
+    def is_uefi_var_present(self, varname):
+        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(varname).as_str(), varname],
                             check=False, simple_output=False, decode=False)
         return res.returncode == 0
 
