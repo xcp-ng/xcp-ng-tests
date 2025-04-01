@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import List, Literal, Optional, Union, cast, overload
+from typing import List, Literal, Iterable, Optional, Union, cast, overload
 
 import lib.commands as commands
 import lib.efi as efi
@@ -510,7 +510,7 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
-    def install_uefi_certs(self, auths):
+    def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
         Install UEFI certs to the VM's NVRAM store.
 
@@ -524,12 +524,14 @@ class VM(BaseVM):
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
             dest = self.host.ssh(['mktemp'])
-            self.host.scp(auth.auth, dest)
-            self.host.ssh([
-                'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
-                str(efi.EFI_AT_ATTRS), dest
-            ])
-            self.host.ssh(['rm', '-f', dest])
+            try:
+                self.host.scp(auth.auth(), dest)
+                self.host.ssh([
+                    'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
+                    str(efi.EFI_AT_ATTRS), dest
+                ])
+            finally:
+                self.host.ssh(['rm', '-f', dest])
 
     def booted_with_secureboot(self):
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
