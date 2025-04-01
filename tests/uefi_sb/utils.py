@@ -5,13 +5,28 @@ from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.efi import EFI_AT_ATTRS_BYTES, EFIAuth, get_md5sum_from_auth, get_secure_boot_guid
 
+from typing import Literal, overload
+
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 
-def generate_keys(self_signed=False, as_dict=False):
+
+@overload
+def generate_keys(*, self_signed: bool = False, as_dict: Literal[True] = True) -> dict[str, EFIAuth]:
+    ...
+
+
+@overload
+def generate_keys(
+    *, self_signed: bool = False, as_dict: Literal[False]
+) -> tuple[EFIAuth, EFIAuth, EFIAuth, EFIAuth]:
+    ...
+
+
+def generate_keys(*, self_signed=False, as_dict=False):
     logging.info('Generating keys' + (' (self signed)' if self_signed else ''))
-    PK = EFIAuth('PK')
-    KEK = EFIAuth('KEK')
-    db = EFIAuth('db')
+    PK = EFIAuth.self_signed('PK')
+    KEK = EFIAuth.self_signed('KEK')
+    db = EFIAuth.self_signed('db')
 
     if self_signed:
         PK.sign_auth(PK)
@@ -23,17 +38,13 @@ def generate_keys(self_signed=False, as_dict=False):
         KEK.sign_auth(db)
 
     # For our tests the dbx blacklists anything signed by the db
-    dbx = EFIAuth.copy(db, name='dbx')
+    dbx = db.copy(name='dbx')
 
     if as_dict:
-        return {
-            'PK': PK,
-            'KEK': KEK,
-            'db': db,
-            'dbx': dbx
-        }
+        return {'PK': PK, 'KEK': KEK, 'db': db, 'dbx': dbx}
     else:
         return PK, KEK, db, dbx
+
 
 def revert_vm_state(vm, snapshot):
     try:
@@ -44,16 +55,15 @@ def revert_vm_state(vm, snapshot):
         logging.info('> remove guest SB messages')
         vm.rm_messages(VM_SECURE_BOOT_FAILED)
 
+
 def boot_and_check_sb_failed(vm):
     vm.start()
-    wait_for(
-        lambda: vm.get_messages(VM_SECURE_BOOT_FAILED),
-        'Wait for message %s' % VM_SECURE_BOOT_FAILED
-    )
+    wait_for(lambda: vm.get_messages(VM_SECURE_BOOT_FAILED), 'Wait for message %s' % VM_SECURE_BOOT_FAILED)
 
     # If there is a VM_SECURE_BOOT_FAILED message and yet the OS still
     # successfully booted, this is a uefistored bug
     assert vm.is_in_uefi_shell()
+
 
 def boot_and_check_no_sb_errors(vm):
     vm.start()
@@ -61,10 +71,12 @@ def boot_and_check_no_sb_errors(vm):
     logging.info("Verify there's no %s message" % VM_SECURE_BOOT_FAILED)
     assert not vm.get_messages(VM_SECURE_BOOT_FAILED)
 
+
 def boot_and_check_sb_succeeded(vm):
     boot_and_check_no_sb_errors(vm)
     logging.info("Check that SB is enabled according to the OS.")
     assert vm.booted_with_secureboot()
+
 
 def sign_efi_bins(vm, db):
     """
@@ -84,19 +96,20 @@ def sign_efi_bins(vm, db):
     if shutdown:
         vm.shutdown(verify=True)
 
+
 def _test_key_exchanges(vm):
-    PK = EFIAuth('PK')
-    null_PK = EFIAuth('PK', is_null=True)
-    new_PK = EFIAuth('PK')
-    bad_PK = EFIAuth('PK')
+    PK = EFIAuth.self_signed('PK')
+    null_PK = EFIAuth('PK')
+    new_PK = EFIAuth.self_signed('PK')
+    bad_PK = EFIAuth.self_signed('PK')
 
-    KEK = EFIAuth('KEK')
-    null_KEK = EFIAuth('KEK', is_null=True)
+    KEK = EFIAuth.self_signed('KEK')
+    null_KEK = EFIAuth('KEK')
 
-    db_from_KEK = EFIAuth('db')
-    db_from_PK = EFIAuth('db')
-    null_db_from_KEK = EFIAuth('db', is_null=True)
-    null_db_from_PK = EFIAuth('db', is_null=True)
+    db_from_KEK = EFIAuth.self_signed('db')
+    db_from_PK = EFIAuth.self_signed('db')
+    null_db_from_KEK = EFIAuth('db')
+    null_db_from_PK = EFIAuth('db')
 
     PK.sign_auth(PK)
     PK.sign_auth(null_PK)
@@ -146,13 +159,13 @@ def _test_key_exchanges(vm):
 
         ok = True
         try:
-            vm.set_efi_var(auth.name, auth.guid,
-                           EFI_AT_ATTRS_BYTES, auth.auth_data())
+            vm.set_efi_var(auth.name, auth.guid, EFI_AT_ATTRS_BYTES, auth.auth_data())
         except SSHCommandFailed:
             ok = False
 
         if (should_succeed and not ok) or (ok and not should_succeed):
             raise AssertionError('Failed to set {} {}'.format(i, auth.name))
+
 
 def check_disk_cert_md5sum(host, key, reference_file, do_assert=True):
     auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
@@ -167,9 +180,14 @@ def check_disk_cert_md5sum(host, key, reference_file, do_assert=True):
     else:
         return host_disk_md5 == reference_md5
 
+
 def check_vm_cert_md5sum(vm, key, reference_file):
-    res = vm.host.ssh(['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
-                      check=False, simple_output=False, decode=False)
+    res = vm.host.ssh(
+        ['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
+        check=False,
+        simple_output=False,
+        decode=False,
+    )
     assert res.returncode == 0, f"Cert {key} must be present"
     reference_md5 = get_md5sum_from_auth(reference_file)
     assert hashlib.md5(res.stdout).hexdigest() == reference_md5
