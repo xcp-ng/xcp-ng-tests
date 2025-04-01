@@ -134,9 +134,9 @@ class TestPoolToVMCertInheritance:
         vm.host.pool.clear_custom_uefi_certs()
         vm.start()
         logging.info("Check that the VM certs were updated: PK only")
-        assert vm.is_cert_present('PK')
+        assert vm.is_uefi_var_present('PK')
         for key in ['KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_start_vm_in_setup_mode(self, uefi_vm):
         # In setup mode, no cert is set, but other UEFI variables are present.
@@ -148,7 +148,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs are unchanged")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_start_vm_which_already_has_pk(self, uefi_vm):
         vm = uefi_vm
@@ -161,7 +161,7 @@ class TestPoolToVMCertInheritance:
         logging.info("Check that the VM certs are unchanged")
         check_vm_cert_md5sum(vm, 'PK', vm_auths['PK'].auth)
         for key in ['KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_switching_to_user_mode(self, uefi_vm):
         vm = uefi_vm
