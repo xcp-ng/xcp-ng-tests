@@ -291,6 +291,39 @@ def pesign(key, cert, name, image):
         return signed
 
 
+class Certificate:
+    def __init__(self, common_name='XCP-ng Test Common Name', init_keys=True):
+        self.common_name = common_name
+        self.name = common_name.replace(' ', '_').lower()
+        self.tempdir = TemporaryDirectory(prefix='cert_' + self.name)
+        atexit.register(self.tempdir.cleanup)
+        self.key = os.path.join(self.tempdir.name, '%s.key' % self.name)
+        self.pub = os.path.join(self.tempdir.name, 'tmp.crt')
+
+        if init_keys:
+            commands.local_cmd([
+                'openssl', 'req', '-new', '-x509', '-newkey', 'rsa:2048',
+                '-subj', '/CN=%s/' % self.common_name, '-nodes', '-keyout',
+                self.key, '-sha256', '-days', '3650', '-out', self.pub
+            ])
+
+    def sign_data(self, var, data, guid):
+        return sign_efi_sig_db(
+            data, var, self.key, self.pub, time=timestamp(), guid=guid
+        )
+
+    def _get_cert_path(self):
+        return os.path.join(
+            self.tempdir.name, '_'.join(self.common_name.split()) + '.crt'
+        )
+
+    def copy(self):
+        obj = Certificate(common_name=self.common_name, init_keys=False)
+        shutil.copyfile(self.key, obj.key)
+        shutil.copyfile(self.pub, obj.pub)
+        return obj
+
+
 class EFIAuth:
     def __init__(self, name, is_null=False):
         if name not in SECURE_BOOT_VARIABLES:
@@ -392,39 +425,6 @@ class EFIAuth:
             return b''
 
         return certs_to_sig_db(self.cert.pub)
-
-
-class Certificate:
-    def __init__(self, common_name='XCP-ng Test Common Name', init_keys=True):
-        self.common_name = common_name
-        self.name = common_name.replace(' ', '_').lower()
-        self.tempdir = TemporaryDirectory(prefix='cert_' + self.name)
-        atexit.register(self.tempdir.cleanup)
-        self.key = os.path.join(self.tempdir.name, '%s.key' % self.name)
-        self.pub = os.path.join(self.tempdir.name, 'tmp.crt')
-
-        if init_keys:
-            commands.local_cmd([
-                'openssl', 'req', '-new', '-x509', '-newkey', 'rsa:2048',
-                '-subj', '/CN=%s/' % self.common_name, '-nodes', '-keyout',
-                self.key, '-sha256', '-days', '3650', '-out', self.pub
-            ])
-
-    def sign_data(self, var, data, guid):
-        return sign_efi_sig_db(
-            data, var, self.key, self.pub, time=timestamp(), guid=guid
-        )
-
-    def _get_cert_path(self):
-        return os.path.join(
-            self.tempdir.name, '_'.join(self.common_name.split()) + '.crt'
-        )
-
-    def copy(self):
-        obj = Certificate(common_name=self.common_name, init_keys=False)
-        shutil.copyfile(self.key, obj.key)
-        shutil.copyfile(self.pub, obj.pub)
-        return obj
 
 
 def esl_from_auth_file(auth: str) -> bytes:
