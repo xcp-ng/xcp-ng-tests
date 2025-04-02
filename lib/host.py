@@ -4,6 +4,7 @@ import shlex
 import subprocess
 import tempfile
 import uuid
+from typing import Optional
 
 from packaging import version
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
@@ -650,3 +651,16 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def get_dom0_uuid(self):
+        output = self.ssh(["grep", "-e", "\"CONTROL_DOMAIN_UUID=\"", "/etc/xensource-inventory"])
+        return output.split("=")[1].replace("'", "")
+
+    def get_sr_from_vdi_uuid(self, vdi_uuid) -> Optional[SR]:
+        sr_uuid = self.xe("vdi-param-get",
+                          {"param-name": "sr-uuid",
+                           "uuid": vdi_uuid,
+                           })
+        if sr_uuid is None:
+            return None
+        return SR(sr_uuid, self.pool)
