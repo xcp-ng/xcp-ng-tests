@@ -1,7 +1,8 @@
-import json
 import logging
 import os
+import subprocess
 import tempfile
+from typing import List, Literal, Optional, Union, cast, overload
 
 import lib.commands as commands
 import lib.efi as efi
@@ -14,7 +15,7 @@ from lib.vif import VIF
 class VM(BaseVM):
     def __init__(self, uuid, host):
         super().__init__(uuid, host)
-        self.ip = None
+        self.ip: Optional[str] = None
         self.previous_host = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
@@ -71,7 +72,7 @@ class VM(BaseVM):
         return ret
 
     def try_get_and_store_ip(self):
-        ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
+        ip = cast(str, self.param_get('networks', '0/ip', accept_unknown_key=True))
 
         # An IP that starts with 169.254. is not a real routable IP.
         # VMs may return such an IP before they get an actual one from DHCP.
@@ -82,14 +83,40 @@ class VM(BaseVM):
             self.ip = ip
             return True
 
-    def ssh(self, cmd, check=True, simple_output=True, background=False, decode=True):
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+            background: Literal[False] = False, decode: Literal[True] = True) -> str:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+            background: Literal[False] = False, decode: Literal[False]) -> bytes:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+            background: Literal[False] = False, decode: bool = True) -> commands.SSHResult:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+            background: Literal[True], decode: bool = True) -> None:
+        ...
+
+    @overload
+    def ssh(self, cmd: Union[str, List[str]], *, check=True, simple_output=True, background=False, decode=True) \
+            -> Union[str, bytes, commands.SSHResult, None]:
+        ...
+
+    def ssh(self, cmd, *, check=True, simple_output=True, background=False, decode=True):
         # raises by default for any nonzero return code
+        assert self.ip is not None
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
                             decode=decode)
 
-    def ssh_with_result(self, cmd):
+    def ssh_with_result(self, cmd) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return self.ssh(cmd, check=False, simple_output=False)
+        return commands.ssh_with_result(self.ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         # Stop execution if scp() is used on Windows VMs as some OpenSSH releases for Windows don't
@@ -160,15 +187,16 @@ class VM(BaseVM):
     def _disk_list(self):
         return self.host.xe('vm-disk-list', {'uuid': self.uuid, 'vbd-params': ''}, minimal=True)
 
-    def _destroy(self):
-        self.host.xe('vm-destroy', {'uuid': self.uuid})
-
     def destroy(self, verify=False):
-        # Note: not using xe vm-uninstall (which would be convenient) because it leaves a VDI behind
-        # See https://github.com/xapi-project/xen-api/issues/4145
         if not self.is_halted():
             self.shutdown(force=True)
-        super().destroy()
+
+        # Note: not using xe vm-uninstall (which would be convenient) because it leaves a VDI behind
+        # See https://github.com/xapi-project/xen-api/issues/4145
+        for vdi_uuid in self.vdi_uuids():
+            self.destroy_vdi(vdi_uuid)
+        self.host.xe('vm-destroy', {'uuid': self.uuid})
+
         if verify:
             wait_for_not(self.exists, "Wait for VM destroyed")
 
@@ -176,6 +204,7 @@ class VM(BaseVM):
         return self.host.pool_has_vm(self.uuid)
 
     def exists_on_previous_pool(self):
+        assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
     def migrate(self, target_host, sr=None, network=None):
@@ -234,7 +263,7 @@ class VM(BaseVM):
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         return Snapshot(self.host.xe('vm-snapshot', args), self.host)
 
-    def checkpoint(self):
+    def checkpoint(self) -> Snapshot:
         logging.info("Checkpoint VM")
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
                                                        'new-name-label': 'Checkpoint of %s' % self.uuid}),
@@ -254,7 +283,7 @@ class VM(BaseVM):
         host_uuid = self.param_get('resident-on')
         return self.host.pool.get_host_by_uuid(host_uuid)
 
-    def start_background_process(self, cmd):
+    def start_background_process(self, cmd: str) -> str:
         script = "/tmp/bg_process.sh"
         pidfile = "/tmp/bg_process.pid"
         with tempfile.NamedTemporaryFile('w') as f:
@@ -424,7 +453,7 @@ class VM(BaseVM):
         if not self.file_exists(efivarfs):
             return b''
 
-        data = self.ssh(['cat', efivarfs], simple_output=False, decode=False).stdout
+        data = self.ssh(['cat', efivarfs], decode=False)
 
         # The efivarfs file starts with the attributes, which are 4 bytes long
         return data[4:]
@@ -440,10 +469,6 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def sign_bins(self):
-        for f in self.get_all_efi_bins():
-            self.sign(f)
-
     def get_all_efi_bins(self):
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
@@ -452,11 +477,10 @@ class VM(BaseVM):
                 'do', 'echo', '$file', '$(head', '-c', magicsz, '$file);',
                 'done'
             ],
-            simple_output=False,
-            decode=False).stdout.split(b'\n')
+            decode=False).split(b'\n')
 
         magic = efi.EFI_HEADER_MAGIC.encode('ascii')
-        binaries = []
+        binaries: list[str] = []
         for f in files:
             if magic in f:
                 # Avoid decoding an unsplit f, as some headers are not utf8
@@ -589,10 +613,22 @@ class VM(BaseVM):
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
 
-    def is_cert_present(vm, key):
-        res = vm.host.ssh(['varstore-get', vm.uuid, efi.get_secure_boot_guid(key).as_str(), key],
-                          check=False, simple_output=False, decode=False)
+    def is_cert_present(self, key):
+        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(key).as_str(), key],
+                            check=False, simple_output=False, decode=False)
         return res.returncode == 0
+
+    @overload
+    def execute_powershell_script(self, script_contents: str,
+                                  simple_output: Literal[True] = True,
+                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str:
+        ...
+
+    @overload
+    def execute_powershell_script(self, script_contents: str,
+                                  simple_output: Literal[False],
+                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> commands.SSHResult:
+        ...
 
     def execute_powershell_script(
             self,

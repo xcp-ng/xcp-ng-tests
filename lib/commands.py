@@ -2,10 +2,12 @@ import base64
 import logging
 import shlex
 import subprocess
+from typing import List, Literal, overload, Union
+
 
 import lib.config as config
-
 from lib.netutil import wrap_ip
+
 
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
@@ -61,7 +63,7 @@ def _ellide_log_lines(log):
     return "\n{}".format("\n".join(reduced_message))
 
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-         background, decode, options):
+         background, decode, options) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
@@ -80,6 +82,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
     ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(opts)} {shlex.quote(command)}"
 
     # Fetch banner and remove it to avoid stdout/stderr pollution.
+    banner_res = None
     if config.ignore_ssh_banner:
         banner_res = subprocess.run(
             "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(opts), '\n'),
@@ -97,9 +100,10 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         stderr=subprocess.STDOUT
     )
     if background:
-        return True, None
+        return None
 
     stdout = []
+    assert process.stdout is not None
     for line in iter(process.stdout.readline, b''):
         readable_line = line.decode(errors='replace').strip()
         stdout.append(line)
@@ -112,34 +116,73 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 
     # Even if check is False, we still raise in case of return code 255, which means a SSH error.
     if res.returncode == 255:
-        return False, SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
+        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
 
-    output = res.stdout
-    if config.ignore_ssh_banner:
+    output: Union[bytes, str] = res.stdout
+    if banner_res:
         if banner_res.returncode == 255:
-            return False, SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
+            return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
         output = output[len(banner_res.stdout):]
 
     if decode:
+        assert isinstance(output, bytes)
         output = output.decode()
 
     if res.returncode and check:
-        return False, SSHCommandFailed(res.returncode, output_for_errors, command)
+        return SSHCommandFailed(res.returncode, output_for_errors, command)
 
     if simple_output:
-        return True, output.strip()
-    return True, SSHResult(res.returncode, output)
+        return output.strip()
+    return SSHResult(res.returncode, output)
 
 # The actual code is in _ssh().
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
-def ssh(hostname_or_ip, cmd, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+@overload
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        decode: Literal[True] = True, options: List[str] = []) -> str:
+    ...
+@overload
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        decode: Literal[False], options: List[str] = []) -> bytes:
+    ...
+@overload
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        decode: bool = True, options: List[str] = []) -> SSHResult:
+    ...
+@overload
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+        suppress_fingerprint_warnings: bool = True, background: Literal[True],
+        decode: bool = True, options: List[str] = []) -> None:
+    ...
+@overload
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check=True, simple_output: bool = True,
+        suppress_fingerprint_warnings=True, background: bool = False,
+        decode: bool = True, options: List[str] = []) \
+        -> Union[str, bytes, SSHResult, None]:
+    ...
+def ssh(hostname_or_ip, cmd, *, check=True, simple_output=True,
+        suppress_fingerprint_warnings=True,
         background=False, decode=True, options=[]):
-    success, result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                                  background, decode, options)
-    if not success:
+    result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
+                         background, decode, options)
+    if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
-    return result_or_exc
+    else:
+        return result_or_exc
+
+def ssh_with_result(hostname_or_ip, cmd, suppress_fingerprint_warnings=True,
+                    background=False, decode=True, options=[]) -> SSHResult:
+    result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
+                         background, decode, options)
+    if isinstance(result_or_exc, SSHCommandFailed):
+        raise result_or_exc
+    elif isinstance(result_or_exc, SSHResult):
+        return result_or_exc
+    assert False, "unexpected type"
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
     opts = '-o "BatchMode yes"'
@@ -173,6 +216,7 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
     return res
 
 def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
+    opts = ''
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
