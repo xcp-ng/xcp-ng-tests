@@ -3,7 +3,7 @@ import time
 
 import lib.commands as commands
 
-from lib.common import prefix_object_name, safe_split, wait_for, wait_for_not
+from lib.common import prefix_object_name, safe_split, strtobool, wait_for, wait_for_not
 from lib.vdi import VDI
 
 class SR:
@@ -41,8 +41,10 @@ class SR:
     def all_pbds_attached(self):
         all_attached = True
         for pbd_uuid in self.pbd_uuids():
-            all_attached = all_attached and self.pool.master.xe('pbd-param-get', {'uuid': pbd_uuid,
-                                                                'param-name': 'currently-attached'})
+            all_attached = all_attached and strtobool(self.pool.master.xe('pbd-param-get',
+                                                                          {'uuid': pbd_uuid,
+                                                                           'param-name': 'currently-attached',
+                                                                           }))
         return all_attached
 
     def plug_pbd(self, pbd_uuid):
@@ -147,7 +149,8 @@ class SR:
 
     def is_shared(self):
         if self._is_shared is None:
-            self._is_shared = self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'shared'})
+            self._is_shared = strtobool(self.pool.master.xe('sr-param-get',
+                                                            {'uuid': self.uuid, 'param-name': 'shared'}))
         return self._is_shared
 
     def create_vdi(self, name_label, virtual_size=64):

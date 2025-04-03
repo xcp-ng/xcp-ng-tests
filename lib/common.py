@@ -5,7 +5,7 @@ import sys
 import time
 import traceback
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Optional, Union
+from typing import Dict, Literal, Optional, overload, TYPE_CHECKING, Union
 from uuid import UUID
 
 import lib.commands as commands
@@ -63,7 +63,7 @@ def is_uuid(maybe_uuid):
     except ValueError:
         return False
 
-def to_xapi_bool(b):
+def to_xapi_bool(b: bool):
     return 'true' if b else 'false'
 
 def parse_xe_dict(xe_dict):
@@ -160,8 +160,23 @@ def strtobool(str):
         return False
     raise ValueError("invalid truth value '{}'".format(str))
 
+@overload
+def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
+               accept_unknown_key: Literal[False] = ...) -> str:
+    ...
+
+@overload
+def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
+               accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    ...
+
+@overload
+def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
+               accept_unknown_key: bool = ...) -> Optional[str]:
+    ...
+
 def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
-               accept_unknown_key=False) -> Union[str, bool, None]:
+               accept_unknown_key: bool = False) -> Optional[str]:
     """ Common implementation for param_get. """
     args: Dict[str, Union[str, bool]] = {'uuid': uuid, 'param-name': param_name}
     if key is not None:

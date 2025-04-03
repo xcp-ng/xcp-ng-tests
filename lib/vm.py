@@ -4,7 +4,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import List, Literal, Optional, Union, cast, overload
+from typing import Dict, List, Literal, Optional, overload, Union
 
 import lib.commands as commands
 import lib.efi as efi
@@ -22,7 +22,7 @@ class VM(BaseVM):
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
 
-    def power_state(self):
+    def power_state(self) -> str:
         return self.param_get('power-state')
 
     def is_running(self):
@@ -74,7 +74,7 @@ class VM(BaseVM):
         return ret
 
     def try_get_and_store_ip(self):
-        ip = cast(str, self.param_get('networks', '0/ip', accept_unknown_key=True))
+        ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
         # An IP that starts with 169.254. is not a real routable IP.
         # VMs may return such an IP before they get an actual one from DHCP.
@@ -709,7 +709,7 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
 
     def are_windows_tools_working(self):
         assert self.is_windows
-        return self.is_windows_pv_device_installed() and self.param_get("PV-drivers-detected")
+        return self.is_windows_pv_device_installed() and strtobool(self.param_get("PV-drivers-detected"))
 
     def are_windows_tools_uninstalled(self):
         assert self.is_windows
