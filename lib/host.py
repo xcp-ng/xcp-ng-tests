@@ -6,14 +6,14 @@ import tempfile
 import uuid
 
 from packaging import version
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
+from typing import Dict, List, Literal, Optional, overload, TYPE_CHECKING, Union
 
 import lib.commands as commands
 import lib.pif as pif
 if TYPE_CHECKING:
     import lib.pool
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
 from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
 from lib.netutil import wrap_ip
@@ -104,17 +104,17 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = True,
-           simple_output: Literal[True] = True, minimal: bool = False, force: bool = False) -> Union[bool, str]:
+    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
+           simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = True,
-           simple_output: Literal[False], minimal: bool = False, force: bool = False) -> commands.SSHResult:
+    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
+           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult:
         ...
 
     def xe(self, action, args={}, *, check=True, simple_output=True, minimal=False, force=False) \
-            -> Union[bool, str, commands.SSHResult]:
+            -> Union[str, commands.SSHResult]:
         maybe_param_minimal = ['--minimal'] if minimal else []
         maybe_param_force = ['--force'] if force else []
 
@@ -137,11 +137,17 @@ class Host:
         )
         assert isinstance(result, (str, commands.SSHResult))
 
-        if result == 'true':
-            return True
-        if result == 'false':
-            return False
         return result
+
+    @overload
+    def param_get(self, param_name: str, key: Optional[str] = ...,
+                  accept_unknown_key: Literal[False] = ...) -> str:
+        ...
+
+    @overload
+    def param_get(self, param_name: str, key: Optional[str] = ...,
+                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+        ...
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self, self.xe_prefix, self.uuid,
@@ -328,7 +334,7 @@ class Host:
 
         download_path = None
         try:
-            params = {'uuid': vdi_uuid}
+            params: Dict[str, Union[str, bool]] = {'uuid': vdi_uuid}
             if '://' in uri:
                 logging.info(f"Download ISO {uri}")
                 download_path = f'/tmp/{vdi_uuid}'
@@ -361,9 +367,9 @@ class Host:
         if verify:
             wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=30 * 60)
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         try:
-            return self.param_get('enabled')
+            return strtobool(self.param_get('enabled'))
         except commands.SSHCommandFailed:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
@@ -619,9 +625,9 @@ class Host:
             f"Wait for joining host {self} to appear in joined pool {master}."
         )
         pool.hosts.append(Host(pool, pool.host_ip(self.uuid)))
-        # Do not use `self.is_enabled` since it'd ask the XAPi of hostB1 before the join...
+        # Do not use `self.is_enabled` since it'd ask the XAPI of hostB1 before the join...
         wait_for(
-            lambda: master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'}),
+            lambda: strtobool(master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'})),
             f"Wait for pool {master} to see joined host {self} as enabled."
         )
         self.pool = pool

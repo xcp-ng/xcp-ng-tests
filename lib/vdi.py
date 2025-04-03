@@ -1,6 +1,6 @@
 import logging
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
 from typing import Literal, Optional, overload, TYPE_CHECKING
 if TYPE_CHECKING:
     from lib.host import Host
@@ -31,7 +31,7 @@ class VDI:
         else:
             self.sr = sr
 
-    def name(self):
+    def name(self) -> str:
         return self.param_get('name-label')
 
     def destroy(self):
@@ -42,13 +42,24 @@ class VDI:
         uuid = self.sr.pool.master.xe('vdi-clone', {'uuid': self.uuid})
         return VDI(uuid, sr=self.sr)
 
-    def readonly(self):
-        return self.param_get("read-only") == "true"
+    def readonly(self) -> bool:
+        return strtobool(self.param_get("read-only"))
 
     def __str__(self):
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 
-    def param_get(self, param_name, key=None, accept_unknown_key=False):
+    @overload
+    def param_get(self, param_name: str, key: Optional[str] = ...,
+                  accept_unknown_key: Literal[False] = ...) -> str:
+        ...
+
+    @overload
+    def param_get(self, param_name: str, key: Optional[str] = ...,
+                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+        ...
+
+    def param_get(self, param_name: str, key: Optional[str] = None,
+                  accept_unknown_key: bool = False):
         return _param_get(self.sr.pool.master, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 

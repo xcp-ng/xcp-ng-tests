@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from lib.commands import SSHCommandFailed
+from lib.common import strtobool
 
 # Requirements:
 # From --hosts parameter:
@@ -21,7 +22,7 @@ XAPI_POOL_PEM_FILEPATH = f'/etc/xensource/{XAPI_POOL_PEM_FILENAME}'
 def host_with_tls_verification_enabled(hostA1):
     for h in hostA1.pool.hosts:
         logging.info(f"Check that TLS verification is enabled on host {h}")
-        assert h.param_get("tls-verification-enabled"), f"TLS verification must be enabled on host {h}"
+        assert strtobool(h.param_get("tls-verification-enabled")), f"TLS verification must be enabled on host {h}"
         logging.info(f"Check that the host certificate exists on host {h}")
         cert_uuid = hostA1.xe('certificate-list', {'host': h.uuid, 'type': 'host_internal'}, minimal=True)
         assert len(cert_uuid) > 0, f"A host_internal certificate must exist on host {h}"
