@@ -1,6 +1,6 @@
 import logging
 
-from typing import Any, Optional, TYPE_CHECKING, Union
+from typing import Any, Literal, Optional, overload, TYPE_CHECKING
 
 import lib.commands as commands
 if TYPE_CHECKING:
@@ -13,14 +13,25 @@ class BaseVM:
     """ Base class for VM and Snapshot. """
 
     xe_prefix = "vm"
+    uuid: str
 
-    def __init__(self, uuid, host: 'lib.host.Host'):
+    def __init__(self, uuid: str, host: 'lib.host.Host'):
         logging.info("New %s: %s", type(self).__name__, uuid)
         self.uuid = uuid
         self.host = host
 
+    @overload
+    def param_get(self, param_name: str, key: Optional[str] = ...,
+                  accept_unknown_key: Literal[False] = ...) -> str:
+        ...
+
+    @overload
+    def param_get(self, param_name: str, key: Optional[str] = ...,
+                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+        ...
+
     def param_get(self, param_name: str, key: Optional[str] = None,
-                  accept_unknown_key: bool = False) -> Union[str, bool, None]:
+                  accept_unknown_key: bool = False) -> Optional[str]:
         return _param_get(self.host, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 

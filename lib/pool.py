@@ -30,7 +30,7 @@ class Pool:
             if host_uuid != self.hosts[0].uuid:
                 host = Host(self, self.host_ip(host_uuid))
                 self.hosts.append(host)
-        self.uuid = cast(str, self.master.xe('pool-list', minimal=True))
+        self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs: Optional[Dict[str, Any]] = None
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
