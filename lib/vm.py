@@ -4,7 +4,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import Dict, List, Literal, Optional, overload, Union
+from typing import Dict, List, Literal, Optional, overload, TYPE_CHECKING, Union
 
 import lib.commands as commands
 import lib.efi as efi
@@ -14,8 +14,11 @@ from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool,
 from lib.snapshot import Snapshot
 from lib.vif import VIF
 
+if TYPE_CHECKING:
+    from lib.host import Host
+
 class VM(BaseVM):
-    def __init__(self, uuid, host):
+    def __init__(self, uuid: str, host: 'Host'):
         super().__init__(uuid, host)
         self.ip: Optional[str] = None
         self.previous_host = None # previous host when migrated or being migrated
@@ -471,7 +474,7 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def get_all_efi_bins(self):
+    def get_all_efi_bins(self) -> List[str]:
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
             [
@@ -482,7 +485,7 @@ class VM(BaseVM):
             decode=False).split(b'\n')
 
         magic = efi.EFI_HEADER_MAGIC.encode('ascii')
-        binaries: list[str] = []
+        binaries: List[str] = []
         for f in files:
             if magic in f:
                 # Avoid decoding an unsplit f, as some headers are not utf8

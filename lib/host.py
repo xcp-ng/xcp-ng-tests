@@ -209,9 +209,9 @@ class Host:
             finally:
                 self.ssh(['rm', '-f', script.name])
 
-    def _get_xensource_inventory(self):
+    def _get_xensource_inventory(self) -> Dict[str, str]:
         output = self.ssh(['cat', '/etc/xensource-inventory'])
-        inventory: dict[str, str] = {}
+        inventory: Dict[str, str] = {}
         for line in output.splitlines():
             key, raw_value = line.split('=')
             inventory[key] = raw_value.strip('\'')
