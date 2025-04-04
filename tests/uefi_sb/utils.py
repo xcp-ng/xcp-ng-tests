@@ -9,9 +9,9 @@ VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 
 def generate_keys(self_signed=False, as_dict=False):
     logging.info('Generating keys' + (' (self signed)' if self_signed else ''))
-    PK = EFIAuth('PK')
-    KEK = EFIAuth('KEK')
-    db = EFIAuth('db')
+    PK = EFIAuth.self_signed('PK')
+    KEK = EFIAuth.self_signed('KEK')
+    db = EFIAuth.self_signed('db')
 
     if self_signed:
         PK.sign_auth(PK)
@@ -23,7 +23,7 @@ def generate_keys(self_signed=False, as_dict=False):
         KEK.sign_auth(db)
 
     # For our tests the dbx blacklists anything signed by the db
-    dbx = EFIAuth.copy(db, name='dbx')
+    dbx = db.copy(name='dbx')
 
     if as_dict:
         return {
@@ -85,18 +85,18 @@ def sign_efi_bins(vm, db):
         vm.shutdown(verify=True)
 
 def _test_key_exchanges(vm):
-    PK = EFIAuth('PK')
-    null_PK = EFIAuth('PK', is_null=True)
-    new_PK = EFIAuth('PK')
-    bad_PK = EFIAuth('PK')
+    PK = EFIAuth.self_signed('PK')
+    null_PK = EFIAuth('PK')
+    new_PK = EFIAuth.self_signed('PK')
+    bad_PK = EFIAuth.self_signed('PK')
 
-    KEK = EFIAuth('KEK')
-    null_KEK = EFIAuth('KEK', is_null=True)
+    KEK = EFIAuth.self_signed('KEK')
+    null_KEK = EFIAuth('KEK')
 
-    db_from_KEK = EFIAuth('db')
-    db_from_PK = EFIAuth('db')
-    null_db_from_KEK = EFIAuth('db', is_null=True)
-    null_db_from_PK = EFIAuth('db', is_null=True)
+    db_from_KEK = EFIAuth.self_signed('db')
+    db_from_PK = EFIAuth.self_signed('db')
+    null_db_from_KEK = EFIAuth('db')
+    null_db_from_PK = EFIAuth('db')
 
     PK.sign_auth(PK)
     PK.sign_auth(null_PK)
@@ -147,7 +147,7 @@ def _test_key_exchanges(vm):
         ok = True
         try:
             vm.set_efi_var(auth.name, auth.guid,
-                           EFI_AT_ATTRS_BYTES, auth.auth_data)
+                           EFI_AT_ATTRS_BYTES, auth.auth_data())
         except SSHCommandFailed:
             ok = False
 

@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import List, Literal, Optional, Union, cast, overload
+from typing import List, Literal, Iterable, Optional, Union, cast, overload
 
 import lib.commands as commands
 import lib.efi as efi
@@ -510,7 +510,7 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
-    def install_uefi_certs(self, auths):
+    def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
         Install UEFI certs to the VM's NVRAM store.
 
@@ -524,25 +524,27 @@ class VM(BaseVM):
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
             dest = self.host.ssh(['mktemp'])
-            self.host.scp(auth.auth, dest)
-            self.host.ssh([
-                'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
-                str(efi.EFI_AT_ATTRS), dest
-            ])
-            self.host.ssh(['rm', '-f', dest])
+            try:
+                self.host.scp(auth.auth(), dest)
+                self.host.ssh([
+                    'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
+                    str(efi.EFI_AT_ATTRS), dest
+                ])
+            finally:
+                self.host.ssh(['rm', '-f', dest])
 
     def booted_with_secureboot(self):
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
         if not self.is_uefi:
             return False
         if self.is_windows:
-            output = self.ssh(['powershell.exe', 'Confirm-SecureBootUEFI'])
+            output = self.execute_powershell_script("Confirm-SecureBootUEFI")
             if output == 'True':
                 return True
             if output == 'False':
                 return False
             raise Exception(
-                "Output of powershell.exe Confirm-SecureBootUEFI should be either True or False. "
+                "Output of Confirm-SecureBootUEFI should be either True or False. "
                 "Got: %s" % output
             )
         else:
@@ -613,8 +615,8 @@ class VM(BaseVM):
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
 
-    def is_cert_present(self, key):
-        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(key).as_str(), key],
+    def is_uefi_var_present(self, varname):
+        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(varname).as_str(), varname],
                             check=False, simple_output=False, decode=False)
         return res.returncode == 0
 
