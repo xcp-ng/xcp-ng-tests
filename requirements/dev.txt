@@ -5,4 +5,6 @@ flake8
 PyYAML>=6.0
 mypy
 typing_extensions
+pyright
+types-requests
 -r base.txt

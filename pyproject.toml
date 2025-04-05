@@ -21,7 +21,10 @@ dev = [
     "bs4>=0.0.1",
     "mypy",
     "flake8",
+    "pydocstyle",
+    "pyright",
     "pyyaml>=6.0",
+    "types-requests",
     "typing-extensions",
 ]
 
