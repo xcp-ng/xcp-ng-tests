@@ -5,7 +5,6 @@ description = "Testing scripts for XCP-ng"
 readme = "README.md"
 requires-python = "~=3.8"
 
-# load the dependencies from the requirements files
 dynamic = ["dependencies", "optional-dependencies"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements/base.txt"]}
