@@ -18,3 +18,15 @@ run = "uv run pytest"
 [tasks.jobs]
 description = "manage test jobs"
 run = "uv run ./jobs.py"
+
+[tasks.lint]
+description = "run linter and static analyzers"
+depends = ["mypy", "pyright"]
+
+[tasks.mypy]
+description = "run mypy static analyzer"
+run = "uv run mypy lib/ tests/"
+
+[tasks.pyright]
+description = "run pyright static analyzer"
+run = "uv run pyright lib/"
