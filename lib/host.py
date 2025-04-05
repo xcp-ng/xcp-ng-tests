@@ -242,7 +242,7 @@ class Host:
                 'allowUnauthorized': 'true',
                 'label': label
             }
-        ).decode()
+        )
         self.xo_srv_id = xo_srv_id
 
     def xo_server_status(self):
