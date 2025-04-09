@@ -1,5 +1,7 @@
 import pytest
 
+from lib.common import strtobool
+
 # Requirements:
 # From --hosts parameter:
 # - host(A1): first XCP-ng host > 8.2.
@@ -8,7 +10,7 @@ import pytest
 
 @pytest.fixture(scope='module')
 def host_without_netdata(host):
-    assert not host.call_plugin('netdata.py', 'is_netdata_installed')
+    assert not strtobool(host.call_plugin('netdata.py', 'is_netdata_installed'))
     yield host
 
 class TestInstall:
@@ -22,7 +24,7 @@ class TestInstall:
             "api_key": "dummy_key", "destination": "127.0.0.1:19999"
         })
 
-        assert host.call_plugin('netdata.py', 'is_netdata_installed')
+        assert strtobool(host.call_plugin('netdata.py', 'is_netdata_installed'))
 
         host.yum_restore_saved_state()
 
