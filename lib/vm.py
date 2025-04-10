@@ -313,7 +313,7 @@ class VM(BaseVM):
                 remote_cmd = f'nohup bash -c "{remote_cmd} &>/dev/null &"'
             self.ssh(remote_cmd, background=True)
 
-            wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]),
+            wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]).returncode == 0,
                      "wait for pid file %s to exist" % pidfile)
             pid = self.ssh(['cat', pidfile])
             self.ssh(['rm', '-f', script])
