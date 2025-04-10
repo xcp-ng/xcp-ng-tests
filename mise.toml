@@ -1,0 +1,23 @@
+[tools]
+"npm:xo-cli" = "0.32.1"
+python = "3.8"
+uv = "0.6"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.test]
+description = "run tests"
+run = "uv run pytest"
+
+[tasks.lint]
+description = "run linter and static analyzers"
+depends = ["mypy", "pyright"]
+
+[tasks.mypy]
+description = "run mypy static analyzer"
+run = "uv run mypy lib/ tests/"
+
+[tasks.pyright]
+description = "run pyright static analyzer"
+run = "uv run pyright lib/"
