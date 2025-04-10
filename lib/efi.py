@@ -10,6 +10,7 @@ import os
 import shutil
 import struct
 from datetime import datetime, timedelta
+from pathlib import Path
 from tempfile import TemporaryDirectory, mkstemp
 from uuid import UUID
 
@@ -45,6 +46,34 @@ class _EfiGlobalTempdir:
 
 
 _tempdir = _EfiGlobalTempdir()
+
+
+class _SecureBootCertList:
+    _prefix = Path(__file__).parent / '../contrib/secureboot_certs'
+
+    def kek_ms_2011(self):
+        return str(self._prefix / "KEK/Certificates/MicCorKEKCA2011_2011-06-24.der")
+
+    def kek_ms_2023(self):
+        return str(self._prefix / "KEK/Certificates/microsoft corporation kek 2k ca 2023.der")
+
+    def db_win_2011(self):
+        return str(self._prefix / "DB/Certificates/MicWinProPCA2011_2011-10-19.der")
+
+    def db_uefi_2011(self):
+        return str(self._prefix / "DB/Certificates/MicCorUEFCA2011_2011-06-27.der")
+
+    def db_win_2023(self):
+        return str(self._prefix / "DB/Certificates/windows uefi ca 2023.der")
+
+    def db_uefi_2023(self):
+        return str(self._prefix / "DB/Certificates/microsoft uefi ca 2023.der")
+
+    def db_oprom_2023(self):
+        return str(self._prefix / "DB/Certificates/microsoft option rom uefi ca 2023.der")
+
+
+ms_certs = _SecureBootCertList()
 
 
 class GUID(UUID):
@@ -370,8 +399,7 @@ class EFIAuth:
         other_certs: Optional[Iterable[Union[Certificate, str]]] = None,
     ):
         assert name in SECURE_BOOT_VARIABLES
-        # No point having an owner cert without a matching private key
-        assert owner_cert is None or owner_cert.key is not None
+        assert owner_cert is None or owner_cert.key is not None, "owner cert must have private key"
         self.name = name
         self.guid = get_secure_boot_guid(self.name)
         self._owner_cert = owner_cert
