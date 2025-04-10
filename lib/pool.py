@@ -1,11 +1,12 @@
 import logging
 import traceback
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Iterable, Optional, cast
 
 from packaging import version
 
 import lib.commands as commands
 from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_not
+from lib.efi import EFIAuth
 from lib.host import Host
 from lib.sr import SR
 
@@ -221,14 +222,14 @@ class Pool:
         logging.info('Clearing custom pool UEFI certificates')
         self.master.ssh(['secureboot-certs', 'clear'])
 
-    def install_custom_uefi_certs(self, auths):
+    def install_custom_uefi_certs(self, auths: Iterable[EFIAuth]):
         host = self.master
         auths_dict = {}
 
         try:
             for auth in auths:
                 tmp_file_on_host = host.ssh(['mktemp'])
-                host.scp(auth.auth, tmp_file_on_host)
+                host.scp(auth.auth(), tmp_file_on_host)
                 auths_dict[auth.name] = tmp_file_on_host
 
             assert 'PK' in auths_dict
