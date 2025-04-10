@@ -307,7 +307,15 @@ class EFIAuth:
         self.auth = os.path.join(self.tempdir.name, '%s.auth' % self.name)
 
     def is_signed(self):
-        return os.path.exists(self.auth)
+        return self._auth_data is not None
+
+    def auth_data(self):
+        assert self.is_signed()
+        return self._auth_data
+
+    def auth(self):
+        assert self.is_signed()
+        return self._auth
 
     def sign_auth(self, other: 'EFIAuth'):
         """

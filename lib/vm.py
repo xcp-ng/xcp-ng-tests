@@ -22,7 +22,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -618,7 +618,7 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
-    def install_uefi_certs(self, auths):
+    def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
         Install UEFI certs to the VM's NVRAM store.
 
@@ -632,7 +632,7 @@ class VM(BaseVM):
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
             dest = self.host.ssh(['mktemp'])
-            self.host.scp(auth.auth, dest)
+            self.host.scp(auth.auth(), dest)
             self.host.ssh([
                 'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
                 str(efi.EFI_AT_ATTRS), dest

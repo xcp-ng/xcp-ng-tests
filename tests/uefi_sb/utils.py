@@ -147,7 +147,7 @@ def _test_key_exchanges(vm):
         ok = True
         try:
             vm.set_efi_var(auth.name, auth.guid,
-                           EFI_AT_ATTRS_BYTES, auth.auth_data)
+                           EFI_AT_ATTRS_BYTES, auth.auth_data())
         except SSHCommandFailed:
             ok = False
 
