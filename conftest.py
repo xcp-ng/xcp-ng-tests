@@ -329,6 +329,40 @@ def sr_disk_for_all_hosts(pytestconfig, request, host):
         logging.info(f">> Disk or block device {disk} is present and free on all pool members")
     yield candidates[0]
 
+@pytest.fixture(scope='session')
+def sr_disks_for_all_hosts(pytestconfig, request, host):
+    disks = pytestconfig.getoption("sr_disk")
+    assert len(disks) > 0, "This test requires at least one --sr-disk parameter"
+    # Fetch available disks on the master host
+    master_disks = host.available_disks()
+    assert len(master_disks) > 0, "a free disk device is required on the master host"
+
+    if "auto" in disks:
+        candidates = list(master_disks)
+    else:
+        # Validate that all specified disks exist on the master host
+        for disk in disks:
+            assert disk in master_disks, \
+                f"Disk or block device {disk} is either not present or already used on the master host"
+        candidates = list(disks)
+
+    # Check if all disks are available on all hosts in the pool
+    for h in host.pool.hosts[1:]:
+        other_disks = h.available_disks()
+        candidates = [d for d in candidates if d in other_disks]
+
+    if "auto" in disks:
+        # Automatically select disks if "auto" is passed
+        assert len(candidates) > 0, \
+            f"Free disk devices are required on all pool members. Pool master has: {' '.join(master_disks)}."
+        logging.info(">> Using free disk device(s) on all pool hosts: %s.", candidates)
+    else:
+        # Ensure specified disks are free on all hosts
+        assert len(candidates) == len(disks), \
+            f"Some specified disks ({', '.join(disks)}) are not free or available on all hosts."
+        logging.info(">> Disk(s) %s are present and free on all pool members", candidates)
+    yield candidates
+
 @pytest.fixture(scope='module')
 def vm_ref(request):
     ref = request.param
