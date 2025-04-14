@@ -48,7 +48,7 @@ class TestXtf:
                              "Checking whether they belong to the allowed list...")
                 for skipped_test in skipped_tests:
                     if skipped_test not in self._common_skips:
-                        logging.error(f"... At least one doesn't")
+                        logging.error("... At least one doesn't")
                         raise
                 logging.info("... They do")
             else:
