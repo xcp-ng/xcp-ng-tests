@@ -29,7 +29,7 @@ def skip_package_source(version, package_source):
     if package_source == "net":
         # Net install is not valid if there is no netinstall URL
         # FIXME: ISO includes a default URL so we should be able to omit net-url
-        if 'net-url' not in ISO_IMAGES[version].keys():
+        if 'net-url' not in ISO_IMAGES[version]:
             return True, "net-url required for netinstall was not found for {}".format(version)
 
         return False, "do not skip"
