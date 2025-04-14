@@ -517,7 +517,7 @@ class Host:
         return disks
 
     def disk_is_available(self, disk):
-        return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
+        return self.ssh_with_result(['blkid', '/dev/' + disk]).returncode == 2
 
     def available_disks(self, blocksize=512):
         """
