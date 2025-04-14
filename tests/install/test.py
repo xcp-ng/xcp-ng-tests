@@ -145,11 +145,8 @@ class TestNested:
 
         # succession of insta/upg/rst operations
         split_mode = mode.split("-")
-        if is_restore:
-            # restore: back to previous installed version
-            expected_rel_id = split_mode[-3]
-        else:
-            expected_rel_id = split_mode[-1]
+        # if restore: back to previous installed version
+        expected_rel_id = split_mode[-3] if is_restore else split_mode[-1]
         expected_rel = {
             "83nightly": "8.3.0",
             "830net": "8.3.0",
