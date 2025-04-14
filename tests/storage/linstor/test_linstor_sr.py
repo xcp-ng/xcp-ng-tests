@@ -6,6 +6,7 @@ from .conftest import STORAGE_POOL_NAME, LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 from tests.storage import vdi_is_open
+import contextlib
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -28,10 +29,8 @@ class TestLinstorSRCreateDestroy:
                 'redundancy': '1',
                 'provisioning': 'thin'
             }, shared=True)
-            try:
+            with contextlib.suppress(Exception):
                 sr.destroy()
-            except Exception:
-                pass
             assert False, "SR creation should not have succeeded!"
         except SSHCommandFailed as e:
             logging.info("SR creation failed, as expected: {}".format(e))
