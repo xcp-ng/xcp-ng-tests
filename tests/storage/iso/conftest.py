@@ -27,10 +27,7 @@ def copy_tools_iso_to_iso_sr(host, sr, location=None):
     # copy the ISO file to the right location
     iso_path = host.ssh(['find', '/opt/xensource/packages/iso/', '-name', '"*.iso"'])
     iso_new_name = sr.uuid + "_test.iso"
-    if location is not None:
-        iso_new_path = f"{location}/{iso_new_name}"
-    else:
-        iso_new_path = f"/run/sr-mount/{sr.uuid}/{iso_new_name}"
+    iso_new_path = f'{location}/{iso_new_name}' if location is not None else f'/run/sr-mount/{sr.uuid}/{iso_new_name}'
     host.ssh(['cp', '-f', iso_path, iso_new_path])
     sr.scan()
     return iso_new_path
