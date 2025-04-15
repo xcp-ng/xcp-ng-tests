@@ -4,7 +4,7 @@ from lib.sr import SR
 
 def try_to_create_sr_with_missing_device(sr_type, label, host):
     try:
-        sr = host.sr_create(sr_type, label, {}, verify=True)
+        host.sr_create(sr_type, label, {}, verify=True)
     except SSHCommandFailed as e:
         assert e.stdout == (
             'Error code: SR_BACKEND_FAILURE_90\nError parameters: , '
