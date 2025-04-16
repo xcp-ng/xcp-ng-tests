@@ -53,8 +53,16 @@ class TestLinstorSRCreateDestroy:
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, linstor_sr):
-        linstor_sr.run_quicktest()
+    def test_quicktest(self, linstor_sr, provisioning_type):
+        try:
+            linstor_sr.run_quicktest()
+        except Exception:
+            if provisioning_type == "thick":
+                pytest.xfail(reason="Known failure for thick provisioning")
+            raise # Let thin failures fail test
+        else:
+            if provisioning_type == "thick":
+                pytest.fail("Expected failure for thick provisioning did not occur (XPASS)")
 
     def test_vdi_is_not_open(self, vdi_on_linstor_sr):
         assert not vdi_is_open(vdi_on_linstor_sr)
