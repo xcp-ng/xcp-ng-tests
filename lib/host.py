@@ -740,3 +740,15 @@ class Host:
         if not sr_uuid:
             return None
         return SR(sr_uuid, self.pool)
+
+    def lvs(self, vgName: Optional[str] = None, ignore_MGT: bool = True) -> List[str]:
+        ret: List[str] = []
+        cmd = ["lvs", "--noheadings", "-o", "LV_NAME"]
+        if vgName:
+            cmd.append(vgName)
+        output = self.ssh(cmd)
+        for line in output.splitlines():
+            if ignore_MGT and "MGT" in line:
+                continue
+            ret.append(line.strip())
+        return ret
