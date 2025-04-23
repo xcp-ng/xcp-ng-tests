@@ -711,3 +711,15 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def lvs(self, vgName: Optional[str] = None, ignore_MGT: bool = True) -> List[str]:
+        ret: List[str] = []
+        cmd = ["lvs", "--noheadings", "-o", "LV_NAME"]
+        if vgName:
+            cmd.append(vgName)
+        output = self.ssh(cmd)
+        for line in output.splitlines():
+            if ignore_MGT and "MGT" in line:
+                continue
+            ret.append(line.strip())
+        return ret
