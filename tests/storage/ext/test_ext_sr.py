@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+import logging
+
 from lib.common import vm_image, wait_for
+from lib.fistpoint import FistPoint
+from lib.vdi import VDI
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 from typing import TYPE_CHECKING
@@ -62,6 +66,47 @@ class TestEXTSR:
             vm.shutdown(verify=True)
 
     # *** tests with reboots (longer tests).
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_blktap_activate_failure(self, vm_on_ext_sr):
+        from lib.fistpoint import FistPoint
+        vm = vm_on_ext_sr
+        with FistPoint(vm.host, "blktap_activate_inject_failure"):
+            try:
+                vm.start()
+                vm.shutdown(force=True)
+            except Exception as e:
+                logging.info(f"Expected failure {e}")
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_resize(self, vm_on_ext_sr):
+        vm = vm_on_ext_sr
+        vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
+        old_size = vdi.size()
+        new_size = old_size + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
+
+        vdi.resize(new_size)
+
+        assert vdi.size() == new_size
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_failing_resize(self, host, ext_sr, vm_on_ext_sr, exit_on_fistpoint):
+        vm = vm_on_ext_sr
+        vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
+        old_size = vdi.size()
+        new_size = old_size + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
+
+        with FistPoint(vm.host, "LVHDRT_inflate_after_setSize"):
+            try:
+                vdi.resize(new_size)
+            except:
+                logging.info(f"Launching SR scan for {ext_sr} after failure")
+                host.xe("sr-scan", {"uuid": ext_sr})
+
+        assert vdi.size() == new_size
 
     @pytest.mark.reboot
     @pytest.mark.small_vm

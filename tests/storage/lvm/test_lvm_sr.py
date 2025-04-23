@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+import logging
+
+from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.fistpoint import FistPoint
+from lib.vdi import VDI
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 from typing import TYPE_CHECKING
@@ -60,6 +65,66 @@ class TestLVMSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_failing_resize_on_inflate_after_setSize(self, host, lvm_sr, vm_on_lvm_sr, exit_on_fistpoint):
+        vm = vm_on_lvm_sr
+        lvinflate = ""
+        need_rescan = False
+        vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
+        new_size = vdi.size() + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
+
+        with FistPoint(vm.host, "LVHDRT_inflate_after_setSize"):
+            try:
+                vdi.resize(new_size)
+            except SSHCommandFailed as e:
+                logging.info(e)
+                need_rescan = True
+
+        assert need_rescan, "Resize did not make an error"
+        lvlist = host.lvs(f"VG_XenStorage-{lvm_sr.uuid}")
+        for lv in lvlist:
+            if lv.startswith("inflate_"):
+                logging.info(f"Found inflate journal following error: {lv}")
+                lvinflate = lv
+
+        logging.info(f"Launching SR scan for {lvm_sr.uuid} to resolve failure")
+        try:
+            host.xe("sr-scan", {"uuid": lvm_sr.uuid})
+        except SSHCommandFailed as e:
+            assert False, f"Failing to scan following a inflate error {e}"
+        assert not lvinflate in host.lvs(f"VG_XenStorage-{lvm_sr.uuid}"), "Inflate journal still exist following the scan"
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_failing_resize_on_inflate_after_setSizePhys(self, host, lvm_sr, vm_on_lvm_sr, exit_on_fistpoint):
+        vm = vm_on_lvm_sr
+        lvinflate = ""
+        need_rescan = False
+        vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
+        new_size = vdi.size() + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
+
+        with FistPoint(vm.host, "LVHDRT_inflate_after_setSizePhys"):
+            try:
+                vdi.resize(new_size)
+            except SSHCommandFailed as e:
+                logging.info(e)
+                need_rescan = True
+
+        assert need_rescan, "Resize did not make an error"
+        lvlist = host.lvs(f"VG_XenStorage-{lvm_sr.uuid}")
+        for lv in lvlist:
+            if lv.startswith("inflate_"):
+                logging.info(f"Found inflate journal following error: {lv}")
+                lvinflate = lv
+
+        logging.info(f"Launching SR scan for {lvm_sr.uuid} to resolve failure")
+        try:
+            host.xe("sr-scan", {"uuid": lvm_sr.uuid})
+        except SSHCommandFailed as e:
+            assert False, f"Failing to scan following a inflate error {e}"
+        assert not lvinflate in host.lvs(f"VG_XenStorage-{lvm_sr.uuid}"), "Inflate journal still exist following the scan"
 
     # *** tests with reboots (longer tests).
 
