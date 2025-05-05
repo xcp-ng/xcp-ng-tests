@@ -3,6 +3,7 @@ import pytest
 
 from packaging import version
 
+from lib.host import Host
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state
 
@@ -65,3 +66,11 @@ def host_with_dom0_tests(host_with_saved_yum_state):
     host = host_with_saved_yum_state
     host.yum_install(['xen-dom0-tests'])
     yield host
+
+@pytest.fixture(scope="package")
+def host_with_ring0_tests(host_with_saved_yum_state: Host):
+    host = host_with_saved_yum_state
+    host.yum_install(['test-ring0'])
+    yield host
+    # clean up the loaded test modules and test states at the end
+    host.reboot(verify=True)
