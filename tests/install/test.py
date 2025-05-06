@@ -310,57 +310,6 @@ class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
-    @pytest.mark.parametrize("mode", (
-        "83nightly-83nightly",
-        "83rc1-83nightly",
-        "83b2-83nightly",
-        "83b1-83nightly",
-        "821.1-83nightly",
-        "81-83nightly",
-        "80-83nightly",
-        "xs8-83nightly",
-        "ch821.1-83nightly",
-        "83rcnet-83rcnet",
-        "821.1-821.1",
-    ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
-        lambda firmware, mode, machine, package_source, local_sr: [dict(
-            vm="vm1",
-            image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}-{package_source}-{local_sr}]"))])
-    def test_boot_upg(self, create_vms,
-                      firmware, mode, machine, package_source, local_sr):
-        self._test_firstboot(create_vms, mode, machine=machine)
-
-    @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
-    @pytest.mark.parametrize("package_source", ("iso", "net"))
-    @pytest.mark.parametrize("mode", (
-        "83nightly-83nightly-83nightly",
-        "83rc1-83nightly-83nightly",
-        "83b2-83nightly-83nightly",
-        "83b1-83nightly-83nightly",
-        "821.1-83nightly-83nightly",
-        "81-83nightly-83nightly",
-        "80-83nightly-83nightly",
-        "xs8-83nightly-83nightly",
-        "ch821.1-83nightly-83nightly",
-        "83rcnet-83rcnet-83rcnet", # FIXME
-        "821.1-821.1-821.1",
-    ))
-    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
-        lambda firmware, mode, package_source, local_sr: [dict(
-            vm="vm1",
-            image_test=(f"TestNested::test_restore[{firmware}-{mode}-{package_source}-{local_sr}]"))])
-    def test_boot_rst(self, create_vms,
-                      firmware, mode, package_source, local_sr):
-        self._test_firstboot(create_vms, mode, is_restore=True)
-
-    @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
-    @pytest.mark.parametrize("package_source", ("iso", "net"))
-    @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83nightly", "83nightly"),
         ("83rc1", "83nightly"),
@@ -396,6 +345,32 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
+    @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("mode", (
+        "83nightly-83nightly",
+        "83rc1-83nightly",
+        "83b2-83nightly",
+        "83b1-83nightly",
+        "821.1-83nightly",
+        "81-83nightly",
+        "80-83nightly",
+        "xs8-83nightly",
+        "ch821.1-83nightly",
+        "83rcnet-83rcnet",
+        "821.1-821.1",
+    ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(
+        lambda firmware, mode, machine, package_source, local_sr: [dict(
+            vm="vm1",
+            image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}-{package_source}-{local_sr}]"))])
+    def test_boot_upg(self, create_vms,
+                      firmware, mode, machine, package_source, local_sr):
+        self._test_firstboot(create_vms, mode, machine=machine)
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
+    @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize(("orig_version", "iso_version"), [
         ("83nightly-83nightly", "83nightly"),
         ("83rc1-83nightly", "83nightly"),
@@ -423,3 +398,28 @@ class TestNested:
                      firmware, orig_version, iso_version, package_source, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_restore(ip=host_vm.ip)
+
+    @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
+    @pytest.mark.parametrize("package_source", ("iso", "net"))
+    @pytest.mark.parametrize("mode", (
+        "83nightly-83nightly-83nightly",
+        "83rc1-83nightly-83nightly",
+        "83b2-83nightly-83nightly",
+        "83b1-83nightly-83nightly",
+        "821.1-83nightly-83nightly",
+        "81-83nightly-83nightly",
+        "80-83nightly-83nightly",
+        "xs8-83nightly-83nightly",
+        "ch821.1-83nightly-83nightly",
+        "83rcnet-83rcnet-83rcnet", # FIXME
+        "821.1-821.1-821.1",
+    ))
+    @pytest.mark.parametrize("firmware", ("uefi", "bios"))
+    @pytest.mark.continuation_of(
+        lambda firmware, mode, package_source, local_sr: [dict(
+            vm="vm1",
+            image_test=(f"TestNested::test_restore[{firmware}-{mode}-{package_source}-{local_sr}]"))])
+    def test_boot_rst(self, create_vms,
+                      firmware, mode, package_source, local_sr):
+        self._test_firstboot(create_vms, mode, is_restore=True)
