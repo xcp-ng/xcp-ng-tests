@@ -185,8 +185,8 @@ def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, 
         decode: bool = True, options: List[str] = []) -> None:
     ...
 @overload
-def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check=True, simple_output: bool = True,
-        suppress_fingerprint_warnings=True, background: bool = False,
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+        suppress_fingerprint_warnings: bool = True, background: bool = False,
         decode: bool = True, options: List[str] = []
         ) -> Union[str, bytes, SSHResult, None]:
     ...
