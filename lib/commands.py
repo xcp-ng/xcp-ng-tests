@@ -190,9 +190,10 @@ def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, 
         decode: bool = True, options: List[str] = []
         ) -> Union[str, bytes, SSHResult, None]:
     ...
-def ssh(hostname_or_ip, cmd, *, check=True, simple_output=True,
-        suppress_fingerprint_warnings=True,
-        background=False, decode=True, options=[]):
+def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+        suppress_fingerprint_warnings: bool = True, background: bool = False,
+        decode: bool = True, options: List[str] = []
+        ) -> Union[str, bytes, SSHResult, None]:
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
                          background, decode, options)
     if isinstance(result_or_exc, SSHCommandFailed):
