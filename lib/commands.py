@@ -62,8 +62,34 @@ def _ellide_log_lines(log):
         reduced_message.append("(...)")
     return "\n{}".format("\n".join(reduced_message))
 
-def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-         background, decode, options) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
+@overload
+def _ssh(hostname_or_ip: str, cmd: Union[str, List[str]], check: bool, simple_output: Literal[True],
+         suppress_fingerprint_warnings: bool, background: Literal[False],
+         decode: Literal[True], options: List[str]) -> str:
+    ...
+@overload
+def _ssh(hostname_or_ip: str, cmd: Union[str, List[str]], check: bool, simple_output: Literal[True],
+         suppress_fingerprint_warnings: bool, background: Literal[False],
+         decode: Literal[False], options: List[str]) -> bytes:
+    ...
+@overload
+def _ssh(hostname_or_ip: str, cmd: Union[str, List[str]], check: bool, simple_output: Literal[False],
+         suppress_fingerprint_warnings: bool, background: Literal[False],
+         decode: bool, options: List[str]) -> SSHResult:
+    ...
+@overload
+def _ssh(hostname_or_ip: str, cmd: Union[str, List[str]], check: bool, simple_output: Literal[False],
+         suppress_fingerprint_warnings: bool, background: Literal[True],
+         decode: bool, options: List[str]) -> None:
+    ...
+@overload
+def _ssh(hostname_or_ip: str, cmd: Union[str, List[str]], check: bool, simple_output: bool,
+         suppress_fingerprint_warnings: bool, background: bool,
+         decode: bool, options: List[str]) -> Union[str, bytes, SSHResult, SSHCommandFailed, None]:
+    ...
+def _ssh(hostname_or_ip: str, cmd: Union[str, List[str]], check: bool, simple_output: bool,
+         suppress_fingerprint_warnings: bool, background: bool,
+         decode: bool, options: List[str]) -> Union[str, bytes, SSHResult, SSHCommandFailed, None]:
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     if suppress_fingerprint_warnings:
