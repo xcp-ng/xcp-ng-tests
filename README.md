@@ -3,25 +3,36 @@
 Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
-* python >= 3.8
-* packages as listed in requirements/base.txt
-* extra test-specific requirements are documented in the test file
-  "Requirements" header
+
+This project uses [mise](https://github.com/jdx/mise) to deal with the dependencies.
+
+Extra test-specific requirements are documented in the test file "Requirements" header.
   * `netcat` is required on the machine running the tests.
 
-### Quick install (python requirements)
+### Quick install
 
-Install the python requirements using pip:
+Install `mise` with
 
-```
-$ pip install -r requirements/base.txt
-```
+~~~sh
+curl https://mise.run | sh
+~~~
 
-Additionally, for dev dependencies (things like the linter / style checker):
+Optionally install the mise managed dependencies with `mise install`.
 
-```
-$ pip install -r requirements/dev.txt
-```
+You can then use the dependencies managed by mise by prefixing running the commands documented in the next chapters with `mise run`.
+For example, `mise run pytest`, `mise run ./jobs.py`, …
+When running the command with `mise run`, `mise` check that your dependencies are up to date and updates them if required, before running your command. You're always sure to have the expected dependencies, even when switching branch!
+
+Alternatively you can run
+
+~~~sh
+mise activate | source
+~~~
+
+to configure the `PATH` environment variable in your shell to point to the expected dependencies.
+This is the equivalent of `source ./venv/bin/activate` with a python environment.
+Note you have to explicitly run `mise install` in that case. `mise` won't ensure that the dependencies are up to date at each command in that case.
+
 
 ## Other requirements
 * XCP-ng hosts that you can ssh to using a SSH key, non-interactively
@@ -55,6 +66,9 @@ pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1
 pytest tests/storage/zfs/test_zfs_sr_crosspool_migration.py --hosts=10.0.0.1,10.0.0.2 --vm=mini-linux-x86_64-uefi
 pytest tests/misc/test_vm_basic_operations.py --hosts=10.0.0.1 --vm=mini-linux-x86_64-bios --vm=mini-linux-x86_64-uefi
 ```
+
+You can run the test without `mise` if you prefer (the old way). Just replace `mise run test` with `pytest`
+in the command.
 
 Most tests take a `--hosts=yourtesthost` (or `--hosts=host1,host2,...` if they need several pools, e.g. crosspool migration tests).
 The `--hosts` parameter can be specified several times. Then `pytest` will run the tests on each host or group of hosts, sequentially.
@@ -100,14 +114,14 @@ Here's an example of selection we can do thanks to the markers:
 
 ```
 # Run storage driver tests that either need no VM at all, or advise to use a small VM. Exclude tests that reboot the hosts.
-pytest tests/storage -m "(small_vm or no_vm) and not reboot" --hosts=ip_of_poolmaster1,ip_of_poolmaster2 --vm=http://path/to/a_small_vm.xva --sr-disk=auto
+mise run test tests/storage -m "(small_vm or no_vm) and not reboot" --hosts=ip_of_poolmaster1,ip_of_poolmaster2 --vm=http://path/to/a_small_vm.xva --sr-disk=auto
 ```
 
 Another example:
 
 ```
 # Run secure boot tests that require a Unix VM (as opposed to a Windows VM) and that should ideally be run on a large variety of VMs
-pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/unix_vm_1.xva --vm=http://path/to/unix_vm_2.xva --vm=http://path/to/unix_vm_3.xva
+mise run test tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/unix_vm_1.xva --vm=http://path/to/unix_vm_2.xva --vm=http://path/to/unix_vm_3.xva
 ```
 
 
