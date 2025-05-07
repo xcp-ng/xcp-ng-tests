@@ -100,7 +100,7 @@ class BaseVM:
         assert sr.attached_to_host(self.host)
         return sr
 
-    def export(self, filepath, compress='none') -> None:
+    def export(self, filepath, compress='none', use_cache=False) -> None:
         logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
         params = {
             'uuid': self.uuid,
