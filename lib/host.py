@@ -85,8 +85,8 @@ class Host:
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True
+            ) -> Union[str, bytes, commands.SSHResult, None]:
         ...
 
     def ssh(self, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
