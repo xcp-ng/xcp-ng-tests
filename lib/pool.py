@@ -1,4 +1,5 @@
 import logging
+import os
 import traceback
 from typing import Any, Dict, Optional, cast
 
@@ -26,6 +27,7 @@ class Pool:
                  f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
                  timeout_secs=30 * 60)
 
+        logging.info("Getting Pool info for %r", master_hostname_or_ip)
         for host_uuid in self.hosts_uuids():
             if host_uuid != self.hosts[0].uuid:
                 host = Host(self, self.host_ip(host_uuid))
@@ -117,6 +119,33 @@ class Pool:
 
     def get_vdi_sr_uuid(self, vdi_uuid):
         return self.master.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
+
+    def get_iso_sr(self):
+        uuids = safe_split(self.master.xe('sr-list', {'type': 'iso',
+                                                      'content-type': 'iso',
+                                                      'is-tools-sr': False},
+                                          minimal=True))
+        assert len(uuids) == 1  # we may need to allow finer selection if this triggers
+        return SR(uuids[0], self)
+
+    def push_iso(self, local_file, remote_filename=None):
+        iso_sr = self.get_iso_sr()
+        mountpoint = f"/run/sr-mount/{iso_sr.uuid}"
+        if remote_filename is None:
+            # needs only work on XCP-ng 8.2+
+            remote_filename = self.master.ssh(["mktemp --suffix=.iso -p", mountpoint])
+            self.master.ssh(["chmod 644", remote_filename])
+
+        logging.info("Uploading to ISO-SR %s as %s", local_file, remote_filename)
+        self.master.scp(local_file, remote_filename)
+        iso_sr.scan()
+        return os.path.basename(remote_filename)
+
+    def remove_iso(self, remote_filename):
+        iso_sr = self.get_iso_sr()
+        fullpath = f"/run/sr-mount/{iso_sr.uuid}/{remote_filename}"
+        logging.info("Removing %s from ISO-SR server", remote_filename)
+        self.master.ssh(["rm", fullpath])
 
     def save_uefi_certs(self) -> None:
         """
@@ -255,3 +284,6 @@ class Pool:
         wait_for_not(lambda: host.uuid in self.hosts_uuids(), f"Wait for host {host} to be ejected of pool {master}.")
         self.hosts = [h for h in self.hosts if h.uuid != host.uuid]
         wait_for(host.is_enabled, f"Wait for host {host} to restart in its own pool.", timeout_secs=10 * 60)
+
+    def network_named(self, network_name):
+        return self.master.xe('network-list', {'name-label': network_name}, minimal=True)
