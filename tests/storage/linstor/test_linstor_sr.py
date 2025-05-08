@@ -2,7 +2,7 @@ import logging
 import pytest
 import time
 
-from .conftest import LINSTOR_PACKAGE
+from .conftest import GROUP_NAME, LINSTOR_PACKAGE, LINSTOR_RELEASE_PACKAGE
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 from tests.storage import vdi_is_open
@@ -85,6 +85,165 @@ class TestLinstorSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    def test_linstor_sr_expand_disk(self, linstor_sr, provisioning_type, storage_pool_name,
+                                    pytestconfig, vm_on_linstor_sr):
+        """
+        This test demonstrates online expansion of a LINSTOR SR while a VM is actively running on it.
+
+        It identifies hosts within the same pool, detects free raw disks, and expands the LVM to grow the SR.
+        A VM is started before the expansion, and its functionality is verified through a shutdown and restart
+        after the expansion completes successfully.
+        """
+        sr = linstor_sr
+        vm = vm_on_linstor_sr
+        vm.start()
+        sr_size = sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'})
+        resized = False
+        disks = []
+        for h in sr.pool.hosts:
+            logging.info("Checking on {}".format(h.hostname_or_ip))
+            available_disks = h.available_disks()
+            # We need the disk to be "raw" (non LVM_member etc) to use
+            available_disks = [disk for disk in available_disks if h.raw_disk_is_available(disk)]
+            expansion_sr_disk = pytestconfig.getoption("expansion_sr_disk")
+            if expansion_sr_disk:
+                assert len(expansion_sr_disk) == 1, "This test requires only one --expansion-sr-disk parameter"
+                if "auto" == expansion_sr_disk[0]:
+                    disks = available_disks
+                else:
+                    assert expansion_sr_disk[0] in available_disks, "The expansion-sr-disk seems unavailable"
+                    disks = expansion_sr_disk
+            else:
+                disks = available_disks
+            for disk in disks:
+                logging.info("Found Disk {}".format(disk))
+                device = '/dev/' + disk
+                try:
+                    h.ssh(['pvcreate', device])
+                    h.ssh(['vgextend', GROUP_NAME, device])
+                    if provisioning_type == "thin":
+                        h.ssh(['lvextend', '-l', '+100%FREE', storage_pool_name])
+                    else: # Needed service restart for thick pool sr scan
+                        h.ssh('systemctl restart linstor-satellite.service')
+                    resized = True
+                    logging.info("Successfully expanded LVM on %s with %s", h.hostname_or_ip, device)
+                except SSHCommandFailed as e:
+                    raise e
+
+        # Need to ensure that linstor is healthy/up-to-date before moving ahead.
+        time.sleep(30) # Wait time for Linstor node communications to restore.
+        sr.scan()
+        new_sr_size = sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'})
+        assert int(new_sr_size) > int(sr_size) and resized is True, \
+            f"Expected SR size to increase but got old size: {sr_size}, new size: {new_sr_size}"
+        logging.info("SR expansion completed")
+        vm.shutdown(verify=True)
+        # Ensure VM is able to start and shutdown on expanded SR
+        self.test_start_and_shutdown_VM(vm)
+
+    @pytest.mark.small_vm
+    def test_linstor_sr_expand_host(self, linstor_sr, host, hostB1, provisioning_type,
+                                    storage_pool_name, vm_on_linstor_sr):
+        """
+        This test validates expansion of a LINSTOR SR by dynamically adding a new host with local storage to the pool.
+        A VM is started on the SR before expansion begins to ensure the SR is in active use during the process.
+
+        It performs the following steps:
+        - Installs LINSTOR packages on the new host (if missing).
+        - Detects and prepares raw disks using LVM commands.
+        - Joins the host (hostB1) to the existing pool and registers it with LINSTOR as a node.
+        - Creates a new LINSTOR storage pool on the added host (LVM or LVM-thin, based on provisioning type).
+        - Confirms SR expansion by verifying increased physical size.
+        - Ensures SR functionality by rebooting the VM running on the SR.
+
+        Finally, the test cleans up by deleting the LINSTOR node, ejecting the host from the pool,
+        and removing packages and LVM metadata.
+        """
+        sr = linstor_sr
+        vm = vm_on_linstor_sr
+        vm.start()
+        sr_size = sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'})
+        resized = False
+        # Ensure that its a single host pool and not multi host pool
+        assert len(hostB1.pool.hosts) == 1, "This test requires second host to be a single host"
+        # Ensure that the host has disks available to use, we do not care about disks symmetry across pool
+        available_disks = hostB1.available_disks()
+        # We need the disk to be "raw" (non LVM_member etc) to use
+        available_disks = [disk for disk in available_disks if hostB1.raw_disk_is_available(disk)]
+        assert len(available_disks) >= 1, "This test requires second host to have free disk(s)"
+        if not hostB1.is_package_installed(LINSTOR_PACKAGE):
+            logging.info("Installing %s on host %s", LINSTOR_PACKAGE, hostB1)
+            hostB1.yum_install([LINSTOR_RELEASE_PACKAGE])
+            hostB1.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
+            # Needed because the linstor driver is not in the xapi sm-plugins list
+            # before installing the LINSTOR packages.
+            hostB1.ssh(["systemctl", "restart", "multipathd"])
+            hostB1.restart_toolstack(verify=True)
+
+        devices = [f"/dev/{disk}" for disk in available_disks]
+
+        for disk in available_disks:
+            logging.info("Found Disk %s", disk)
+            device = "/dev/" + disk
+            hostB1.ssh(['pvcreate', device])
+
+        hostB1.ssh(['vgcreate', GROUP_NAME] + devices)
+
+        sr_group_name = "xcp-sr-" + storage_pool_name.replace("/", "_")
+        hostname_hostB1 = hostB1.xe('host-param-get', {'uuid': hostB1.uuid,
+                                    'param-name': 'name-label'})
+
+        controller_option = "--controllers="
+        for member in host.pool.hosts:
+            controller_option += f"{member.hostname_or_ip},"
+
+        hostB1_pool = hostB1.pool # Saving the hostB1 pool info before overwrite in join_pool.
+        try:
+            logging.info("Joining host %s to pool %s", hostB1, host)
+            # This will cause hostB1 pool to overwrite itself as host.pool creating issues on next run.
+            hostB1.join_pool(host.pool)
+            logging.info("Current list of linstor nodes:")
+            logging.info(host.ssh_with_result(["linstor", controller_option, "node", "list"]).stdout)
+            logging.info("Creating linstor node")
+            host.ssh(["linstor", controller_option, "node", "create", "--node-type", "combined",
+                      "--communication-type", "plain", hostname_hostB1, hostB1.hostname_or_ip]) # Linstor Node Create
+            logging.info(hostB1.ssh_with_result(['systemctl', 'restart', 'linstor-satellite.service']).stdout)
+            time.sleep(45) # Wait for node to come online
+            logging.info("New list of linstor nodes:")
+            logging.info(host.ssh_with_result(["linstor", controller_option, "node", "list"]).stdout)
+            logging.info("Expanding with linstor node")
+
+            if provisioning_type == "thin":
+                hostB1.ssh(['lvcreate', '-l', '+100%FREE', '-T', storage_pool_name])
+                host.ssh_with_result(["linstor", controller_option, "storage-pool", "create", "lvmthin",
+                                      hostname_hostB1, sr_group_name, storage_pool_name]).stdout # Expand linstor
+            else:
+                host.ssh_with_result(["linstor", controller_option, "storage-pool", "create", "lvm",
+                                      hostname_hostB1, sr_group_name, storage_pool_name]).stdout # Expand linstor
+        except Exception as e:
+            logging.info("Exception: {}".format(e))
+            host.ssh(["linstor", controller_option, "node", "delete", hostname_hostB1]) # Linstor Node Delete
+            host.pool.eject_host(hostB1)
+            hostB1.ssh(['vgremove', '-y', GROUP_NAME])
+            hostB1.ssh(['pvremove', '-y'] + devices) # Device cleanup
+            hostB1.yum_remove([LINSTOR_PACKAGE]) # Package cleanup
+
+        resized = True
+        sr.scan()
+        new_sr_size = sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'})
+        assert int(new_sr_size) > int(sr_size) and resized is True, \
+            f"Expected SR size to increase but got old size: {sr_size}, new size: {new_sr_size}"
+        logging.info("SR expansion completed from size %s to %s", sr_size, new_sr_size)
+        vm.shutdown(verify=True)
+        # Ensure VM is able to start and shutdown on expanded SR
+        self.test_start_and_shutdown_VM(vm)
+
+        host.ssh_with_result(["linstor", controller_option, "node", "delete", hostname_hostB1]).stdout
+        host.pool.eject_host(hostB1)
+        hostB1.pool = hostB1_pool # Post eject, reset hostB1.pool for next run ("thick")
+        hostB1.yum_remove([LINSTOR_PACKAGE]) # Package cleanup
 
     # *** tests with reboots (longer tests).
 
