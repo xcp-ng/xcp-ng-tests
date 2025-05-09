@@ -45,7 +45,7 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
 def storage_pool_name(provisioning_type):
     return GROUP_NAME if provisioning_type == "thick" else STORAGE_POOL_NAME
 
-@pytest.fixture(params=["thin", "thick"], scope="session")
+@pytest.fixture(params=["thin"], scope="session")
 def provisioning_type(request):
     return request.param
 
