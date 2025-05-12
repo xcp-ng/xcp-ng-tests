@@ -68,13 +68,6 @@ def answerfile(request):
     answerfile_def = callable_marker(marker.args[0], request)
     assert isinstance(answerfile_def, AnswerFile)
 
-    answerfile_def.top_append(
-        dict(TAG="admin-interface",
-             name="eth0",
-             proto="dhcp",
-             ),
-    )
-
     yield answerfile_def
 
 

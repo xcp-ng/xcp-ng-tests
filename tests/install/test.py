@@ -85,6 +85,7 @@ class TestNested:
              "net": {"TAG": "source", "type": "url",
                      "CONTENTS": ISO_IMAGES[iso_version]['net-url']},
              }[package_source],
+            {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": install_disk},
