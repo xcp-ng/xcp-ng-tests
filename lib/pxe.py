@@ -35,9 +35,9 @@ def server_remove_bootconf(mac_address: str) -> None:
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
     ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
 
-def arp_addresses_for(mac_address: str) -> list[str]:
+def arp_addresses_for(mac_address: str, server: str = ARP_SERVER) -> list[str]:
     output = ssh(
-        ARP_SERVER,
+        server,
         ['ip', 'neigh', 'show', 'nud', 'reachable',
          '|', 'grep', mac_address,
          '|', 'awk', '\'{ print $1 }\'']
