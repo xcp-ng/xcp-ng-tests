@@ -33,7 +33,7 @@ def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=F
             logging.info(f"Attempt evacuating host {source_host}. This should fail.")
         source_host.xe('host-evacuate', args)
         wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
-        wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
+        wait_for(lambda: vm.is_running_on_host(dest_host), f"Wait for VM to be running on destination host {dest_host.uuid}")
         vm.wait_for_os_booted()
         assert not expect_error, "host-evacuate should have raised: %s" % error
     except SSHCommandFailed as e:
