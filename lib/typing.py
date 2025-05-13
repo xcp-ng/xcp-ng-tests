@@ -25,6 +25,7 @@ AnswerfileDict = TypedDict('AnswerfileDict', {
     # field's type, but allows them in places we wouldn't want them,
     # and forces every XML attribute we use to appear here.
     # NOTE: duplicated below, TypedDict() expects a dictionary literal as the second argument
+    'device': NotRequired[str],
     'guest-storage': NotRequired[str],
     'mode': NotRequired[str],
     'name': NotRequired[str],
@@ -42,6 +43,7 @@ SimpleAnswerfileDict = TypedDict('SimpleAnswerfileDict', {
     # field's type, but allows them in places we wouldn't want them,
     # and forces every XML attribute we use to appear here.
     # NOTE: duplicated above, TypedDict() expects a dictionary literal as the second argument
+    'device': NotRequired[str],
     'guest-storage': NotRequired[str],
     'mode': NotRequired[str],
     'name': NotRequired[str],

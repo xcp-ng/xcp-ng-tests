@@ -43,6 +43,7 @@ def helper_vm_with_plugged_disk(running_vm, create_vms):
 class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
+    @pytest.mark.parametrize("system_disk", ("disk", "raid1"))
     @pytest.mark.parametrize("iso_version", (
         "83nightly", "830net",
         "830",
@@ -54,7 +55,7 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.vm_definitions(
-        lambda firmware: dict(
+        lambda firmware, system_disk: dict(
             name="vm1",
             template="Other install media",
             params=(
@@ -74,31 +75,45 @@ class TestNested:
                 ),
                 "bios": (),
             }[firmware],
-            vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
+            vdis=([dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")]
+                  + ([dict(name="vm1 system disk mirror", size="100GiB", device="xvdb", userdevice="1")]
+                     if system_disk == "raid1" else [])
+                  ),
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
     @pytest.mark.answerfile(
-        lambda install_disk, local_sr, package_source, iso_version: AnswerFile("INSTALL")
+        lambda firmware, install_disk, local_sr, package_source, system_disk, iso_version: AnswerFile("INSTALL")
         .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr})
         .top_append(
             {"TAG": "source", "type": "local"} if package_source == "iso"
             else {"TAG": "source", "type": "url",
                   "CONTENTS": ISO_IMAGES[iso_version]['net-url']} if package_source == "net"
             else ValueError(f"package_source {package_source!r}"),
+
+            # FIXME belongs to a generalization of install_disk fixture
+            {"TAG": "raid", "device": "md127",
+             "CONTENTS": (
+                 {"TAG": "disk", "CONTENTS": {"bios": "sda", "uefi": "nvme0n1"}[firmware]},
+                 {"TAG": "disk", "CONTENTS": {"bios": "sdb", "uefi": "nvme0n2"}[firmware]},
+             )} if system_disk == "raid1"
+            else None if system_disk == "disk"
+            else ValueError(f"system_disk {system_disk!r}"),
+
             {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
-             "CONTENTS": install_disk},
+             "CONTENTS": "md127" if system_disk == "raid1" else install_disk},
         ))
     def test_install(self, vm_booted_with_installer, install_disk,
-                     firmware, iso_version, package_source, local_sr):
+                     firmware, iso_version, package_source, system_disk, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
+    @pytest.mark.parametrize("system_disk", ("disk", "raid1"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
         "83nightly", "830net",
@@ -112,15 +127,23 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda version, firmware, local_sr, package_source: [dict(
+        lambda version, firmware, local_sr, package_source, system_disk: [dict(
             vm="vm1",
-            image_test=f"TestNested::test_install[{firmware}-{version}-{package_source}-{local_sr}]")])
-    @pytest.mark.small_vm
+            image_test=f"TestNested::test_install[{firmware}-{version}-{system_disk}-{package_source}-{local_sr}]")])
     def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk,
-                            firmware, version, machine, local_sr, package_source):
+                            firmware, version, machine, local_sr, package_source, system_disk):
         helper_vm = helper_vm_with_plugged_disk
 
-        helper_vm.ssh(["mount /dev/xvdb1 /mnt"])
+        if system_disk == "disk":
+            helper_vm.ssh(["mount /dev/xvdb1 /mnt"])
+        elif system_disk == "raid1":
+            # FIXME helper VM has to be an Alpine, that should not be a random vm_ref
+            helper_vm.ssh(["apk add mdadm"])
+            helper_vm.ssh(["mdadm -A /dev/md/127 -N localhost:127"])
+            helper_vm.ssh(["mount /dev/md127p1 /mnt"])
+        else:
+            raise ValueError(f"unhandled system_disk {system_disk!r}")
+
         try:
             # hostname
             logging.info("Setting hostname to %r", machine)
@@ -134,7 +157,7 @@ class TestNested:
                  '/mnt/etc/xensource-inventory'])
             helper_vm.ssh(["grep UUID /mnt/etc/xensource-inventory"])
         finally:
-            helper_vm.ssh(["umount /dev/xvdb1"])
+            helper_vm.ssh(["umount /mnt"])
 
     def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
         host_vm = create_vms[0]
@@ -290,6 +313,7 @@ class TestNested:
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
+    @pytest.mark.parametrize("system_disk", ("disk", "raid1"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
         "83nightly", "830net",
@@ -303,12 +327,12 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, version, machine, local_sr, package_source: [
+        lambda firmware, version, machine, local_sr, package_source, system_disk: [
             dict(vm="vm1",
                  image_test=("TestNested::test_tune_firstboot"
-                             f"[None-{firmware}-{version}-{machine}-{package_source}-{local_sr}]"))])
+                             f"[None-{firmware}-{version}-{machine}-{system_disk}-{package_source}-{local_sr}]"))])
     def test_boot_inst(self, create_vms,
-                       firmware, version, machine, package_source, local_sr):
+                       firmware, version, machine, package_source, system_disk, local_sr):
         self._test_firstboot(create_vms, version, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
