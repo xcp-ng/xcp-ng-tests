@@ -31,6 +31,7 @@ SimpleAnswerfileDict = TypedDict('SimpleAnswerfileDict', {
     # No way to allow arbitrary fields in addition?  This conveys the
     # field's type, but allows them in places we wouldn't want them,
     # and forces every XML attribute we use to appear here.
+    'device': NotRequired[str],
     'guest-storage': NotRequired[str],
     'mode': NotRequired[str],
     'name': NotRequired[str],
