@@ -153,6 +153,9 @@ echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
 
+HOSTINSTALLER=$HOME/src/xs/host-installer
+make -C "$HOSTINSTALLER" DESTDIR="$INSTALLIMG" XS_MPATH_CONF="$HOME/src/xapi/sm/multipath/multipath.conf"
+
 mkdir -p "$INSTALLIMG/usr/local/sbin"
 cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
 #! /bin/bash
