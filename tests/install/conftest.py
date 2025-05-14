@@ -172,7 +172,7 @@ if ! [ -e /opt/xensource/installer ]; then
     test "$eth_mac" = "$br_mac"
 fi
 
-if [ $(readlink "/bin/ping") = busybox ]; then
+if [ "$(readlink /bin/ping)" = busybox ]; then
     # XS before 7.0
     PINGARGS=""
 else
