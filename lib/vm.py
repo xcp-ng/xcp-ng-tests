@@ -11,7 +11,9 @@ import lib.efi as efi
 
 from lib.basevm import BaseVM
 from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool, wait_for, wait_for_not
+from lib.common import shortened_nodeid, expand_scope_relative_nodeid
 from lib.snapshot import Snapshot
+from lib.vbd import VBD
 from lib.vif import VIF
 
 if TYPE_CHECKING:
@@ -280,6 +282,18 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
+    def create_vif(self, vif_num, *, network_uuid=None, network_name=None):
+        assert bool(network_uuid) != bool(network_name), \
+            "create_vif needs network_uuid XOR network_name"
+        if network_name:
+            network_uuid = self.host.pool.network_named(network_name)
+        assert network_uuid, f"No UUID given, and network name {network_name!r} not found"
+        logging.info("Create VIF %d to network %r on VM %s", vif_num, network_uuid, self.uuid)
+        self.host.xe('vif-create', {'vm-uuid': self.uuid,
+                                    'device': str(vif_num),
+                                    'network-uuid': network_uuid,
+                                    })
+
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
@@ -508,6 +522,27 @@ class VM(BaseVM):
         logging.info("Destroying vTPM %s" % vtpm_uuid)
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
+    def create_vbd(self, device, vdi_uuid):
+        logging.info("Create VBD %r for VDI %r on VM %s", device, vdi_uuid, self.uuid)
+        vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
+                                               'device': device,
+                                               'vdi-uuid': vdi_uuid,
+                                               })
+        logging.info("New VBD %s", vbd_uuid)
+        return VBD(vbd_uuid, self, device)
+
+    def create_cd_vbd(self, device, userdevice):
+        logging.info("Create CD VBD %r on VM %s", device, self.uuid)
+        vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
+                                               'device': device,
+                                               'type': 'CD',
+                                               'mode': 'RO',
+                                               })
+        vbd = VBD(vbd_uuid, self, device)
+        vbd.param_set(param_name="userdevice", value=userdevice)
+        logging.info("New VBD %s", vbd_uuid)
+        return vbd
+
     def clone(self, *, name=None):
         if name is None:
             name = self.name() + '_clone_for_tests'
@@ -721,3 +756,29 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
             and not self.are_windows_services_present()
             and not self.are_windows_drivers_present()
         )
+
+    def save_to_cache(self, cache_id):
+        logging.info("Save VM %s to cache for %r as a clone" % (self.uuid, cache_id))
+
+        while True:
+            old_vm = self.host.cached_vm(cache_id, sr_uuid=self.host.main_sr_uuid())
+            if old_vm is None:
+                break
+            logging.info("Destroying old cache %s first", old_vm.uuid)
+            old_vm.destroy()
+
+        clone = self.clone(name=f"{self.name()} cache")
+        logging.info(f"Marking VM {clone.uuid} as cached")
+        clone.param_set('name-description', self.host.vm_cache_key(cache_id))
+
+
+def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
+    vm_name = vm_def["name"]
+    image_test = vm_def["image_test"]
+    image_vm = vm_def.get("image_vm", vm_name)
+    image_scope = vm_def.get("image_scope", "module")
+    nodeid = shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid))
+    image_key = f"{nodeid}-{image_vm}-{test_gitref}"
+
+    from data import IMAGE_EQUIVS
+    return IMAGE_EQUIVS.get(image_key, image_key)
