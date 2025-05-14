@@ -187,6 +187,11 @@ else
     PINGARGS="-c1"
 fi
 
+# detect lack of ipv4 in installed host
+if grep -q "^MODE='none'\\$" /etc/firstboot.d/data/management.conf; then
+    PINGARGS+=" -6"
+fi
+
 ping $PINGARGS "$1"
 EOF
 chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
