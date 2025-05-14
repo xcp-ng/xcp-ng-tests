@@ -179,7 +179,7 @@ else
     PINGARGS="-c1"
 fi
 
-ping $PINGARGS "$1"
+ping -6 $PINGARGS "$1"
 EOF
 chmod +x "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh"
 
