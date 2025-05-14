@@ -103,8 +103,8 @@ class TestNested:
 
             {"TAG": "admin-interface", "name": "eth0",
              "proto": "dhcp" if admin_iface == "ipv4" else "none",
-             "protov6": "dhcp" if admin_iface == "ipv6" else "none",
-             # FIXME should also test autoconf?
+             "protov6": "autoconf" if admin_iface == "ipv6" else "none",
+             # FIXME should also test dhcp?
              },
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
