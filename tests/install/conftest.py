@@ -239,6 +239,7 @@ EOF
 set -ex
 ISODIR="$1"
 SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz network_device=all sshpassword={passwd} atexit=shell@")
+SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz network_config=none network_config6=autoconf@")
 test ! -e "{answerfile_xml}" ||
     SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile=file:///root/answerfile.xml@")
 # assuming *gpgcheck only appear within unsigned ISO
