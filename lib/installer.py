@@ -32,8 +32,8 @@ class AnswerFile:
     # makes a mutable deep copy of all `contents`
     @staticmethod
     def _normalize_structure(defn):
-        assert isinstance(defn, dict)
-        assert 'TAG' in defn
+        assert isinstance(defn, dict), f"{defn!r} is not a dict"
+        assert 'TAG' in defn, f"{defn} has no TAG"
         defn = dict(defn)
         if 'CONTENTS' not in defn:
             defn['CONTENTS'] = []

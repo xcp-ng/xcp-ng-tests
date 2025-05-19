@@ -84,7 +84,7 @@ class TestNested:
             {"TAG": "source", "type": "local"} if package_source == "iso"
             else {"TAG": "source", "type": "url",
                   "CONTENTS": ISO_IMAGES[iso_version]['net-url']} if package_source == "net"
-            else {},
+            else ValueError(f"package_source {package_source!r}"),
             {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
