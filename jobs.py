@@ -432,6 +432,15 @@ JOBS = {
         "params": {},
         "paths": ["tests/fs_diff"],
     },
+    "air-gapped": {
+        "description": "air gapped — without network — tests",
+        "requirements": [
+            "A host with no access to the internet",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/air_gapped"],
+    }
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
