@@ -1,5 +1,10 @@
+import sys
 from typing import TypedDict
-from typing_extensions import NotRequired
+
+if sys.version_info >= (3, 11):
+    from typing import NotRequired
+else:
+    from typing_extensions import NotRequired
 
 IsoImageDef = TypedDict('IsoImageDef',
                         {'path': str,
