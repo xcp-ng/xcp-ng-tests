@@ -5,7 +5,7 @@ import os
 from typing import Any, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lib.typing import IsoImageDef
+    from lib.typing import SimpleAnswerfileDict, IsoImageDef
 
 # Default user and password to connect to a host through XAPI
 # Note: this won't be used for SSH.
@@ -225,7 +225,7 @@ LVMOISCSI_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'SCSIid': 'id'
 }
 
-BASE_ANSWERFILES = dict(
+BASE_ANSWERFILES: dict[str, "SimpleAnswerfileDict"] = dict(
     INSTALL={
         "TAG": "installation",
         "CONTENTS": (
