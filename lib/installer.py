@@ -19,6 +19,8 @@ class AnswerFile:
 
     def top_append(self, *defs):
         for defn in defs:
+            if defn is None:
+                continue
             self.defn['CONTENTS'].append(self._normalize_structure(defn))
         return self
 
