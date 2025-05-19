@@ -109,3 +109,53 @@ def vm_on_linstor_sr(host, linstor_sr, vm_ref):
     yield vm
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def prepare_linstor_packages(hostB1):
+    if not hostB1.is_package_installed(LINSTOR_PACKAGE):
+        logging.info("Installing %s on host %s", LINSTOR_PACKAGE, hostB1)
+        hostB1.yum_install([LINSTOR_RELEASE_PACKAGE])
+        hostB1.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
+        # Needed because the linstor driver is not in the xapi sm-plugins list
+        # before installing the LINSTOR packages.
+        hostB1.ssh(["systemctl", "restart", "multipathd"])
+        hostB1.restart_toolstack(verify=True)
+    yield
+    hostB1.yum_remove([LINSTOR_PACKAGE]) # Package cleanup
+
+@pytest.fixture(scope='module')
+def setup_lvm_on_host(hostB1):
+    # Ensure that the host has disks available to use, we do not care about disks symmetry across pool
+    # We need the disk to be "raw" (non LVM_member etc) to use
+    disks = [d for d in hostB1.available_disks() if hostB1.raw_disk_is_available(d)]
+    assert disks, "hostB1 requires at least one raw disk"
+    devices = [f"/dev/{d}" for d in disks]
+
+    for disk in devices:
+        logging.info("Found Disk %s", disk)
+        hostB1.ssh(['pvcreate', disk])
+    hostB1.ssh(['vgcreate', GROUP_NAME] + devices)
+
+    yield "linstor_group", devices
+
+@pytest.fixture(scope='module')
+def join_host_to_pool(host, hostB1):
+    assert len(hostB1.pool.hosts) == 1, "This test requires second host to be a single host"
+    original_pool = hostB1.pool
+    logging.info("Joining host %s to pool %s", hostB1, host)
+    hostB1.join_pool(host.pool)
+    yield
+    host.pool.eject_host(hostB1)
+    hostB1.pool = original_pool
+
+@pytest.fixture(scope='module')
+def vm_with_reboot_check(vm_on_linstor_sr):
+    vm = vm_on_linstor_sr
+    vm.start()
+    vm.wait_for_os_booted()
+    yield vm
+    vm.shutdown(verify=True)
+    # Ensure VM is able to start and shutdown on modified SR
+    vm.start()
+    vm.wait_for_os_booted()
+    vm.shutdown(verify=True)
