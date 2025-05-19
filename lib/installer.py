@@ -34,13 +34,28 @@ class AnswerFile:
     def _normalize_structure(defn):
         assert isinstance(defn, dict), f"{defn!r} is not a dict"
         assert 'TAG' in defn, f"{defn} has no TAG"
-        defn = dict(defn)
-        if 'CONTENTS' not in defn:
-            defn['CONTENTS'] = []
-        if not isinstance(defn['CONTENTS'], str):
-            defn['CONTENTS'] = [AnswerFile._normalize_structure(item)
-                                for item in defn['CONTENTS']]
-        return defn
+
+        # type mutation through nearly-shallow copy
+        new_defn = {
+            'TAG': defn['TAG'],
+            'CONTENTS': [],
+        }
+        for key, value in defn.items():
+            if key == 'CONTENTS':
+                if isinstance(value, str):
+                    new_defn['CONTENTS'] = value
+                else:
+                    new_defn['CONTENTS'] = [
+                        AnswerFile._normalize_structure(item)
+                        for item in value
+                        if item is not None
+                    ]
+            elif key == 'TAG':
+                pass            # already copied
+            else:
+                new_defn[key] = value
+
+        return new_defn
 
     # convert to a ElementTree.Element tree suitable for further
     # modification before we serialize it to XML
