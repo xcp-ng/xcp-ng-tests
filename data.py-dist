@@ -1,9 +1,8 @@
 # Configuration file, to be adapted to one's needs
 
-from typing import Any, Dict, TYPE_CHECKING
-
 import legacycrypt as crypt     # type: ignore
 import os
+from typing import Any, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.typing import IsoImageDef
