@@ -1,7 +1,12 @@
 import logging
-import time
 
+from lib.common import wait_for_not
 from lib.host import Host
+from lib.vdi import VDI
+
+def wait_for_vdi_coalesce(vdi: VDI):
+    wait_for_not(lambda: vdi.get_parent(), msg="Waiting for coalesce")
+    logging.info("Coalesce done")
 
 def copy_data_to_tapdev(host: Host, data_file: str, tapdev: str, offset: int, length: int):
     """
@@ -64,10 +69,7 @@ def test_coalesce(host, tapdev, vdi_with_vbd_on_dom0, data_file_on_host):
     logging.info("Removing VDI snapshot")
     host.xe("vdi-destroy", {"uuid": vdi_snap})
 
-    logging.info("Waiting for coalesce")
-    while vdi.get_parent() is not None:
-        time.sleep(1)
-    logging.info("Coalesce done")
+    wait_for_vdi_coalesce(vdi)
 
     assert compare_data(host, tapdev, data_file_on_host, offset, length)
 
@@ -83,11 +85,9 @@ def test_clone_coalesce(host, tapdev, vdi_with_vbd_on_dom0, data_file_on_host):
     logging.info("Copying data to tapdev")
     copy_data_to_tapdev(host, data_file_on_host, tapdev, offset, length)
 
+    logging.info("Removing VDI clone")
     host.xe("vdi-destroy", {"uuid": clone_uuid})
 
-    logging.info("Waiting for coalesce")
-    while vdi.get_parent() is not None:
-        time.sleep(1)
-    logging.info("Coalesce done")
+    wait_for_vdi_coalesce(vdi)
 
     assert compare_data(host, tapdev, data_file_on_host, offset, length)
