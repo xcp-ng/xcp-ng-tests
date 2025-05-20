@@ -212,6 +212,32 @@ class TestLinstorSR:
             f"Expected SR size to decrease but got old size: {sr_size}, new size: {new_sr_size}"
         logging.info("SR reduction by removing disk is completed from %s to %s", sr_size, new_sr_size)
 
+    @pytest.mark.small_vm
+    def test_linstor_sr_reduce_host(self, linstor_sr, get_sr_size, vm_with_reboot_check, host, hostA2,
+                                    remove_host_from_linstor):
+        """
+        Remove non master host from the same pool Linstor SR.
+        Do we measure the time taken by system to rebalance after host removal?
+        Should the host be graceful empty or force removal?
+        """
+        sr = linstor_sr
+        sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+        sr_size = 886189670400
+        resized = False
+
+        # Restart satellite services for clean state. This can be optional.
+        for h in host.pool.hosts:
+            h.ssh(['systemctl', 'restart', 'linstor-satellite.service'])
+
+        time.sleep(30) # Wait till all services become normal
+
+        resized = True
+        sr.scan()
+        new_sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+        assert new_sr_size < sr_size and resized, \
+            f"Expected SR size to decrease but got old size: {sr_size}, new size: {new_sr_size}"
+        logging.info("SR reduction by removing host is completed from %s to %s", sr_size, new_sr_size)
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
