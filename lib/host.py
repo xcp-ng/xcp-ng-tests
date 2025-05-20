@@ -702,8 +702,7 @@ class Host:
         self.restart_toolstack(verify=True)
 
     def get_dom0_uuid(self):
-        output = self.ssh(["grep", "-e", "\"CONTROL_DOMAIN_UUID=\"", "/etc/xensource-inventory"])
-        return output.split("=")[1].replace("'", "")
+        return self.inventory["CONTROL_DOMAIN_UUID"]
 
     def get_sr_from_vdi_uuid(self, vdi_uuid) -> Optional[SR]:
         sr_uuid = self.xe("vdi-param-get",
