@@ -26,17 +26,18 @@ def helper_vm_with_plugged_disk(running_vm, create_vms):
 
     all_vdis = [VDI(uuid, host=host_vm.host) for uuid in host_vm.vdi_uuids()]
     disk_vdis = [vdi for vdi in all_vdis if not vdi.readonly()]
-    vdi, = disk_vdis
 
-    vbd = helper_vm.create_vbd("1", vdi.uuid)
+    vbds = [helper_vm.create_vbd(str(n + 1), vdi.uuid) for n, vdi in enumerate(disk_vdis)]
     try:
-        vbd.plug()
+        for vbd in vbds:
+            vbd.plug()
 
         yield helper_vm
 
     finally:
-        vbd.unplug()
-        vbd.destroy()
+        for vbd in reversed(vbds):
+            vbd.unplug()
+            vbd.destroy()
 
 @pytest.mark.dependency()
 class TestNested:
