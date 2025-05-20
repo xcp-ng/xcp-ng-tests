@@ -5,7 +5,9 @@ param (
     [Parameter()]
     [switch]$NoNetReporting,
     [Parameter()]
-    [switch]$Cleanup
+    [switch]$NoCleanup,
+    [Parameter()]
+    [switch]$WithTools
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,21 +16,20 @@ if (!(Test-Path "$PSScriptRoot\id_rsa.pub")) {
     throw "Cannot find id_rsa.pub for SSH configuration"
 }
 
-# Sometimes enabling updates will disrupt installation and rebooting.
-# This is a temporary measure at most, but Microsoft makes disabling updates really difficult...
+if ($WithTools) {
+    Read-Host -Prompt "Did you install PV tools manually?"
+}
+
+# Sometimes enabling updates will disrupt installation and rebooting. So disable that.
 Write-Output "Disabling updates"
+Set-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU -Name NoAutoUpdate -Type DWord -Value 1 -Force
 Set-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU -Name AUOptions -Type DWord -Value 2 -Force
-Stop-Service wuauserv
-Set-Service wuauserv -StartupType Disabled
 
 Write-Output "Installing SSH"
-$SSHDownloadPath = "$env:TEMP\OpenSSH-Win64-v9.8.1.0.msi"
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.8.1.0p1-Preview/OpenSSH-Win64-v9.8.1.0.msi" -OutFile $SSHDownloadPath
-$exitCode = (Start-Process -Wait msiexec.exe -ArgumentList "/i", $SSHDownloadPath, "/passive", "/norestart" -PassThru).ExitCode
+$exitCode = (Start-Process -Wait msiexec.exe -ArgumentList "/i `"$PSScriptRoot\OpenSSH-Win64-v9.8.3.0.msi`" /passive /norestart" -PassThru).ExitCode
 if ($exitCode -ne 0) {
     throw
 }
-Remove-Item -Force $SSHDownloadPath -ErrorAction SilentlyContinue
 Copy-Item "$PSScriptRoot\id_rsa.pub" "$env:ProgramData\ssh\administrators_authorized_keys" -Force
 icacls.exe "$env:ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"
 if ($LASTEXITCODE -ne 0) {
@@ -37,14 +38,17 @@ if ($LASTEXITCODE -ne 0) {
 New-NetFirewallRule -Action Allow -Program "$env:ProgramFiles\OpenSSH\sshd.exe" -Direction Inbound -Protocol TCP -LocalPort 22 -DisplayName sshd
 
 Write-Output "Installing Git Bash"
-$GitDownloadPath = "$env:TEMP\Git-2.47.1-64-bit.exe"
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe" -OutFile $GitDownloadPath
-$exitCode = (Start-Process -Wait $GitDownloadPath -ArgumentList "/silent" -PassThru).ExitCode
+$exitCode = (Start-Process -Wait "$PSScriptRoot\Git-2.49.0-64-bit.exe" -ArgumentList "/silent" -PassThru).ExitCode
 if ($exitCode -ne 0) {
     throw
 }
-Remove-Item -Force $GitDownloadPath -ErrorAction SilentlyContinue
 Set-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Type String -Value "$env:ProgramFiles\Git\bin\bash.exe" -Force
+
+Write-Output "Disabling automatic disk optimization"
+schtasks /change /disable /tn "\Microsoft\Windows\Defrag\ScheduledDefrag"
+if ($exitCode -ne 0) {
+    throw
+}
 
 if (!$NoNetReporting) {
     Write-Output "Installing network reporting script"
@@ -56,23 +60,28 @@ if (!$NoNetReporting) {
     Register-ScheduledTask -InputObject $task -TaskName "XCP-ng Test Network Report"
 }
 
-if ($Cleanup) {
+if (!$NoCleanup) {
     Read-Host -Prompt "Unplug Internet, run Disk Cleanup and continue"
+    # You should check at least "Temporary files" in Disk Cleanup
 
     Write-Output "Cleaning up component store"
     dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
 
     Write-Output "Cleaning up SoftwareDistribution"
-    Stop-Service wuauserv, BITS -ErrorAction SilentlyContinue
+    Stop-Service wuauserv, BITS
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$env:windir\SoftwareDistribution\Download\*"
 
     Write-Output "Cleaning up Defender signatures"
     & "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" -RemoveDefinitions -All
-
-    Write-Output "Optimizing system drive"
-    defrag.exe $env:SystemDrive /O
 }
 
 Write-Output "Resealing"
 Stop-Process -Name sysprep -ErrorAction SilentlyContinue
-& "$env:windir\System32\Sysprep\sysprep.exe" /generalize /oobe /shutdown /unattend:$PSScriptRoot\unattend.xml
+if ($WithTools) {
+    # WS2025 eval only allows 1 rearm, save this for later
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SoftwareProtectionPlatform" -Name SkipRearm -Type DWord -Value 1
+    & "$env:windir\System32\Sysprep\sysprep.exe" "/generalize" "/oobe" "/shutdown" "/unattend:$PSScriptRoot\unattend-persisthw.xml"
+}
+else {
+    & "$env:windir\System32\Sysprep\sysprep.exe" "/generalize" "/oobe" "/shutdown" "/unattend:$PSScriptRoot\unattend.xml"
+}
