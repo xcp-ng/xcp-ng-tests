@@ -131,6 +131,32 @@ class TestLinstorSR:
             if not linstor_installed:
                 host.yum_install([LINSTOR_PACKAGE])
 
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
+    def test_linstor_sr_pool_update(self, linstor_sr, vm_on_linstor_sr):
+        """
+        Perform a rolling update on the Linstor SR pool while ensuring VM availability.
+        1. Identify all hosts in the SR pool and order them with the master first.
+        2. Sequentially update and reboot each host while ensuring the VM can start on it.
+        """
+
+        sr = linstor_sr
+        vm = vm_on_linstor_sr
+
+        hosts = sorted(sr.pool.hosts, key=lambda h: h != sr.pool.master)
+
+        # Ensure that VM is able to start on all post applying available updates on hosts, starting with master
+        for h in hosts:
+            logging.info("Checking on host %s", h.hostname_or_ip)
+            if h.has_updates():
+                h.install_updates()
+                h.reboot(verify=True)
+                vm.start(on=h.uuid)
+                vm.wait_for_os_booted()
+                vm.shutdown(verify=True)
+
+        sr.scan()
+
     # *** End of tests with reboots
 
 # --- Test diskless resources --------------------------------------------------
