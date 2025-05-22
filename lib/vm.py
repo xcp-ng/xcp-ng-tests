@@ -148,7 +148,11 @@ class VM(BaseVM):
             return False
 
     def is_management_agent_up(self):
-        return self.param_get('PV-drivers-version', 'major', accept_unknown_key=True) is not None
+        return (
+            self.param_get("PV-drivers-version", "major", accept_unknown_key=True) is not None
+            # HACK: workaround for Windows XS guest agents not updating major version after resume
+            or self.param_get("PV-drivers-version", "xenbus", accept_unknown_key=True) is not None
+        )
 
     def wait_for_os_booted(self):
         wait_for(self.is_running, "Wait for VM running")
