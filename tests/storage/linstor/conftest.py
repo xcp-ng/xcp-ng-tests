@@ -37,9 +37,10 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
     yield devices
 
     for host in hosts:
+        devices = host.ssh('vgs ' + GROUP_NAME + ' -o pv_name --no-headings').split("\n")
         host.ssh(['vgremove', '-f', GROUP_NAME])
         for device in devices:
-            host.ssh(['pvremove', device])
+            host.ssh(['pvremove', '-ff', '-y', device.strip()])
 
 @pytest.fixture(scope="package")
 def storage_pool_name(provisioning_type):
@@ -108,3 +109,120 @@ def vm_on_linstor_sr(host, linstor_sr, vm_ref):
     yield vm
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def prepare_linstor_packages(hostB1):
+    if not hostB1.is_package_installed(LINSTOR_PACKAGE):
+        logging.info("Installing %s on host %s", LINSTOR_PACKAGE, hostB1)
+        hostB1.yum_install([LINSTOR_RELEASE_PACKAGE])
+        hostB1.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
+        # Needed because the linstor driver is not in the xapi sm-plugins list
+        # before installing the LINSTOR packages.
+        hostB1.ssh(["systemctl", "restart", "multipathd"])
+        hostB1.restart_toolstack(verify=True)
+    yield
+    hostB1.yum_remove([LINSTOR_PACKAGE]) # Package cleanup
+
+@pytest.fixture(scope='module')
+def setup_lvm_on_host(hostB1):
+    # Ensure that the host has disks available to use, we do not care about disks symmetry across pool
+    # We need the disk to be "raw" (non LVM_member etc) to use
+    disks = [d for d in hostB1.available_disks() if hostB1.raw_disk_is_available(d)]
+    assert disks, "hostB1 requires at least one raw disk"
+    devices = [f"/dev/{d}" for d in disks]
+
+    for disk in devices:
+        logging.info("Found Disk %s", disk)
+        hostB1.ssh(['pvcreate', disk])
+    hostB1.ssh(['vgcreate', GROUP_NAME] + devices)
+
+    yield "linstor_group", devices
+
+@pytest.fixture(scope='module')
+def join_host_to_pool(host, hostB1):
+    assert len(hostB1.pool.hosts) == 1, "This test requires second host to be a single host"
+    original_pool = hostB1.pool
+    logging.info("Joining host %s to pool %s", hostB1, host)
+    hostB1.join_pool(host.pool)
+    yield
+    host.pool.eject_host(hostB1)
+    hostB1.pool = original_pool
+
+@pytest.fixture(scope='module')
+def vm_with_reboot_check(vm_on_linstor_sr):
+    vm = vm_on_linstor_sr
+    vm.start()
+    vm.wait_for_os_booted()
+    yield vm
+    vm.shutdown(verify=True)
+    # Ensure VM is able to start and shutdown on modified SR
+    vm.start()
+    vm.wait_for_os_booted()
+    vm.shutdown(verify=True)
+
+@pytest.fixture(scope='module')
+def evacuate_host_and_prepare_removal(host, hostA2, vm_with_reboot_check):
+    assert len(host.pool.hosts) >= 3, "This test requires Pool to have more than 3 hosts"
+
+    vm = vm_with_reboot_check
+    try:
+        host.ssh(f'xe host-evacuate uuid={hostA2.uuid}')
+    except Exception as e:
+        logging.warning("Host evacuation failed: %s", e)
+        if "lacks the feature" in getattr(e, "stdout", ""):
+            vm.shutdown(verify=True, force_if_fails=True)
+            host.ssh(f'xe host-evacuate uuid={hostA2.uuid}')
+            available_hosts = [h.uuid for h in host.pool.hosts if h.uuid != hostA2.uuid]
+            if available_hosts:
+                vm.start(on=available_hosts[0])
+    yield
+
+@pytest.fixture(scope='module')
+def remove_host_from_linstor(host, hostA2, linstor_sr, evacuate_host_and_prepare_removal):
+    import time
+    # Select a host that is not running the LINSTOR controller (port 3370)
+    linstor_controller_host = None
+    for h in host.pool.hosts:
+        if h.ssh_with_result(["ss -tuln | grep :3370"]).returncode == 0:
+            linstor_controller_host = h
+            break
+
+    # If the controller is running on the host to be ejected (hostA2), stop the services first
+    if linstor_controller_host and linstor_controller_host.uuid == hostA2.uuid:
+        logging.info("Ejecting host is running LINSTOR controller, stopping services first.")
+        hostA2.ssh("systemctl stop linstor-controller.service")
+        hostA2.ssh("systemctl stop drbd-reactor.service")
+        hostA2.ssh("systemctl stop drbd-graceful-shutdown.service")
+        time.sleep(30)  # Give time for services to stop
+
+    ejecting_host = hostA2.xe('host-param-get', {'uuid': hostA2.uuid, 'param-name': 'name-label'})
+    controller_option = "--controllers=" + ",".join([m.hostname_or_ip for m in host.pool.hosts])
+
+    hostA2.ssh("systemctl stop linstor-satellite.service")
+
+    pbd = host.xe('pbd-list', {'sr-uuid': linstor_sr.uuid, 'host-uuid': hostA2.uuid}, minimal=True)
+    host.xe('pbd-unplug', {'uuid': pbd})
+
+    logging.info(host.ssh_with_result(["linstor", controller_option, "node", "delete", ejecting_host]).stdout)
+    host.pool.eject_host(hostA2)
+
+    yield
+
+    logging.info("Rejoining hostA2 to the pool after test")
+    hostA2.join_pool(host.pool)
+    # We dont want linstor services to be running on a deleted node
+    hostA2.ssh("systemctl stop linstor-satellite.service")
+    hostA2.ssh("systemctl stop drbd-graceful-shutdown.service")
+    # TODO: Package list is not retained in teardown
+    # hostA2.saved_packages_list = hostA2.packages()
+    # hostA2.saved_rollback_id = hostA2.get_last_yum_history_tid()
+
+@pytest.fixture(scope='module')
+def get_sr_size(linstor_sr):
+    sr = linstor_sr
+    sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+    logging.info("SR Size: %s", sr_size)
+    yield
+    new_sr_size = int(sr.pool.master.xe('sr-param-get', {'uuid': sr.uuid, 'param-name': 'physical-size'}))
+    logging.info("New SR Size vs Old SR Size: %s vs %s", new_sr_size, sr_size)
+    assert new_sr_size != sr_size, "SR size did not change"

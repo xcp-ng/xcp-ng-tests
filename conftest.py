@@ -86,6 +86,13 @@ def pytest_addoption(parser):
              "4KiB blocksize to be formatted and used in storage tests. "
              "Set it to 'auto' to let the fixtures auto-detect available disks."
     )
+    parser.addoption(
+        "--expansion-sr-disk",
+        action="append",
+        default=[],
+        help="Name of an available disk (sdc) or partition device (sdc2) to be formatted and used in storage tests. "
+             "Set it to 'auto' to let the fixtures auto-detect available disks."
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
