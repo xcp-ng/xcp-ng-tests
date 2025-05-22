@@ -1,12 +1,31 @@
-from typing import Any, Dict
-
 # Configuration file, to be adapted to one's needs
+
+from typing import Any, Dict, TYPE_CHECKING
+
+import legacycrypt as crypt     # type: ignore
+import os
+
+if TYPE_CHECKING:
+    from lib.typing import IsoImageDef
 
 # Default user and password to connect to a host through XAPI
 # Note: this won't be used for SSH.
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
+
+def hash_password(password):
+    """Hash password for /etc/password."""
+    salt = crypt.mksalt(crypt.METHOD_SHA512)
+    return crypt.crypt(password, salt)
+
+HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
+
+# Public key for a private key available to the test runner
+TEST_SSH_PUBKEY = """
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKz9uQOoxq6Q0SQ0XTzQHhDolvuo/7EyrDZsYQbRELhcPJG8MT/o5u3HyJFhIP2+HqBSXXgmqRPJUkwz9wUwb2sUwf44qZm/pyPUWOoxyVtrDXzokU/uiaNKUMhbnfaXMz6Ogovtjua63qld2+ZRXnIgrVtYKtYBeu/qKGVSnf4FTOUKl1w3uKkr59IUwwAO8ay3wVnxXIHI/iJgq6JBgQNHbn3C/SpYU++nqL9G7dMyqGD36QPFuqH/cayL8TjNZ67TgAzsPX8OvmRSqjrv3KFbeSlpS/R4enHkSemhgfc8Z2f49tE7qxWZ6x4Uyp5E6ur37FsRf/tEtKIUJGMRXN XCP-ng CI
+"""
 
 # The following prefix will be added to the `name-label` parameter of XAPI objects
 # that the tests will create or import, such as VMs and SRs.
@@ -23,8 +42,15 @@ HOSTS: Dict[str, Dict[str, Any]] = {
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
 
+NETWORKS = {
+    "MGMT": "Pool-wide network associated with eth0",
+}
+
 # PXE config server for automated XCP-ng installation
 PXE_CONFIG_SERVER = 'pxe'
+
+# server on MGMT network, where ARP tables can reveal the MACs
+ARP_SERVER = PXE_CONFIG_SERVER
 
 # Default VM images location
 DEF_VM_URL = 'http://pxe/images/'
@@ -80,10 +106,57 @@ OTHER_GUEST_TOOLS = {
     },
 }
 
+# Tools
+TOOLS: Dict[str, str] = {
+#    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
+}
+
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
 VM_IMAGES = {
     'mini-linux-x86_64-bios': 'alpine-minimal-3.12.0.xva',
     'mini-linux-x86_64-uefi': 'alpine-uefi-minimal-3.12.0.xva'
+}
+
+ISO_IMAGES_BASE = "https://updates.xcp-ng.org/isos/"
+ISO_IMAGES_CACHE = "/home/user/iso"
+# ISO_IMAGES path can be:
+# - absolute filename
+# - absolute URL
+# - path relative to ISO_IMAGES_BASE URL
+# Note the dirname part is ignored when looking in ISO_IMAGES_CACHE, abuse this
+# for local-only ISO with things like "locally-built/my.iso" or "xs/8.3.iso".
+# If 'net-only' is set to 'True' only source of type URL will be possible.
+# By default the parameter is set to False.
+ISO_IMAGES: Dict[str, "IsoImageDef"] = {
+    '83nightly': {'path': os.environ.get("XCPNG83_NIGHTLY",
+                                         "http://unconfigured.iso"),
+                  'unsigned': True},
+    # FIXME: no such symlimk + useless without 'net-url'
+    #'83nightlynet': {'path': "http://pxe/isos/xcp-ng-8.3-ci-netinstall-latest"},
+    #                 'net-url': 'fake",
+    #                 'net-only': True},
+    '830': {'path': "8.3/xcp-ng-8.3.0.iso",
+            #'net-url': "http://server/installers/xcp-ng/8.3.0",
+            },
+    ## FIXME: only a compensation for the lack of 83nightlynet
+    #'830net': {'path': "8.3/xcp-ng-8.3.0-netinstall.iso",
+    #           'net-url': "http://server/installers/xcp-ng/8.3.0",
+    #           'net-only': True},
+    '82nightly': {'path': os.environ.get("XCPNG82_NIGHTLY",
+                                         "http://unconfigured.iso"),
+                  'unsigned': True},
+    '821.1': {'path': "8.2/xcp-ng-8.2.1-20231130.iso",
+              #'net-url': f"http://{PXE_CONFIG_SERVER}/installers/xcp-ng/8.2.1-refreshed/",
+              },
+    '821': {'path': "8.2/xcp-ng-8.2.1.iso"},
+    '820': {'path': "8.2/xcp-ng-8.2.0.iso"},
+    '81': {'path': "8.1/xcp-ng-8.1.0-2.iso"},
+    '80': {'path': "8.0/xcp-ng-8.0.0.iso"},
+    '76': {'path': "7.6/xcp-ng-7.6.0.iso"},
+    '75': {'path': "7.5/xcp-ng-7.5.0-2.iso"},
+    'xs8': {'path': "XenServer8_2024-03-18.iso"},
+    'ch821.1': {'path': "CitrixHypervisor-8.2.1-2306-install-cd.iso"},
+    'ch821': {'path': "CitrixHypervisor-8.2.1-install-cd.iso"},
 }
 
 # In some cases, we may prefer to favour a local SR to store test VM disks,
@@ -151,6 +224,33 @@ LVMOISCSI_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'port': '3260',
 #    'targetIQN': 'target.example',
 #    'SCSIid': 'id'
+}
+
+BASE_ANSWERFILES = dict(
+    INSTALL={
+        "TAG": "installation",
+        "CONTENTS": (
+            {"TAG": "root-password",
+             "type": "hash",
+             "CONTENTS": HOST_DEFAULT_PASSWORD_HASH},
+            {"TAG": "timezone",
+             "CONTENTS": "Europe/Paris"},
+            {"TAG": "keymap",
+             "CONTENTS": "us"},
+        ),
+    },
+    UPGRADE={
+        "TAG": "installation",
+        "mode": "upgrade",
+    },
+    RESTORE={
+        "TAG": "restore",
+    },
+)
+
+IMAGE_EQUIVS: Dict[str, str] = {
+#    'install.test::Nested::install[bios-830-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb':
+#    'install.test::Nested::install[bios-830-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
 }
 
 # compatibility settings for older tests

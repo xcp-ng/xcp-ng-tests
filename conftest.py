@@ -1,5 +1,7 @@
 import itertools
+import git
 import logging
+import os
 import pytest
 import tempfile
 
@@ -8,11 +10,14 @@ from typing import Dict
 
 import lib.config as global_config
 
+from lib import pxe
+from lib.common import callable_marker, shortened_nodeid, prefix_object_name
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 from lib.pool import Pool
-from lib.vm import VM
+from lib.sr import SR
+from lib.vm import VM, vm_cache_key_from_def
 from lib.xo import xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
@@ -30,6 +35,12 @@ assert CACHE_IMPORTED_VM in [True, False]
 # pytest hooks
 
 def pytest_addoption(parser):
+    parser.addoption(
+        "--nest",
+        action="store",
+        default=None,
+        help="XCP-ng or XS master of pool to use for nesting hosts under test",
+    )
     parser.addoption(
         "--hosts",
         action="append",
@@ -137,21 +148,72 @@ def pytest_runtest_makereport(item, call):
 
 # fixtures
 
-def setup_host(hostname_or_ip):
-    pool = Pool(hostname_or_ip)
-    h = pool.master
-    return h
-
 @pytest.fixture(scope='session')
 def hosts(pytestconfig):
+    nested_list = []
+
+    def setup_host(hostname_or_ip, *, config=None):
+        host_vm = None
+        if hostname_or_ip.startswith("cache://"):
+            if config is None:
+                raise RuntimeError("setup_host: a cache:// host requires --nest")
+            nest_hostname = config.getoption("nest")
+            if not nest_hostname:
+                pytest.fail("--hosts=cache://... requires --nest parameter")
+            nest = Pool(nest_hostname).master
+
+            protocol, rest = hostname_or_ip.split(":", 1)
+            host_vm = nest.import_vm(f"clone:{rest}", nest.main_sr_uuid(),
+                                     use_cache=True)
+            nested_list.append(host_vm)
+
+            vif = host_vm.vifs()[0]
+            mac_address = vif.param_get('MAC')
+            logging.info("Nested host has MAC %s", mac_address)
+
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for nested host VM running")
+
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see nested host in ARP tables",
+                     timeout_secs=10 * 60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Nested host has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+
+            wait_for(lambda: not os.system(f"nc -zw5 {host_vm.ip} 22"),
+                     "Wait for ssh up on nested host", retry_delay_secs=5)
+
+            hostname_or_ip = host_vm.ip
+
+        pool = Pool(hostname_or_ip)
+        h = pool.master
+        return h
+
+    def cleanup_hosts():
+        for vm in nested_list:
+            logging.info("Destroying nested host VM %s", vm.uuid)
+            vm.destroy(verify=True)
+
     # a list of master hosts, each from a different pool
     hosts_args = pytestconfig.getoption("hosts")
     hosts_split = [hostlist.split(',') for hostlist in hosts_args]
     hostname_list = list(itertools.chain(*hosts_split))
-    host_list = [setup_host(hostname_or_ip) for hostname_or_ip in hostname_list]
+
+    try:
+        host_list = [setup_host(hostname_or_ip, config=pytestconfig)
+                     for hostname_or_ip in hostname_list]
+    except Exception:
+        cleanup_hosts()
+        raise
+
     if not host_list:
         pytest.fail("This test requires at least one --hosts parameter")
     yield host_list
+
+    cleanup_hosts()
 
 @pytest.fixture(scope='session')
 def registered_xo_cli():
@@ -409,6 +471,172 @@ def imported_vm(host, vm_ref):
     if not is_uuid(vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
+
+@pytest.fixture(scope="session")
+def tests_git_revision():
+    """
+    Get the git revision string for this tests repo.
+
+    Use of this fixture means impacted tests cannot run unless all
+    modifications are commited.
+    """
+    test_repo = git.Repo(".")
+    assert not test_repo.is_dirty(), "test repo must not be dirty"
+    yield test_repo.head.commit.hexsha
+
+@pytest.fixture(scope="function")
+def create_vms(request, host, tests_git_revision):
+    """
+    Returns list of VM objects created from `vm_definitions` marker.
+
+    `vm_definitions` marker test author to specify one or more VMs, by
+    giving for each VM one `dict`, or a callable taking fixtures as
+    arguments and returning such a `dict`.
+
+    Mandatory keys:
+    - `name`: name of the VM to create (str)
+    - `template`: name (or UUID) of template to use (str)
+
+    Optional keys: see example below
+
+    Example:
+    -------
+    > @pytest.mark.vm_definitions(
+    >     dict(name="vm1", template="Other install media"),
+    >     dict(name="vm2",
+    >          template="CentOS 7",
+    >          params=(
+    >              dict(param_name="memory-static-max", value="4GiB"),
+    >              dict(param_name="HVM-boot-params", key="order", value="dcn"),
+    >          ),
+    >          vdis=[dict(name="vm 2 system disk",
+    >                     size="100GiB",
+    >                     device="xvda",
+    >                     userdevice="0",
+    >                     )],
+    >          cd_vbd=dict(device="xvdd", userdevice="3"),
+    >          vifs=(dict(index=0, network_name=NETWORKS["MGMT"]),
+    >                dict(index=1, network_uuid=NETWORKS["MYNET_UUID"]),
+    >          ),
+    >     ))
+    > def test_foo(create_vms):
+    >    ...
+
+    Example:
+    -------
+    > @pytest.mark.dependency(depends=["test_foo"])
+    > @pytest.mark.vm_definitions(dict(name="vm1", image_test="test_foo", image_vm="vm2"))
+    > def test_bar(create_vms):
+    >    ...
+
+    """
+    marker = request.node.get_closest_marker("vm_definitions")
+    if marker is None:
+        raise Exception("No vm_definitions marker specified.")
+
+    vm_defs = []
+    for vm_def in marker.args:
+        vm_def = callable_marker(vm_def, request)
+        assert "name" in vm_def
+        assert "template" in vm_def or "image_test" in vm_def
+        if "template" in vm_def:
+            assert "image_test" not in vm_def
+            # FIXME should check optional vdis contents
+        # FIXME should check for extra args
+        vm_defs.append(vm_def)
+
+    try:
+        vms = []
+        vdis = []
+        vbds = []
+        for vm_def in vm_defs:
+            if "template" in vm_def:
+                _create_vm(request, vm_def, host, vms, vdis, vbds)
+            elif "image_test" in vm_def:
+                _vm_from_cache(request, vm_def, host, vms, tests_git_revision)
+        yield vms
+
+        # request.node is an "item" because this fixture has "function" scope
+        report = request.node.stash.get(PHASE_REPORT_KEY, None)
+        if report is None:
+            # user interruption during setup
+            logging.warning("test setup result not available: not exporting VMs")
+        elif report["setup"].failed:
+            logging.warning("setting up a test failed or skipped: not exporting VMs")
+        elif ("call" not in report) or report["call"].failed:
+            logging.warning("executing test failed or skipped: not exporting VMs")
+        else:
+            # record this state
+            for vm_def, vm in zip(vm_defs, vms):
+                nodeid = shortened_nodeid(request.node.nodeid)
+                vm.save_to_cache(f"{nodeid}-{vm_def['name']}-{tests_git_revision}")
+
+    except Exception:
+        logging.error("exception caught...")
+        raise
+
+    finally:
+        for vbd in vbds:
+            logging.info("<< Destroy VBD %s", vbd.uuid)
+            vbd.destroy()
+        for vdi in vdis:
+            logging.info("<< Destroy VDI %s", vdi.uuid)
+            vdi.destroy()
+        for vm in vms:
+            logging.info("<< Destroy VM %s", vm.uuid)
+            vm.destroy(verify=True)
+
+def _vm_name(request, vm_def):
+    return f"{vm_def['name']} in {request.node.nodeid}"
+
+def _create_vm(request, vm_def, host, vms, vdis, vbds):
+    vm_name = _vm_name(request, vm_def)
+    vm_template = vm_def["template"]
+
+    logging.info("Installing VM %r from template %r", vm_name, vm_template)
+
+    vm = host.vm_from_template(vm_name, vm_template)
+
+    # VM is now created, make sure we clean it up on any subsequent failure
+    vms.append(vm)
+
+    if "vdis" in vm_def:
+        for vdi_def in vm_def["vdis"]:
+            sr = SR(host.main_sr_uuid(), host.pool)
+            vdi = sr.create_vdi(vdi_def["name"], vdi_def["size"])
+            vdis.append(vdi)
+            # connect to VM
+            vbd = vm.create_vbd(vdi_def["device"], vdi.uuid)
+            vbds.append(vbd)
+            vbd.param_set(param_name="userdevice", value=vdi_def["userdevice"])
+
+    if "cd_vbd" in vm_def:
+        vm.create_cd_vbd(**vm_def["cd_vbd"])
+
+    if "vifs" in vm_def:
+        for vif_def in vm_def["vifs"]:
+            vm.create_vif(vif_def["index"],
+                          network_uuid=vif_def.get("network_uuid", None),
+                          network_name=vif_def.get("network_name", None))
+
+    if "params" in vm_def:
+        for param_def in vm_def["params"]:
+            logging.info("Setting param %s", param_def)
+            vm.param_set(**param_def)
+
+def _vm_from_cache(request, vm_def, host, vms, tests_hexsha):
+    base_vm = host.cached_vm(vm_cache_key_from_def(vm_def, request.node.nodeid, tests_hexsha),
+                             sr_uuid=host.main_sr_uuid())
+    if base_vm is None:
+        raise RuntimeError("No cache found")
+
+    # Clone the VM before running tests, so that the original VM remains untouched
+    logging.info("Cloning VM from cache")
+    vm = base_vm.clone(name=prefix_object_name(_vm_name(request, vm_def)))
+    # Remove the description, which may contain a cache identifier
+    vm.param_set('name-description', "")
+
+    vms.append(vm)
 
 @pytest.fixture(scope="module")
 def started_vm(imported_vm):

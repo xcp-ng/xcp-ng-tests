@@ -18,9 +18,9 @@ jobs:
         pip install mypy
     - name: Create a dummy data.py
       run: cp data.py-dist data.py
-    - name: Check with mypy
-      run: mypy lib/ tests/
-      
+    - name: Install additional typing data and check with mypy
+      run: mypy --install-types --non-interactive lib/ tests/
+
   pyright:
     runs-on: ubuntu-latest
     steps:

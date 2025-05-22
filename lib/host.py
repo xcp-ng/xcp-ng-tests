@@ -291,13 +291,28 @@ class Host:
             if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
                 logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
                 return vm
-        logging.info("Could not find a VM in cache with key %r", cache_key)
+        logging.info("Could not find a VM in cache for %r", uri)
 
     def import_vm(self, uri, sr_uuid=None, use_cache=False):
+        vm = None
         if use_cache:
-            vm = self.cached_vm(uri, sr_uuid)
+            if '://' in uri and uri.startswith("clone"):
+                protocol, rest = uri.split(":", 1)
+                assert rest.startswith("//")
+                filename = rest[2:] # strip "//"
+                base_vm = self.cached_vm(filename, sr_uuid)
+                if base_vm:
+                    vm = base_vm.clone()
+                    vm.param_clear('name-description')
+                    if uri.startswith("clone+start"):
+                        vm.start()
+                        wait_for(vm.is_running, "Wait for VM running")
+            else:
+                vm = self.cached_vm(uri, sr_uuid)
             if vm:
                 return vm
+        else:
+            assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
         params = {}
         msg = "Import VM %s" % uri
@@ -352,6 +367,15 @@ class Host:
                 self.ssh(f"rm -f '{download_path}'")
 
         return VDI(vdi_uuid, sr=sr)
+
+    def vm_from_template(self, name, template):
+        params = {
+            "new-name-label": prefix_object_name(name),
+            "template": template,
+            "sr-uuid": self.main_sr_uuid(),
+        }
+        vm_uuid = self.xe('vm-install', params)
+        return VM(vm_uuid, self)
 
     def pool_has_vm(self, vm_uuid, vm_type='vm'):
         if vm_type == 'snapshot':

@@ -29,6 +29,7 @@ JOBS = {
             "tests/system",
             "tests/xapi",
             "tests/xapi_plugins",
+            "tests/install/test_fixtures.py",
         ],
         "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
     },
@@ -448,6 +449,15 @@ JOBS = {
         "params": {},
         "paths": ["tests/fs_diff"],
     },
+    "pool-reboot": {
+        "description": "Tests centered on pools with join/eject causing reboots",
+        "requirements": [
+            "1 XCP-ng pool and an additionnal host >= 8.2"
+        ],
+        "nb_pools": 2,
+        "params": {},
+        "paths": ["tests/misc/test_pool.py"],
+    }
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
