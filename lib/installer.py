@@ -73,8 +73,8 @@ class AnswerFile:
         if isinstance(contents, str):
             element.text = contents
         else:
-            for contents in contents:
-                AnswerFile._defn_to_xml_et(contents, parent=element)
+            for content in contents:
+                AnswerFile._defn_to_xml_et(content, parent=element)
         return element
 
 def poweroff(ip):
