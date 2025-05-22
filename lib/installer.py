@@ -67,7 +67,7 @@ class AnswerFile:
         assert isinstance(name, str)
         contents = defn.pop('CONTENTS', ())
         assert isinstance(contents, (str, list))
-        element = ET.Element(name, **defn)
+        element = ET.Element(name, {}, **defn)
         if parent is not None:
             parent.append(element)
         if isinstance(contents, str):
