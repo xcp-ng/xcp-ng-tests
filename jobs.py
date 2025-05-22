@@ -22,6 +22,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": [
+            "tests/security",
             "tests/misc",
             "tests/migration",
             "tests/network",
