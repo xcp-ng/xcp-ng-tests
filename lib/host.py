@@ -540,7 +540,22 @@ class Host:
         disks.sort()
         return disks
 
-    def disk_is_available(self, disk):
+    def raw_disk_is_available(self, disk: str) -> bool:
+        """
+        Check if a raw disk (without any identifiable filesystem or partition label) is available.
+        It suggests the disk is "raw" and likely unformatted thus available.
+        """
+        return self.ssh_with_result(['blkid', '/dev/' + disk]).returncode == 2
+
+    def disk_is_available(self, disk: str) -> bool:
+        """
+        Check if a disk is unmounted and appears available for use.
+        It may or may not contain identifiable filesystem or partition label.
+        If there are no mountpoints, it is assumed that the disk is not in use.
+
+        Warn: This function may misclassify LVM_member disks (e.g. in XOSTOR, RAID, ZFS) as "available".
+        Such disks may not have mountpoints but still be in use.
+        """
         return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
     def available_disks(self, blocksize=512):
