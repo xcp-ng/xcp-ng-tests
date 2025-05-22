@@ -40,8 +40,10 @@ VMS = {
         "debian_uefi_vm": "",
     },
     "multi": {
-        # all VMs we want to run "multi_vms" tests on
-        "all": [],
+        # all Unix VMs we want to run "multi_vms" tests on
+        "all_unix": [],
+        # all Windows VMs we want to run "multi_vms" tests on
+        "all_windows": [],
         # VMs which support the installation of our unix guest tools from the ISO
         "tools_unix": [],
         # UEFI unix/linux Vms

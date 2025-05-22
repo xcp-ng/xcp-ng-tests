@@ -32,17 +32,33 @@ JOBS = {
         ],
         "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
     },
-    "main-multi": {
-        "description": "a group of tests that need to run on the largest variety of VMs",
+    "main-multi-unix": {
+        "description": "a group of tests that need to run on the largest variety of VMs - unix split",
         "requirements": [
             "A pool with at least 2 hosts, each with a local SR and a shared SR.",
             "An additional free disk on the first host.",
             "A second pool with a SR to receive migrated VMs.",
-            "VMs of all sorts (unix, windows, HVM, PV, PV-shim, BIOS, UEFI...).",
+            "Unix VMs of all sorts (HVM, PV, PV-shim, BIOS, UEFI...).",
         ],
         "nb_pools": 2,
         "params": {
-            "--vm[]": "multi/all",
+            "--vm[]": "multi/all_unix",
+            "--sr-disk": "auto",
+        },
+        "paths": ["tests/misc", "tests/migration"],
+        "markers": "multi_vms and not flaky and not reboot",
+    },
+    "main-multi-windows": {
+        "description": "a group of tests that need to run on the largest variety of VMs - windows split",
+        "requirements": [
+            "A pool with at least 2 hosts, each with a local SR and a shared SR.",
+            "An additional free disk on the first host.",
+            "A second pool with a SR to receive migrated VMs.",
+            "Windows VMs of all sorts (HVM, PV, PV-shim, BIOS, UEFI...).",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm[]": "multi/all_windows",
             "--sr-disk": "auto",
         },
         "paths": ["tests/misc", "tests/migration"],
