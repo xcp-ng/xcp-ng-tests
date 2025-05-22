@@ -1,0 +1,37 @@
+#!/bin/bash
+set -e
+
+# needs at least --nest=$NEST
+
+. $(dirname $0)/lib.bash
+
+# subject to EQUIVS
+REFSHA="$(git rev-parse HEAD)"
+
+for conf in "${TESTCONFS[@]}"; do
+    IFS=- read fw sr < <(echo "$conf")
+    host1="install.test::Nested::boot_inst[$fw-83nightly-host1-iso-$sr]-vm1-$REFSHA"
+    host2="install.test::Nested::boot_inst[$fw-83nightly-host2-iso-$sr]-vm1-$REFSHA"
+
+    run_pytest "$conf" \
+        --runner "./jobs.py --host-version 8.3.0 run postinstall cache://${host1}" \
+        -m "not hostB1" \
+        --log-file=test-postinstall-$conf.log \
+        "$@"
+
+    run_pytest "$conf-tls" \
+        --runner "./jobs.py --host-version 8.3.0 run postinstall-with-tls cache://${host1},cache://${host2}" \
+        --log-file=test-postinstall-tls-$conf.log \
+        -m "not hostA2" \
+        "$@"
+
+    # FIXME postinstall-intrapool-migrate needs a 2-host pool
+
+    run_pytest "$conf" \
+        --hosts="cache://${host1}" \
+        --log-file=test-postinstall-fsdiff-$conf.log \
+        "$@" \
+        tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_against_ref
+done
+
+report_failures
