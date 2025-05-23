@@ -94,7 +94,7 @@ def linstor_sr(pool_with_linstor, provisioning_type, storage_pool_name):
         'provisioning': provisioning_type
     }, shared=True)
     yield sr
-    sr.destroy()
+    sr.destroy(verify=True)
 
 @pytest.fixture(scope='module')
 def vdi_on_linstor_sr(linstor_sr):
