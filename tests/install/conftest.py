@@ -96,7 +96,7 @@ def installer_iso(request):
                 )
 
 @pytest.fixture(scope='function')
-def install_disk(request):
+def system_disks_names(request):
     firmware = request.getfixturevalue("firmware")
     yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
 

@@ -79,7 +79,7 @@ class TestNested:
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
     @pytest.mark.answerfile(
-        lambda install_disk, local_sr, package_source, iso_version: AnswerFile("INSTALL")
+        lambda system_disks_names, local_sr, package_source, iso_version: AnswerFile("INSTALL")
         .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr})
         .top_append(
             {"iso": {"TAG": "source", "type": "local"},
@@ -89,9 +89,9 @@ class TestNested:
             {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
-             "CONTENTS": install_disk},
+             "CONTENTS": system_disks_names[0]},
         ))
-    def test_install(self, vm_booted_with_installer, install_disk,
+    def test_install(self, vm_booted_with_installer, system_disks_names,
                      firmware, iso_version, package_source, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
@@ -334,15 +334,15 @@ class TestNested:
             vm="vm1",
             image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}-{machine}-{package_source}-{local_sr}]")])
     @pytest.mark.answerfile(
-        lambda install_disk, package_source, iso_version: AnswerFile("UPGRADE").top_append(
+        lambda system_disks_names, package_source, iso_version: AnswerFile("UPGRADE").top_append(
             {"iso": {"TAG": "source", "type": "local"},
              "net": {"TAG": "source", "type": "url",
                      "CONTENTS": ISO_IMAGES[iso_version]['net-url']},
              }[package_source],
             {"TAG": "existing-installation",
-             "CONTENTS": install_disk},
+             "CONTENTS": system_disks_names[0]},
         ))
-    def test_upgrade(self, vm_booted_with_installer, install_disk,
+    def test_upgrade(self, vm_booted_with_installer, system_disks_names,
                      firmware, orig_version, iso_version, machine, package_source, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_upgrade(ip=host_vm.ip)
@@ -395,11 +395,11 @@ class TestNested:
             vm="vm1",
             image_test=f"TestNested::test_boot_upg[{firmware}-{orig_version}-host1-{package_source}-{local_sr}]")])
     @pytest.mark.answerfile(
-        lambda install_disk: AnswerFile("RESTORE").top_append(
+        lambda system_disks_names: AnswerFile("RESTORE").top_append(
             {"TAG": "backup-disk",
-             "CONTENTS": install_disk},
+             "CONTENTS": system_disks_names[0]},
         ))
-    def test_restore(self, vm_booted_with_installer, install_disk,
+    def test_restore(self, vm_booted_with_installer, system_disks_names,
                      firmware, orig_version, iso_version, package_source, local_sr):
         host_vm = vm_booted_with_installer
         installer.monitor_restore(ip=host_vm.ip)
