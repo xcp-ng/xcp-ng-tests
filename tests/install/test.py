@@ -1,6 +1,7 @@
 import logging
 import pytest
 from uuid import uuid4
+from typing import cast
 
 from lib import commands, installer, pxe
 from lib.common import safe_split, wait_for
@@ -9,8 +10,9 @@ from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
 
-from data import ISO_IMAGES, NETWORKS
+from data import HOSTS_IP_CONFIG, ISO_IMAGES, NETWORKS
 assert "MGMT" in NETWORKS
+assert "HOSTS" in HOSTS_IP_CONFIG
 
 # Requirements:
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
@@ -41,7 +43,7 @@ def helper_vm_with_plugged_disk(running_vm, create_vms):
 
 @pytest.mark.dependency()
 class TestNested:
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -101,8 +103,19 @@ class TestNested:
              }[system_disk_config],
 
             {"TAG": "admin-interface", "name": "eth0",
-             "proto": "dhcp" if admin_iface == "ipv4dhcp" else "none",
+             "proto": ("dhcp" if admin_iface == "ipv4dhcp"
+                       else "static" if admin_iface == "ipv4static"
+                       else "none"),
+             "CONTENTS": (
+                 {"TAG": "ipaddr", "CONTENTS": cast(str, HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])},
+                 {"TAG": "subnet", "CONTENTS": cast(str, HOSTS_IP_CONFIG['NETMASK'])},
+                 {"TAG": 'gateway', "CONTENTS": cast(str, HOSTS_IP_CONFIG['GATEWAY'])},
+             ) if admin_iface == "ipv4static"
+             else (),
              },
+            {"TAG": "name-server", "CONTENTS": cast(str, HOSTS_IP_CONFIG['DNS'])} if admin_iface == "ipv4static"
+            else None,
+
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": {"disk": system_disks_names[0],
@@ -116,7 +129,7 @@ class TestNested:
         installer.monitor_install(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -155,6 +168,13 @@ class TestNested:
             # hostname
             logging.info("Setting hostname to %r", machine)
             helper_vm.ssh(["echo > /mnt/etc/hostname", machine])
+            if admin_iface == "ipv4static" and machine in HOSTS_IP_CONFIG['HOSTS']:
+                # static management IPv4 if not the default set during install
+                ip = HOSTS_IP_CONFIG['HOSTS'][machine]
+                logging.info("Changing IP to %s", ip)
+
+                helper_vm.ssh([f"sed -i s/^IP=.*/IP='{ip}'/",
+                               "/mnt/etc/firstboot.d/data/management.conf"])
             # UUIDs
             logging.info("Randomizing UUIDs")
             helper_vm.ssh(
@@ -166,7 +186,7 @@ class TestNested:
         finally:
             helper_vm.ssh(["umount /mnt"])
 
-    def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
+    def _test_firstboot(self, create_vms, mode, admin_iface, *, machine='DEFAULT', is_restore=False):
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
@@ -207,14 +227,21 @@ class TestNested:
             host_vm.start()
             wait_for(host_vm.is_running, "Wait for host VM running")
 
-            # catch host-vm IP address
-            wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                     "Wait for DHCP server to see Host VM in ARP tables",
-                     timeout_secs=10 * 60)
-            ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Host VM has IPs %s", ips)
-            assert len(ips) == 1
-            host_vm.ip = ips[0]
+            if admin_iface == "ipv4dhcp":
+                # catch host-vm IP address
+                wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                         "Wait for DHCP server to see Host VM in ARP tables",
+                         timeout_secs=10 * 60)
+                ips = pxe.arp_addresses_for(mac_address)
+                logging.info("Host VM has IPs %s", ips)
+                assert len(ips) == 1
+                host_vm.ip = ips[0]
+            elif admin_iface == "ipv4static":
+                host_vm.ip = HOSTS_IP_CONFIG['HOSTS'].get(machine,
+                                                          HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])
+                logging.info("Expecting host VM to have IP %s", host_vm.ip)
+            else:
+                raise ValueError(f"admin_iface {admin_iface!r}")
 
             wait_for(
                 lambda: commands.local_cmd(
@@ -318,7 +345,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -342,10 +369,10 @@ class TestNested:
                              f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_inst(self, create_vms,
                        firmware, version, machine, package_source, system_disk_config, local_sr, admin_iface):
-        self._test_firstboot(create_vms, version, machine=machine)
+        self._test_firstboot(create_vms, version, admin_iface, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -388,7 +415,7 @@ class TestNested:
         installer.monitor_upgrade(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -414,10 +441,10 @@ class TestNested:
                         f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_upg(self, create_vms,
                       firmware, mode, machine, package_source, system_disk_config, local_sr, admin_iface):
-        self._test_firstboot(create_vms, mode, machine=machine)
+        self._test_firstboot(create_vms, mode, admin_iface, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -454,7 +481,7 @@ class TestNested:
         installer.monitor_restore(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -479,4 +506,4 @@ class TestNested:
                         f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_rst(self, create_vms,
                       firmware, mode, package_source, system_disk_config, local_sr, admin_iface):
-        self._test_firstboot(create_vms, mode, is_restore=True)
+        self._test_firstboot(create_vms, mode, admin_iface, is_restore=True)
