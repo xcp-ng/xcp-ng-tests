@@ -250,7 +250,7 @@ class TestNested:
             if admin_iface in ("ipv4dhcp", "ipv6dhcp", "ipv6ac"):
                 # catch host-vm IP address
                 wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                         "Wait for DHCP server to see Host VM in ARP tables",
+                         "Wait for ARP_SERVER to see Host VM in ARP tables",
                          timeout_secs=10 * 60)
                 ips = pxe.arp_addresses_for(mac_address)
                 logging.info("Host VM has IPs %s", ips)
