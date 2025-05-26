@@ -23,6 +23,7 @@ JOBS = {
         },
         "paths": [
             "tests/misc",
+            "tests/security",
             "tests/migration",
             "tests/network",
             "tests/snapshot",
