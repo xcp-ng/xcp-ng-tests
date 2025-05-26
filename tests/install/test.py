@@ -43,7 +43,7 @@ def helper_vm_with_plugged_disk(running_vm, create_vms):
 
 @pytest.mark.dependency()
 class TestNested:
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static", "ipv6ac", "ipv6dhcp"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -106,7 +106,9 @@ class TestNested:
              "proto": ("dhcp" if admin_iface == "ipv4dhcp"
                        else "static" if admin_iface == "ipv4static"
                        else "none"),
-             "protov6": ("static" if admin_iface == "ipv6static"
+             "protov6": ("dhcp" if admin_iface == "ipv6dhcp"
+                         else "autoconf" if admin_iface == "ipv6ac"
+                         else "static" if admin_iface == "ipv6static"
                          else "none"),
              "CONTENTS": (((
                  {"TAG": "ipaddr", "CONTENTS": cast(str, HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])},
@@ -138,7 +140,7 @@ class TestNested:
         installer.monitor_install(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static", "ipv6ac", "ipv6dhcp"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -245,7 +247,7 @@ class TestNested:
             wait_for(host_vm.is_running, "Wait for host VM running")
 
             machine_v6 = f"{machine}_v6"
-            if admin_iface == "ipv4dhcp":
+            if admin_iface in ("ipv4dhcp", "ipv6dhcp", "ipv6ac"):
                 # catch host-vm IP address
                 wait_for(lambda: pxe.arp_addresses_for(mac_address),
                          "Wait for DHCP server to see Host VM in ARP tables",
@@ -367,7 +369,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static", "ipv6ac", "ipv6dhcp"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
