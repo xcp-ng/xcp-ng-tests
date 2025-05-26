@@ -84,7 +84,8 @@ class TestNested:
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
     @pytest.mark.answerfile(
-        lambda system_disks_names, local_sr, package_source, system_disk_config, iso_version, admin_iface: AnswerFile("INSTALL")
+        lambda system_disks_names, local_sr, package_source, system_disk_config, iso_version,
+        admin_iface: AnswerFile("INSTALL")
         .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr})
         .top_append(
             {"iso": {"TAG": "source", "type": "local"},
