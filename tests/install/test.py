@@ -41,6 +41,7 @@ def helper_vm_with_plugged_disk(running_vm, create_vms):
 
 @pytest.mark.dependency()
 class TestNested:
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -83,7 +84,7 @@ class TestNested:
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
     @pytest.mark.answerfile(
-        lambda system_disks_names, local_sr, package_source, system_disk_config, iso_version: AnswerFile("INSTALL")
+        lambda system_disks_names, local_sr, package_source, system_disk_config, iso_version, admin_iface: AnswerFile("INSTALL")
         .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr})
         .top_append(
             {"iso": {"TAG": "source", "type": "local"},
@@ -98,7 +99,9 @@ class TestNested:
              "disk": None,
              }[system_disk_config],
 
-            {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
+            {"TAG": "admin-interface", "name": "eth0",
+             "proto": "dhcp" if admin_iface == "ipv4dhcp" else "none",
+             },
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": {"disk": system_disks_names[0],
@@ -107,11 +110,12 @@ class TestNested:
              },
         ))
     def test_install(self, vm_booted_with_installer, system_disks_names,
-                     firmware, iso_version, package_source, system_disk_config, local_sr):
+                     firmware, iso_version, package_source, system_disk_config, local_sr, admin_iface):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -128,12 +132,12 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda version, firmware, local_sr, package_source, system_disk_config: [dict(
+        lambda version, firmware, local_sr, admin_iface, package_source, system_disk_config: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_install[{firmware}-{version}-{system_disk_config}"
-                        f"-{package_source}-{local_sr}]"))])
+                        f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk,
-                            firmware, version, machine, local_sr, package_source, system_disk_config):
+                            firmware, version, machine, local_sr, admin_iface, package_source, system_disk_config):
         helper_vm = helper_vm_with_plugged_disk
 
         if system_disk_config == "disk":
@@ -313,6 +317,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -329,16 +334,17 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, version, machine, local_sr, package_source, system_disk_config: [
+        lambda firmware, version, machine, local_sr, admin_iface, package_source, system_disk_config: [
             dict(vm="vm1",
                  image_test=("TestNested::test_tune_firstboot"
                              f"[None-{firmware}-{version}-{machine}-{system_disk_config}"
-                             f"-{package_source}-{local_sr}]"))])
+                             f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_inst(self, create_vms,
-                       firmware, version, machine, package_source, system_disk_config, local_sr):
+                       firmware, version, machine, package_source, system_disk_config, local_sr, admin_iface):
         self._test_firstboot(create_vms, version, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -358,10 +364,10 @@ class TestNested:
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, orig_version, machine, system_disk_config, package_source, local_sr: [dict(
+        lambda firmware, orig_version, machine, system_disk_config, package_source, local_sr, admin_iface: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_boot_inst[{firmware}-{orig_version}-{machine}-{system_disk_config}"
-                        f"-{package_source}-{local_sr}]"))])
+                        f"-{package_source}-{local_sr}-{admin_iface}]"))])
     @pytest.mark.answerfile(
         lambda system_disks_names, package_source, system_disk_config, iso_version:
         AnswerFile("UPGRADE").top_append(
@@ -376,11 +382,12 @@ class TestNested:
         ))
     def test_upgrade(self, vm_booted_with_installer, system_disks_names,
                      firmware, orig_version, iso_version, machine, package_source,
-                     system_disk_config, local_sr):
+                     system_disk_config, local_sr, admin_iface):
         host_vm = vm_booted_with_installer
         installer.monitor_upgrade(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -400,15 +407,16 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, mode, machine, system_disk_config, package_source, local_sr: [dict(
+        lambda firmware, mode, machine, system_disk_config, package_source, local_sr, admin_iface: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}-{system_disk_config}"
-                        f"-{package_source}-{local_sr}]"))])
+                        f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_upg(self, create_vms,
-                      firmware, mode, machine, package_source, system_disk_config, local_sr):
+                      firmware, mode, machine, package_source, system_disk_config, local_sr, admin_iface):
         self._test_firstboot(create_vms, mode, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -427,10 +435,10 @@ class TestNested:
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, orig_version, local_sr, system_disk_config, package_source: [dict(
+        lambda firmware, orig_version, local_sr, admin_iface, system_disk_config, package_source: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_boot_upg[{firmware}-{orig_version}-host1-{system_disk_config}"
-                        f"-{package_source}-{local_sr}]"))])
+                        f"-{package_source}-{local_sr}-{admin_iface}]"))])
     @pytest.mark.answerfile(
         lambda system_disks_names, system_disk_config: AnswerFile("RESTORE").top_append(
             {"TAG": "backup-disk",
@@ -440,11 +448,12 @@ class TestNested:
         ))
     def test_restore(self, vm_booted_with_installer, system_disks_names,
                      firmware, orig_version, iso_version, package_source,
-                     system_disk_config, local_sr):
+                     system_disk_config, local_sr, admin_iface):
         host_vm = vm_booted_with_installer
         installer.monitor_restore(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp",))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -463,10 +472,10 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, mode, system_disk_config, package_source, local_sr: [dict(
+        lambda firmware, mode, system_disk_config, package_source, local_sr, admin_iface: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_restore[{firmware}-{mode}-{system_disk_config}"
-                        f"-{package_source}-{local_sr}]"))])
+                        f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_rst(self, create_vms,
-                      firmware, mode, package_source, system_disk_config, local_sr):
+                      firmware, mode, package_source, system_disk_config, local_sr, admin_iface):
         self._test_firstboot(create_vms, mode, is_restore=True)
