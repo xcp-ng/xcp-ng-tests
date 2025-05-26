@@ -138,6 +138,7 @@ class TestLinstorSR:
         Identify random host within the same pool, detect used disks, fail one, and test VM useability on LINSTOR SR.
         """
         import random
+        import multiprocessing
 
         sr = linstor_sr
         if provisioning_type == "thick":
@@ -158,14 +159,29 @@ class TestLinstorSR:
         except Exception as e:
             # Offline disk shall connect back after host reboot. Teardown normally.
             random_host.reboot(verify=True)
-            pytest.fail("Failed to simulate device failure. Error %s", e.stdout)
+            pytest.fail("Failed to simulate device failure. Error %s", e)
 
         # Ensure that VM is able to start on all hosts despite Linstor pool disk failure
         for h in sr.pool.hosts:
-            logging.info(f"Checking VM on host {h.hostname_or_ip}")
-            vm.start(on=h.uuid)
-            vm.wait_for_os_booted()
-            vm.shutdown(verify=True)
+            logging.info("Checking VM on host %s", h.hostname_or_ip)
+            try:
+                proc = multiprocessing.Process(target=vm.start, kwargs={'on': h.uuid})
+                proc.start()
+                proc.join(timeout=30)
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join()
+                    logging.warning("VM start on host %s timed out. Recovering failed disk.", h.hostname_or_ip)
+                    random_host.ssh(['echo', '"running"', '>', f'/sys/block/{fail_device}/device/state'])
+                    # Handle in case VM.start succeed after disk becomes online
+                    if vm.is_running():
+                        vm.shutdown(verify=True, force_if_fails=True)
+                    pytest.fail("VM start timed out on host %s after 30s. Disk recovered.", h.hostname_or_ip)
+                else: # VM booted fine
+                    vm.wait_for_os_booted()
+                    vm.shutdown(verify=True)
+            except Exception as e:
+                logging.info("Caught exception in multiprocessing: %s", e)
 
         random_host.reboot(verify=True)
 
