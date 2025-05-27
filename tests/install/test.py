@@ -47,6 +47,7 @@ class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
+    @pytest.mark.parametrize("install_iface", ("ipv4dhcp", "ipv6dhcp"))
     @pytest.mark.parametrize("iso_version", (
         "83nightly", "830net",
         "830",
@@ -136,7 +137,7 @@ class TestNested:
             else ValueError(f"system_disk_config {system_disk_config!r}"),
         ))
     def test_install(self, vm_booted_with_installer, system_disks_names,
-                     firmware, iso_version, package_source, system_disk_config, local_sr, admin_iface):
+                     firmware, iso_version, install_iface, package_source, system_disk_config, local_sr, admin_iface):
         host_vm = vm_booted_with_installer
         installer.monitor_install(ip=host_vm.ip)
 
@@ -146,6 +147,7 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("install_iface", ("ipv4dhcp", "ipv6dhcp"))
     @pytest.mark.parametrize("version", (
         "83nightly", "830net",
         "830",
@@ -158,12 +160,12 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda version, firmware, local_sr, admin_iface, package_source, system_disk_config: [dict(
+        lambda version, firmware, install_iface, local_sr, admin_iface, package_source, system_disk_config: [dict(
             vm="vm1",
-            image_test=(f"TestNested::test_install[{firmware}-{version}-{system_disk_config}"
+            image_test=(f"TestNested::test_install[{firmware}-{version}-{install_iface}-{system_disk_config}"
                         f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk,
-                            firmware, version, machine, local_sr, admin_iface, package_source, system_disk_config):
+                            firmware, version, install_iface, machine, local_sr, admin_iface, package_source, system_disk_config):
         helper_vm = helper_vm_with_plugged_disk
 
         if system_disk_config == "disk":
@@ -374,6 +376,7 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
+    @pytest.mark.parametrize("install_iface", ("ipv4dhcp", "ipv6dhcp"))
     @pytest.mark.parametrize("version", (
         "83nightly", "830net",
         "830",
@@ -386,13 +389,13 @@ class TestNested:
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
     @pytest.mark.continuation_of(
-        lambda firmware, version, machine, local_sr, admin_iface, package_source, system_disk_config: [
+        lambda firmware, version, install_iface, machine, local_sr, admin_iface, package_source, system_disk_config: [
             dict(vm="vm1",
                  image_test=("TestNested::test_tune_firstboot"
-                             f"[None-{firmware}-{version}-{machine}-{system_disk_config}"
+                             f"[None-{firmware}-{version}-{install_iface}-{machine}-{system_disk_config}"
                              f"-{package_source}-{local_sr}-{admin_iface}]"))])
     def test_boot_inst(self, create_vms,
-                       firmware, version, machine, package_source, system_disk_config, local_sr, admin_iface):
+                       firmware, version, install_iface, machine, package_source, system_disk_config, local_sr, admin_iface):
         self._test_firstboot(create_vms, version, admin_iface, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
