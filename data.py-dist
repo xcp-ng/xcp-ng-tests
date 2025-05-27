@@ -113,10 +113,15 @@ HOSTS_IP_CONFIG: dict[str, dict[str, str]] = {
     'HOSTS': {
 #        'DEFAULT': '192.16.0.1',
 #        'host2': '192.16.0.2',
+#        "DEFAULT_v6": '2001:db8::1:1/32',
+#        "host_v6": '2001:db8::1:2/32',
     },
 #    'NETMASK': '255.255.0.0',
 #    'GATEWAY': '192.16.0.254',
 #    'DNS': '192.16.0.254',
+
+#    'GATEWAY_v6': '2001:db8::1',
+#    'DNS_v6': '2001:db8::2',
 }
 
 # Tools
