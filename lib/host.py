@@ -359,9 +359,10 @@ class Host:
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
-    def install_updates(self):
+    def install_updates(self, enablerepo=None):
         logging.info("Install updates on host %s" % self)
-        return self.ssh(['yum', 'update', '-y'])
+        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
+        return self.ssh(['yum', 'update', '-y'] + enablerepo_cmd)
 
     def restart_toolstack(self, verify=False):
         logging.info("Restart toolstack on host %s" % self)
@@ -376,10 +377,11 @@ class Host:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
-    def has_updates(self):
+    def has_updates(self, enablerepo=None):
+        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
-            self.ssh(['yum', 'check-update'])
+            self.ssh(['yum', 'check-update'] + enablerepo_cmd)
             # returned 0, else there would have been a SSHCommandFailed
             return False
         except commands.SSHCommandFailed as e:
