@@ -43,7 +43,7 @@ def helper_vm_with_plugged_disk(running_vm, create_vms):
 
 @pytest.mark.dependency()
 class TestNested:
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -106,14 +106,23 @@ class TestNested:
              "proto": ("dhcp" if admin_iface == "ipv4dhcp"
                        else "static" if admin_iface == "ipv4static"
                        else "none"),
-             "CONTENTS": (
+             "protov6": ("static" if admin_iface == "ipv6static"
+                         else "none"),
+             "CONTENTS": (((
                  {"TAG": "ipaddr", "CONTENTS": cast(str, HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])},
                  {"TAG": "subnet", "CONTENTS": cast(str, HOSTS_IP_CONFIG['NETMASK'])},
                  {"TAG": 'gateway', "CONTENTS": cast(str, HOSTS_IP_CONFIG['GATEWAY'])},
              ) if admin_iface == "ipv4static"
-             else (),
+             else ())
+                          + ((
+                              {"TAG": "ipv6", "CONTENTS": cast(str, HOSTS_IP_CONFIG['HOSTS']['DEFAULT_v6'])},
+                              {"TAG": "gatewayv6", "CONTENTS": cast(str, HOSTS_IP_CONFIG['GATEWAY_v6'])},
+                          ) if admin_iface == "ipv6static"
+             else ())),
              },
             {"TAG": "name-server", "CONTENTS": cast(str, HOSTS_IP_CONFIG['DNS'])} if admin_iface == "ipv4static"
+            else None,
+            {"TAG": "name-server", "CONTENTS": cast(str, HOSTS_IP_CONFIG['DNS_v6'])} if admin_iface == "ipv6static"
             else None,
 
             {"TAG": "primary-disk",
@@ -130,7 +139,7 @@ class TestNested:
         installer.monitor_install(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -175,6 +184,14 @@ class TestNested:
                 logging.info("Changing IP to %s", ip)
 
                 helper_vm.ssh([f"sed -i s/^IP=.*/IP='{ip}'/",
+                               "/mnt/etc/firstboot.d/data/management.conf"])
+            machine_v6 = f"{machine}_v6"
+            if admin_iface == "ipv6static" and machine_v6 in HOSTS_IP_CONFIG['HOSTS']:
+                # static management IPv6 if not the default set during install
+                ip = HOSTS_IP_CONFIG['HOSTS'][machine_v6]
+                logging.info("Changing IP to %s", ip)
+
+                helper_vm.ssh([f"sed -i s/^IPv6=.*/IPv6='{ip}'/",
                                "/mnt/etc/firstboot.d/data/management.conf"])
             # UUIDs
             logging.info("Randomizing UUIDs")
@@ -240,6 +257,10 @@ class TestNested:
             elif admin_iface == "ipv4static":
                 host_vm.ip = HOSTS_IP_CONFIG['HOSTS'].get(machine,
                                                           HOSTS_IP_CONFIG['HOSTS']['DEFAULT'])
+                logging.info("Expecting host VM to have IP %s", host_vm.ip)
+            elif admin_iface == "ipv6static":
+                host_vm.ip, prefix_len = HOSTS_IP_CONFIG['HOSTS'].get(
+                    machine, HOSTS_IP_CONFIG['HOSTS']['DEFAULT_v6']).split('/')
                 logging.info("Expecting host VM to have IP %s", host_vm.ip)
             else:
                 raise ValueError(f"admin_iface {admin_iface!r}")
@@ -346,7 +367,7 @@ class TestNested:
             raise
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -373,7 +394,7 @@ class TestNested:
         self._test_firstboot(create_vms, version, admin_iface, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -417,7 +438,7 @@ class TestNested:
         installer.monitor_upgrade(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -446,7 +467,7 @@ class TestNested:
         self._test_firstboot(create_vms, mode, admin_iface, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
@@ -485,7 +506,7 @@ class TestNested:
         installer.monitor_restore(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
-    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static"))
+    @pytest.mark.parametrize("admin_iface", ("ipv4dhcp", "ipv4static", "ipv6static"))
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("system_disk_config", ("disk", "raid1"))
