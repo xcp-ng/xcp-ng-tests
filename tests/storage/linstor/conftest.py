@@ -108,14 +108,26 @@ def storage_pool_name(provisioning_type: str) -> str:
 def provisioning_type(request: pytest.FixtureRequest) -> str:
     return request.param
 
+def pytest_configure(config):
+    config._linstor_upgrade_test = False
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if item.get_closest_marker("upgrade_test"):
+            config._linstor_upgrade_test = True
+            break
+
 @pytest.fixture(scope='package')
 def pool_with_linstor(
     hostA2: Host,
     lvm_disks: None,
     pool_with_saved_yum_state: Pool,
-    _linstor_config: LinstorConfig
+    _linstor_config: LinstorConfig,
+    request
 ) -> Generator[Pool, None, None]:
     import concurrent.futures
+
+    dont_use_testing_repo = request.config._linstor_upgrade_test
     pool = pool_with_saved_yum_state
 
     def check_linstor_installed(host: Host) -> None:
@@ -130,7 +142,10 @@ def pool_with_linstor(
     def install_linstor(host: Host) -> None:
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
         host.yum_install([LINSTOR_RELEASE_PACKAGE])
-        host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
+        if dont_use_testing_repo:
+            host.yum_install([LINSTOR_PACKAGE])
+        else:
+            host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
         # Needed because the linstor driver is not in the xapi sm-plugins list
         # before installing the LINSTOR packages.
         host.ssh('systemctl restart multipathd')
