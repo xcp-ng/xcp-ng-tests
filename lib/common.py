@@ -14,13 +14,27 @@ import time
 import traceback
 from datetime import datetime
 from enum import Enum
+from functools import lru_cache
 from uuid import UUID
 
 import requests
+from pydantic import TypeAdapter
 
 import lib.commands as commands
 
-from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeAlias, TypeVar, Union, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    TypeAlias,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 if TYPE_CHECKING:
     import lib.host
@@ -84,6 +98,43 @@ def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
         raise RuntimeError(f"Internal error: invalid scope {scope!r}")
     logging.debug("scope: %r base: %r relative: %r", scope, base, scoped_nodeid)
     return "::".join(itertools.chain(base, (scoped_nodeid,)))
+
+@lru_cache(maxsize=None)
+def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:
+    return TypeAdapter(tp)
+
+@overload
+def ensure_type(tp: type[T], v: object) -> T:
+    ...
+
+@overload
+def ensure_type(tp: Any, v: object) -> Any:
+    ...
+
+def ensure_type(tp, v):
+    """
+    Cast a value to the specified type, and checks it's actual type at run time
+
+    Unlike typing.cast, it also performs a runtime check.
+    Unlike isinstance, it also supports complex types.
+
+    Until PEP 747 is accepted and fully implemented, we can't rely on typing_extensions.TypeForm
+    to properly infer the type when using Literal, Union, etc. In that case ensure_type() returns Any
+    and the value must be explicitly cast to get the actual type in the static type checkers.
+
+    Examples:
+    FB = Literal['foo', 'bar']
+    x = cast(FB, ensure_type(FB, 'foo'))
+    # x is seen as type Literal['foo', 'bar']
+
+    o = object()
+    y = ensure_type(int, o)
+    # y is seen as type int (without using cast)
+
+    The code for x would validate 'foo' at runtime but would generate an exception for y, because
+    o is not actually of type int.
+    """
+    return _get_type_adapter(tp).validate_python(v)
 
 def callable_marker(value: Union[T, Callable[..., T]], request: pytest.FixtureRequest) -> T:
     """
