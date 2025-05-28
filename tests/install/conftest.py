@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Sequence
 import pytest
 import pytest_dependency        # type: ignore
 import tempfile
@@ -329,6 +330,7 @@ def xcpng_chained(request):
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
     continuation_of = callable_marker(marker.args[0], request)
+    assert isinstance(continuation_of, Sequence)
 
     vm_defs = [dict(name=vm_spec['vm'],
                     image_test=vm_spec['image_test'],
