@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import logging
 import os
-from typing import Sequence
+from typing import Callable, Generator, Sequence, Union
 import pytest
 import pytest_dependency        # type: ignore
 import tempfile
 import xml.etree.ElementTree as ET
 
 from lib import installer, pxe
-from lib.common import callable_marker, url_download, wait_for
+from lib.common import callable_marker, ensure_type, url_download, wait_for
 from lib.installer import AnswerFile
 from lib.commands import local_cmd
 
@@ -39,7 +41,7 @@ def skip_package_source(version, package_source):
     return True, "unknown source type {}".format(package_source)
 
 @pytest.fixture(scope='function')
-def answerfile(request):
+def answerfile(request: pytest.FixtureRequest) -> Generator[Union[AnswerFile, None], None, None]:
     """
     Makes an AnswerFile object available to test and other fixtures.
 
@@ -66,8 +68,8 @@ def answerfile(request):
         return
 
     # construct answerfile definition from option "base", and explicit bits
-    answerfile_def = callable_marker(marker.args[0], request)
-    assert isinstance(answerfile_def, AnswerFile)
+    value = callable_marker(marker.args[0], request)
+    answerfile_def = ensure_type(AnswerFile, value)
 
     yield answerfile_def
 
@@ -322,8 +324,8 @@ def xcpng_chained(request):
     # take test name from mark
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
-    continuation_of = callable_marker(marker.args[0], request)
-    assert isinstance(continuation_of, Sequence)
+    value = callable_marker(marker.args[0], request)
+    continuation_of = ensure_type(Sequence[dict], value)
 
     vm_defs = [dict(name=vm_spec['vm'],
                     image_test=vm_spec['image_test'],
