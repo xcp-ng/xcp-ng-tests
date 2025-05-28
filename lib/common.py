@@ -7,7 +7,7 @@ import sys
 import time
 import traceback
 from enum import Enum
-from typing import Dict, Literal, Optional, overload, TYPE_CHECKING, Union
+from typing import Any, Dict, Literal, Optional, Type, TypeVar, overload, TYPE_CHECKING, Union
 from uuid import UUID
 
 import pytest
@@ -66,6 +66,14 @@ def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
         raise RuntimeError(f"Internal error: invalid scope {scope!r}")
     logging.debug("scope: %r base: %r relative: %r", scope, base, scoped_nodeid)
     return "::".join(itertools.chain(base, (scoped_nodeid,)))
+
+T = TypeVar("T")
+
+def ensure_type(typ: Type[T], value: Any) -> T:
+    """Converts a value to the specified type. Also performs a runtime check."""
+    if not isinstance(value, typ):
+        raise TypeError(f"'{type(value).__name__}' object is not of the expected type '{typ.__name__}'")
+    return value
 
 def callable_marker(value, request):
     """
