@@ -1,13 +1,13 @@
 import logging
 import os
-from typing import Sequence
+from typing import Callable, Sequence, Union
 import pytest
 import pytest_dependency        # type: ignore
 import tempfile
 import xml.etree.ElementTree as ET
 
 from lib import installer, pxe
-from lib.common import callable_marker, url_download, wait_for
+from lib.common import callable_marker, ensure_type, url_download, wait_for
 from lib.installer import AnswerFile
 from lib.commands import local_cmd
 
@@ -66,8 +66,8 @@ def answerfile(request):
         return
 
     # construct answerfile definition from option "base", and explicit bits
-    answerfile_def = callable_marker(marker.args[0], request)
-    assert isinstance(answerfile_def, AnswerFile)
+    marker_args = ensure_type(Sequence[Union[AnswerFile, Callable[..., AnswerFile]]], marker.args)
+    answerfile_def = callable_marker(marker_args[0], request)
 
     answerfile_def.top_append(
         dict(TAG="admin-interface",
@@ -329,8 +329,8 @@ def xcpng_chained(request):
     # take test name from mark
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
-    continuation_of = callable_marker(marker.args[0], request)
-    assert isinstance(continuation_of, Sequence)
+    marker_args = ensure_type(Sequence[Union[Sequence[dict], Callable[..., Sequence[dict]]]], marker.args)
+    continuation_of = callable_marker(marker_args[0], request)
 
     vm_defs = [dict(name=vm_spec['vm'],
                     image_test=vm_spec['image_test'],
