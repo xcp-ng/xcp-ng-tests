@@ -66,8 +66,7 @@ def answerfile(request):
         return
 
     # construct answerfile definition from option "base", and explicit bits
-    answerfile_def = callable_marker(marker.args[0], request)
-    assert isinstance(answerfile_def, AnswerFile)
+    answerfile_def = callable_marker(marker.args[0], request, AnswerFile)
 
     answerfile_def.top_append(
         dict(TAG="admin-interface",
@@ -329,8 +328,7 @@ def xcpng_chained(request):
     # take test name from mark
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
-    continuation_of = callable_marker(marker.args[0], request)
-    assert isinstance(continuation_of, Sequence)
+    continuation_of = callable_marker(marker.args[0], request, Sequence)
 
     vm_defs = [dict(name=vm_spec['vm'],
                     image_test=vm_spec['image_test'],
