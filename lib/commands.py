@@ -65,14 +65,14 @@ def _ellide_log_lines(log):
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
          background, decode, options) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
     opts = list(options)
-    opts.append('-o "BatchMode yes"')
+    opts.append('-o BatchMode=yes')
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        opts.append('-o "StrictHostKeyChecking no"')
-        opts.append('-o "LogLevel ERROR"')
-        opts.append('-o "UserKnownHostsFile /dev/null"')
+        opts.extend(['-o StrictHostKeyChecking=no',
+                     '-o LogLevel=ERROR',
+                     '-o UserKnownHostsFile=/dev/null'])
 
     if isinstance(cmd, str):
         command = cmd
@@ -258,7 +258,7 @@ def local_cmd(cmd, check=True, decode=True):
 
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
-    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+    logging.debug(f"[local] {command}{errorcode_msg}, output: {_ellide_log_lines(output_for_logs)}")
 
     if res.returncode and check:
         raise LocalCommandFailed(res.returncode, output_for_logs, command)

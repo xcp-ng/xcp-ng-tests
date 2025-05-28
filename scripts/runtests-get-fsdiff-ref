@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+# extract reference dumps from install
+
+# needs at least --nest=$NEST
+# needs runtest-install output cache
+
+VERSION="83nightly"
+
+. $(dirname $0)/lib.bash
+
+GITREV=$(git rev-parse HEAD)
+
+declare -A FSDIFFCONFS=()
+for conf in "${TESTCONFS[@]}"; do
+    IFS=- read fw sr < <(echo "$conf")
+    [ "$sr" = "ext" ] || continue
+    FSDIFFCONFS[$fw-$VERSION]=$conf
+done
+
+for fsdiffconf in "${!FSDIFFCONFS[@]}"; do # "in FSDIFFCONFS.keys"
+    IFS=- read fw sr < <(echo "$fsdiffconf")
+    # get ref data for install
+    run_pytest "$fsdiffconf" \
+        --hosts="cache://install.test::Nested::boot_inst[$fw-$VERSION-host1-iso-ext]-vm1-$GITREV" \
+        --log-file=test-fsdiffref-$fsdiffconf.log \
+        "$@" \
+        tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_mkref
+done
+
+report_failures
