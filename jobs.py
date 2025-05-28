@@ -386,9 +386,13 @@ JOBS = {
         "description": "Testing of the Xen hypervisor itself",
         "requirements": [
             "A host with HVM FEP enabled (`hvm_fep` Xen command line parameter).",
+            "A small VM that can be imported on the SRs.",
+            "The host will be rebooted by the tests.",
         ],
         "nb_pools": 1,
-        "params": {},
+        "params": {
+            "--vm": "single/small_vm",
+        },
         "paths": ["tests/xen"],
     },
     "vtpm": {
