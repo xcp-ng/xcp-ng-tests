@@ -77,7 +77,7 @@ class TestNested:
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
-    @pytest.mark.answerfile(
+    @pytest.mark.answerfile.with_args(
         lambda install_disk, local_sr, package_source, iso_version: AnswerFile("INSTALL")
         .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr})
         .top_append(
@@ -109,7 +109,7 @@ class TestNested:
         "xs70",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
+    @pytest.mark.continuation_of.with_args(
         lambda version, firmware, local_sr, package_source: [dict(
             vm="vm1",
             image_test=f"TestNested::test_install[{firmware}-{version}-{package_source}-{local_sr}]")])
@@ -243,6 +243,7 @@ class TestNested:
                 raise AssertionError(f"Unhandled LSB release {lsb_rel!r}")
             # check for firstboot issues
             # FIXME: flaky, must check logs extraction on failure
+            stamp = ''
             try:
                 for stamp in sorted(STAMPS):
                     wait_for(lambda: pool.master.ssh(["test", "-e", f"{STAMPS_DIR}/{stamp}"],
@@ -300,7 +301,7 @@ class TestNested:
         "xs70",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
+    @pytest.mark.continuation_of.with_args(
         lambda firmware, version, machine, local_sr, package_source: [
             dict(vm="vm1",
                  image_test=("TestNested::test_tune_firstboot"
@@ -327,11 +328,11 @@ class TestNested:
         ("821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
+    @pytest.mark.continuation_of.with_args(
         lambda firmware, orig_version, machine, package_source, local_sr: [dict(
             vm="vm1",
             image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}-{machine}-{package_source}-{local_sr}]")])
-    @pytest.mark.answerfile(
+    @pytest.mark.answerfile.with_args(
         lambda install_disk, package_source, iso_version: AnswerFile("UPGRADE").top_append(
             {"TAG": "source", "type": "local"} if package_source == "iso"
             else {"TAG": "source", "type": "url",
@@ -363,7 +364,7 @@ class TestNested:
         "821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
+    @pytest.mark.continuation_of.with_args(
         lambda firmware, mode, machine, package_source, local_sr: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}-{package_source}-{local_sr}]"))])
@@ -388,7 +389,7 @@ class TestNested:
         ("821.1-821.1", "821.1"),
     ])
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
+    @pytest.mark.continuation_of.with_args(
         lambda firmware, orig_version, local_sr, package_source: [dict(
             vm="vm1",
             image_test=f"TestNested::test_boot_upg[{firmware}-{orig_version}-host1-{package_source}-{local_sr}]")])
@@ -419,7 +420,7 @@ class TestNested:
         "821.1-821.1-821.1",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
-    @pytest.mark.continuation_of(
+    @pytest.mark.continuation_of.with_args(
         lambda firmware, mode, package_source, local_sr: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_restore[{firmware}-{mode}-{package_source}-{local_sr}]"))])
