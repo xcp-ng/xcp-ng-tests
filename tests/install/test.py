@@ -81,10 +81,10 @@ class TestNested:
         lambda install_disk, local_sr, package_source, iso_version: AnswerFile("INSTALL")
         .top_setattr({} if local_sr == "nosr" else {"sr-type": local_sr})
         .top_append(
-            {"TAG": "source", "type": "local"} if package_source == "iso"
-            else {"TAG": "source", "type": "url",
-                  "CONTENTS": ISO_IMAGES[iso_version]['net-url']} if package_source == "net"
-            else {},
+            {"iso": {"TAG": "source", "type": "local"},
+             "net": {"TAG": "source", "type": "url",
+                     "CONTENTS": ISO_IMAGES[iso_version]['net-url']},
+             }[package_source],
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": install_disk},
@@ -333,10 +333,10 @@ class TestNested:
             image_test=f"TestNested::test_boot_inst[{firmware}-{orig_version}-{machine}-{package_source}-{local_sr}]")])
     @pytest.mark.answerfile(
         lambda install_disk, package_source, iso_version: AnswerFile("UPGRADE").top_append(
-            {"TAG": "source", "type": "local"} if package_source == "iso"
-            else {"TAG": "source", "type": "url",
-                  "CONTENTS": ISO_IMAGES[iso_version]['net-url']} if package_source == "net"
-            else {},
+            {"iso": {"TAG": "source", "type": "local"},
+             "net": {"TAG": "source", "type": "url",
+                     "CONTENTS": ISO_IMAGES[iso_version]['net-url']},
+             }[package_source],
             {"TAG": "existing-installation",
              "CONTENTS": install_disk},
         ))
