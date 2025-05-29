@@ -71,6 +71,8 @@ def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
 
 T = TypeVar("T")
 
+_ensure_type_cache: Dict[type, TypeAdapter] = {}
+
 def ensure_type(typ: Type[T], value: Any) -> T:
     """
     Converts a value to the specified type.
@@ -84,7 +86,8 @@ def ensure_type(typ: Type[T], value: Any) -> T:
     except TypeError:
         # not just a simple type, lets try with pydantic
         with suppress(ValidationError):
-            TypeAdapter(typ).validate_python(value)
+            ta = _ensure_type_cache.setdefault(typ, TypeAdapter(typ))
+            ta.validate_python(value)
             ok = True
     if not ok:
         raise TypeError(f"'{type(value).__name__}' object is not of the expected type '{typ.__name__}'")
