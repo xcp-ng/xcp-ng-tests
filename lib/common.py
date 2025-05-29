@@ -9,7 +9,7 @@ import time
 import traceback
 from enum import Enum
 from pydantic import TypeAdapter, ValidationError
-from typing import Any, Dict, Literal, Optional, Type, TypeVar, overload, TYPE_CHECKING, Union
+from typing import Any, Dict, Literal, Optional, Type, TypeVar, cast, overload, TYPE_CHECKING, Union
 from uuid import UUID
 
 import pytest
@@ -71,6 +71,8 @@ def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
 
 T = TypeVar("T")
 
+_ensure_type_cache: Dict[type, TypeAdapter] = {}
+
 def ensure_type(typ: Type[T], value: Any) -> T:
     """
     Converts a value to the specified type.
@@ -84,7 +86,7 @@ def ensure_type(typ: Type[T], value: Any) -> T:
     except TypeError:
         # not just a simple type, lets try with pydantic
         with suppress(ValidationError):
-            ta = TypeAdapter(typ)
+            ta = cast(TypeAdapter[T], _ensure_type_cache.setdefault(typ, TypeAdapter(typ)))
             return ta.validate_python(value)
     raise TypeError(f"'{type(value).__name__}' object is not of the expected type '{typ.__name__}'")
 
