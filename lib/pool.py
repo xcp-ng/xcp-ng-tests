@@ -1,7 +1,7 @@
 import logging
 import os
 import traceback
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 from packaging import version
 
@@ -9,6 +9,7 @@ import lib.commands as commands
 from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
+import contextlib
 
 
 class Pool:
@@ -65,10 +66,8 @@ class Pool:
 
                     logging.info("Attempting to run the rollback function on host(s) "
                                  f"{', '.join([str(h) for h in rollback_hosts])}...")
-                    try:
+                    with contextlib.suppress(Exception):
                         self.exec_on_hosts_on_error_continue(rollback_func, rollback_hosts)
-                    except Exception:
-                        pass
                 raise e
 
     def exec_on_hosts_on_error_continue(self, func, host_list=[]):
@@ -265,7 +264,7 @@ class Pool:
             assert 'db' in auths_dict
 
             logging.info('Installing auths to pool: %s' % list(auths_dict.keys()))
-            for key in auths_dict.keys():
+            for key in auths_dict:
                 value = host.ssh([f'md5sum {auths_dict[key]} | cut -d " " -f 1'])
                 logging.debug('Key: %s, value: %s' % (key, value))
             params = [auths_dict['PK'], auths_dict['KEK'], auths_dict['db']]
