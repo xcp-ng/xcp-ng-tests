@@ -1,3 +1,4 @@
+from contextlib import suppress
 import getpass
 import inspect
 import itertools
@@ -7,6 +8,7 @@ import sys
 import time
 import traceback
 from enum import Enum
+from pydantic import TypeAdapter, ValidationError
 from typing import Any, Dict, Literal, Optional, Type, TypeVar, overload, TYPE_CHECKING, Union
 from uuid import UUID
 
@@ -70,10 +72,21 @@ def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
 T = TypeVar("T")
 
 def ensure_type(typ: Type[T], value: Any) -> T:
-    """Converts a value to the specified type. Also performs a runtime check."""
-    if not isinstance(value, typ):
-        raise TypeError(f"'{type(value).__name__}' object is not of the expected type '{typ.__name__}'")
-    return value
+    """
+    Converts a value to the specified type.
+
+    Unlike typing.cast, it also performs a runtime check.
+    Unlike isinstance, it also supports complex types.
+    """
+    try:
+        if isinstance(value, typ):
+            return value
+    except TypeError:
+        # not just a simple type, lets try with pydantic
+        with suppress(ValidationError):
+            ta = TypeAdapter(typ)
+            return ta.validate_python(value)
+    raise TypeError(f"'{type(value).__name__}' object is not of the expected type '{typ.__name__}'")
 
 def callable_marker(value, request):
     """
