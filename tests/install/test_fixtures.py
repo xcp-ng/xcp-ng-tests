@@ -5,7 +5,7 @@ from lib.installer import AnswerFile
 
 # test the answerfile fixture can run on 2 parametrized instances
 # of the test in one run
-@pytest.mark.answerfile(lambda: AnswerFile("INSTALL").top_append(
+@pytest.mark.answerfile(lambda: AnswerFile("INSTALL").top_append( # type: ignore[call-arg]
     {"TAG": "source", "type": "local"},
     {"TAG": "primary-disk", "CONTENTS": "nvme0n1"},
 ))
