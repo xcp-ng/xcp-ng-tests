@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from lib.commands import ssh, scp
 from data import ARP_SERVER, PXE_CONFIG_SERVER
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
 
-def generate_boot_conf(directory, installer, action):
+def generate_boot_conf(directory: str, installer: str, action: str) -> None:
     # in case of restore, we disable the text ui from the installer completely,
     # to workaround a bug that leaves us stuck on a confirmation dialog at the end of the operation.
     rt = 'rt=1' if action == 'restore' else ''
@@ -15,7 +17,7 @@ is_default=1
 {rt}
 """)
 
-def server_push_config(mac_address, tmp_local_path):
+def server_push_config(mac_address: str, tmp_local_path: str) -> None:
     assert mac_address
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     server_remove_config(mac_address)
@@ -23,17 +25,17 @@ def server_push_config(mac_address, tmp_local_path):
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
 
-def server_remove_config(mac_address):
+def server_remove_config(mac_address: str) -> None:
     assert mac_address # protection against deleting the whole parent dir!
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     ssh(PXE_CONFIG_SERVER, ['rm', '-rf', remote_dir])
 
-def server_remove_bootconf(mac_address):
+def server_remove_bootconf(mac_address: str) -> None:
     assert mac_address
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
     ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
 
-def arp_addresses_for(mac_address):
+def arp_addresses_for(mac_address: str) -> list[str]:
     output = ssh(
         ARP_SERVER,
         ['ip', 'neigh', 'show', 'nud', 'reachable',
