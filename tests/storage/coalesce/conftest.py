@@ -1,27 +1,18 @@
 import pytest
 import logging
 
-from lib.vdi import VDI
-
 MAX_LENGTH = 1 * 1024 * 1024 * 1024 # 1GiB
 
 @pytest.fixture(scope="module")
 def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
-    sr_uuid = local_sr_on_hostA1.uuid
-    vdi_uuid = host.xe("vdi-create",
-                       {"sr-uuid": sr_uuid,
-                        "name-label": "testVDI",
-                        "virtual-size": str(MAX_LENGTH),
-                        "sm-config:type": image_format,
-                        })
-    logging.info(">> Created VDI {} of type {}".format(vdi_uuid, image_format))
-
-    vdi = VDI(vdi_uuid, host=host)
+    sr = local_sr_on_hostA1
+    vdi = sr.create_vdi("testVDI", MAX_LENGTH, image_format=image_format)
+    logging.info(">> Created VDI {} of type {}".format(vdi.uuid, image_format))
 
     yield vdi
 
-    logging.info("<< Destroying VDI {}".format(vdi_uuid))
-    host.xe("vdi-destroy", {"uuid": vdi_uuid})
+    logging.info("<< Destroying VDI {}".format(vdi.uuid))
+    vdi.destroy()
 
 @pytest.fixture(scope="module")
 def vdi_with_vbd_on_dom0(host, vdi_on_local_sr):
