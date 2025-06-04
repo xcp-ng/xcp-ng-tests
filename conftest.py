@@ -304,6 +304,13 @@ def host_no_ipv6(host):
     if is_ipv6(host.hostname_or_ip):
         pytest.skip(f"This test requires an IPv4 XCP-ng")
 
+@pytest.fixture(scope="session")
+def shared_sr(host):
+    sr = host.pool.first_shared_sr()
+    assert sr, "No shared SR available on hosts"
+    logging.info(">> Shared SR on host present: {} of type {}".format(sr.uuid, sr.get_type()))
+    yield sr
+
 @pytest.fixture(scope='session')
 def local_sr_on_hostA1(hostA1):
     """ A local SR on the pool's master. """
@@ -311,7 +318,7 @@ def local_sr_on_hostA1(hostA1):
     assert len(srs) > 0, "a local SR is required on the pool's master"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostA1 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostA1 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
@@ -321,7 +328,7 @@ def local_sr_on_hostA2(hostA2):
     assert len(srs) > 0, "a local SR is required on the pool's second host"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostA2 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostA2 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
@@ -331,7 +338,7 @@ def local_sr_on_hostB1(hostB1):
     assert len(srs) > 0, "a local SR is required on the second pool's master"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostB1 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostB1 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
