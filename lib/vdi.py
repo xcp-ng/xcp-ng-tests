@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
 from typing import Literal, Optional, overload, TYPE_CHECKING
@@ -23,11 +24,7 @@ class VDI:
         # TODO: use a different approach when migration is possible
         if sr is None:
             assert host
-            sr_uuid = host.pool.get_vdi_sr_uuid(uuid)
-            # avoid circular import
-            # FIXME should get it from Host instead
-            from lib.sr import SR
-            self.sr = SR(sr_uuid, host.pool)
+            self.sr = host.get_sr_from_vdi_uuid(self.uuid)
         else:
             self.sr = sr
 
@@ -47,6 +44,12 @@ class VDI:
 
     def __str__(self):
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
+
+    def get_parent(self) -> Optional[str]:
+        return self.param_get("sm-config", key="vhd-parent", accept_unknown_key=True)
+
+    def get_image_format(self) -> Optional[str]:
+        return self.param_get("sm-config", key="image-format", accept_unknown_key=True)
 
     @overload
     def param_get(self, param_name: str, key: Optional[str] = ...,
