@@ -48,6 +48,9 @@ class VDI:
     def get_parent(self) -> Optional[str]:
         return self.param_get("sm-config", key="vhd-parent", accept_unknown_key=True)
 
+    def get_image_format(self) -> Optional[str]:
+        return self.param_get("sm-config", key="image-format", accept_unknown_key=True)
+
     @overload
     def param_get(self, param_name: str, key: Optional[str] = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
