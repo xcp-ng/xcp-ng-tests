@@ -22,6 +22,7 @@ JOBS = {
             "--vm": "single/small_vm",
         },
         "paths": [
+            "tests/xapi/firstboot",
             "tests/xo/test_xo_connection.py",
             "tests/misc",
             "tests/system",
