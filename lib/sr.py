@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Optional
 
 import lib.commands as commands
 from lib.common import prefix_object_name, safe_split, strtobool, wait_for, wait_for_not
@@ -11,6 +12,7 @@ class SR:
         self.pool = pool
         self._is_shared = None # cached value for is_shared()
         self._main_host = None # cached value for main_host()
+        self._type = None # cache value for get_type()
 
     def pbd_uuids(self):
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
@@ -152,13 +154,21 @@ class SR:
                                                             {'uuid': self.uuid, 'param-name': 'shared'}))
         return self._is_shared
 
-    def create_vdi(self, name_label, virtual_size=64):
+    def get_type(self) -> str:
+        if self._type is None:
+            self._type = self.pool.master.xe("sr-param-get", {"uuid": self.uuid, "param-name": "type"})
+        return self._type
+
+    def create_vdi(self, name_label: str, virtual_size: int = 64, image_format: Optional[str] = None) -> VDI:
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
-        vdi_uuid = self.pool.master.xe('vdi-create', {
+        args = {
             'name-label': prefix_object_name(name_label),
             'virtual-size': str(virtual_size),
-            'sr-uuid': self.uuid
-        })
+            'sr-uuid': self.uuid,
+        }
+        if image_format:
+            args["sm-config:image-format"] = image_format
+        vdi_uuid = self.pool.master.xe('vdi-create', args)
         return VDI(vdi_uuid, sr=self)
 
     def run_quicktest(self):
