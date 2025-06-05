@@ -42,7 +42,7 @@ for conf in "${REFCONFS[@]}"; do
     run_pytest "$conf-fsdiff" \
         --hosts="cache://${host1}" \
         --log-file=test-postupgrade-fsdiff-$conf.log \
-        tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_against_ref \
+        tests/fs_diff/test_fsdiff_ref.py::test_fsdiff_against_ref \
         "$@"
 done
 
