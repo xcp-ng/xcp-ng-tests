@@ -786,3 +786,35 @@ def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
 
     from data import IMAGE_EQUIVS
     return IMAGE_EQUIVS.get(image_key, image_key)
+
+def vm_default_cache_key_from_def(vm_def, ref_nodeid):
+    vm_name = vm_def["name"]
+    image_test = vm_def["image_test"]
+    image_vm = vm_def.get("image_vm", vm_name)
+    image_scope = vm_def.get("image_scope", "module")
+    nodeid = shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid))
+
+    from lib.config import IMAGE_DEFAULT_EQUIVS
+    try:
+        default = IMAGE_DEFAULT_EQUIVS[f"{nodeid}-{image_vm}"]
+        logging.info("Found VM cache id in IMAGE_DEFAULT_EQUIVS")
+        return default
+    except KeyError:
+        logging.info(f"No entry for '{nodeid}-{image_vm}' in IMAGE_DEFAULT_EQUIVS")
+        return None
+
+# FIXME ugly hack
+def vm_default_cache_key_from_key(vm_key):
+    sha_idx = vm_key.rindex("-")
+    vm_idx = vm_key.rindex("-", 0, sha_idx)
+    nodeid = vm_key[:vm_idx]
+    image_vm = vm_key[vm_idx + 1:sha_idx]
+
+    from lib.config import IMAGE_DEFAULT_EQUIVS
+    try:
+        default = IMAGE_DEFAULT_EQUIVS[f"{nodeid}-{image_vm}"]
+        logging.info("Found VM cache id in IMAGE_DEFAULT_EQUIVS")
+        return default
+    except KeyError:
+        logging.info(f"No entry for '{nodeid}-{image_vm}' in IMAGE_DEFAULT_EQUIVS")
+        return None
