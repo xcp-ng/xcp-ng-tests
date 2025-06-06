@@ -12,7 +12,7 @@ from lib import commands
 @pytest.mark.parametrize("command_id", ["curl", "wget"])
 @pytest.mark.parametrize("url_id", [
     "xoa",
-    "xcp-ng",
+    "xcpng",
     "vates"
 ])
 def test_access_links(host, command_id, url_id):
