@@ -49,7 +49,7 @@ run_pytest() {
 # FIXME this is also where we take the list to create all ref
 # installs, 75/76 should be separated
 REFVERSIONS=(
-    81
+    81 830 821.1
 #    830
 #    821.1 81 80
 #    76 75
