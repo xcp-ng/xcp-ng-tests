@@ -2,6 +2,8 @@ import pytest
 import subprocess
 import hashlib
 
+from lib import commands
+
 # This test is designed to verify the accessibility of the XOA deployment script
 #
 # Requirements:
@@ -32,7 +34,7 @@ def test_access_links(host, command_id, url_id):
 
     # Verify the download worked by comparing with local download
     # This ensures the content is accessible and identical from both locations
-    local_result = host.local_cmd(COMMAND)
+    local_result = commands.local_cmd(COMMAND)
 
     assert local_result.returncode == 0, (
         f"Failed to fetch URL locally: {local_result.stderr}"
