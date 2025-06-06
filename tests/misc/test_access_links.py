@@ -20,14 +20,14 @@ def test_access_links(host, command_id, url_id):
     Verifies that the specified URL responds correctly via the specified command
     and compares the checksum of the downloaded content between local and remote.
     """
-    command = {"curl": "curl -fsSL",
-               "wget": "wget -qO-"}[command_id]
+    command = {"curl": ["curl", "-fsSL"],
+               "wget": ["wget", "-qO-"]}[command_id]
     url = {
         "xoa": "https://xoa.io/deploy",
         "xcpng": "https://updates.xcp-ng.org/trace",
         "vates": "https://repo.vates.tech/README.txt"
     }[url_id]
-    COMMAND = f"{command} '{url}'"
+    COMMAND = command + [url]
 
     # Download from remote host
     remote_result = host.ssh(COMMAND)
