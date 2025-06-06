@@ -6,7 +6,7 @@ set -e
 . $(dirname $0)/lib.bash
 
 # subject to EQUIVS
-REFSHA="$(git rev-parse HEAD)"
+: ${REFSHA:="$(git rev-parse HEAD)"}
 
 for conf in "${TESTCONFS[@]}"; do
     IFS=- read fw sr < <(echo "$conf")
