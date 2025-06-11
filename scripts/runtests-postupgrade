@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+
+# needs at least --nest=$NEST
+
+. $(dirname $0)/lib.bash
+
+# subject to EQUIVS
+REFSHA="$(git rev-parse HEAD)"
+
+for conf in "${REFCONFS[@]}"; do
+    IFS=- read fw version media sr < <(echo "$conf")
+    upgrade_should_work "$version" || continue
+    host1="install.test::Nested::boot_upg[$fw-$version-83nightly-host1-$media-$sr]-vm1-$REFSHA"
+    host2="install.test::Nested::boot_upg[$fw-$version-83nightly-host2-$media-$sr]-vm1-$REFSHA"
+
+    run_pytest "$conf-post" \
+        --runner "./jobs.py --host-version 8.3.0 run postinstall cache://${host1}" \
+        -m "not hostB1" \
+        --log-file=test-postupgrade-$conf.log \
+        "$@"
+
+    # FIXME postinstall-intrapool-migrate needs a 2-host pool
+
+    case "$version" in
+        83*) ;;                 # TLS already tested
+        *)                      # go on and test with TLS
+            # FIXME activate TLS
+
+            run_pytest "$conf-tls" \
+                --runner "./jobs.py --host-version 8.3.0 run postinstall-with-tls cache://${host1},cache://${host2}" \
+                --log-file=test-postupgrade-tls-$conf.log \
+                -m "not hostA2" \
+                "$@"
+
+            # FIXME postinstall-intrapool-migrate (with TLS) needs a 2-host pool
+            ;;
+    esac
+
+    # FIXME: check fsdiff with TLS activated, since that's what the 8.3+ ref have
+
+    run_pytest "$conf-fsdiff" \
+        --hosts="cache://${host1}" \
+        --log-file=test-postupgrade-fsdiff-$conf.log \
+        tests/fs-diff/test_fsdiff_ref.py::test_fsdiff_against_ref \
+        "$@"
+done
+
+report_failures

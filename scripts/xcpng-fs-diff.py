@@ -39,6 +39,7 @@
 #
 
 import argparse
+import logging
 import sys
 import subprocess
 import json
@@ -47,6 +48,8 @@ import os
 import shlex
 from fnmatch import fnmatch
 from enum import StrEnum, auto
+
+from lib.commands import ssh
 
 class DataType(StrEnum):
     FILE = auto()
@@ -61,15 +64,6 @@ def ignore_file(filename, ignored_files):
             return True
 
     return False
-
-def ssh_cmd(host, cmd):
-    args = ["ssh", f"root@{host}", cmd]
-
-    cmdres = subprocess.run(args, capture_output=True, text=True)
-    if cmdres.returncode:
-        raise Exception(cmdres.stderr)
-
-    return cmdres.stdout
 
 def ssh_get_files(host, file_type, folders):
     md5sum = False
@@ -101,7 +95,7 @@ def ssh_get_files(host, file_type, folders):
         # This is much more efficient than using find '-exec md5sum {}'
         find_cmd += " -print0 | xargs -0 md5sum"
 
-    rawres = ssh_cmd(host, find_cmd)
+    rawres = ssh(host, [find_cmd])
 
     res = dict()
     for line in rawres.splitlines():
@@ -113,7 +107,7 @@ def ssh_get_files(host, file_type, folders):
 def ssh_get_packages(host):
     packages = dict()
 
-    res = ssh_cmd(host, "rpm -qa --queryformat '%{NAME} %{VERSION}\n'")
+    res = ssh(host, ["rpm -qa --queryformat '%{NAME} %{VERSION}\n'"])
     for line in res.splitlines():
         entries = line.split(' ', 1)
         packages[entries[0]] = entries[1]
@@ -131,7 +125,7 @@ def get_data(host, folders):
         ref_data[DataType.PACKAGE] = ssh_get_packages(host)
     except Exception as e:
         print(e, file=sys.stderr)
-        exit(-1)
+        exit(1)
 
     return ref_data
 
@@ -160,8 +154,8 @@ def remote_diff(host_ref, host_test, filename):
         file_test = None
 
         # check remote files are text files
-        cmd = f"file -b {shlex.quote(filename)}"
-        file_type = ssh_cmd(host_ref, cmd)
+        cmd = ["file", "-b", shlex.quote(filename)]
+        file_type = ssh(host_ref, cmd)
         if not file_type.lower().startswith("ascii"):
             print("Binary file. Not showing diff")
             return
@@ -292,7 +286,7 @@ def load_reference_files(filename):
             return json.load(fd)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        exit(-1)
+        exit(1)
 
 # Save files from a reference host in json format
 def save_reference_data(files, filename):
@@ -301,9 +295,11 @@ def save_reference_data(files, filename):
             json.dump(files, fd, indent=4)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        exit(-1)
+        exit(1)
 
 def main():
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
+
     ref_data = None
     folders = ["/boot", "/etc", "/opt", "/usr"]
     ignored_file_patterns = [
@@ -347,6 +343,7 @@ def main():
         '/etc/sysconfig/xencommons',
         '/etc/sysctl.d/91-net-ipv6.conf',
         '/etc/vconsole.conf',
+        '/etc/xapi.d/plugins/vmssc',
         '/etc/xsconsole/state.txt',
         '/etc/xensource-inventory',
         '/etc/xensource/boot_time_cpus',
@@ -385,20 +382,20 @@ def main():
 
     if args.ref_host is None and args.show_diff:
         print("Missing parameters. -d must be used with -r. Try --help", file=sys.stderr)
-        return -1
+        return 1
 
     if args.load_ref:
         if not args.json_output:
-            print(f"Get reference data from {args.load_ref}")
+            logging.info("Get reference data from %s", args.load_ref)
         ref_data = load_reference_files(args.load_ref)
     elif args.ref_host:
         if not args.json_output:
-            print(f"Get reference data from {args.ref_host}")
+            logging.info("Get reference data from %s", args.ref_host)
         ref_data = get_data(args.ref_host, args.folders)
 
         if args.save_ref:
             if not args.json_output:
-                print(f"Saving reference data to {args.save_ref}")
+                logging.info("Saving reference data to %s", args.save_ref)
             save_reference_data(ref_data, args.save_ref)
 
     if ref_data is None or args.test_host is None:
@@ -406,10 +403,10 @@ def main():
             return 0
 
         print("\nMissing parameters. Try --help", file=sys.stderr)
-        return -1
+        return 1
 
     if not args.json_output:
-        print(f"Get test host data from {args.test_host}")
+        logging.info("Get test host data from %s", args.test_host)
     test_data = get_data(args.test_host, args.folders)
 
     ref = dict([('data', ref_data), ('host', args.ref_host)])
