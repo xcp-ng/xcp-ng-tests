@@ -98,7 +98,15 @@ def installer_iso(request):
 @pytest.fixture(scope='function')
 def system_disks_names(request):
     firmware = request.getfixturevalue("firmware")
-    yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    system_disk_config = request.getfixturevalue("system_disk_config")
+    yield (
+        ({"uefi": "nvme0n1", "bios": "sda"}[firmware],)
+        + (
+            {"raid1": {"uefi": "nvme0n2", "bios": "sdb"}[firmware],
+             "disk": (),
+             }[system_disk_config],
+        )
+    )
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
@@ -113,9 +121,11 @@ def system_disks_names(request):
 #     in contexts where the same IP is reused by successively different MACs
 #     (when cloning VMs from cache)
 @pytest.fixture(scope='function')
-def remastered_iso(installer_iso, answerfile):
+def remastered_iso(request, installer_iso, answerfile):
     iso_file = installer_iso['iso']
     unsigned = installer_iso['unsigned']
+
+    install_iface = request.getfixturevalue("install_iface")
 
     assert "iso-remaster" in TOOLS
     iso_remaster = TOOLS["iso-remaster"]
@@ -153,6 +163,9 @@ echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
 
+HOSTINSTALLER=$HOME/src/xs/host-installer
+make -C "$HOSTINSTALLER" DESTDIR="$INSTALLIMG" XS_MPATH_CONF="$HOME/src/xapi/sm/multipath/multipath.conf"
+
 mkdir -p "$INSTALLIMG/usr/local/sbin"
 cat > "$INSTALLIMG/usr/local/sbin/test-pingpxe.sh" << 'EOF'
 #! /bin/bash
@@ -177,6 +190,11 @@ if [ "$(readlink /bin/ping)" = busybox ]; then
     PINGARGS=""
 else
     PINGARGS="-c1"
+fi
+
+# detect lack of ipv4 both in installer and in installed host
+if grep -q -w network_config=none /proc/cmdline || grep -q "^MODE='none'\\$" /etc/firstboot.d/data/management.conf; then
+    PINGARGS+=" -6"
 fi
 
 ping $PINGARGS "$1"
@@ -239,6 +257,11 @@ EOF
 set -ex
 ISODIR="$1"
 SED_COMMANDS=(-e "s@/vmlinuz@/vmlinuz network_device=all sshpassword={passwd} atexit=shell@")
+case "{install_iface}" in
+ipv4dhcp) ;;
+ipv6dhcp) SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz network_config=none network_config6=dhcp@") ;;
+*) echo >&2 "ERROR unhandled install_iface '{install_iface}'"; exit 1 ;;
+esac
 test ! -e "{answerfile_xml}" ||
     SED_COMMANDS+=(-e "s@/vmlinuz@/vmlinuz install answerfile=file:///root/answerfile.xml@")
 # assuming *gpgcheck only appear within unsigned ISO
