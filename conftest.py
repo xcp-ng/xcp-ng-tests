@@ -432,10 +432,9 @@ def vm_ref(request):
     if ref is None:
         # get default VM from test if there's one
         marker = request.node.get_closest_marker("default_vm")
-        default_vm = marker.args[0] if marker is not None else None
-        if default_vm is not None:
-            logging.info(">> No VM specified on CLI. Using default: %s." % default_vm)
-            ref = default_vm
+        if marker is not None:
+            ref = marker.args[0]
+            logging.info(">> No VM specified on CLI. Using default: %s.", ref)
         else:
             # global default
             logging.info(">> No VM specified on CLI, and no default found in test definition. Using global default.")

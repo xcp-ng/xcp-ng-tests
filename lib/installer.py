@@ -19,6 +19,8 @@ class AnswerFile:
 
     def top_append(self, *defs):
         for defn in defs:
+            if defn is None:
+                continue
             self.defn['CONTENTS'].append(self._normalize_structure(defn))
         return self
 
@@ -30,15 +32,30 @@ class AnswerFile:
     # makes a mutable deep copy of all `contents`
     @staticmethod
     def _normalize_structure(defn):
-        assert isinstance(defn, dict)
-        assert 'TAG' in defn
-        defn = dict(defn)
-        if 'CONTENTS' not in defn:
-            defn['CONTENTS'] = []
-        if not isinstance(defn['CONTENTS'], str):
-            defn['CONTENTS'] = [AnswerFile._normalize_structure(item)
-                                for item in defn['CONTENTS']]
-        return defn
+        assert isinstance(defn, dict), f"{defn!r} is not a dict"
+        assert 'TAG' in defn, f"{defn} has no TAG"
+
+        # type mutation through nearly-shallow copy
+        new_defn = {
+            'TAG': defn['TAG'],
+            'CONTENTS': [],
+        }
+        for key, value in defn.items():
+            if key == 'CONTENTS':
+                if isinstance(value, str):
+                    new_defn['CONTENTS'] = value
+                else:
+                    new_defn['CONTENTS'] = [
+                        AnswerFile._normalize_structure(item)
+                        for item in value
+                        if item is not None
+                    ]
+            elif key == 'TAG':
+                pass            # already copied
+            else:
+                new_defn[key] = value
+
+        return new_defn
 
     # convert to a ElementTree.Element tree suitable for further
     # modification before we serialize it to XML
@@ -50,14 +67,14 @@ class AnswerFile:
         assert isinstance(name, str)
         contents = defn.pop('CONTENTS', ())
         assert isinstance(contents, (str, list))
-        element = ET.Element(name, **defn)
+        element = ET.Element(name, {}, **defn)
         if parent is not None:
             parent.append(element)
         if isinstance(contents, str):
             element.text = contents
         else:
-            for contents in contents:
-                AnswerFile._defn_to_xml_et(contents, parent=element)
+            for content in contents:
+                AnswerFile._defn_to_xml_et(content, parent=element)
         return element
 
 def poweroff(ip):

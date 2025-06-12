@@ -68,13 +68,6 @@ def answerfile(request):
     answerfile_def = callable_marker(marker.args[0], request)
     assert isinstance(answerfile_def, AnswerFile)
 
-    answerfile_def.top_append(
-        dict(TAG="admin-interface",
-             name="eth0",
-             proto="dhcp",
-             ),
-    )
-
     yield answerfile_def
 
 
@@ -103,7 +96,7 @@ def installer_iso(request):
                 )
 
 @pytest.fixture(scope='function')
-def install_disk(request):
+def system_disks_names(request):
     firmware = request.getfixturevalue("firmware")
     yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
 
@@ -179,7 +172,7 @@ if ! [ -e /opt/xensource/installer ]; then
     test "$eth_mac" = "$br_mac"
 fi
 
-if [ $(readlink "/bin/ping") = busybox ]; then
+if [ "$(readlink /bin/ping)" = busybox ]; then
     # XS before 7.0
     PINGARGS=""
 else

@@ -1,9 +1,10 @@
 # Configuration file, to be adapted to one's needs
 
-from typing import Any, Dict, TYPE_CHECKING
+from __future__ import annotations
 
 import legacycrypt as crypt     # type: ignore
 import os
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.typing import IsoImageDef
@@ -21,7 +22,7 @@ def hash_password(password):
 
 HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
 
-# Public key for a private key available to the test runner
+# Public keys for a private keys available to the test runner
 TEST_SSH_PUBKEY = """
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI
 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKz9uQOoxq6Q0SQ0XTzQHhDolvuo/7EyrDZsYQbRELhcPJG8MT/o5u3HyJFhIP2+HqBSXXgmqRPJUkwz9wUwb2sUwf44qZm/pyPUWOoxyVtrDXzokU/uiaNKUMhbnfaXMz6Ogovtjua63qld2+ZRXnIgrVtYKtYBeu/qKGVSnf4FTOUKl1w3uKkr59IUwwAO8ay3wVnxXIHI/iJgq6JBgQNHbn3C/SpYU++nqL9G7dMyqGD36QPFuqH/cayL8TjNZ67TgAzsPX8OvmRSqjrv3KFbeSlpS/R4enHkSemhgfc8Z2f49tE7qxWZ6x4Uyp5E6ur37FsRf/tEtKIUJGMRXN XCP-ng CI
@@ -37,7 +38,7 @@ OBJECTS_NAME_PREFIX = None
 # skip_xo_config allows to not touch XO's configuration regarding the host
 # Else the default behaviour is to add the host to XO servers at the beginning
 # of the testing session and remove it at the end.
-HOSTS: Dict[str, Dict[str, Any]] = {
+HOSTS: dict[str, dict[str, Any]] = {
 #    "10.0.0.1": {"user": "root", "password": ""},
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
 }
@@ -107,7 +108,7 @@ OTHER_GUEST_TOOLS = {
 }
 
 # Tools
-TOOLS: Dict[str, str] = {
+TOOLS: dict[str, str] = {
 #    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
 }
 
@@ -127,7 +128,7 @@ ISO_IMAGES_CACHE = "/home/user/iso"
 # for local-only ISO with things like "locally-built/my.iso" or "xs/8.3.iso".
 # If 'net-only' is set to 'True' only source of type URL will be possible.
 # By default the parameter is set to False.
-ISO_IMAGES: Dict[str, "IsoImageDef"] = {
+ISO_IMAGES: dict[str, "IsoImageDef"] = {
     '83nightly': {'path': os.environ.get("XCPNG83_NIGHTLY",
                                          "http://unconfigured.iso"),
                   'unsigned': True},
@@ -182,25 +183,25 @@ DEFAULT_SR = 'default'
 CACHE_IMPORTED_VM = False
 
 # Default NFS device config:
-NFS_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+NFS_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path/to/shared/mount' # Path to shared mountpoint
 }
 
 # Default NFS4+ only device config:
-NFS4_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+NFS4_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path_to_shared_mount' # Path to shared mountpoint
 #    'nfsversion': '4.1'
 }
 
 # Default NFS ISO device config:
-NFS_ISO_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+NFS_ISO_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'location': '10.0.0.2:/path/to/shared/mount' # URL/Hostname of NFS server and path to shared mountpoint
 }
 
 # Default CIFS ISO device config:
-CIFS_ISO_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+CIFS_ISO_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'location': r'\\10.0.0.2\<shared folder name>',
 #    'username': '<user>',
 #    'cifspassword': '<password>',
@@ -208,18 +209,18 @@ CIFS_ISO_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
 #    'vers': '<1.0> or <3.0>'
 }
 
-CEPHFS_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+CEPHFS_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
 }
 
-MOOSEFS_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+MOOSEFS_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'masterhost': 'mfsmaster',
 #    'masterport': '9421',
 #    'rootpath': '/vms'
 }
 
-LVMOISCSI_DEVICE_CONFIG: Dict[str, Dict[str, str]] = {
+LVMOISCSI_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'target': '192.168.1.1',
 #    'port': '3260',
 #    'targetIQN': 'target.example',
@@ -248,16 +249,7 @@ BASE_ANSWERFILES = dict(
     },
 )
 
-IMAGE_EQUIVS: Dict[str, str] = {
+IMAGE_EQUIVS: dict[str, str] = {
 #    'install.test::Nested::install[bios-830-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb':
 #    'install.test::Nested::install[bios-830-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
 }
-
-# compatibility settings for older tests
-DEFAULT_NFS_DEVICE_CONFIG = NFS_DEVICE_CONFIG
-DEFAULT_NFS4_DEVICE_CONFIG = NFS4_DEVICE_CONFIG
-DEFAULT_NFS_ISO_DEVICE_CONFIG = NFS_ISO_DEVICE_CONFIG
-DEFAULT_CIFS_ISO_DEVICE_CONFIG = CIFS_ISO_DEVICE_CONFIG
-DEFAULT_CEPHFS_DEVICE_CONFIG = CEPHFS_DEVICE_CONFIG
-DEFAULT_MOOSEFS_DEVICE_CONFIG = MOOSEFS_DEVICE_CONFIG
-DEFAULT_LVMOISCSI_DEVICE_CONFIG = LVMOISCSI_DEVICE_CONFIG
