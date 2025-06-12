@@ -3,25 +3,130 @@
 Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
-* python >= 3.8
-* packages as listed in requirements/base.txt
-* extra test-specific requirements are documented in the test file
-  "Requirements" header
+
+This project encourages the use of [uv](https://github.com/astral-sh/uv) to deal with the python dependencies.
+
+Some tools are required on the host running the tests:
+  * python >= 3.11 (from your distro, or from `uv` as described below)
   * `netcat` is required on the machine running the tests.
 
-### Quick install (python requirements)
+Extra test-specific requirements are documented in the test file "Requirements" header.
 
-Install the python requirements using pip:
+### Quick install
 
-```
-$ pip install -r requirements/base.txt
-```
+Install `uv` with one of these commands
 
-Additionally, for dev dependencies (things like the linter / style checker):
+~~~sh
+pip install uv                                      # for Fedora-based and older distros
+pipx install uv                                     # for newer distros
+curl -LsSf https://astral.sh/uv/install.sh | sh     # if you don't mind an installer modifying your environment
+~~~
 
-```
-$ pip install -r requirements/dev.txt
-```
+You have two options to run the tests:
+
+* with the `uv run` command
+
+You can use the dependencies managed by `uv` by prefixing the commands documented in the next chapters with `uv run`.
+For example
+
+~~~sh
+uv run pytest
+~~~
+
+or
+
+~~~sh
+uv run ./jobs.py
+~~~
+
+When running the command with `uv run`, `uv` checks that your dependencies are
+up to date and updates them if required, before running your command. You're
+always sure to have the expected dependencies, even when switching branch!
+
+* by activating the virtual environment
+
+You need to run `uv sync` to install the dependencies managed by uv, and then
+activate the virtual environment with
+
+~~~sh
+source .venv/bin/activate
+~~~
+
+You can then run the commands directly in your shell: `pytest`, `./jobs.py`, …
+
+Note you have to explicitly run `uv sync` when the dependencies are modified in
+the project, as `uv` won't ensure that the dependencies are up to date when run
+this way.
+
+Running `deactivate` restores your shell configuration.
+
+### Advanced usages
+
+> [!CAUTION]
+> These methods don't strictly guarantee the version of the dependencies.
+
+#### Use a specific python interpreter with `uv`
+
+`uv` is able to use any python version accessible on your system. Many `uv`
+commands accept a `-p`/`--python` option which takes either the path of the
+python interpreter to use, or a python version. `uv` also uses the value of
+the `UV_PYTHON` environment variable to set the python interpreter (or version
+to use).
+
+So if you want to run this project with your system's interpreter, you can
+
+~~~sh
+export UV_PYTHON=$(which python3)
+~~~
+
+and then use `uv` as shown in the previous section.
+
+> [!TIP]
+> [direnv](https://direnv.net/) may be used to automatically deal with the
+> environment variables when you enter the project directory with your shell.
+
+#### Dealing with dependencies without `uv`
+
+This project can be used without `uv`.
+
+If you desire, you can install a virtual environment with
+
+~~~sh
+python3 -m venv .venv
+source .venv/bin/activate
+~~~
+
+or skip the virtual environment entirely and just go with a user or system
+installation of the dependencies.
+
+The base dependencies can be installed with
+
+~~~sh
+./pip_install_pyproject.py
+~~~
+
+Optionally, you can install the development dependencies with
+
+~~~sh
+./pip_install_pyproject.py dev
+~~~
+
+### Adding python dependencies
+
+When adding a dependency, run
+
+~~~sh
+uv add --raw my_dep
+~~~
+
+This command installs the dependency locally and update the `uv.lock` file.
+
+> [!NOTE]
+> In order to keep this project usable with dependency packaged by the system,
+> we always use `uv add` with the `--raw` command line option.
+
+The lock file allows `uv` to install the dependencies at the exact same versions
+on all the environments.
 
 ## Other requirements
 * XCP-ng hosts that you can ssh to using a SSH key, non-interactively
