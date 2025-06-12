@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 from typing import Callable, Generator, Sequence, Union
@@ -66,7 +68,7 @@ def answerfile(request: pytest.FixtureRequest) -> Generator[Union[AnswerFile, No
         return
 
     # construct answerfile definition from option "base", and explicit bits
-    marker_args = ensure_type(Sequence[Union[AnswerFile, Callable[..., AnswerFile]]], marker.args)
+    marker_args = ensure_type(tuple[Union[AnswerFile, Callable[..., AnswerFile]]], marker.args)
     answerfile_def = callable_marker(marker_args[0], request)
 
     answerfile_def.top_append(
@@ -329,7 +331,7 @@ def xcpng_chained(request):
     # take test name from mark
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
-    marker_args = ensure_type(Sequence[Union[Sequence[dict], Callable[..., Sequence[dict]]]], marker.args)
+    marker_args = ensure_type(tuple[Union[Sequence[dict], Callable[..., Sequence[dict]]]], marker.args)
     continuation_of = callable_marker(marker_args[0], request)
 
     vm_defs = [dict(name=vm_spec['vm'],
