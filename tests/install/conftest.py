@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Callable, Sequence, Union
+from typing import Callable, Generator, Sequence, Union
 import pytest
 import pytest_dependency        # type: ignore
 import tempfile
@@ -39,7 +39,7 @@ def skip_package_source(version, package_source):
     return True, "unknown source type {}".format(package_source)
 
 @pytest.fixture(scope='function')
-def answerfile(request):
+def answerfile(request: pytest.FixtureRequest) -> Generator[Union[AnswerFile, None], None, None]:
     """
     Makes an AnswerFile object available to test and other fixtures.
 
