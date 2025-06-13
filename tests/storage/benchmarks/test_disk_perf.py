@@ -17,6 +17,7 @@ DEFAULT_SAMPLES_NUM = 10
 DEFAULT_SIZE = "1G"
 DEFAULT_BS = "4k"
 DEFAULT_IODEPTH = 1
+DEFAULT_NUMJOBS = 1
 DEFAULT_FILE = "fio-testfile"
 
 ### Tests parameters
@@ -43,6 +44,7 @@ def run_fio(
         bs=DEFAULT_BS,
         iodepth=DEFAULT_IODEPTH,
         size=DEFAULT_SIZE,
+        numjobs=DEFAULT_NUMJOBS,
         file_path="",
 ):
     json_output_path = os.path.join(temp_dir, f"{test_name}.json")
@@ -60,7 +62,7 @@ def run_fio(
         "--direct=1",
         "--end_fsync=1",
         "--fsync_on_close=1",
-        "--numjobs=1",
+        f"--numjobs={numjobs}",
         "--group_reporting",
         "--output-format=json",
         f"--output={json_output_path}"
