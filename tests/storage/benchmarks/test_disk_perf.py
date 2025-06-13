@@ -25,7 +25,8 @@ DEFAULT_FILE = "fio-testfile"
 system_memory = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
 
 block_sizes = ("4k", "16k", "64k", "1M")
-file_sizes = ("1G", "4G", f"{(system_memory/(1024.**3))*2}G")
+file_sizes = ("1G", "4G", f"{int((system_memory//(1024.**3))*2)}G")
+
 modes = (
         "read",
         "randread",
@@ -139,7 +140,7 @@ class TestDiskPerf:
             )
             summary = log_result_csv(test_type, rw_mode, result, CSV_FILE)
             assert summary["IOPS"] > 0
-        results = load_results_from_csv(CSV_FILE)
         key = (test_type, rw_mode)
         if prev_results and key in prev_results:
+            results = load_results_from_csv(CSV_FILE)
             assert_performance_not_degraded(results[key], prev_results[key])

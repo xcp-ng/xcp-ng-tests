@@ -72,12 +72,12 @@ def running_unix_vm_and_vbd(host, vdi_on_local_sr, running_unix_vm_with_fio):
 
 @pytest.fixture(scope="module")
 def vm_with_vbd(running_unix_vm_and_vbd):
-    vm, _vbd = running_unix_vm_and_vbd
+    vm, _ = running_unix_vm_and_vbd
     return vm
 
 @pytest.fixture(scope="module")
 def plugged_vbd(running_unix_vm_and_vbd):
-    _vm, vbd = running_unix_vm_and_vbd
+    _, vbd = running_unix_vm_and_vbd
     return vbd
 
 @pytest.fixture(scope="module")
