@@ -2,12 +2,12 @@ import itertools
 import os
 import json
 import statistics
-import subprocess
 import pytest
 import logging
 from datetime import datetime
 
-from helpers import load_results_from_csv, log_result_csv, mean
+from lib.commands import SSHCommandFailed
+from .helpers import load_results_from_csv, log_result_csv, mean
 
 ### Tests default settings ###
 
@@ -32,25 +32,21 @@ modes = (
         "randwrite"
 )
 
-test_types = {
-    "read": "seq_read",
-    "randread": "rand_read",
-    "write": "seq_write",
-    "randwrite": "rand_write"
-}
-
 ### End of tests parameters ###
 
 def run_fio(
+        vm,
         test_name,
         rw_mode,
         temp_dir,
+        local_temp_dir,
         bs=DEFAULT_BS,
         iodepth=DEFAULT_IODEPTH,
         size=DEFAULT_SIZE,
         file_path="",
 ):
     json_output_path = os.path.join(temp_dir, f"{test_name}.json")
+    local_json_path = os.path.join(local_temp_dir, f"{test_name}.json")
     if not file_path:
         file_path = os.path.join(temp_dir, DEFAULT_FILE)
     fio_cmd = [
@@ -69,12 +65,14 @@ def run_fio(
         "--output-format=json",
         f"--output={json_output_path}"
     ]
-
-    result = subprocess.run(fio_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"fio failed for {test_name}:\n{result.stderr}")
-
-    with open(json_output_path) as f:
+    logging.debug(f"Running {fio_cmd}")
+    try:
+        vm.ssh(fio_cmd, check=True)
+    except SSHCommandFailed as e:
+        raise RuntimeError(f"fio failed for {test_name}:{e}")
+    vm.scp(json_output_path, local_json_path, local_dest=True)
+    logging.debug(f"Stored json at {local_json_path}")
+    with open(local_json_path) as f:
         return json.load(f)
 
 def assert_performance_not_degraded(current, previous, threshold=10):
@@ -107,14 +105,36 @@ class TestDiskPerf:
     def test_disk_benchmark(
             self,
             temp_dir,
+            local_temp_dir,
             prev_results,
             block_size,
             file_size,
-            rw_mode
+            rw_mode,
+            vm_with_vbd,
+            plugged_vbd,
+            image_format
     ):
-        test_type = test_types[rw_mode]
+        vm = vm_with_vbd
+        vbd = plugged_vbd
+        device = f"/dev/{vbd.param_get(param_name="device")}"
+        test_type = "{}-{}-{}-{}".format(
+            block_size,
+            file_size,
+            rw_mode,
+            image_format
+        )
+
         for i in range(DEFAULT_SAMPLES_NUM):
-            result = run_fio(test_type, rw_mode, temp_dir)
+            result = run_fio(
+                vm,
+                test_type,
+                rw_mode,
+                temp_dir,
+                local_temp_dir,
+                file_path=device,
+                bs=block_size,
+                size=file_size
+            )
             summary = log_result_csv(test_type, rw_mode, result, CSV_FILE)
             assert summary["IOPS"] > 0
         results = load_results_from_csv(CSV_FILE)
