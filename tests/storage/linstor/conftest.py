@@ -77,15 +77,6 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
 
     yield pool
 
-    # Need to remove this package as we have separate run of `test_create_sr_without_linstor`
-    # for `thin` and `thick` `provisioning_type`.
-    def remove_linstor(host):
-        logging.info(f"Cleaning up python-linstor from host {host}...")
-        host.yum_remove(["python-linstor"])
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(remove_linstor, pool.hosts)
-
 @pytest.fixture(scope='package')
 def linstor_sr(pool_with_linstor, provisioning_type, storage_pool_name):
     sr = pool_with_linstor.master.sr_create('linstor', 'LINSTOR-SR-test', {
