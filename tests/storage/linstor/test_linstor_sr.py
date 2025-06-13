@@ -18,10 +18,9 @@ class TestLinstorSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_without_linstor(self, host, lvm_disks, provisioning_type, storage_pool_name):
+    def test_create_sr_without_linstor(self, host_without_linstor, lvm_disks, provisioning_type, storage_pool_name):
         # This test must be the first in the series in this module
-        assert not host.is_package_installed('python-linstor'), \
-            "linstor must not be installed on the host at the beginning of the tests"
+        host = host_without_linstor
         with pytest.raises(SSHCommandFailed):
             sr = host.sr_create('linstor', 'LINSTOR-SR-test', {
                 'group-name': storage_pool_name,

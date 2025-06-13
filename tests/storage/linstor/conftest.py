@@ -99,3 +99,9 @@ def vm_on_linstor_sr(host, linstor_sr, vm_ref):
     yield vm
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def host_without_linstor(host):
+    # FIXME: is that really the package to test?
+    assert not host.is_package_installed('python-linstor'), \
+        "linstor must not be installed on the host at the beginning of the tests"
