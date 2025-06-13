@@ -54,6 +54,6 @@ class TestXenClean:
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
             return
-        logging.info(f"XenClean with other tools")
+        logging.info("XenClean with other tools")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()

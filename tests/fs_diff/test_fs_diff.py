@@ -10,7 +10,7 @@ pytest.fixture(scope='module')
 def test_fs_diff(hosts):
     assert len(hosts) == 2, "This test requires exactly 2 hosts"
 
-    assert (hosts[0].xcp_version == hosts[1].xcp_version), f"Host versions must be the same"
+    assert (hosts[0].xcp_version == hosts[1].xcp_version), "Host versions must be the same"
 
     fsdiff = os.path.realpath(f"{os.path.dirname(__file__)}/../../scripts/xcpng-fs-diff.py")
 
