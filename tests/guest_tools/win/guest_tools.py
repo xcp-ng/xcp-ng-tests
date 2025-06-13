@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from lib.common import wait_for
 from lib.vm import VM
+
 from . import (
     WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
@@ -11,7 +12,6 @@ from . import (
     insert_cd_safe,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
-
 
 ERROR_SUCCESS = 0
 ERROR_INSTALL_FAILURE = 1603

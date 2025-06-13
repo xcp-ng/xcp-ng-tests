@@ -7,13 +7,14 @@ import sys
 import time
 import traceback
 from enum import Enum
-from typing import Dict, Literal, Optional, overload, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Union, overload
 from uuid import UUID
 
 import pytest
 import requests
 
 import lib.commands as commands
+
 if TYPE_CHECKING:
     import lib.host
 
@@ -24,7 +25,7 @@ class PackageManagerEnum(Enum):
 
 # Common VM images used in tests
 def vm_image(vm_key):
-    from data import VM_IMAGES, DEF_VM_URL
+    from data import DEF_VM_URL, VM_IMAGES
     url = VM_IMAGES[vm_key]
     if not url.startswith('http'):
         url = DEF_VM_URL + url

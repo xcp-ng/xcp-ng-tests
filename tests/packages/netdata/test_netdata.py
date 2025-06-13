@@ -1,5 +1,6 @@
-import pytest
 import subprocess
+
+import pytest
 
 from lib.netutil import wrap_ip
 
