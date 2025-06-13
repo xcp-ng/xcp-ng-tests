@@ -1,5 +1,7 @@
 import logging
+
 import pytest
+
 
 @pytest.fixture(scope='package')
 def host_with_xfsprogs(host):

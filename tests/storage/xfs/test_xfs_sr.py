@@ -1,9 +1,10 @@
 import logging
 import time
+
 import pytest
 
 from lib.commands import SSHCommandFailed
-from lib.common import wait_for, vm_image
+from lib.common import vm_image, wait_for
 from tests.storage import vdi_is_open
 
 # Requirements:

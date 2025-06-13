@@ -1,7 +1,9 @@
 import logging
+
 import pytest
 
 from lib.common import exec_nofail, raise_errors
+
 
 @pytest.fixture(scope='module')
 def vdis(host, local_sr_on_hostA1):

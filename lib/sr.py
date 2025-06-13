@@ -2,9 +2,9 @@ import logging
 import time
 
 import lib.commands as commands
-
 from lib.common import prefix_object_name, safe_split, strtobool, wait_for, wait_for_not
 from lib.vdi import VDI
+
 
 class SR:
     def __init__(self, uuid, pool):

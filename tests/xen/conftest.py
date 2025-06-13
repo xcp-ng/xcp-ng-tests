@@ -1,10 +1,11 @@
 import logging
-import pytest
 
+import pytest
 from packaging import version
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state
+
 
 @pytest.fixture(scope="package")
 def host_with_hvm_fep(host):

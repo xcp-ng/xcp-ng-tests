@@ -1,8 +1,10 @@
 import logging
+
 import pytest
 
 from lib.common import wait_for_not
 from lib.vm import VM
+
 
 @pytest.mark.multi_vms
 class Test:

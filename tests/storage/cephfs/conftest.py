@@ -1,11 +1,13 @@
 import logging
+
 import pytest
 
-from lib.common import exec_nofail, raise_errors
 from lib import config
+from lib.common import exec_nofail, raise_errors
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
+
 
 @pytest.fixture(scope='package')
 def pool_without_ceph(host):

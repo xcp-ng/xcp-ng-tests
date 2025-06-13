@@ -1,6 +1,5 @@
-import lib.commands as commands
-
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+
 
 class VIF:
     xe_prefix = "vif"

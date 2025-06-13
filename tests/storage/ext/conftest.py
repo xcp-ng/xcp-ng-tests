@@ -1,5 +1,7 @@
 import logging
+
 import pytest
+
 
 @pytest.fixture(scope='package')
 def ext_sr(host, sr_disk):

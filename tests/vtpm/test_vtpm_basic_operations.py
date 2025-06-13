@@ -1,5 +1,7 @@
 import logging
+
 import pytest
+
 import lib.commands as commands
 
 # These tests are basic tests for vTPM devices.

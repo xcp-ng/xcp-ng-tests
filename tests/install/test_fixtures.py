@@ -1,7 +1,9 @@
 import logging
+
 import pytest
 
 from lib.installer import AnswerFile
+
 
 # test the answerfile fixture can run on 2 parametrized instances
 # of the test in one run

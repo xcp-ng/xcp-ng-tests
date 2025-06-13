@@ -1,6 +1,7 @@
-import pytest
-import os
 import logging
+import os
+
+import pytest
 
 from .conftest import DIRECTORIES_PATH
 
