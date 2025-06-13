@@ -3,7 +3,7 @@ import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
-from lib.efi import EFIAuth, EFI_AT_ATTRS_BYTES, get_md5sum_from_auth, get_secure_boot_guid
+from lib.efi import EFI_AT_ATTRS_BYTES, EFIAuth, get_md5sum_from_auth, get_secure_boot_guid
 
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 

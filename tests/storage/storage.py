@@ -2,6 +2,7 @@ from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
 from lib.sr import SR
 
+
 def try_to_create_sr_with_missing_device(sr_type, label, host):
     try:
         sr = host.sr_create(sr_type, label, {}, verify=True)

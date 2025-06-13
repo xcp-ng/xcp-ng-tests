@@ -1,5 +1,7 @@
 import logging
+
 import pytest
+
 
 @pytest.fixture(scope='package')
 def lvm_sr(host, sr_disk):

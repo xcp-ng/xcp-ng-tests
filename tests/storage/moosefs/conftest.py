@@ -1,10 +1,12 @@
 import logging
+
 import pytest
 
 from lib import config
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
+
 
 def install_moosefs(host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \

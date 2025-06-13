@@ -1,7 +1,8 @@
 import logging
-import pytest
 
+import pytest
 from packaging import version
+
 
 @pytest.fixture(scope='module')
 def pool_without_uefi_certs(host):

@@ -1,5 +1,6 @@
 import socket
 
+
 def is_ipv6(ip):
     try:
         socket.inet_pton(socket.AF_INET6, ip)

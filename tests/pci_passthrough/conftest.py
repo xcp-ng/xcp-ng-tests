@@ -1,7 +1,9 @@
 import logging
+
 import pytest
 
 from lib.common import safe_split
+
 
 @pytest.fixture(scope="session")
 def enabled_pgpu_uuid(host):

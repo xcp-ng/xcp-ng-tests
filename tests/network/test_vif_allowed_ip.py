@@ -1,5 +1,6 @@
 import ipaddress
 import os
+
 import pytest
 
 # Requirements:

@@ -2,6 +2,7 @@ import logging
 
 from lib.basevm import BaseVM
 
+
 class Snapshot(BaseVM):
     def _disk_list(self):
         return self.host.xe('snapshot-disk-list', {'uuid': self.uuid, 'vbd-params': ''},

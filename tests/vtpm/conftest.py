@@ -1,7 +1,9 @@
-import pytest
 import logging
 
+import pytest
+
 from lib.common import PackageManagerEnum
+
 
 @pytest.fixture(scope='module')
 def halted_uefi_unix_vm(uefi_vm, unix_vm):

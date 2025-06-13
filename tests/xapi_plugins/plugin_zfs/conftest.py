@@ -3,6 +3,7 @@ import pytest
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 
+
 @pytest.fixture(scope='package')
 def host_without_zfs(host):
     assert not host.file_exists('/usr/sbin/zpool'), \

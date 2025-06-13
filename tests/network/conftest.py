@@ -1,5 +1,6 @@
 import pytest
 
+
 @pytest.fixture(scope='package')
 def host_no_sdn_controller(host):
     """ An XCP-ng with no SDN controller. """

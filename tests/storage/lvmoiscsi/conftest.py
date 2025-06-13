@@ -1,7 +1,9 @@
 import logging
+
 import pytest
 
 from lib import config
+
 
 @pytest.fixture(scope='package')
 def lvmoiscsi_device_config():

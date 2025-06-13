@@ -1,13 +1,14 @@
 import logging
-
-from typing import Any, Literal, Optional, overload, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, Optional, overload
 
 import lib.commands as commands
+
 if TYPE_CHECKING:
     import lib.host
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
+
 
 class BaseVM:
     """ Base class for VM and Snapshot. """

@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from lib.common import strtobool, wait_for
 from lib.vm import VM
+
 from . import WINDOWS_SHUTDOWN_COMMAND, enable_testsign, insert_cd_safe, wait_for_vm_running_and_ssh_up_without_tools
 
 

@@ -3,6 +3,7 @@
 # - host(A1): any xcp-ng host
 import re
 
+
 def perf_probe(host, probe):
     host.ssh(['perf', 'probe', '--add', probe])
     host.ssh(['perf', 'record', '-e', 'probe:' + probe, '-o', '~/perf.data', '-aR', '--', 'sleep', '10'])

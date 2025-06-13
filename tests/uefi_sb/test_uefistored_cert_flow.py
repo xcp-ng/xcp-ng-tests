@@ -1,5 +1,6 @@
 import hashlib
 import logging
+
 import pytest
 
 from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, revert_vm_state
