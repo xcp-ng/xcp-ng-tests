@@ -10,7 +10,6 @@ from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_no
 from lib.host import Host
 from lib.sr import SR
 
-
 class Pool:
     xe_prefix = "pool"
 

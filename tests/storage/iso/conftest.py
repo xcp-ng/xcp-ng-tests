@@ -1,6 +1,7 @@
-import pytest
-import time
 import os
+import time
+
+import pytest
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import formatted_and_mounted_ext4_disk

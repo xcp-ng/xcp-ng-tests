@@ -1,10 +1,12 @@
 import logging
+
 import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
+
 # The pool needs a shared SR to use `host.evacuate`. All three fixtures below are needed.
-from tests.storage.nfs.conftest import vm_on_nfs_sr, nfs_sr, nfs_device_config
+from tests.storage.nfs.conftest import nfs_device_config, nfs_sr, vm_on_nfs_sr
 
 # Requirements:
 # From --hosts parameter:

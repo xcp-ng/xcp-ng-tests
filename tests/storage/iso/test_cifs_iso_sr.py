@@ -1,7 +1,9 @@
-import pytest
 import logging
 import os
-from .conftest import copy_tools_iso_to_iso_sr, check_iso_mount_and_read_from_vm, remove_iso_from_sr
+
+import pytest
+
+from .conftest import check_iso_mount_and_read_from_vm, copy_tools_iso_to_iso_sr, remove_iso_from_sr
 
 # Requirements:
 # From --hosts parameter:

@@ -2,7 +2,6 @@ import json
 import subprocess
 from typing import Any, Dict, Literal, Union, overload
 
-
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[True] = True,
            use_json: Literal[False] = False) -> str:

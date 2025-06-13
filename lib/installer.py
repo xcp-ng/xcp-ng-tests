@@ -2,7 +2,7 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 
-from lib.commands import ssh, SSHCommandFailed
+from lib.commands import SSHCommandFailed, ssh
 from lib.common import wait_for
 
 class AnswerFile:

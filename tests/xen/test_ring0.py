@@ -1,8 +1,9 @@
 import logging
-import pytest
 import secrets
 import time
 from typing import Generator, Optional
+
+import pytest
 
 from lib.host import Host
 from lib.vm import VM

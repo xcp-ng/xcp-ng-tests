@@ -1,4 +1,5 @@
 import logging
+
 import pytest
 
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk

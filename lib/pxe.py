@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from lib.commands import ssh, scp
 from data import ARP_SERVER, PXE_CONFIG_SERVER
+from lib.commands import scp, ssh
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
 

@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, Tuple
+
 import pytest
 
 from data import OTHER_GUEST_TOOLS, OTHER_GUEST_TOOLS_ISO, WIN_GUEST_TOOLS_ISOS
@@ -8,6 +9,7 @@ from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vm import VM
+
 from . import (
     WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
@@ -17,7 +19,6 @@ from . import (
 )
 from .guest_tools import install_guest_tools
 from .other_tools import install_other_drivers
-
 
 @pytest.fixture(scope="module")
 def running_windows_vm_without_tools(imported_vm: VM) -> VM:

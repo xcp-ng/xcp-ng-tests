@@ -1,6 +1,6 @@
 import logging
-import pytest
 
+import pytest
 from packaging import version
 
 @pytest.fixture(scope='module')

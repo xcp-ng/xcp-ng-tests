@@ -1,7 +1,8 @@
 import logging
 import os
-import pytest
 import tempfile
+
+import pytest
 
 from lib.common import exec_nofail, raise_errors
 

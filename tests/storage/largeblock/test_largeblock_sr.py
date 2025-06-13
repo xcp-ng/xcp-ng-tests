@@ -1,5 +1,6 @@
 import pytest
-from lib.common import wait_for, vm_image
+
+from lib.common import vm_image, wait_for
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 # Requirements:

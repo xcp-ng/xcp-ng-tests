@@ -1,4 +1,5 @@
 import logging
+
 import pytest
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)

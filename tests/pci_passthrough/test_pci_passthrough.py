@@ -1,5 +1,6 @@
-import pytest
 import logging
+
+import pytest
 
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.3 with a PGPU to hide from dom0

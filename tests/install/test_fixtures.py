@@ -1,4 +1,5 @@
 import logging
+
 import pytest
 
 from lib.installer import AnswerFile

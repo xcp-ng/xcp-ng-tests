@@ -1,6 +1,7 @@
 import os
-import pytest
 import subprocess
+
+import pytest
 
 # Requirements:
 # - 2 XCP-ng host of same version

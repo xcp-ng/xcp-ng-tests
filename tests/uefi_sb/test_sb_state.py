@@ -1,4 +1,5 @@
 import logging
+
 import pytest
 
 from .utils import generate_keys, revert_vm_state

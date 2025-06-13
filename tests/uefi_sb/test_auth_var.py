@@ -2,10 +2,10 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.efi import (
+    EFI_AT_ATTRS_BYTES,
     Certificate,
     EFIAuth,
     global_variable_guid,
-    EFI_AT_ATTRS_BYTES,
 )
 
 # Requirements:

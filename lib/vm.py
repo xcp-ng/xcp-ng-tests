@@ -4,14 +4,21 @@ import logging
 import os
 import subprocess
 import tempfile
-from typing import Dict, List, Literal, Optional, overload, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
 
 import lib.commands as commands
 import lib.efi as efi
-
 from lib.basevm import BaseVM
-from lib.common import PackageManagerEnum, parse_xe_dict, safe_split, strtobool, wait_for, wait_for_not
-from lib.common import shortened_nodeid, expand_scope_relative_nodeid
+from lib.common import (
+    PackageManagerEnum,
+    expand_scope_relative_nodeid,
+    parse_xe_dict,
+    safe_split,
+    shortened_nodeid,
+    strtobool,
+    wait_for,
+    wait_for_not,
+)
 from lib.snapshot import Snapshot
 from lib.vbd import VBD
 from lib.vif import VIF
