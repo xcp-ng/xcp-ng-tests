@@ -20,6 +20,7 @@ class TestLinstorSRCreateDestroy:
 
     def test_create_sr_without_linstor(self, host_without_linstor, lvm_disks, provisioning_type, storage_pool_name):
         # This test must be the first in the series in this module
+        # FIXME: why would it be?
         host = host_without_linstor
         with pytest.raises(SSHCommandFailed):
             sr = host.sr_create('linstor', 'LINSTOR-SR-test', {

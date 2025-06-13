@@ -43,16 +43,29 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
 
 @pytest.fixture(scope="package")
 def storage_pool_name(provisioning_type):
+    # FIXME: this needs an explanation
     return GROUP_NAME if provisioning_type == "thick" else STORAGE_POOL_NAME
 
+# FIXME why having this feature of session scope?  Shouldn't it make
+# it impossible to run both thin and thick tests in the same session?
 @pytest.fixture(params=["thin"], scope="session")
 def provisioning_type(request):
     return request.param
 
+# FIXME: this feature has scope "package" but even test_linsor_sr file
+# includes tests that need *not* to have linstor installed.  Currently
+# pool_with_saved_yum_state's setup is being run for both thin and
+# thick, but with a single teardown at the end (which is even not what
+# --setup-plan claims it will do)?  Is there even a way to make this
+# work, with pool_with_saved_yum_state being of scope package anyway?
+# Possibly by grouping packages with identical package reqs into
+# searate sub-packages?
 @pytest.fixture(scope='package')
 def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
     import concurrent.futures
     pool = pool_with_saved_yum_state
+
+    # FIXME must check we have at least 3 hosts - hostA3 or a simple check here?
 
     def check_linstor_installed(host):
         if host.is_package_installed(LINSTOR_PACKAGE):
@@ -69,6 +82,7 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
         host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
         # Needed because the linstor driver is not in the xapi sm-plugins list
         # before installing the LINSTOR packages.
+        # FIXME: why multipathd?
         host.ssh(["systemctl", "restart", "multipathd"])
         host.restart_toolstack(verify=True)
 
