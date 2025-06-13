@@ -22,19 +22,16 @@ class TestLinstorSRCreateDestroy:
         # This test must be the first in the series in this module
         assert not host.is_package_installed('python-linstor'), \
             "linstor must not be installed on the host at the beginning of the tests"
-        try:
+        with pytest.raises(SSHCommandFailed):
             sr = host.sr_create('linstor', 'LINSTOR-SR-test', {
                 'group-name': storage_pool_name,
                 'redundancy': '1',
                 'provisioning': provisioning_type
             }, shared=True)
-            try:
+            # if exception was not raised, cleanup
+            # FIXME: ignoring all exceptions looks like a problem here?
+            with contextlib.suppress(Exception):
                 sr.destroy()
-            except Exception:
-                pass
-            assert False, "SR creation should not have succeeded!"
-        except SSHCommandFailed as e:
-            logging.info("SR creation failed, as expected: {}".format(e))
 
     def test_create_and_destroy_sr(self, pool_with_linstor, provisioning_type, storage_pool_name):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
