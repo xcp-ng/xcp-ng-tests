@@ -55,7 +55,7 @@ def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
     vdi.destroy()
 
 @pytest.fixture(scope="module")
-def running_unix_vm_and_vbd(host, vdi_on_local_sr, running_unix_vm_with_fio):
+def plugged_vbd(vdi_on_local_sr, running_unix_vm_with_fio):
     vm = running_unix_vm_with_fio
     vdi = vdi_on_local_sr
     vbd = vm.create_vbd("autodetect", vdi.uuid)
@@ -63,7 +63,7 @@ def running_unix_vm_and_vbd(host, vdi_on_local_sr, running_unix_vm_with_fio):
     logging.info(f">> Plugging VDI {vdi.uuid} on VM {vm.uuid}")
     vbd.plug()
 
-    yield vm, vbd
+    yield vbd
 
     # teardown
     logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {vm.uuid}")
@@ -71,23 +71,13 @@ def running_unix_vm_and_vbd(host, vdi_on_local_sr, running_unix_vm_with_fio):
     vbd.destroy()
 
 @pytest.fixture(scope="module")
-def vm_with_vbd(running_unix_vm_and_vbd):
-    vm, _ = running_unix_vm_and_vbd
-    return vm
-
-@pytest.fixture(scope="module")
-def plugged_vbd(running_unix_vm_and_vbd):
-    _, vbd = running_unix_vm_and_vbd
-    return vbd
-
-@pytest.fixture(scope="module")
 def local_temp_dir():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
 @pytest.fixture(scope="module")
-def temp_dir(vm_with_vbd):
-    vm = vm_with_vbd
+def temp_dir(running_unix_vm_with_fio):
+    vm = running_unix_vm_with_fio
     tempdir = vm.ssh("mktemp -d")
 
     yield tempdir

@@ -113,11 +113,11 @@ class TestDiskPerf:
             block_size,
             file_size,
             rw_mode,
-            vm_with_vbd,
+            running_unix_vm_with_fio,
             plugged_vbd,
             image_format
     ):
-        vm = vm_with_vbd
+        vm = running_unix_vm_with_fio
         vbd = plugged_vbd
         device = f"/dev/{vbd.param_get(param_name="device")}"
         test_type = "{}-{}-{}-{}".format(
