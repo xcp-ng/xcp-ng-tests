@@ -105,7 +105,7 @@ def _fallback_gluster_teardown(host):
         try:
             # Volume might already be stopped if failure happened on delete
             h.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
-        except Exception as e:
+        except Exception:
             pass
 
         h.ssh(['gluster', '--mode=script', 'volume', 'delete', 'vol0'])
