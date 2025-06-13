@@ -1,3 +1,4 @@
+import contextlib
 import logging
 
 import pytest
@@ -102,11 +103,9 @@ def _fallback_gluster_teardown(host):
             if h.hostname_or_ip != h2.hostname_or_ip:
                 h.ssh(['gluster', '--mode=script', 'peer', 'detach', h2.hostname_or_ip])
 
-        try:
+        with contextlib.suppress(Exception):
             # Volume might already be stopped if failure happened on delete
             h.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
-        except Exception:
-            pass
 
         h.ssh(['gluster', '--mode=script', 'volume', 'delete', 'vol0'])
 

@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import time
 
@@ -30,10 +31,8 @@ class TestLinstorSRCreateDestroy:
                 'redundancy': '1',
                 'provisioning': provisioning_type
             }, shared=True)
-            try:
+            with contextlib.suppress(Exception):
                 sr.destroy()
-            except Exception:
-                pass
             assert False, "SR creation should not have succeeded!"
         except SSHCommandFailed as e:
             logging.info("SR creation failed, as expected: {}".format(e))
