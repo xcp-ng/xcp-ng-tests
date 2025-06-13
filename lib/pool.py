@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import traceback
@@ -65,10 +66,8 @@ class Pool:
 
                     logging.info("Attempting to run the rollback function on host(s) "
                                  f"{', '.join([str(h) for h in rollback_hosts])}...")
-                    try:
+                    with contextlib.suppress(Exception):
                         self.exec_on_hosts_on_error_continue(rollback_func, rollback_hosts)
-                    except Exception:
-                        pass
                 raise e
 
     def exec_on_hosts_on_error_continue(self, func, host_list=[]):
