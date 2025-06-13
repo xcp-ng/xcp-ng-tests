@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-import subprocess
 import tempfile
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
 
 import lib.commands as commands
 import lib.efi as efi
