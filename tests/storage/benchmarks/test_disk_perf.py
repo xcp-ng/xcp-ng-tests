@@ -11,7 +11,7 @@ from .helpers import load_results_from_csv, log_result_csv, mean
 
 # Tests default settings #
 
-CSV_FILE = f"/tmp/results_{datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}.csv"
+CSV_FILE = f"/tmp/results_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}.csv"
 
 DEFAULT_SAMPLES_NUM = 10
 DEFAULT_SIZE = "1G"
@@ -116,7 +116,7 @@ class TestDiskPerf:
     ):
         vm = running_unix_vm_with_fio
         vbd = plugged_vbd
-        device = f"/dev/{vbd.param_get(param_name="device")}"
+        device = f"/dev/{vbd.param_get(param_name='device')}"
         test_type = "{}-{}-{}-{}".format(
             block_size,
             file_size,
