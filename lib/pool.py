@@ -1,7 +1,7 @@
 import logging
 import os
 import traceback
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 from packaging import version
 

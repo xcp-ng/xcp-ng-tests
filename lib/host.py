@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import shlex
-import subprocess
 import tempfile
 import uuid
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
