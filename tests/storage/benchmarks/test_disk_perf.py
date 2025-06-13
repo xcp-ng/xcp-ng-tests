@@ -9,7 +9,7 @@ from datetime import datetime
 from lib.commands import SSHCommandFailed
 from .helpers import load_results_from_csv, log_result_csv, mean
 
-### Tests default settings ###
+# Tests default settings #
 
 CSV_FILE = f"/tmp/results_{datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}.csv"
 
@@ -20,21 +20,21 @@ DEFAULT_IODEPTH = 1
 DEFAULT_NUMJOBS = 1
 DEFAULT_FILE = "fio-testfile"
 
-### Tests parameters
+# Tests parameters #
 
 system_memory = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
 
 block_sizes = ("4k", "16k", "64k", "1M")
-file_sizes = ("1G", "4G", f"{int((system_memory//(1024.**3))*2)}G")
+file_sizes = ("1G", "4G", f"{int((system_memory // (1024.**3)) * 2)}G")
 
 modes = (
-        "read",
-        "randread",
-        "write",
-        "randwrite"
+    "read",
+    "randread",
+    "write",
+    "randwrite"
 )
 
-### End of tests parameters ###
+# End of tests parameters #
 
 def run_fio(
         vm,
@@ -87,7 +87,7 @@ def assert_performance_not_degraded(current, previous, threshold=10):
         except statistics.StatisticsError:
             logging.info(f"Missing metric ({metric}), skipping comparison")
             continue
-        diff = (curr-prev if metric == "latency" else prev-curr) / (prev * 100)
+        diff = (curr - prev if metric == "latency" else prev - curr) / (prev * 100)
         assert diff <= threshold, \
             f"{metric} changed by {diff:.2f}% (allowed {threshold}%)"
         diffs[metric] = diff
@@ -96,9 +96,6 @@ def assert_performance_not_degraded(current, previous, threshold=10):
     for k, v in diffs.items():
         sign = "+" if v < 0 else "-"
         logging.info(f"- {k}: {sign}{abs(v):.2f}%")
-
-
-class TestDiskPerfDestroy: ...
 
 
 class TestDiskPerf:

@@ -6,7 +6,7 @@ import logging
 from lib.commands import SSHCommandFailed
 from .helpers import load_results_from_csv
 
-MAX_LENGTH = 64*(1024**3) # 64GiB
+MAX_LENGTH = 64 * (1024**3) # 64GiB
 
 # use vhd, qcow2, raw... when image_format support will be available
 @pytest.fixture(scope="module", params=['vdi'])
@@ -30,7 +30,8 @@ def running_unix_vm_with_fio(running_unix_vm):
             vm.ssh(install_cmd, check=True)
             remove_cmd = remove
             break
-        except SSHCommandFailed: ...
+        except SSHCommandFailed:
+            ...
     else:
         raise RuntimeError("Unsupported package manager: could not install fio")
 
