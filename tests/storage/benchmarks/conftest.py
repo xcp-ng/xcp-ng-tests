@@ -1,17 +1,24 @@
-import pytest
-import tempfile
-import os
 import logging
+import os
+import tempfile
+import urllib.request
+from urllib.parse import urlparse
+from uuid import uuid4
+
+import pytest
 
 from lib.commands import SSHCommandFailed
+
 from .helpers import load_results_from_csv
 
-MAX_LENGTH = 64 * (1024**3) # 64GiB
+MAX_LENGTH = 64 * (1024**3)  # 64GiB
+
 
 # use vhd, qcow2, raw... when image_format support will be available
-@pytest.fixture(scope="module", params=['vdi'])
+@pytest.fixture(scope="module", params=["vdi"])
 def image_format(request):
     return request.param
+
 
 @pytest.fixture(scope="module")
 def running_unix_vm_with_fio(running_unix_vm):
@@ -20,7 +27,7 @@ def running_unix_vm_with_fio(running_unix_vm):
         ("command -v apt", "apt update && apt install -y fio", "apt remove -y fio"),
         ("command -v dnf", "dnf install -y fio", "dnf remove -y fio"),
         ("command -v yum", "yum install -y fio", "yum remove -y fio"),
-        ("command -v apk", "apk add fio", "apk del fio")
+        ("command -v apk", "apk add fio", "apk del fio"),
     )
 
     for check_cmd, install_cmd, remove in install_cmds:
@@ -55,6 +62,7 @@ def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
     logging.info(f"<< Destroying VDI {vdi.uuid}")
     vdi.destroy()
 
+
 @pytest.fixture(scope="module")
 def plugged_vbd(vdi_on_local_sr, running_unix_vm_with_fio):
     vm = running_unix_vm_with_fio
@@ -71,10 +79,12 @@ def plugged_vbd(vdi_on_local_sr, running_unix_vm_with_fio):
     vbd.unplug()
     vbd.destroy()
 
+
 @pytest.fixture(scope="module")
 def local_temp_dir():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
+
 
 @pytest.fixture(scope="module")
 def temp_dir(running_unix_vm_with_fio):
@@ -92,13 +102,19 @@ def pytest_addoption(parser):
         "--prev-csv",
         action="store",
         default=None,
-        help="Path to previous CSV results file for comparison",
+        help="Path/URI to previous CSV results file for comparison",
     )
 
+
 @pytest.fixture(scope="session")
-def prev_results(request):
-    csv_path = request.config.getoption("--prev-csv")
-    results = {}
-    if csv_path and os.path.exists(csv_path):
-        load_results_from_csv(csv_path)
-    return results
+def prev_results(pytestconfig):
+    csv_uri = pytestconfig.getoption("--prev-csv")
+    if not csv_uri:
+        return {}
+    csv_path = csv_uri
+    if urlparse(csv_uri).scheme != "":
+        csv_path = f"{uuid4()}.csv"
+        urllib.request.urlretrieve(csv_uri, csv_path)
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(csv_path)
+    return load_results_from_csv(csv_path)

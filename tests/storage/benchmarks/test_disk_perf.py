@@ -1,12 +1,14 @@
 import itertools
-import os
 import json
-import statistics
-import pytest
 import logging
+import os
+import statistics
 from datetime import datetime
 
+import pytest
+
 from lib.commands import SSHCommandFailed
+
 from .helpers import load_results_from_csv, log_result_csv, mean
 
 # Tests default settings #
@@ -22,31 +24,27 @@ DEFAULT_FILE = "fio-testfile"
 
 # Tests parameters #
 
-system_memory = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+system_memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
 
 block_sizes = ("4k", "16k", "64k", "1M")
 file_sizes = ("1G", "4G", f"{int((system_memory // (1024.**3)) * 2)}G")
 
-modes = (
-    "read",
-    "randread",
-    "write",
-    "randwrite"
-)
+modes = ("read", "randread", "write", "randwrite")
 
 # End of tests parameters #
 
+
 def run_fio(
-        vm,
-        test_name,
-        rw_mode,
-        temp_dir,
-        local_temp_dir,
-        bs=DEFAULT_BS,
-        iodepth=DEFAULT_IODEPTH,
-        size=DEFAULT_SIZE,
-        numjobs=DEFAULT_NUMJOBS,
-        file_path="",
+    vm,
+    test_name,
+    rw_mode,
+    temp_dir,
+    local_temp_dir,
+    bs=DEFAULT_BS,
+    iodepth=DEFAULT_IODEPTH,
+    size=DEFAULT_SIZE,
+    numjobs=DEFAULT_NUMJOBS,
+    file_path="",
 ):
     json_output_path = os.path.join(temp_dir, f"{test_name}.json")
     local_json_path = os.path.join(local_temp_dir, f"{test_name}.json")
@@ -66,7 +64,7 @@ def run_fio(
         f"--numjobs={numjobs}",
         "--group_reporting",
         "--output-format=json",
-        f"--output={json_output_path}"
+        f"--output={json_output_path}",
     ]
     logging.debug(f"Running {fio_cmd}")
     try:
@@ -78,6 +76,7 @@ def run_fio(
     with open(local_json_path) as f:
         return json.load(f)
 
+
 def assert_performance_not_degraded(current, previous, threshold=10):
     diffs = {}
     for metric in ("bw_MBps", "IOPS", "latency"):
@@ -88,8 +87,9 @@ def assert_performance_not_degraded(current, previous, threshold=10):
             logging.info(f"Missing metric ({metric}), skipping comparison")
             continue
         diff = (curr - prev if metric == "latency" else prev - curr) / (prev * 100)
-        assert diff <= threshold, \
-            f"{metric} changed by {diff:.2f}% (allowed {threshold}%)"
+        assert (
+            diff <= threshold
+        ), f"{metric} changed by {diff:.2f}% (allowed {threshold}%)"
         diffs[metric] = diff
 
     logging.info("Performance difference summary:")
@@ -103,26 +103,21 @@ class TestDiskPerf:
 
     @pytest.mark.parametrize("block_size,file_size,rw_mode", test_cases)
     def test_disk_benchmark(
-            self,
-            temp_dir,
-            local_temp_dir,
-            prev_results,
-            block_size,
-            file_size,
-            rw_mode,
-            running_unix_vm_with_fio,
-            plugged_vbd,
-            image_format
+        self,
+        temp_dir,
+        local_temp_dir,
+        prev_results,
+        block_size,
+        file_size,
+        rw_mode,
+        running_unix_vm_with_fio,
+        plugged_vbd,
+        image_format,
     ):
         vm = running_unix_vm_with_fio
         vbd = plugged_vbd
         device = f"/dev/{vbd.param_get(param_name='device')}"
-        test_type = "{}-{}-{}-{}".format(
-            block_size,
-            file_size,
-            rw_mode,
-            image_format
-        )
+        test_type = "{}-{}-{}-{}".format(block_size, file_size, rw_mode, image_format)
 
         for i in range(DEFAULT_SAMPLES_NUM):
             result = run_fio(
@@ -133,7 +128,7 @@ class TestDiskPerf:
                 local_temp_dir,
                 file_path=device,
                 bs=block_size,
-                size=file_size
+                size=file_size,
             )
             summary = log_result_csv(test_type, rw_mode, result, CSV_FILE)
             assert summary["IOPS"] > 0

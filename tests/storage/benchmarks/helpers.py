@@ -1,6 +1,6 @@
+import csv
 import os
 import statistics
-import csv
 from datetime import datetime
 
 
@@ -43,6 +43,4 @@ def load_results_from_csv(csv_path):
 
 
 def mean(data, key):
-    return statistics.mean(
-        [float(x[key]) for x in data if key in x]
-    )
+    return statistics.mean([float(x[key]) for x in data if key in x])
