@@ -3,6 +3,8 @@ import os
 import statistics
 from datetime import datetime
 
+system_memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+
 
 def log_result_csv(test_type, rw_mode, result_json, csv_path):
     job = result_json["jobs"][0]
@@ -44,3 +46,7 @@ def load_results_from_csv(csv_path):
 
 def mean(data, key):
     return statistics.mean([float(x[key]) for x in data if key in x])
+
+
+def str_to_tuple(value, sep=","):
+    return tuple(item.strip() for item in value.split(sep))

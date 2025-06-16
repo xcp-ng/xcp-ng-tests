@@ -1,3 +1,4 @@
+import itertools
 import logging
 import os
 import tempfile
@@ -9,7 +10,7 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 
-from .helpers import load_results_from_csv
+from .helpers import load_results_from_csv, str_to_tuple
 
 MAX_LENGTH = 64 * (1024**3)  # 64GiB
 
@@ -98,12 +99,57 @@ def temp_dir(running_unix_vm_with_fio):
 
 
 def pytest_addoption(parser):
+    system_memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+
     parser.addoption(
         "--prev-csv",
         action="store",
         default=None,
         help="Path/URI to previous CSV results file for comparison",
     )
+    parser.addoption(
+        "--block-sizes",
+        action="store",
+        type=lambda value: str_to_tuple(value, sep=","),
+        default=("4k", "16k", "64k", "1M"),
+        help="Comma separated values of block sizes to test in disk benchmarks",
+    )
+    parser.addoption(
+        "--file-sizes",
+        action="store",
+        type=lambda value: str_to_tuple(value, sep=","),
+        default=("1G", "4G", f"{int((system_memory // (1024.**3)) * 2)}G"),
+        help="Comma separated values of file sizes to test in disk benchmarks",
+    )
+    parser.addoption(
+        "--modes",
+        action="store",
+        type=lambda value: str_to_tuple(value, sep=","),
+        default=("read", "randread", "write", "randwrite"),
+        help="Comma separated values of rw_modes to test in disk benchmarks",
+    )
+    parser.addoption(
+        "--numjobs",
+        action="store",
+        default=1,
+        help="Mapped to fio's --numjobs",
+    )
+    parser.addoption(
+        "--iodepth",
+        action="store",
+        default=1,
+        help="Mapped to fio's --iodepth",
+    )
+
+
+def pytest_generate_tests(metafunc):
+    if {"block_size", "file_size", "rw_mode"} <= set(metafunc.fixturenames):
+        block_sizes = metafunc.config.getoption("block_sizes")
+        file_sizes = metafunc.config.getoption("file_sizes")
+        modes = metafunc.config.getoption("modes")
+
+        test_cases = list(itertools.product(block_sizes, file_sizes, modes))
+        metafunc.parametrize("block_size,file_size,rw_mode", test_cases)
 
 
 @pytest.fixture(scope="session")
@@ -113,8 +159,10 @@ def prev_results(pytestconfig):
         return {}
     csv_path = csv_uri
     if urlparse(csv_uri).scheme != "":
-        csv_path = f"{uuid4()}.csv"
+        logging.info("Detected CSV path as an url")
+        csv_path = f"/tmp/{uuid4()}.csv"
         urllib.request.urlretrieve(csv_uri, csv_path)
+        logging.info(f"Fetching CSV file from {csv_uri} to {csv_path}")
     if not os.path.exists(csv_path):
         raise FileNotFoundError(csv_path)
     return load_results_from_csv(csv_path)

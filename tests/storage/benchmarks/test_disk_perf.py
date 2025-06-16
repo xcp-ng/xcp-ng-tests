@@ -1,4 +1,3 @@
-import itertools
 import json
 import logging
 import os
@@ -13,7 +12,7 @@ from .helpers import load_results_from_csv, log_result_csv, mean
 
 # Tests default settings #
 
-CSV_FILE = f"/tmp/results_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}.csv"
+CSV_FILE = f"/tmp/results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
 DEFAULT_SAMPLES_NUM = 10
 DEFAULT_SIZE = "1G"
@@ -21,17 +20,6 @@ DEFAULT_BS = "4k"
 DEFAULT_IODEPTH = 1
 DEFAULT_NUMJOBS = 1
 DEFAULT_FILE = "fio-testfile"
-
-# Tests parameters #
-
-system_memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
-
-block_sizes = ("4k", "16k", "64k", "1M")
-file_sizes = ("1G", "4G", f"{int((system_memory // (1024.**3)) * 2)}G")
-
-modes = ("read", "randread", "write", "randwrite")
-
-# End of tests parameters #
 
 
 def run_fio(
@@ -99,11 +87,11 @@ def assert_performance_not_degraded(current, previous, threshold=10):
 
 
 class TestDiskPerf:
-    test_cases = itertools.product(block_sizes, file_sizes, modes)
 
     @pytest.mark.parametrize("block_size,file_size,rw_mode", test_cases)
     def test_disk_benchmark(
         self,
+        pytestconfig,
         temp_dir,
         local_temp_dir,
         prev_results,
@@ -129,6 +117,8 @@ class TestDiskPerf:
                 file_path=device,
                 bs=block_size,
                 size=file_size,
+                iodepth=pytestconfig.getoption("iodepth"),
+                numjobs=pytestconfig.getoption("numjobs"),
             )
             summary = log_result_csv(test_type, rw_mode, result, CSV_FILE)
             assert summary["IOPS"] > 0
