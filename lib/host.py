@@ -201,13 +201,13 @@ class Host:
             script.write('#!/usr/bin/env ' + shebang + '\n')
             script.write(script_contents)
             script.flush()
-            self.scp(script.name, script.name)
+            self.scp(script.name, "/tmp/" + script.name.split('/')[-1])
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh([script.name], simple_output=simple_output)
+                return self.ssh(["/tmp/" + script.name.split('/')[-1]], simple_output=simple_output)
             finally:
-                self.ssh(['rm', '-f', script.name])
+                self.ssh(['rm', '-f', "/tmp/" + script.name.split('/')[-1]])
 
     def _get_xensource_inventory(self) -> Dict[str, str]:
         output = self.ssh(['cat', '/etc/xensource-inventory'])
