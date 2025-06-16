@@ -346,6 +346,8 @@ def main():
         '/etc/sysconfig/network-scripts/interface-rename-data/*',
         '/etc/sysconfig/xencommons',
         '/etc/sysctl.d/91-net-ipv6.conf',
+        '/etc/systemd/system/default.target.wants/test-pingpxe.service',
+        '/etc/systemd/system/test-pingpxe.service',
         '/etc/vconsole.conf',
         '/etc/xsconsole/state.txt',
         '/etc/xensource-inventory',
@@ -354,10 +356,12 @@ def main():
         '/etc/xensource/xapi-pool-tls.bak',
         '/etc/xensource/xapi-pool-tls.pem',
         '/etc/xensource/xapi-ssl.pem',
+        '/etc/xapi.d/plugins/__cache__/*.pyc',
         '/opt/xensource/gpg/trustdb.gpg',
         '/opt/xensource/sm/__pycache__/*.pyc',
         '/usr/lib64/xsconsole/__pycache__/*.pyc',
         '/usr/lib64/xsconsole/plugins-base/__pycache__/*.pyc',
+        '/usr/local/sbin/test-pingpxe.sh',
     ]
 
     parser = argparse.ArgumentParser(description='Spot filesystem differences between 2 XCP-ng hosts')
