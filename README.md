@@ -3,25 +3,43 @@
 Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
-* python >= 3.8
-* packages as listed in requirements/base.txt
-* extra test-specific requirements are documented in the test file
-  "Requirements" header
+
+This project encourages the use of [uv](https://github.com/astral-sh/uv) to deal with the dependencies.
+
+Extra test-specific requirements are documented in the test file "Requirements" header.
   * `netcat` is required on the machine running the tests.
 
-### Quick install (python requirements)
+### Quick install
 
-Install the python requirements using pip:
+Install `uv` with one of these commands
 
-```
-$ pip install -r requirements/base.txt
-```
+~~~sh
+pip install uv
+pipx install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+~~~
 
-Additionally, for dev dependencies (things like the linter / style checker):
+You have two options to run the tests:
 
-```
-$ pip install -r requirements/dev.txt
-```
+* with the `uv run` command
+
+You can use the dependencies managed by uv by prefixing the commands documented in the next chapters with `uv run`.
+For example, `uv run pytest`, `uv run ./jobs.py`, …
+When running the command with `uv run`, `uv` checks that your dependencies are up to date and updates them if required, before running your command. You're always sure to have the expected dependencies, even when switching branch!
+
+* by activating the virtual environment
+
+You need to run `uv sync` to install the dependencies managed by uv, and then activate the virtual environment with
+
+~~~sh
+source .venv/bin/activate
+~~~
+
+You can then run the commands directly in your shell: `pytest`, `./jobs.py`, …
+
+Note you have to explicitly run `uv sync` when the dependencies are modified in the project, as `uv` won't ensure that the dependencies are up to date when run this way.
+
+Running `deactivate` restores your shell configuration.
 
 ## Other requirements
 * XCP-ng hosts that you can ssh to using a SSH key, non-interactively
