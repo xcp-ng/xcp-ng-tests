@@ -1,5 +1,6 @@
-import pytest
 import logging
+
+import pytest
 
 from lib.common import PackageManagerEnum
 

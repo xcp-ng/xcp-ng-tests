@@ -1,17 +1,16 @@
 import logging
 import os
-import pytest
-import pytest_dependency        # type: ignore
 import tempfile
 import xml.etree.ElementTree as ET
 
+import pytest
+import pytest_dependency  # type: ignore
+
+from data import ARP_SERVER, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE, TEST_SSH_PUBKEY, TOOLS
 from lib import installer, pxe
+from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
-from lib.commands import local_cmd
-
-from data import (ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE,
-                  ARP_SERVER, TEST_SSH_PUBKEY, TOOLS)
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
@@ -29,7 +28,7 @@ def skip_package_source(version, package_source):
     if package_source == "net":
         # Net install is not valid if there is no netinstall URL
         # FIXME: ISO includes a default URL so we should be able to omit net-url
-        if 'net-url' not in ISO_IMAGES[version].keys():
+        if 'net-url' not in ISO_IMAGES[version]:
             return True, "net-url required for netinstall was not found for {}".format(version)
 
         return False, "do not skip"

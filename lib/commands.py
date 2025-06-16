@@ -2,12 +2,10 @@ import base64
 import logging
 import shlex
 import subprocess
-from typing import List, Literal, overload, Union
-
+from typing import List, Literal, Union, overload
 
 import lib.config as config
 from lib.netutil import wrap_ip
-
 
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
@@ -74,10 +72,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         opts.append('-o "LogLevel ERROR"')
         opts.append('-o "UserKnownHostsFile /dev/null"')
 
-    if isinstance(cmd, str):
-        command = cmd
-    else:
-        command = " ".join(cmd)
+    command = cmd if isinstance(cmd, str) else ' '.join(cmd)
 
     ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(opts)} {shlex.quote(command)}"
 

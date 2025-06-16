@@ -6,7 +6,6 @@ import logging
 import os
 import sys
 import tempfile
-import __main__
 from signal import SIGABRT, SIGINT, SIGQUIT, SIGTERM, signal
 from subprocess import run
 from typing import List
@@ -14,6 +13,8 @@ from typing import List
 import requests
 import yaml
 from bs4 import BeautifulSoup
+
+import __main__
 
 try:
     from yaml import CDumper as Dumper

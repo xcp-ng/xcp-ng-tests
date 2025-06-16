@@ -1,7 +1,9 @@
 import logging
-import pytest
 from uuid import uuid4
 
+import pytest
+
+from data import ISO_IMAGES, NETWORKS
 from lib import commands, installer, pxe
 from lib.common import safe_split, wait_for
 from lib.installer import AnswerFile
@@ -9,7 +11,6 @@ from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
 
-from data import ISO_IMAGES, NETWORKS
 assert "MGMT" in NETWORKS
 
 # Requirements:
@@ -144,11 +145,8 @@ class TestNested:
 
         # succession of insta/upg/rst operations
         split_mode = mode.split("-")
-        if is_restore:
-            # restore: back to previous installed version
-            expected_rel_id = split_mode[-3]
-        else:
-            expected_rel_id = split_mode[-1]
+        # if restore: back to previous installed version
+        expected_rel_id = split_mode[-3] if is_restore else split_mode[-1]
         expected_rel = {
             "83nightly": "8.3.0",
             "830net": "8.3.0",
