@@ -143,6 +143,19 @@ JOBS = {
         "markers": "quicktest and not sr_disk_4k",
         "name_filter": "not linstor and not zfsvol",
     },
+    "storage-benchmarks": {
+        "description": "runs disk benchmark tests",
+        "requirements": [
+            "A local SR on host A1"
+            "A small VM that can be imported on the SR",
+            "Enough storage space to store the largest test file (numjobs*memory*2)G"
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/storage"],
+    },
     "linstor-main": {
         "description": "tests the linstor storage driver, but avoids migrations and reboots",
         "requirements": [

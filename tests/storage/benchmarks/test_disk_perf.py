@@ -88,7 +88,7 @@ def assert_performance_not_degraded(current, previous, threshold=10):
 
 class TestDiskPerf:
 
-    @pytest.mark.parametrize("block_size,file_size,rw_mode", test_cases)
+    @pytest.mark.small_vm
     def test_disk_benchmark(
         self,
         pytestconfig,
