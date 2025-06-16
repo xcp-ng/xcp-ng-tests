@@ -8,7 +8,7 @@ from lib.common import wait_for, vm_image
 from tests.storage import vdi_is_open
 
 # Requirements:
-# - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
+# - one pool of 3 or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
 # - access to XCP-ng RPM repository from the host
 
 class TestLinstorSRCreateDestroy:
