@@ -121,7 +121,8 @@ def pytest_collection_modifyitems(items, config):
         'hostA2',
         'hostB1',
         'sr_disk',
-        'sr_disk_4k'
+        'sr_disk_4k',
+        'unused_512B_disks',
     ]
 
     for item in items:
@@ -339,6 +340,27 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
+def disks(hosts: list[Host]) -> Generator[dict[Host, list[Host.BlockDeviceInfo]], None, None]:
+    """Dict identifying names of all disks for on all hosts of first pool."""
+    ret = {host: host.disks()
+           for pool_master in hosts
+           for host in pool_master.pool.hosts
+           }
+    logging.debug("disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    yield ret
+
+@pytest.fixture(scope='session')
+def unused_512B_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
+                      ) -> Generator[dict[Host, list[Host.BlockDeviceInfo]]]:
+    """Dict identifying names of all 512-bytes-blocks disks for on all hosts of first pool."""
+    ret = {host: [disk for disk in host_disks
+                  if disk["log-sec"] == "512" and host.disk_is_available(disk["name"])]
+           for host, host_disks in disks.items()
+           }
+    logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    yield ret
+
+@pytest.fixture(scope='session')
 def sr_disk(pytestconfig, host: Host) -> Generator[DiskDevName]:
     """
     Disk DEVICE NAME available on FIRST POOL MASTER.
@@ -420,6 +442,14 @@ def sr_disk_for_all_hosts(pytestconfig, request, host):
             f"disk or block device {disk} was not found to be present and free on all hosts"
         logging.info(f">> Disk or block device {disk} is present and free on all pool members")
     yield candidates[0]
+
+@pytest.fixture(scope='session')
+def pool_with_unused_512B_disk(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Pool:
+    """Returns the first pool, ensuring all hosts have at least one unused 512-bytes-blocks disk."""
+    for h in host.pool.hosts:
+        assert h in unused_512B_disks
+        assert unused_512B_disks[h], f"host {h} does not have any unused 512B-block disk"
+    return host.pool
 
 @pytest.fixture(scope='session')
 def sr_disks_for_all_hosts(pytestconfig, request, host):
