@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import itertools
@@ -12,6 +14,7 @@ import lib.config as global_config
 from lib import pxe
 from lib.common import (
     callable_marker,
+    DiskDevName,
     is_uuid,
     prefix_object_name,
     setup_formatted_and_mounted_disk,
@@ -21,6 +24,7 @@ from lib.common import (
     wait_for,
 )
 from lib.netutil import is_ipv6
+from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
@@ -31,7 +35,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Dict
+from typing import Dict, Generator
 
 # Do we cache VMs?
 try:
@@ -157,7 +161,7 @@ def pytest_runtest_makereport(item, call):
 # fixtures
 
 @pytest.fixture(scope='session')
-def hosts(pytestconfig):
+def hosts(pytestconfig) -> Generator[list[Host]]:
     nested_list = []
 
     def setup_host(hostname_or_ip, *, config=None):
@@ -335,7 +339,7 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def sr_disk(pytestconfig, host):
+def sr_disk(pytestconfig, host: Host) -> Generator[DiskDevName]:
     """
     Disk DEVICE NAME available on FIRST POOL MASTER.
 
@@ -359,7 +363,7 @@ def sr_disk(pytestconfig, host):
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_4k(pytestconfig, host):
+def sr_disk_4k(pytestconfig, host: Host) -> Generator[DiskDevName]:
     """
     Disk DEVICE NAME with 4KB blocksize available on FIRST POOL MASTER.
 
