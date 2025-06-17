@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import itertools
 import git
 import logging
@@ -6,7 +8,7 @@ import pytest
 import tempfile
 
 from packaging import version
-from typing import Dict
+from typing import Dict, Generator
 
 import lib.config as global_config
 
@@ -15,6 +17,7 @@ from lib.common import callable_marker, shortened_nodeid, prefix_object_name
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
+from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
@@ -149,7 +152,7 @@ def pytest_runtest_makereport(item, call):
 # fixtures
 
 @pytest.fixture(scope='session')
-def hosts(pytestconfig):
+def hosts(pytestconfig) -> Generator[list[Host], None, None]:
     nested_list = []
 
     def setup_host(hostname_or_ip, *, config=None):
