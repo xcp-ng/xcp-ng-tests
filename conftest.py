@@ -13,6 +13,7 @@ from typing import Dict, Generator
 import lib.config as global_config
 
 from lib import pxe
+from lib.common import DiskDevName
 from lib.common import callable_marker, shortened_nodeid, prefix_object_name
 from lib.common import wait_for, vm_image, is_uuid
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
@@ -330,6 +331,24 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
+def disks(hosts: list[Host]) -> Generator[dict[Host, list[DiskDevName]], None, None]:
+    ret = {host: host.disks()
+           for pool_master in hosts
+           for host in pool_master.pool.hosts
+           }
+    logging.debug("disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    yield ret
+
+@pytest.fixture(scope='session')
+def unused_disks(disks: dict[Host, list[DiskDevName]]
+                 ) -> Generator[dict[Host, list[DiskDevName]], None, None]:
+    ret = {host: [disk for disk in disks if host.disk_is_available(disk)]
+           for host, disks in disks.items()
+           }
+    logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    yield ret
+
+@pytest.fixture(scope='session')
 def sr_disk(pytestconfig, host):
     """
     Disk DEVICE NAME available on FIRST POOL MASTER.
@@ -411,6 +430,13 @@ def sr_disk_for_all_hosts(pytestconfig, request, host):
             f"disk or block device {disk} was not found to be present and free on all hosts"
         logging.info(f">> Disk or block device {disk} is present and free on all pool members")
     yield candidates[0]
+
+@pytest.fixture(scope='session')
+def pool_with_unused_disk(host: Host, unused_disks: dict[Host, list[DiskDevName]]) -> Pool:
+    for h in host.pool.hosts:
+        assert h in unused_disks
+        assert unused_disks[h], f"host {h} does not have any unused disk"
+    return host.pool
 
 @pytest.fixture(scope='session')
 def sr_disks_for_all_hosts(pytestconfig, request, host):
