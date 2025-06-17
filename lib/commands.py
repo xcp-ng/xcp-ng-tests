@@ -4,6 +4,7 @@ import shlex
 import subprocess
 
 import lib.config as config
+from lib.common import HostAddress
 from lib.netutil import wrap_ip
 
 from typing import List, Literal, Union, overload
@@ -138,27 +139,32 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
 @overload
-def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+        simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
         decode: Literal[True] = True, options: List[str] = []) -> str:
     ...
 @overload
-def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+        simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
         decode: Literal[False], options: List[str] = []) -> bytes:
     ...
 @overload
-def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+        simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
         decode: bool = True, options: List[str] = []) -> SSHResult:
     ...
 @overload
-def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+        simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[True],
         decode: bool = True, options: List[str] = []) -> None:
     ...
 @overload
-def ssh(hostname_or_ip: str, cmd: Union[str, List[str]], *, check=True, simple_output: bool = True,
+def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check=True,
+        simple_output: bool = True,
         suppress_fingerprint_warnings=True, background: bool = False,
         decode: bool = True, options: List[str] = []) \
         -> Union[str, bytes, SSHResult, None]:

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import lib.pool
 
 from lib.common import (
+    DiskDevName,
     _param_add,
     _param_clear,
     _param_get,
@@ -546,7 +547,7 @@ class Host:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
         return pif.PIF(uuid, self)
 
-    def disks(self):
+    def disks(self) -> list[DiskDevName]:
         """ List of disks, e.g ['sda', 'sdb', 'nvme0n1']. """
         disks = self.ssh(['lsblk', '--noheadings', '--nodeps',
                           '-I', '8,259', # limit to: sd, blkext
@@ -554,7 +555,7 @@ class Host:
         disks.sort()
         return disks
 
-    def disk_is_available(self, disk: str) -> bool:
+    def disk_is_available(self, disk: DiskDevName) -> bool:
         """
         Check if a disk is unmounted and appears available for use.
 
@@ -566,7 +567,7 @@ class Host:
         """
         return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
-    def available_disks(self, blocksize=512):
+    def available_disks(self, blocksize: int = 512) -> list[DiskDevName]:
         """
         Return a list of available disks for formatting, creating SRs or such.
 

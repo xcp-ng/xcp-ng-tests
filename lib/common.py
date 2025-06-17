@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import getpass
@@ -15,12 +17,15 @@ import requests
 
 import lib.commands as commands
 
-from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeAlias, TypeVar, Union, cast, overload
 
 if TYPE_CHECKING:
     import lib.host
 
 T = TypeVar("T")
+
+HostAddress: TypeAlias = str
+DiskDevName: TypeAlias = str
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
