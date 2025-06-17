@@ -569,8 +569,8 @@ class Host:
         """
         avail_disks = []
         blk_output = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME,LOG-SEC']).splitlines()
-        for line in blk_output:
-            line = line.split()
+        for line_str in blk_output:
+            line = line_str.split()
             disk = line[0]
             sec_size = line[1]
             if sec_size == str(blocksize):
