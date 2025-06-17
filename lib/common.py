@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import getpass
 import inspect
 import itertools
@@ -16,8 +18,12 @@ import requests
 import lib.commands as commands
 if TYPE_CHECKING:
     import lib.host
+    from lib.typing import TypeAlias
 
 T = TypeVar("T")
+
+HostAddress: TypeAlias = str
+DiskDevName: TypeAlias = str
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
