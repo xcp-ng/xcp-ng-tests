@@ -14,6 +14,16 @@ LINSTOR_PACKAGE = 'xcp-ng-linstor'
 
 @pytest.fixture(scope='package')
 def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
+    """
+    Common LVM PVs on which a LV is created on each host of the pool.
+
+    On each host in the pool, create PV on each of those disks whose
+    DEVICE NAME exists ACROSS THE WHOLE POOL. Then make a VG out of
+    all those, then a LV taking up the whole VG space.
+
+    Return the list of device node paths for that list of devices
+    used in all hosts.
+    """
     devices = [f"/dev/{disk}" for disk in sr_disks_for_all_hosts]
     hosts = host.pool.hosts
 

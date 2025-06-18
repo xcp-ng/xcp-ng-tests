@@ -13,6 +13,7 @@ from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_
 # package scope because previous test packages may have used the disk
 @pytest.fixture(scope='package')
 def sr_disk_wiped(host, sr_disk):
+    """A disk on MASTER HOST OF FIRST POOL which we wipe."""
     logging.info(">> wipe disk %s" % sr_disk)
     host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
     yield sr_disk
@@ -20,6 +21,7 @@ def sr_disk_wiped(host, sr_disk):
 # package scope so that the device is unmounted before tests from the next package is executed.
 @pytest.fixture(scope='package')
 def formatted_and_mounted_ext4_disk(host, sr_disk):
+    """Mountpoint for newly-formatted disk on MASTER HOST OF FIRST POOL."""
     mountpoint = '/var/tmp/sr_disk_mountpoint'
     setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
     yield mountpoint

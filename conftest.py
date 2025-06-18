@@ -336,6 +336,12 @@ def local_sr_on_hostB1(hostB1):
 
 @pytest.fixture(scope='session')
 def sr_disk(pytestconfig, host):
+    """
+    Disk DEVICE NAME available on FIRST POOL MASTER.
+
+    Abort if not exactly one --sr_disk.  If --sr_disk=auto take any, else
+    return requested device (abort if not present).
+    """
     disks = pytestconfig.getoption("sr_disk")
     if len(disks) != 1:
         pytest.fail("This test requires exactly one --sr-disk parameter")
@@ -354,6 +360,12 @@ def sr_disk(pytestconfig, host):
 
 @pytest.fixture(scope='session')
 def sr_disk_4k(pytestconfig, host):
+    """
+    Disk DEVICE NAME with 4KB blocksize available on FIRST POOL MASTER.
+
+    Abort if not exactly one --sr_disk.  If --sr_disk=auto take any, else
+    return requested device (abort if not present).
+    """
     disks = pytestconfig.getoption("sr_disk_4k")
     if len(disks) != 1:
         pytest.fail("This test requires exactly one --sr-disks-4k parameter")
@@ -372,6 +384,12 @@ def sr_disk_4k(pytestconfig, host):
 
 @pytest.fixture(scope='session')
 def sr_disk_for_all_hosts(pytestconfig, request, host):
+    """
+    Disk DEVICE NAME available on all hosts of FIRST POOL.
+
+    Abort if not exactly one --sr_disk.  If --sr_disk=auto take any, else
+    return requested device (abort if not present).
+    """
     disks = pytestconfig.getoption("sr_disk")
     if len(disks) != 1:
         pytest.fail("This test requires exactly one --sr-disk parameter")
@@ -401,6 +419,14 @@ def sr_disk_for_all_hosts(pytestconfig, request, host):
 
 @pytest.fixture(scope='session')
 def sr_disks_for_all_hosts(pytestconfig, request, host):
+    """
+    List of disk DEVICE NAMES available on all hosts of FIRST POOL.
+
+    Abort if no --sr_disk.  If one --sr_disk=auto given, return names of all
+    "available" disk device occuring on all hosts in the pool and
+    IGNORE ALL OTHER --sr_disk; else return all devices on commandline (abort
+    if any is not present or not "available").
+    """
     disks = pytestconfig.getoption("sr_disk")
     assert len(disks) > 0, "This test requires at least one --sr-disk parameter"
     # Fetch available disks on the master host
