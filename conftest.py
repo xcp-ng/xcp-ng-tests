@@ -544,10 +544,10 @@ def create_vms(request, host, tests_git_revision):
         # FIXME should check for extra args
         vm_defs.append(vm_def)
 
+    vms = []
+    vdis = []
+    vbds = []
     try:
-        vms = []
-        vdis = []
-        vbds = []
         for vm_def in vm_defs:
             if "template" in vm_def:
                 _create_vm(request, vm_def, host, vms, vdis, vbds)
