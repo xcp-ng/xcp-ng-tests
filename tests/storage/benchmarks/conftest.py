@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from lib.commands import SSHCommandFailed
+from lib.common import PackageManagerEnum
 
 from .helpers import load_results_from_csv, str_to_tuple
 
@@ -24,36 +25,34 @@ def image_format(request):
 @pytest.fixture(scope="module")
 def running_unix_vm_with_fio(running_unix_vm):
     vm = running_unix_vm
-    install_cmds = (
-        ("command -v apt", "apt update && apt install -y fio", "apt remove -y fio"),
-        ("command -v dnf", "dnf install -y fio", "dnf remove -y fio"),
-        ("command -v yum", "yum install -y fio", "yum remove -y fio"),
-        ("command -v apk", "apk add fio", "apk del fio"),
-    )
+    snapshot = vm.snapshot()
 
-    for check_cmd, install_cmd, remove in install_cmds:
-        try:
-            vm.ssh(check_cmd, check=True)
-            logging.info(f">> Installing fio with {install_cmd}")
-            vm.ssh(install_cmd, check=True)
-            remove_cmd = remove
-            break
-        except SSHCommandFailed:
-            ...
-    else:
+    package_cmds = {
+        PackageManagerEnum.APT_GET.value: "apt-get update && apt install -y fio",
+        PackageManagerEnum.RPM.value: "yum install -y fio",
+        PackageManagerEnum.UNKNOWN.value: "apk add fio",
+    }
+
+    package_manager = vm.detect_package_manager().value
+    try:
+        vm.ssh(package_cmds[package_manager])
+        logging.info(f">> Installing fio with {package_cmds[package_manager]}")
+    except SSHCommandFailed:
         raise RuntimeError("Unsupported package manager: could not install fio")
 
     yield vm
 
     # teardown
-    logging.info(f"<< Removing fio with {remove_cmd}")
-    vm.ssh(remove_cmd, check=False)
+    try:
+        snapshot.revert()
+    finally:
+        snapshot.destroy()
 
 
 @pytest.fixture(scope="module")
 def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
     sr = local_sr_on_hostA1
-    vdi = sr.create_vdi("testVDI", MAX_LENGTH, image_format=image_format)
+    vdi = sr.create_vdi("testVDI", MAX_LENGTH) # , image_format=image_format)
     logging.info(f">> Created VDI {vdi.uuid} of type {image_format}")
 
     yield vdi
