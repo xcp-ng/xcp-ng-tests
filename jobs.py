@@ -154,7 +154,7 @@ JOBS = {
         "params": {
             "--vm": "single/small_vm",
         },
-        "paths": ["tests/storage"],
+        "paths": ["tests/storage/benchmarks"],
     },
     "linstor-main": {
         "description": "tests the linstor storage driver, but avoids migrations and reboots",

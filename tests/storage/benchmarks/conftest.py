@@ -16,7 +16,7 @@ MAX_LENGTH = 64 * (1024**3)  # 64GiB
 
 
 # use vhd, qcow2, raw... when image_format support will be available
-@pytest.fixture(scope="module", params=["vdi"])
+@pytest.fixture(scope="module", params=["vhd"])
 def image_format(request):
     return request.param
 
@@ -53,8 +53,7 @@ def running_unix_vm_with_fio(running_unix_vm):
 @pytest.fixture(scope="module")
 def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
     sr = local_sr_on_hostA1
-    vdi = sr.create_vdi("testVDI", MAX_LENGTH)
-    vdi.image_format = image_format
+    vdi = sr.create_vdi("testVDI", MAX_LENGTH, image_format=image_format)
     logging.info(f">> Created VDI {vdi.uuid} of type {image_format}")
 
     yield vdi
