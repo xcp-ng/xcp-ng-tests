@@ -14,7 +14,8 @@ import time
 
 from packaging import version
 
-sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..") # noqa
+# flake8: noqa: E402
+sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
 from lib.commands import ssh, scp, SSHCommandFailed
 from lib.common import wait_for, is_uuid

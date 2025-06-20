@@ -1,7 +1,7 @@
 # All requirements + those only used in development
 ansible>=5.0.1
 bs4>=0.0.1
-pycodestyle>=2.6.0
+flake8
 PyYAML>=6.0
 mypy
 typing_extensions
