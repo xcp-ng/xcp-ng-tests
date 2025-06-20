@@ -4,31 +4,12 @@ version = "0.1.0"
 description = "Testing scripts for XCP-ng"
 readme = "README.md"
 requires-python = "~=3.8"
-dependencies = [
-    "cryptography>=3.3.1",
-    "gitpython>=3.1.44",
-    "legacycrypt>=0.3",
-    "packaging>=20.7",
-    "pluggy>=1.1.0",
-    "pytest>=8.0.0",
-    "pytest-dependency>=0.6.0",
-    "requests>=2.32.3",
-]
 
-[dependency-groups]
-dev = [
-    "ansible>=5.0.1",
-    "bs4>=0.0.1",
-    "cryptography>=3.3.1",
-    "packaging>=20.7",
-    "pluggy>=1.1.0",
-    "pycodestyle>=2.6.0",
-    "pytest>=8.0.0",
-    "pytest-dependency>=0.6.0",
-    "pyyaml>=6.0",
-    "requests>=2.32.3",
-    "typing-extensions>=4.13.0",
-]
+# load the dependencies from the requirements files
+dynamic = ["dependencies", "optional-dependencies"]
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements/base.txt"]}
+optional-dependencies = {dev = { file = ["requirements/dev.txt"] }}
 
 [tool.pyright]
 typeCheckingMode = "standard"
