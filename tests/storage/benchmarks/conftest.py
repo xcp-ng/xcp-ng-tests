@@ -116,7 +116,7 @@ def pytest_addoption(parser):
         "--file-sizes",
         action="store",
         type=lambda value: str_to_tuple(value, sep=","),
-        default=("1G", "4G", f"{int((system_memory // (1024.**3)) * 2)}G"),
+        default=("1G", "4G", f"{int((system_memory // (1024.**3)) * 2)}G"), # (2*Memory) GiB
         help="Comma separated values of file sizes to test in disk benchmarks",
     )
     parser.addoption(
