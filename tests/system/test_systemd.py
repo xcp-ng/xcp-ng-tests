@@ -17,6 +17,7 @@ white_list_issues = [
     "Cannot add dependency job for unit display-manager.service, ignoring: Unit not found.",
     "Cannot add dependency job for unit qemuback.service, ignoring: Unit not found.",
     "Cannot add dependency job for unit sr_health_check.timer, ignoring: Unit not found.",
+    "Cannot add dependency job for unit polkit.service, ignoring: Unit not found.",
 ]
 
 pytest.fixture(scope='module')
