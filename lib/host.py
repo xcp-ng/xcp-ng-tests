@@ -15,6 +15,7 @@ import lib.pif as pif
 if TYPE_CHECKING:
     import lib.pool
 
+from lib.common import DiskDevName
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
 from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
 from lib.common import prefix_object_name
@@ -534,21 +535,13 @@ class Host:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
         return pif.PIF(uuid, self)
 
-    def disks(self):
+    def disks(self) -> list[DiskDevName]:
         """ List of SCSI disks, e.g ['sda', 'sdb', 'nvme0n1']. """
         disks = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME']).splitlines()
         disks.sort()
         return disks
 
-    def raw_disk_is_available(self, disk: str) -> bool:
-        """
-        Check if a raw disk (without any identifiable filesystem or partition label) is available.
-
-        It suggests the disk is "raw" and likely unformatted thus available.
-        """
-        return self.ssh_with_result(['blkid', '/dev/' + disk]).returncode == 2
-
-    def disk_is_available(self, disk: str) -> bool:
+    def disk_is_available(self, disk: DiskDevName) -> bool:
         """
         Check if a disk is unmounted and appears available for use.
 
@@ -560,7 +553,7 @@ class Host:
         """
         return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
-    def available_disks(self, blocksize=512):
+    def available_disks(self, blocksize: int = 512) -> list[DiskDevName]:
         """
         Return a list of available disks for formatting, creating SRs or such.
 
@@ -569,8 +562,8 @@ class Host:
         """
         avail_disks = []
         blk_output = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME,LOG-SEC']).splitlines()
-        for line in blk_output:
-            line = line.split()
+        for line_str in blk_output:
+            line = line_str.split()
             disk = line[0]
             sec_size = line[1]
             if sec_size == str(blocksize):

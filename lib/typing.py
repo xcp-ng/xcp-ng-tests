@@ -1,6 +1,11 @@
 import sys
 from typing import TypedDict
 
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+
 if sys.version_info >= (3, 11):
     from typing import NotRequired
 else:
