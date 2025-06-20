@@ -13,7 +13,7 @@ LINSTOR_RELEASE_PACKAGE = 'xcp-ng-release-linstor'
 LINSTOR_PACKAGE = 'xcp-ng-linstor'
 
 @pytest.fixture(scope='package')
-def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
+def lvm_disks(pool_with_unused_512B_disk, unused_512B_disks, provisioning_type):
     """
     Common LVM PVs on which a LV is created on each host of the pool.
 
@@ -24,10 +24,10 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
     Return the list of device node paths for that list of devices
     used in all hosts.
     """
-    devices = [f"/dev/{disk}" for disk in sr_disks_for_all_hosts]
-    hosts = host.pool.hosts
+    hosts = pool_with_unused_512B_disk.hosts
 
     for host in hosts:
+        devices = [f"/dev/{disk}" for disk in unused_512B_disks[host][0:1]]
         for device in devices:
             try:
                 host.ssh(['pvcreate', '-ff', '-y', device])
