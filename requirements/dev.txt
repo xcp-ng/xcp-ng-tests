@@ -1,10 +1,11 @@
-# All requirements + those only used in development
+# generated with update_requirements.py, do not edit manually
 ansible>=5.0.1
 bs4>=0.0.1
-flake8
-PyYAML>=6.0
 mypy
-typing_extensions
+flake8
+pydocstyle
 pyright
+pyyaml>=6.0
 types-requests
+typing-extensions
 -r base.txt
