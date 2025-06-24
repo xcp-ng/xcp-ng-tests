@@ -15,7 +15,7 @@ import lib.pif as pif
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, TypedDict, Union, overload
 
 if TYPE_CHECKING:
-    import lib.pool
+    from lib.pool import Pool
 
 from lib.common import (
     DiskDevName,
@@ -52,6 +52,7 @@ def host_data(hostname_or_ip):
 
 class Host:
     xe_prefix = "host"
+    pool: Pool
 
     # Data extraction is automatic, no conversion from str is done.
     BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
@@ -65,7 +66,7 @@ class Host:
 
     block_devices_info: list[BlockDeviceInfo]
 
-    def __init__(self, pool: 'lib.pool.Pool', hostname_or_ip):
+    def __init__(self, pool: Pool, hostname_or_ip):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
         self.xo_srv_id: Optional[str] = None
