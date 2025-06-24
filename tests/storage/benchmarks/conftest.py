@@ -52,7 +52,7 @@ def running_unix_vm_with_fio(running_unix_vm):
 @pytest.fixture(scope="module")
 def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
     sr = local_sr_on_hostA1
-    vdi = sr.create_vdi("testVDI", MAX_LENGTH) # , image_format=image_format)
+    vdi = sr.create_vdi("testVDI", MAX_LENGTH)  # , image_format=image_format)
     logging.info(f">> Created VDI {vdi.uuid} of type {image_format}")
 
     yield vdi
@@ -137,6 +137,18 @@ def pytest_addoption(parser):
         action="store",
         default=1,
         help="Mapped to fio's --iodepth",
+    )
+    parser.addoption(
+        "--regression_threshold",
+        action="store",
+        default=10,
+        help="Percentage of regression that will cause the test to fail",
+    )
+    parser.addoption(
+        "--improvement_threshold",
+        action="store",
+        default=10,
+        help="Minimum percentage of improvement considered significant enough to report",
     )
 
 

@@ -10,8 +10,6 @@ from lib.commands import SSHCommandFailed
 
 from .helpers import load_results_from_csv, log_result_csv, mean
 
-# Tests default settings #
-
 CSV_FILE = f"/tmp/results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
 DEFAULT_SAMPLES_NUM = 10
@@ -65,7 +63,9 @@ def run_fio(
         return json.load(f)
 
 
-def assert_performance_not_degraded(current, previous, threshold=10):
+def assert_performance_not_degraded(
+    current, previous, regression_threshold=10, improvement_threshold=10
+):
     diffs = {}
     for metric in ("bw_MBps", "IOPS", "latency"):
         try:
@@ -74,10 +74,12 @@ def assert_performance_not_degraded(current, previous, threshold=10):
         except statistics.StatisticsError:
             logging.info(f"Missing metric ({metric}), skipping comparison")
             continue
-        diff = (curr - prev if metric == "latency" else prev - curr) / (prev * 100)
+        diff = (curr - prev if metric == "latency" else prev - curr) / prev * 100
+        if diff < improvement_threshold:
+            logging.info(f"{metric} improved by {abs(diff):.2f}%")
         assert (
-            diff <= threshold
-        ), f"{metric} changed by {diff:.2f}% (allowed {threshold}%)"
+            diff <= regression_threshold
+        ), f"{metric} regressed by {diff:.2f}% (allowed {regression_threshold}%)"
         diffs[metric] = diff
 
     logging.info("Performance difference summary:")
@@ -105,7 +107,14 @@ class TestDiskPerf:
         vm = running_unix_vm_with_fio
         vbd = plugged_vbd
         device = f"/dev/{vbd.param_get(param_name='device')}"
-        test_type = "{}-{}-{}-{}".format(block_size, file_size, rw_mode, image_format)
+        test_type = "bench-fio-{}-{}-{}-{}-{}-{}".format(
+            block_size,
+            file_size,
+            pytestconfig.getoption("iodepth"),
+            pytestconfig.getoption("numjobs"),
+            rw_mode,
+            image_format,
+        )
 
         for i in range(DEFAULT_SAMPLES_NUM):
             result = run_fio(
@@ -125,4 +134,9 @@ class TestDiskPerf:
         key = (test_type, rw_mode)
         if prev_results and key in prev_results:
             results = load_results_from_csv(CSV_FILE)
-            assert_performance_not_degraded(results[key], prev_results[key])
+            assert_performance_not_degraded(
+                results[key],
+                prev_results[key],
+                regression_threshold=pytestconfig.getoption("regression_threshold"),
+                improvement_threshold=pytestconfig.getoption("improvement_threshold"),
+            )
