@@ -91,7 +91,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not sr_disk_4k",
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks",
         "name_filter": "not migration and not linstor",
     },
     "storage-migrations": {
@@ -109,7 +109,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "not sr_disk_4k",
+        "markers": "not unused_4k_disks",
         "name_filter": "migration and not linstor",
     },
     "storage-reboots": {
@@ -126,7 +126,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "reboot and not flaky and not sr_disk_4k",
+        "markers": "reboot and not flaky and not unused_4k_disks",
         "name_filter": "not linstor",
     },
     "storage-quicktest": {
@@ -141,7 +141,7 @@ JOBS = {
             "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "quicktest and not sr_disk_4k",
+        "markers": "quicktest and not unused_4k_disks",
         "name_filter": "not linstor and not zfsvol",
     },
     "linstor-main": {
@@ -218,7 +218,7 @@ JOBS = {
             "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "(small_vm or no_vm) and sr_disk_4k and not reboot and not quicktest",
+        "markers": "(small_vm or no_vm) and unused_4k_disks and not reboot and not quicktest",
         "name_filter": "not migration",
     },
     "largeblock-migrations": {
@@ -235,7 +235,7 @@ JOBS = {
             "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "sr_disk_4k",
+        "markers": "unused_4k_disks",
         "name_filter": "migration",
     },
     "largeblock-reboots": {
@@ -251,7 +251,7 @@ JOBS = {
             "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "sr_disk_4k and reboot",
+        "markers": "unused_4k_disks and reboot",
     },
     "largeblock-quicktest": {
         "description": "runs `quicktest` on the largeblock storage driver",
@@ -264,7 +264,7 @@ JOBS = {
             "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
-        "markers": "sr_disk_4k and quicktest",
+        "markers": "unused_4k_disks and quicktest",
     },
     "sb-main": {
         "description": "tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)",
