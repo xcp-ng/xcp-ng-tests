@@ -1,7 +1,14 @@
+from __future__ import annotations
+
 import pytest
 
 from lib.common import vm_image, wait_for
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.host import Host
 
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
@@ -16,7 +23,8 @@ class TestLVMSRCreateDestroy:
     def test_create_sr_with_missing_device(self, host):
         try_to_create_sr_with_missing_device('lvm', 'LVM-local-SR-test', host)
 
-    def test_create_and_destroy_sr(self, host, sr_disk):
+    def test_create_and_destroy_sr(self, host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> None:
+        sr_disk = unused_512B_disks[host][0]["name"]
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('lvm', "LVM-local-SR-test", {'device': '/dev/' + sr_disk}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
