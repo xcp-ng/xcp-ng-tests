@@ -520,7 +520,10 @@ class Host:
             if "closed by remote host" not in e.stdout:
                 raise
         if verify:
-            wait_for_not(self.is_enabled, "Wait for host down")
+            # FIXME for more robustness we should make sure that 0%
+            # pings of a given number actually get a response
+            wait_for_not(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
+                         "Wait for host down", timeout_secs=10 * 60, retry_delay_secs=10)
             wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
             wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
