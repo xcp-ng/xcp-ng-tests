@@ -1,11 +1,20 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
 
+from typing import TYPE_CHECKING, Generator
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.sr import SR
+
 @pytest.fixture(scope='package')
-def largeblock_sr(host, sr_disk_4k):
+def largeblock_sr(host: Host, unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[SR]:
     """ A LARGEBLOCK SR on first host. """
-    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk_4k})
+    sr_disk = unused_4k_disks[host][0]["name"]
+    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk})
     yield sr
     # teardown
     sr.destroy()

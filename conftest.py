@@ -131,6 +131,7 @@ def pytest_collection_modifyitems(items, config):
         'hostB1',
         'sr_disk_4k',
         'unused_512B_disks',
+        'unused_4k_disks',
     ]
 
     for item in items:
@@ -401,6 +402,17 @@ def unused_512B_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
            for host, host_disks in disks.items()
            }
     logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    return ret
+
+@pytest.fixture(scope='session')
+def unused_4k_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
+                    ) -> dict[Host, list[Host.BlockDeviceInfo]]:
+    """Dict identifying names of all 4K-blocks disks for on all hosts of first pool."""
+    ret = {host: [disk for disk in host_disks
+                  if disk["log-sec"] == "4096" and host.disk_is_available(disk["name"])]
+           for host, host_disks in disks.items()
+           }
+    logging.debug("available 4k disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
     return ret
 
 @pytest.fixture(scope='session')
