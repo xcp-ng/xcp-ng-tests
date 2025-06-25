@@ -548,7 +548,9 @@ class Host:
 
     def disks(self):
         """ List of disks, e.g ['sda', 'sdb', 'nvme0n1']. """
-        disks = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME']).splitlines()
+        disks = self.ssh(['lsblk', '--noheadings', '--nodeps',
+                          '-I', '8,259', # limit to: sd, blkext
+                          '--output', 'NAME']).splitlines()
         disks.sort()
         return disks
 
@@ -570,7 +572,7 @@ class Host:
         Warn: This function may misclassify LVM_member disks (e.g. in XOSTOR, RAID, ZFS) as "available".
         Such disks may not have mountpoints but still be in use.
         """
-        return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
+        return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
     def available_disks(self, blocksize=512):
         """
@@ -580,7 +582,9 @@ class Host:
         the output of lsblk (including their children such as partitions or md RAID devices)
         """
         avail_disks = []
-        blk_output = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME,LOG-SEC']).splitlines()
+        blk_output = self.ssh(['lsblk', '--noheadings', '--nodeps',
+                               '-I', '8,259', # limit to: sd, blkext
+                               '--output', 'NAME,LOG-SEC']).splitlines()
         for line in blk_output:
             disk, sec_size = line.split()
             if sec_size == str(blocksize):
