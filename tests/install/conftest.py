@@ -1,13 +1,12 @@
 from typing import Generator, Sequence, Union
 
 import pytest
+import pytest_dependency  # type: ignore
 
 import logging
 import os
 import tempfile
 import xml.etree.ElementTree as ET
-
-import pytest_dependency  # type: ignore
 
 from data import ARP_SERVER, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE, TEST_SSH_PUBKEY, TOOLS
 from lib import installer, pxe

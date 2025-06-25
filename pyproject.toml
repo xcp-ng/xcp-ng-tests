@@ -62,7 +62,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort.sections]
-testing = ["pytest"]
+testing = ["pytest*"]
 typing = ["typing"]
 
 [tool.ruff.lint.isort]
