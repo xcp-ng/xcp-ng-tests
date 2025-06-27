@@ -2,7 +2,7 @@ import logging
 import pytest
 import time
 
-from .conftest import LINSTOR_PACKAGE
+from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for, vm_image
 from tests.storage import vdi_is_open
@@ -130,6 +130,67 @@ class TestLinstorSR:
         finally:
             if not linstor_installed:
                 host.yum_install([LINSTOR_PACKAGE])
+
+    @pytest.mark.reboot
+    @pytest.mark.small_vm
+    def test_linstor_sr_fail_disk(self, linstor_sr, vm_on_linstor_sr, provisioning_type):
+        """
+        Identify random host within the same pool, detect used disks, fail one, and test VM useability on LINSTOR SR.
+        """
+        import random
+        import multiprocessing
+
+        sr = linstor_sr
+        if provisioning_type == "thick":
+            time.sleep(45) # Let xcp-persistent-database come in sync across the nodes
+
+        vm = vm_on_linstor_sr
+
+        # Fail a disk from random host of Linstor pool
+        try:
+            random_host = random.choice(sr.pool.hosts) # TBD: Choose Linstor Diskfull node
+            logging.info("Working on %s", random_host.hostname_or_ip)
+            devices = random_host.ssh('vgs ' + GROUP_NAME + ' -o pv_name --no-headings').split("\n")
+            # Choosing last device from list, assuming its least filled
+            fail_device = devices[-1].strip() # /dev/sdb
+            fail_device = random_host.ssh(['lsblk', fail_device, '--nodeps --output NAME --noheadings']) # sdb
+            logging.info("Attempting to fail device: %s", fail_device)
+            random_host.ssh(['echo', '"offline"', '>', '/sys/block/' + fail_device + '/device/state'])
+        except Exception as e:
+            # Offline disk shall connect back after host reboot. Teardown normally.
+            random_host.reboot(verify=True)
+            pytest.fail("Failed to simulate device failure. Error %s", e)
+
+        # Ensure that VM is able to start on all hosts despite Linstor pool disk failure
+        for h in sr.pool.hosts:
+            logging.info("Checking VM on host %s", h.hostname_or_ip)
+            try:
+                proc = multiprocessing.Process(target=vm.start, kwargs={'on': h.uuid})
+                proc.start()
+                proc.join(timeout=30)
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join()
+                    logging.warning("VM start on host %s timed out. Recovering failed disk.", h.hostname_or_ip)
+                    random_host.ssh(['echo', '"running"', '>', f'/sys/block/{fail_device}/device/state'])
+                    # Handle in case VM.start succeed after disk becomes online
+                    if vm.is_running():
+                        vm.shutdown(verify=True, force_if_fails=True)
+                    pytest.fail("VM start timed out on host %s after 30s. Disk recovered.", h.hostname_or_ip)
+                else: # VM booted fine
+                    vm.wait_for_os_booted()
+                    vm.shutdown(verify=True)
+            except Exception as e:
+                logging.info("Caught exception in multiprocessing: %s", e)
+
+        random_host.reboot(verify=True)
+
+        # Ensure PBDs are attached post reboot
+        if not sr.all_pbds_attached():
+            sr.plug_pbds()
+
+        # Ensure SR scan works and proceed for teardown
+        sr.scan()
 
     # *** End of tests with reboots
 
