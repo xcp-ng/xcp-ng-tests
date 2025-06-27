@@ -1,2 +1,32 @@
+[project]
+name = "xcp-ng-tests"
+version = "0.1.0"
+description = "Testing scripts for XCP-ng"
+readme = "README.md"
+requires-python = "~=3.11"
+dependencies = [
+    "cryptography>=3.3.1",
+    "gitpython",
+    "legacycrypt",
+    "packaging>=20.7",
+    "pluggy>=1.1.0",
+    "pytest>=8.0.0",
+    "pytest-dependency",
+    "requests",
+]
+
+[dependency-groups]
+dev = [
+    "ansible>=5.0.1",
+    "bs4>=0.0.1",
+    "mypy",
+    "flake8",
+    "pydocstyle",
+    "pyright",
+    "pyyaml>=6.0",
+    "types-requests",
+    "typing-extensions",
+]
+
 [tool.pyright]
 typeCheckingMode = "standard"
