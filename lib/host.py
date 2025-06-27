@@ -699,3 +699,8 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def firmware_type(self):
+        retcode = self.ssh(['test', '-d', '/sys/firmware/efi/'],
+                           check=False, simple_output=False).returncode
+        return "uefi" if retcode == 0 else "bios"
