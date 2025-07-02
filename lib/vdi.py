@@ -25,11 +25,7 @@ class VDI:
         # TODO: use a different approach when migration is possible
         if sr is None:
             assert host
-            sr_uuid = host.pool.get_vdi_sr_uuid(uuid)
-            # avoid circular import
-            # FIXME should get it from Host instead
-            from lib.sr import SR
-            self.sr = SR(sr_uuid, host.pool)
+            self.sr = host.get_sr_from_vdi_uuid(self.uuid)
         else:
             self.sr = sr
 

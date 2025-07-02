@@ -1,10 +1,17 @@
 import logging
 import time
-from typing import Optional
 
 import lib.commands as commands
-from lib.common import prefix_object_name, safe_split, strtobool, wait_for, wait_for_not
+from lib.common import (
+    prefix_object_name,
+    safe_split,
+    strtobool,
+    wait_for,
+    wait_for_not,
+)
 from lib.vdi import VDI
+
+from typing import Optional
 
 class SR:
     def __init__(self, uuid, pool):
