@@ -16,21 +16,12 @@ def vdi_on_local_sr(host, local_sr_on_hostA1, image_format):
 
 @pytest.fixture(scope="module")
 def vdi_with_vbd_on_dom0(host, vdi_on_local_sr):
-    vdi_uuid = vdi_on_local_sr.uuid
-    dom0_uuid = host.get_dom0_uuid()
-    logging.info(f">> Plugging VDI {vdi_uuid} on Dom0")
-    vbd_uuid = host.xe("vbd-create",
-                       {"vdi-uuid": vdi_uuid,
-                        "vm-uuid": dom0_uuid,
-                        "device": "autodetect",
-                        })
-    host.xe("vbd-plug", {"uuid": vbd_uuid})
+    dom0 = host.get_dom0_VM()
+    vbd_uuid = dom0.connect_vdi(vdi_on_local_sr)
 
     yield vdi_on_local_sr
 
-    logging.info(f"<< Unplugging VDI {vdi_uuid} from Dom0")
-    host.xe("vbd-unplug", {"uuid": vbd_uuid})
-    host.xe("vbd-destroy", {"uuid": vbd_uuid})
+    dom0.disconnect_vdi(vdi_on_local_sr)
 
 @pytest.fixture(scope="class")
 def data_file_on_host(host):
