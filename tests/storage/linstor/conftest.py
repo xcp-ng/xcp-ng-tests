@@ -70,6 +70,8 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
         # Needed because the linstor driver is not in the xapi sm-plugins list
         # before installing the LINSTOR packages.
         host.ssh(["systemctl", "restart", "multipathd"])
+        # Needed because sometimes the systemctl may complain about service reload.
+        host.ssh(["systemctl", "daemon-reload"])
         host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
