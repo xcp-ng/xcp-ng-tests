@@ -1,6 +1,6 @@
 import logging
 
-from typing import Any, Literal, Optional, overload, TYPE_CHECKING
+from typing import Any, Literal, Optional, overload, TYPE_CHECKING, List
 
 import lib.commands as commands
 if TYPE_CHECKING:
@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
+from lib.vdi import VDI
 
 class BaseVM:
     """ Base class for VM and Snapshot. """
@@ -19,6 +20,15 @@ class BaseVM:
         logging.info("New %s: %s", type(self).__name__, uuid)
         self.uuid = uuid
         self.host = host
+        try:
+            self.vdis = [VDI(vdi_uuid, host=host) for vdi_uuid in self.vdi_uuids()]
+        except commands.SSHCommandFailed as e:
+            # Doesn't work with Dom0 since `vm-disk-list` doesn't work on it so we create empty list
+            if e.stdout == "Error: No matching VMs found":
+                logging.info("Couldn't get disks list. We are Dom0. Continuing...")
+                self.vdis = []
+            else:
+                raise
 
     @overload
     def param_get(self, param_name: str, key: Optional[str] = ...,
@@ -56,11 +66,31 @@ class BaseVM:
         assert isinstance(n, str)
         return n
 
+    def connect_vdi(self, vdi: VDI, device: str = "autodetect") -> str:
+        logging.info(f">> Plugging VDI {vdi.uuid} on VM {self.uuid}")
+        vbd_uuid = self.host.xe("vbd-create",
+                                {
+                                    "vdi-uuid": vdi.uuid,
+                                    "vm-uuid": self.uuid,
+                                    "device": device,
+                                })
+        self.host.xe("vbd-plug", {"uuid": vbd_uuid})
+
+        self.vdis.append(vdi)
+
+        return vbd_uuid
+
+    def disconnect_vdi(self, vdi: VDI):
+        logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
+        vbd_uuid = self.host.xe("vbd-list", {"vdi-uuid": vdi.uuid, "vm-uuid": self.uuid}, minimal=True)
+        self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
+        self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
+
     # @abstractmethod
     def _disk_list(self):
         raise NotImplementedError()
 
-    def vdi_uuids(self, sr_uuid=None):
+    def vdi_uuids(self, sr_uuid=None) -> List[str]:
         output = self._disk_list()
         if output == '':
             return []
@@ -78,6 +108,9 @@ class BaseVM:
 
     def destroy_vdi(self, vdi_uuid: str) -> None:
         self.host.xe('vdi-destroy', {'uuid': vdi_uuid})
+        for vdi in self.vdis:
+            if vdi.uuid == vdi_uuid:
+                self.vdis.remove(vdi)
 
     def all_vdis_on_host(self, host):
         for vdi_uuid in self.vdi_uuids():

@@ -56,6 +56,7 @@ class Host:
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
+        self._dom0: Optional[VM] = None
 
     def __str__(self):
         return self.hostname_or_ip
@@ -703,6 +704,11 @@ class Host:
 
     def get_dom0_uuid(self):
         return self.inventory["CONTROL_DOMAIN_UUID"]
+
+    def get_dom0_VM(self) -> VM:
+        if not self._dom0:
+            self._dom0 = VM(self.get_dom0_uuid(), self)
+        return self._dom0
 
     def get_sr_from_vdi_uuid(self, vdi_uuid) -> Optional[SR]:
         sr_uuid = self.xe("vdi-param-get",
