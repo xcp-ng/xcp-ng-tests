@@ -1,6 +1,6 @@
 import logging
 
-from typing import TYPE_CHECKING, Any, Literal, Optional, overload
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, overload
 
 if TYPE_CHECKING:
     import lib.host
@@ -59,7 +59,7 @@ class BaseVM:
     def _disk_list(self):
         raise NotImplementedError()
 
-    def vdi_uuids(self, sr_uuid=None):
+    def vdi_uuids(self, sr_uuid: Optional[str] = None) -> List[str]:
         output = self._disk_list()
         if output == '':
             return []
