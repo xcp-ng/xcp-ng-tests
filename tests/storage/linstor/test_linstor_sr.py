@@ -138,17 +138,27 @@ class TestLinstorSR:
 # --- Test diskless resources --------------------------------------------------
 
 def _get_diskful_hosts(host, controller_option, volume_name):
-    # Find host where volume is diskless
-    # | {volume_name} | {host} | 7017 | Unused | Ok    |   UpToDate | 2023-10-24 18:52:05 |
-    lines = host.ssh([
-        "linstor", controller_option, "resource", "list",
-        "|", "grep", volume_name, "|", "grep", "UpToDate"
-    ]).splitlines()
-    diskfuls = []
-    for line in lines:
-        hostname = line.split('|')[2].strip()
-        diskfuls += hostname
-    return diskfuls
+    attempt = 0
+    retries = 3
+    sleep_sec = 5
+    while attempt < retries:
+        try:
+            # Find host where volume is diskless
+            # | {volume_name} | {host} | 7017 | Unused | Ok    |   UpToDate | 2023-10-24 18:52:05 |
+            lines = host.ssh([
+                "linstor", controller_option, "resource", "list",
+                "|", "grep", volume_name, "|", "grep", "UpToDate"
+            ]).splitlines()
+            diskfuls = []
+            for line in lines:
+                hostname = line.split('|')[2].strip()
+                diskfuls += hostname
+            return diskfuls
+        except SSHCommandFailed:
+            attempt += 1
+        if attempt >= retries:
+            raise
+        time.sleep(sleep_sec)
 
 def _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless):
     diskfuls = _get_diskful_hosts(host, controller_option, volume_name)
