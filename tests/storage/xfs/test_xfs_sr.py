@@ -27,7 +27,8 @@ class TestXFSSRCreateDestroy:
 
     def test_create_xfs_sr_without_xfsprogs(self,
                                             host: Host,
-                                            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
+                                            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                                            image_format
                                             ) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
@@ -35,7 +36,10 @@ class TestXFSSRCreateDestroy:
         sr_disk = unused_512B_disks[host][0]["name"]
         sr = None
         try:
-            sr = host.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
+            sr = host.sr_create('xfs', "XFS-local-SR-test", {
+                'device': '/dev/' + sr_disk,
+                'preferred-image-formats': image_format
+            })
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:
