@@ -2,9 +2,12 @@ import logging
 import pytest
 
 @pytest.fixture(scope='package')
-def ext_sr(host, sr_disk):
+def ext_sr(host, sr_disk, image_format):
     """ An EXT SR on first host. """
-    sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('ext', "EXT-local-SR-test", {
+        'device': '/dev/' + sr_disk,
+        'preferred-image-formats': image_format
+    })
     yield sr
     # teardown
     sr.destroy()
