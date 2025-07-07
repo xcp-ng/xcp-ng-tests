@@ -14,11 +14,14 @@ def host_without_zfs(host):
         "zfs must not be installed on the host at the beginning of the tests"
 
 @pytest.fixture(scope='package')
-def host_with_zfs(host_without_zfs, host_with_saved_yum_state):
+def host_with_zfs(host_without_zfs, host_with_saved_yum_state, image_format):
     host = host_with_saved_yum_state
     host.yum_install(['zfs'])
     host.ssh(['modprobe', 'zfs'])
     yield host
+    host.ssh(["systemctl", "stop", "zfs-zed"])
+    host.ssh(['rmmod', 'zfs'])
+    host.yum_remove(['zfs'])
 
 @pytest.fixture(scope='package')
 def zpool_vol0(sr_disk_wiped, host_with_zfs):
@@ -28,9 +31,12 @@ def zpool_vol0(sr_disk_wiped, host_with_zfs):
     host_with_zfs.ssh(['zpool', 'destroy', POOL_NAME])
 
 @pytest.fixture(scope='package')
-def zfs_sr(host, zpool_vol0):
+def zfs_sr(host, image_format, zpool_vol0):
     """ A ZFS SR on first host. """
-    sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': POOL_PATH})
+    sr = host.sr_create('zfs', "ZFS-local-SR-test", {
+        'location': POOL_PATH,
+        'preferred-image-formats': image_format
+    }, verify=True)
     yield sr
     # teardown
     sr.destroy()
