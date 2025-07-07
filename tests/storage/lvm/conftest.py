@@ -2,9 +2,12 @@ import logging
 import pytest
 
 @pytest.fixture(scope='package')
-def lvm_sr(host, sr_disk):
+def lvm_sr(host, sr_disk, image_format):
     """ An LVM SR on first host. """
-    sr = host.sr_create('lvm', "LVM-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('lvm', "LVM-local-SR-test", {
+        'device': '/dev/' + sr_disk,
+        'preferred-image-formats': image_format
+    })
     yield sr
     # teardown
     sr.destroy()
