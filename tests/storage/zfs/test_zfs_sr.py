@@ -20,6 +20,12 @@ from tests.storage import (
     xva_export_import,
 )
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.vdi import VDI
+
 from .conftest import POOL_NAME, POOL_PATH
 
 # Requirements:
@@ -34,13 +40,16 @@ class TestZFSSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_zfs_sr_without_zfs(self, host):
+    def test_create_zfs_sr_without_zfs(self, host: Host, image_format: str) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/zpool'), \
             "zfs must not be installed on the host at the beginning of the tests"
         sr = None
         try:
-            sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': POOL_PATH})
+            sr = host.sr_create('zfs', "ZFS-local-SR-test", {
+                'location': POOL_PATH,
+                'preferred-image-formats': image_format
+            }, verify=True)
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:
@@ -48,9 +57,12 @@ class TestZFSSRCreateDestroy:
             assert False, "SR creation should not have succeeded!"
 
     @pytest.mark.usefixtures("zpool_vol0")
-    def test_create_and_destroy_sr(self, host):
+    def test_create_and_destroy_sr(self, host: Host, image_format: str) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': POOL_PATH}, verify=True)
+        sr = host.sr_create('zfs', "ZFS-local-SR-test", {
+            'location': POOL_PATH,
+            'preferred-image-formats': image_format
+        }, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
@@ -65,6 +77,13 @@ class TestZFSSR:
 
     def test_vdi_is_not_open(self, vdi_on_zfs_sr):
         assert not vdi_is_open(vdi_on_zfs_sr)
+
+    def test_vdi_image_format(self, vdi_on_zfs_sr: VDI, image_format: str):
+        fmt = vdi_on_zfs_sr.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
