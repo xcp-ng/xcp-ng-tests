@@ -34,7 +34,8 @@ class TestXFSSRCreateDestroy:
 
     def test_create_xfs_sr_without_xfsprogs(self,
                                             host: Host,
-                                            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
+                                            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                                            image_format: str
                                             ) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
@@ -42,7 +43,10 @@ class TestXFSSRCreateDestroy:
         sr_disk = unused_512B_disks[host][0]["name"]
         sr = None
         try:
-            sr = host.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
+            sr = host.sr_create('xfs', "XFS-local-SR-test", {
+                'device': '/dev/' + sr_disk,
+                'preferred-image-formats': image_format
+            })
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:
@@ -71,6 +75,13 @@ class TestXFSSR:
 
     def test_vdi_is_not_open(self, vdi_on_xfs_sr):
         assert not vdi_is_open(vdi_on_xfs_sr)
+
+    def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: str):
+        fmt = vdi_on_xfs_sr.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
