@@ -17,6 +17,11 @@ if TYPE_CHECKING:
 class XfsConfig:
     uninstall_xfs: bool = True
 
+# NOTE: @pytest.mark.usefixtures does not parametrize this fixture.
+# To recreate host_with_xfsprogs for each image_format value, accept
+# image_format in the fixture arguments.
+# ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
+
 @pytest.fixture(scope='package')
 def _xfs_config() -> XfsConfig:
     return XfsConfig()
@@ -37,10 +42,13 @@ def xfs_sr(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     host_with_xfsprogs: Host,
     _xfs_config: XfsConfig,
+    image_format: str
 ) -> Generator[SR]:
     """ A XFS SR on first host. """
     sr_disk = unused_512B_disks[host_with_xfsprogs][0]["name"]
-    sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
+                                      {'device': '/dev/' + sr_disk,
+                                       'preferred-image-formats': image_format})
     yield sr
     # teardown
     try:
