@@ -107,8 +107,10 @@ def pytest_generate_tests(metafunc):
 
     if "image_format" in metafunc.fixturenames:
         image_format = metafunc.config.getoption("image_format")
-        if len(image_format) == 0:
-            image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
+        if len(image_format) == 1:
+            image_format = image_format[0].split(",")
+        if not image_format:
+            image_format = ["vhd"]
         metafunc.parametrize("image_format", image_format, scope="session")
 
 def pytest_collection_modifyitems(items, config):
