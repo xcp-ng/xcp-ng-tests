@@ -600,18 +600,6 @@ class Host:
         """
         return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
-    def available_disks(self, blocksize: int = 512) -> list[DiskDevName]:
-        """
-        Return a list of available disks for formatting, creating SRs or such.
-
-        Returns a list of disk names (eg.: ['sdb', 'sdc']) that don't have any mountpoint in
-        the output of lsblk (including their children such as partitions or md RAID devices)
-        """
-        blocksize_str = str(blocksize)
-        return [disk["name"] for disk in self.block_devices_info
-                if not disk["pkname"] and disk["log-sec"] == blocksize_str
-                and self.disk_is_available(disk["name"])]
-
     def file_exists(self, filepath, regular_file=True):
         option = '-f' if regular_file else '-e'
         return self.ssh_with_result(['test', option, filepath]).returncode == 0
