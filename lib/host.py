@@ -547,7 +547,7 @@ class Host:
         return pif.PIF(uuid, self)
 
     def disks(self):
-        """ List of SCSI disks, e.g ['sda', 'sdb', 'nvme0n1']. """
+        """ List of disks, e.g ['sda', 'sdb', 'nvme0n1']. """
         disks = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME']).splitlines()
         disks.sort()
         return disks
