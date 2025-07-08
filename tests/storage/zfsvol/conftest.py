@@ -5,17 +5,22 @@ import pytest
 from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 
 @pytest.fixture(scope='package')
-def host_with_zfsvol(host_with_saved_yum_state):
+def host_with_zfsvol(host_with_saved_yum_state, image_format):
     host = host_with_saved_yum_state
     host.yum_install(['xcp-ng-xapi-storage-volume-zfsvol'])
     host.restart_toolstack(verify=True)
     yield host
+    host.yum_remove(['xcp-ng-xapi-storage-volume-zfsvol'])
+    host.restart_toolstack(verify=True)
 
 @pytest.fixture(scope='package')
-def zfsvol_sr(host, sr_disk_wiped, host_with_zfsvol):
+def zfsvol_sr(host, image_format, sr_disk_wiped, host_with_zfsvol):
     """ A ZFS Volume SR on first host. """
     device = '/dev/' + sr_disk_wiped
-    sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {'device': device})
+    sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {
+        'device': device,
+        'preferred-image-formats': image_format
+    }, verify=True)
     yield sr
     # teardown violently - we don't want to require manual recovery when a test fails
     sr.forget()
