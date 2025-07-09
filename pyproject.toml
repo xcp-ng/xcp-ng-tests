@@ -61,5 +61,18 @@ ignore = [
   "F811",  # F811 redefined-while-unused
 ]
 
+[tool.ruff.lint.isort.sections]
+testing = ["pytest"]
+typing = ["typing"]
+
 [tool.ruff.lint.isort]
 lines-after-imports = 1
+section-order = [
+    "future",
+    "typing",
+    "testing",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]

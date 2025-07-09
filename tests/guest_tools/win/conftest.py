@@ -1,7 +1,8 @@
-import logging
 from typing import Any, Dict, Tuple
 
 import pytest
+
+import logging
 
 from data import OTHER_GUEST_TOOLS, OTHER_GUEST_TOOLS_ISO, WIN_GUEST_TOOLS_ISOS
 from lib.common import wait_for

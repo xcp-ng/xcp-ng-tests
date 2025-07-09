@@ -1,7 +1,7 @@
+import pytest
+
 import logging
 import re
-
-import pytest
 
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.2

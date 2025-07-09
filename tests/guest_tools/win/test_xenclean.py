@@ -1,8 +1,9 @@
-import logging
-from pathlib import PureWindowsPath
 from typing import Any, Dict, Tuple
 
 import pytest
+
+import logging
+from pathlib import PureWindowsPath
 
 from lib.common import wait_for
 from lib.vm import VM

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from typing import List
+
 import argparse
 import atexit
 import logging
@@ -8,7 +10,6 @@ import sys
 import tempfile
 from signal import SIGABRT, SIGINT, SIGQUIT, SIGTERM, signal
 from subprocess import run
-from typing import List
 
 import requests
 import yaml

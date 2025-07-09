@@ -1,5 +1,6 @@
-import sys
 from typing import TypedDict
+
+import sys
 
 if sys.version_info >= (3, 11):
     from typing import NotRequired

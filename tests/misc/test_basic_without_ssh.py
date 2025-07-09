@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from lib.common import wait_for
 from lib.host import Host

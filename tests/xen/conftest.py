@@ -1,6 +1,7 @@
+import pytest
+
 import logging
 
-import pytest
 from packaging import version
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)

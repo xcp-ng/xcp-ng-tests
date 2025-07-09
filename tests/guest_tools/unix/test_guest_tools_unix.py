@@ -1,7 +1,7 @@
+import pytest
+
 import logging
 import time
-
-import pytest
 
 from lib.common import PackageManagerEnum, wait_for
 

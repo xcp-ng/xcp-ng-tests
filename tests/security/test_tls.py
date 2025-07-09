@@ -1,8 +1,8 @@
+import pytest
+
 import logging
 import socket
 import ssl
-
-import pytest
 
 # This test is designed to verify that TLS connections is secured
 #

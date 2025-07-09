@@ -1,3 +1,7 @@
+from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeVar, Union, cast, overload
+
+import pytest
+
 import getpass
 import inspect
 import itertools
@@ -7,10 +11,8 @@ import sys
 import time
 import traceback
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeVar, Union, cast, overload
 from uuid import UUID
 
-import pytest
 import requests
 
 import lib.commands as commands

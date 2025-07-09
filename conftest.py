@@ -1,11 +1,13 @@
+from typing import Dict
+
+import pytest
+
 import itertools
 import logging
 import os
 import tempfile
-from typing import Dict
 
 import git
-import pytest
 from packaging import version
 
 import lib.config as global_config

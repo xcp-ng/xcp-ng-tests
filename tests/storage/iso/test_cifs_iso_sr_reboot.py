@@ -1,6 +1,6 @@
-import os
-
 import pytest
+
+import os
 
 from lib.common import wait_for
 

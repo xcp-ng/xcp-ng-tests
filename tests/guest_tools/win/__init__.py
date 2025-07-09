@@ -1,8 +1,9 @@
+from typing import Any, Dict, Union
+
 import enum
 import logging
 import re
 import time
-from typing import Any, Dict, Union
 
 from data import ISO_DOWNLOAD_URL
 from lib.commands import SSHCommandFailed

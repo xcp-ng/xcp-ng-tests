@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
+
 import logging
 import os
 import tempfile
-from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
 
 import lib.commands as commands
 import lib.efi as efi

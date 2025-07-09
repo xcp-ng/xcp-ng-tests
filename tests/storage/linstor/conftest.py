@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 import lib.commands as commands
 

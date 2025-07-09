@@ -1,7 +1,7 @@
+import pytest
+
 import logging
 import time
-
-import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for

@@ -1,7 +1,7 @@
+import pytest
+
 import logging
 import os
-
-import pytest
 
 from .conftest import check_iso_mount_and_read_from_vm, copy_tools_iso_to_iso_sr, remove_iso_from_sr
 

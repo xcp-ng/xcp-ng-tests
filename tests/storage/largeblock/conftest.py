@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 @pytest.fixture(scope='package')
 def largeblock_sr(host, sr_disk_4k):

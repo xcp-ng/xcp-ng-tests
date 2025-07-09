@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for

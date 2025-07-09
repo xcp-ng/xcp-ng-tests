@@ -1,7 +1,7 @@
+import pytest
+
 import hashlib
 import subprocess
-
-import pytest
 
 from lib import commands
 

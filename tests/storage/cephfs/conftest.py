@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from lib import config
 from lib.common import exec_nofail, raise_errors

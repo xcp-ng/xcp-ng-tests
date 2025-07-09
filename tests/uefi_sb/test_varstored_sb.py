@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from .utils import (
     _test_key_exchanges,

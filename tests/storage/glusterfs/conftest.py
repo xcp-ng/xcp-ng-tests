@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6

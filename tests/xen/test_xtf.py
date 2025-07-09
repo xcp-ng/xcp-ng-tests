@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from lib.commands import SSHCommandFailed
 

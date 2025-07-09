@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from . import PowerAction, wait_for_vm_running_and_ssh_up_without_tools
 from .guest_tools import (

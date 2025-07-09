@@ -1,7 +1,7 @@
+import pytest
+
 import logging
 from uuid import uuid4
-
-import pytest
 
 from data import ISO_IMAGES, NETWORKS
 from lib import commands, installer, pxe

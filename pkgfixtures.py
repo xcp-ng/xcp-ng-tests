@@ -1,6 +1,6 @@
-import logging
-
 import pytest
+
+import logging
 
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 
