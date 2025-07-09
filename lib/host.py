@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import tempfile
 import uuid
+from typing import Optional
 
 from packaging import version
 from typing import Dict, List, Literal, Optional, overload, TYPE_CHECKING, Union
@@ -55,6 +56,7 @@ class Host:
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
+        self._dom0: Optional[VM] = None
 
     def __str__(self):
         return self.hostname_or_ip
@@ -201,13 +203,13 @@ class Host:
             script.write('#!/usr/bin/env ' + shebang + '\n')
             script.write(script_contents)
             script.flush()
-            self.scp(script.name, script.name)
+            self.scp(script.name, "/tmp/" + os.path.basename(script.name))
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh([script.name], simple_output=simple_output)
+                return self.ssh(["/tmp/" + os.path.basename(script.name)], simple_output=simple_output)
             finally:
-                self.ssh(['rm', '-f', script.name])
+                self.ssh(['rm', '-f', "/tmp/" + os.path.basename(script.name)])
 
     def _get_xensource_inventory(self) -> Dict[str, str]:
         output = self.ssh(['cat', '/etc/xensource-inventory'])
@@ -699,3 +701,20 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def get_dom0_uuid(self):
+        return self.inventory["CONTROL_DOMAIN_UUID"]
+
+    def get_dom0_VM(self) -> VM:
+        if not self._dom0:
+            self._dom0 = VM(self.get_dom0_uuid(), self)
+        return self._dom0
+
+    def get_sr_from_vdi_uuid(self, vdi_uuid) -> Optional[SR]:
+        sr_uuid = self.xe("vdi-param-get",
+                          {"param-name": "sr-uuid",
+                           "uuid": vdi_uuid,
+                           })
+        if sr_uuid is None:
+            return None
+        return SR(sr_uuid, self.pool)

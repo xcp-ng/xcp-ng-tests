@@ -2,9 +2,12 @@ import logging
 import pytest
 
 @pytest.fixture(scope='package')
-def largeblock_sr(host, sr_disk_4k):
+def largeblock_sr(host, image_format, sr_disk_4k):
     """ A LARGEBLOCK SR on first host. """
-    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk_4k})
+    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {
+        'device': '/dev/' + sr_disk_4k,
+        'preferred-image-formats': image_format
+    })
     yield sr
     # teardown
     sr.destroy()
