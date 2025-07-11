@@ -373,10 +373,10 @@ class VM(BaseVM):
                                     'network-uuid': network_uuid,
                                     })
 
-    def is_running_on_host(self, host):
+    def is_running_on_host(self, host: Host) -> bool:
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
-    def get_residence_host(self):
+    def get_residence_host(self) -> Host:
         assert self.is_running()
         host_uuid = self.param_get('resident-on')
         return self.host.pool.get_host_by_uuid(host_uuid)
