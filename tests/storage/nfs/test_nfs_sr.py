@@ -1,7 +1,16 @@
+from __future__ import annotations
+
 import pytest
 
+from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.vdi import VDI
 from tests.storage import vdi_is_open
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.vm import VM
 
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
@@ -29,6 +38,39 @@ class TestNFSSR:
     def test_vdi_is_not_open(self, dispatch_nfs):
         vdi = dispatch_nfs
         assert not vdi_is_open(vdi)
+
+    @pytest.mark.small_vm
+    @pytest.mark.usefixtures('hostA2')
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_plugin_nfs_on_on_slave(self, dispatch_nfs: VM):
+        vm = dispatch_nfs
+        vm.start()
+        vm.wait_for_os_booted()
+        host = vm.get_residence_host()
+
+        vdi = vm.vdis[0]
+        image_format = vdi.get_image_format() or "vhd"
+
+        vdi_path = f"/run/sr-mount/{vdi.sr.uuid}/{vdi.uuid}.{image_format}"
+
+        # nfs-on-slave returns an error when the VDI is open on the host.
+        # Otherwise, it return "success", including in case "path" doesn't exist
+        with pytest.raises(SSHCommandFailed) as excinfo:
+            host.call_plugin("nfs-on-slave", "check", {"path": vdi_path})
+
+        # The output of the host plugin would have "stdout: NfsCheckException"
+        # and information about which process has the path open.
+        assert "NfsCheckException" in excinfo.value.stdout
+
+        for member in host.pool.hosts:
+            # skip the host where the VM is running
+            if member.uuid == host.uuid:
+                continue
+            member.call_plugin("nfs-on-slave", "check", {"path": vdi_path})
+
+        vm.shutdown(verify=True)
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
