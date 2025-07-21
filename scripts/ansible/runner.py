@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from typing import List
-
 import argparse
 import atexit
 import logging
@@ -16,6 +14,8 @@ import yaml
 from bs4 import BeautifulSoup
 
 import __main__
+
+from typing import List
 
 try:
     from yaml import CDumper as Dumper

@@ -1,5 +1,3 @@
-from typing import Generator, Optional
-
 import pytest
 
 import logging
@@ -8,6 +6,8 @@ import time
 
 from lib.host import Host
 from lib.vm import VM
+
+from typing import Generator, Optional
 
 # Requirements:
 # From --hosts parameter:

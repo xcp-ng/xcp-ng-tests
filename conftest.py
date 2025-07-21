@@ -1,5 +1,3 @@
-from typing import Dict
-
 import pytest
 
 import itertools
@@ -32,6 +30,8 @@ from lib.xo import xo_cli
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
+
+from typing import Dict
 
 # Do we cache VMs?
 try:

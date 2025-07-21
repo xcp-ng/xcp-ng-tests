@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
-
 import logging
 import os
 import shlex
@@ -12,6 +10,8 @@ from packaging import version
 
 import lib.commands as commands
 import lib.pif as pif
+
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
 
 if TYPE_CHECKING:
     import lib.pool

@@ -1,5 +1,3 @@
-from typing import Generator, Sequence, Union
-
 import pytest
 import pytest_dependency  # type: ignore
 
@@ -13,6 +11,8 @@ from lib import installer, pxe
 from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
+
+from typing import Generator, Sequence, Union
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported

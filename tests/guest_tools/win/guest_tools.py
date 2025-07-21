@@ -1,5 +1,3 @@
-from typing import Any, Dict
-
 import logging
 from pathlib import PureWindowsPath
 
@@ -13,6 +11,8 @@ from . import (
     insert_cd_safe,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
+
+from typing import Any, Dict
 
 ERROR_SUCCESS = 0
 ERROR_INSTALL_FAILURE = 1603

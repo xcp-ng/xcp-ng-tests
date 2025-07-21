@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Any, Literal, Optional, overload
-
 import logging
+
+from typing import TYPE_CHECKING, Any, Literal, Optional, overload
 
 if TYPE_CHECKING:
     import lib.host

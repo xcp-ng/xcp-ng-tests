@@ -1,5 +1,3 @@
-from typing import Any, Dict, Tuple
-
 import pytest
 
 import logging
@@ -20,6 +18,8 @@ from . import (
 )
 from .guest_tools import install_guest_tools
 from .other_tools import install_other_drivers
+
+from typing import Any, Dict, Tuple
 
 @pytest.fixture(scope="module")
 def running_windows_vm_without_tools(imported_vm: VM) -> VM:

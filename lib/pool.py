@@ -1,5 +1,3 @@
-from typing import Any, Dict, Optional
-
 import logging
 import os
 import traceback
@@ -10,6 +8,8 @@ import lib.commands as commands
 from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
+
+from typing import Any, Dict, Optional
 
 class Pool:
     xe_prefix = "pool"

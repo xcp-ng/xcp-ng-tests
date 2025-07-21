@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
-
 import logging
 import os
 import tempfile
@@ -22,6 +20,8 @@ from lib.common import (
 from lib.snapshot import Snapshot
 from lib.vbd import VBD
 from lib.vif import VIF
+
+from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
 
 if TYPE_CHECKING:
     from lib.host import Host

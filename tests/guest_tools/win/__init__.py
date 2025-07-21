@@ -1,5 +1,3 @@
-from typing import Any, Dict, Union
-
 import enum
 import logging
 import re
@@ -11,6 +9,8 @@ from lib.common import wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vm import VM
+
+from typing import Any, Dict, Union
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.

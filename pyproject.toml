@@ -69,10 +69,10 @@ typing = ["typing"]
 lines-after-imports = 1
 section-order = [
     "future",
-    "typing",
     "testing",
     "standard-library",
     "third-party",
     "first-party",
     "local-folder",
+    "typing",
 ]
