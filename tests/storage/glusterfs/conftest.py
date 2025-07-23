@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
@@ -104,7 +105,7 @@ def _fallback_gluster_teardown(host):
         try:
             # Volume might already be stopped if failure happened on delete
             h.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
-        except Exception as e:
+        except Exception:
             pass
 
         h.ssh(['gluster', '--mode=script', 'volume', 'delete', 'vol0'])

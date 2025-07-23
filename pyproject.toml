@@ -24,9 +24,55 @@ dev = [
     "pydocstyle",
     "pyright",
     "pyyaml>=6.0",
+    "ruff",
     "types-requests",
     "typing-extensions",
 ]
 
 [tool.pyright]
 typeCheckingMode = "standard"
+
+[tool.ruff]
+preview = true
+line-length = 120
+exclude = ["data.py", "vm_data.py", ".git"]
+
+[tool.ruff.format]
+quote-style = "preserve"
+
+[tool.ruff.lint]
+select = [
+  "F",  # Pyflakes
+  "I",  # isort
+  "SLF",  # flake8-self
+  "SIM",  # flake8-simplify
+]
+# don't use some of the SIM rules
+ignore = [
+  "SIM105",  # suppressible-exception
+  "SIM108",  # if-else-block-instead-of-if-exp
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+# pytest requires some import and function arguments to match, but
+# the linter doesn't know that
+"tests/**/*.py" = [
+  "F401",  # F401 unused-import
+  "F811",  # F811 redefined-while-unused
+]
+
+[tool.ruff.lint.isort.sections]
+testing = ["pytest*"]
+typing = ["typing"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 1
+section-order = [
+    "future",
+    "testing",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+    "typing",
+]

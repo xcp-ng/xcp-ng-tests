@@ -1,6 +1,7 @@
+import pytest
+
 import ipaddress
 import os
-import pytest
 
 # Requirements:
 # - one XCP-ng host (--host) >= 8.2 (>= 8.3 for the CIDR tests) with no SDN controller configured

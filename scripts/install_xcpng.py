@@ -5,20 +5,20 @@ import atexit
 import logging
 import os
 import random
-import requests
 import string
 import subprocess
 import sys
 import tempfile
 import time
 
+import requests
 from packaging import version
 
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
-from lib.commands import ssh, scp, SSHCommandFailed
-from lib.common import wait_for, is_uuid
+from lib.commands import SSHCommandFailed, scp, ssh
+from lib.common import is_uuid, wait_for
 from lib.host import host_data
 from lib.pool import Pool
 from lib.vm import VM

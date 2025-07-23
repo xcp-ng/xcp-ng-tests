@@ -1,11 +1,13 @@
-import logging
 import pytest
+
+import logging
 import time
 
-from .conftest import LINSTOR_PACKAGE
 from lib.commands import SSHCommandFailed
-from lib.common import wait_for, vm_image
+from lib.common import vm_image, wait_for
 from tests.storage import vdi_is_open
+
+from .conftest import LINSTOR_PACKAGE
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR

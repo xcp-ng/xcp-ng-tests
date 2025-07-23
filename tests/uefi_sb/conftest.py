@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 
 from packaging import version
 

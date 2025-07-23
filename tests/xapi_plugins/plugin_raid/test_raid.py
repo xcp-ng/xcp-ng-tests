@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 
 # Requirements:
 # From --hosts parameter:

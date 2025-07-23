@@ -1,7 +1,6 @@
 import logging
 import os
 import traceback
-from typing import Any, Dict, Optional, cast
 
 from packaging import version
 
@@ -10,6 +9,7 @@ from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_no
 from lib.host import Host
 from lib.sr import SR
 
+from typing import Any, Dict, Optional
 
 class Pool:
     xe_prefix = "pool"
@@ -265,7 +265,7 @@ class Pool:
             assert 'db' in auths_dict
 
             logging.info('Installing auths to pool: %s' % list(auths_dict.keys()))
-            for key in auths_dict.keys():
+            for key in auths_dict:
                 value = host.ssh([f'md5sum {auths_dict[key]} | cut -d " " -f 1'])
                 logging.debug('Key: %s, value: %s' % (key, value))
             params = [auths_dict['PK'], auths_dict['KEK'], auths_dict['db']]

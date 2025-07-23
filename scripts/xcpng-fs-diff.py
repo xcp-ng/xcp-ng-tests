@@ -39,14 +39,14 @@
 #
 
 import argparse
-import sys
-import subprocess
 import json
-import tempfile
 import os
 import shlex
-from fnmatch import fnmatch
+import subprocess
+import sys
+import tempfile
 from enum import StrEnum, auto
+from fnmatch import fnmatch
 
 class DataType(StrEnum):
     FILE = auto()

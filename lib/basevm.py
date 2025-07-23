@@ -1,8 +1,7 @@
 import logging
 
-from typing import Any, Literal, Optional, overload, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, Optional, overload
 
-import lib.commands as commands
 if TYPE_CHECKING:
     import lib.host
 
@@ -87,10 +86,7 @@ class BaseVM:
         return True
 
     def all_vdis_on_sr(self, sr) -> bool:
-        for vdi_uuid in self.vdi_uuids():
-            if self.host.pool.get_vdi_sr_uuid(vdi_uuid) != sr.uuid:
-                return False
-        return True
+        return all(self.host.pool.get_vdi_sr_uuid(vdi_uuid) == sr.uuid for vdi_uuid in self.vdi_uuids())
 
     def get_sr(self):
         # in this method we assume the SR of the first VDI is the VM SR

@@ -1,19 +1,25 @@
+import pytest
+
 import itertools
-import git
 import logging
 import os
-import pytest
 import tempfile
 
+import git
 from packaging import version
-from typing import Dict
 
 import lib.config as global_config
-
 from lib import pxe
-from lib.common import callable_marker, shortened_nodeid, prefix_object_name
-from lib.common import wait_for, vm_image, is_uuid
-from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+from lib.common import (
+    callable_marker,
+    is_uuid,
+    prefix_object_name,
+    setup_formatted_and_mounted_disk,
+    shortened_nodeid,
+    teardown_formatted_and_mounted_disk,
+    vm_image,
+    wait_for,
+)
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
@@ -24,6 +30,8 @@ from lib.xo import xo_cli
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
+
+from typing import Dict
 
 # Do we cache VMs?
 try:

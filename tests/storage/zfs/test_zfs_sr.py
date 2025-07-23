@@ -1,11 +1,13 @@
-import logging
-import time
 import pytest
 
-from .conftest import POOL_PATH, POOL_NAME
+import logging
+import time
+
 from lib.commands import SSHCommandFailed
-from lib.common import wait_for, vm_image
+from lib.common import vm_image, wait_for
 from tests.storage import vdi_is_open
+
+from .conftest import POOL_NAME, POOL_PATH
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR

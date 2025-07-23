@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 
 from lib.common import wait_for_not
 from lib.vm import VM

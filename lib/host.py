@@ -3,21 +3,33 @@ from __future__ import annotations
 import logging
 import os
 import shlex
-import subprocess
 import tempfile
 import uuid
 
 from packaging import version
-from typing import Dict, List, Literal, Optional, overload, TYPE_CHECKING, Union
 
 import lib.commands as commands
 import lib.pif as pif
+
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
+
 if TYPE_CHECKING:
     import lib.pool
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
-from lib.common import safe_split, strip_suffix, to_xapi_bool, wait_for, wait_for_not
-from lib.common import prefix_object_name
+from lib.common import (
+    _param_add,
+    _param_clear,
+    _param_get,
+    _param_remove,
+    _param_set,
+    prefix_object_name,
+    safe_split,
+    strip_suffix,
+    strtobool,
+    to_xapi_bool,
+    wait_for,
+    wait_for_not,
+)
 from lib.netutil import wrap_ip
 from lib.sr import SR
 from lib.vdi import VDI
@@ -29,7 +41,7 @@ XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
 def host_data(hostname_or_ip):
     # read from data.py
-    from data import HOST_DEFAULT_USER, HOST_DEFAULT_PASSWORD, HOSTS
+    from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER, HOSTS
     if hostname_or_ip in HOSTS:
         h_data = HOSTS[hostname_or_ip]
         return h_data

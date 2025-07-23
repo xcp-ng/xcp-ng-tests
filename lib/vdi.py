@@ -1,7 +1,9 @@
 import logging
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
-from typing import Literal, Optional, overload, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Literal, Optional, overload
+
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.sr import SR

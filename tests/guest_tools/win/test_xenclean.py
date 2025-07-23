@@ -1,12 +1,14 @@
+import pytest
+
 import logging
 from pathlib import PureWindowsPath
-from typing import Any, Dict, Tuple
-import pytest
+
 from lib.common import wait_for
 from lib.vm import VM
 
 from . import WINDOWS_SHUTDOWN_COMMAND, insert_cd_safe, wait_for_vm_running_and_ssh_up_without_tools
 
+from typing import Any, Dict, Tuple
 
 def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
     insert_cd_safe(vm, guest_tools_iso["name"])
@@ -53,6 +55,6 @@ class TestXenClean:
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
             return
-        logging.info(f"XenClean with other tools")
+        logging.info("XenClean with other tools")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()

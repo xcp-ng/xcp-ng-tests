@@ -19,7 +19,6 @@ from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
 
 import lib.commands as commands
 
-
 class GUID(UUID):
     def as_bytes(self):
         return self.bytes_le

@@ -1,5 +1,6 @@
-import json
 import pytest
+
+import json
 
 # Requirements:
 # From --hosts parameter:

@@ -2,12 +2,11 @@ import base64
 import logging
 import shlex
 import subprocess
-from typing import List, Literal, overload, Union
-
 
 import lib.config as config
 from lib.netutil import wrap_ip
 
+from typing import List, Literal, Union, overload
 
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'

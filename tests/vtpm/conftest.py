@@ -1,4 +1,5 @@
 import pytest
+
 import logging
 
 from lib.common import PackageManagerEnum

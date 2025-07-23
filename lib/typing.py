@@ -1,4 +1,5 @@
 import sys
+
 from typing import TypedDict
 
 if sys.version_info >= (3, 11):

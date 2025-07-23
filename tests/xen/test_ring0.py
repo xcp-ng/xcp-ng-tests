@@ -1,11 +1,13 @@
-import logging
 import pytest
+
+import logging
 import secrets
 import time
-from typing import Generator, Optional
 
 from lib.host import Host
 from lib.vm import VM
+
+from typing import Generator, Optional
 
 # Requirements:
 # From --hosts parameter:

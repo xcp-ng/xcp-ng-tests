@@ -1,8 +1,8 @@
 import pytest
+
 import re
 
 import lib.commands as commands
-
 from lib.netutil import wrap_ip
 
 # These tests are meant to test an host fileserver behavior.

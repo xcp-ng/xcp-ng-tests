@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 import urllib.request
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)

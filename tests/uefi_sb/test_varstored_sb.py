@@ -1,8 +1,16 @@
-import logging
 import pytest
 
-from .utils import _test_key_exchanges, boot_and_check_no_sb_errors, boot_and_check_sb_failed, \
-    boot_and_check_sb_succeeded, generate_keys, revert_vm_state, sign_efi_bins
+import logging
+
+from .utils import (
+    _test_key_exchanges,
+    boot_and_check_no_sb_errors,
+    boot_and_check_sb_failed,
+    boot_and_check_sb_succeeded,
+    generate_keys,
+    revert_vm_state,
+    sign_efi_bins,
+)
 
 # These tests check the behaviour of XAPI and varstored as they are in XCP-ng 8.3
 # For XCP-ng 8.2, see test_uefistored_sb.py

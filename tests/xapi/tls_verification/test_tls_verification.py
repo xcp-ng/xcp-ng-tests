@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool

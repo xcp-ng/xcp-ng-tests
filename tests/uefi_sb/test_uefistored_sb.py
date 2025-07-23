@@ -1,11 +1,20 @@
-import logging
 import pytest
+
+import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 
-from .utils import _test_key_exchanges, boot_and_check_no_sb_errors, boot_and_check_sb_failed, \
-    boot_and_check_sb_succeeded, generate_keys, revert_vm_state, sign_efi_bins, VM_SECURE_BOOT_FAILED
+from .utils import (
+    VM_SECURE_BOOT_FAILED,
+    _test_key_exchanges,
+    boot_and_check_no_sb_errors,
+    boot_and_check_sb_failed,
+    boot_and_check_sb_succeeded,
+    generate_keys,
+    revert_vm_state,
+    sign_efi_bins,
+)
 
 # These tests check the behaviour of XAPI and uefistored as they are in XCP-ng 8.2
 # For XCP-ng 8.3 or later, see test_varstored_sb.py

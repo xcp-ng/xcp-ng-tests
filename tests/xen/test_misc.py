@@ -1,5 +1,6 @@
-import logging
 import pytest
+
+import logging
 import re
 
 # Misc tests for Xen host

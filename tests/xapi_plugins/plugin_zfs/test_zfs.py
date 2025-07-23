@@ -1,6 +1,7 @@
+import pytest
+
 import json
 import logging
-import pytest
 
 # Requirements:
 # From --hosts parameter:
