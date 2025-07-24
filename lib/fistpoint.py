@@ -1,12 +1,32 @@
 import logging
-from typing import Final
 
 from lib.host import Host
+
+from typing import Final
 
 FISTPOINT_DIR: Final = "/tmp"
 LVHDRT_EXIT_FIST: Final = "fist_LVHDRT_exit"
 
+
 class FistPoint:
+    """
+    A fistpoint is an action that you can enable in the smapi for tests.
+
+    It allows for example, add a sleep at some point or raise an exception.
+    For example:
+    ```
+    with FistPoint(vm.host, "blktap_activate_inject_failure"):
+        with pytest.raises(SSHCommandFailed):
+            vm.start()
+            vm.shutdown(force=True)
+    ```
+    Activating the fistpoint `blktap_activate_inject_failure` mean that the VDI
+    activation will fail. This fistpoint always raise an exception but most
+    fistpoint just add a sleep at a point in the code.
+    Using the fixture `exit_on_fistpoint` make all fistpoints raise an
+    exception instead by enabling a special fistpoint called `fist_LVHDRT_exit`
+    """
+
     fistpointName: str
 
     def __init__(self, host: Host, name: str):
