@@ -4,6 +4,7 @@ import pytest
 
 import logging
 
+from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.fistpoint import FistPoint
 from lib.vdi import VDI
@@ -72,12 +73,9 @@ class TestEXTSR:
     def test_blktap_activate_failure(self, vm_on_ext_sr):
         from lib.fistpoint import FistPoint
         vm = vm_on_ext_sr
-        with FistPoint(vm.host, "blktap_activate_inject_failure"):
-            try:
-                vm.start()
-                vm.shutdown(force=True)
-            except Exception as e:
-                logging.info(f"Expected failure {e}")
+        with FistPoint(vm.host, "blktap_activate_inject_failure"), pytest.raises(SSHCommandFailed):
+            vm.start()
+            vm.shutdown(force=True)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
@@ -102,7 +100,7 @@ class TestEXTSR:
         with FistPoint(vm.host, "LVHDRT_inflate_after_setSize"):
             try:
                 vdi.resize(new_size)
-            except:
+            except Exception:
                 logging.info(f"Launching SR scan for {ext_sr} after failure")
                 host.xe("sr-scan", {"uuid": ext_sr})
 

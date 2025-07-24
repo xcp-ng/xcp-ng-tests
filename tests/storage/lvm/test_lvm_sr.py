@@ -94,7 +94,8 @@ class TestLVMSR:
             host.xe("sr-scan", {"uuid": lvm_sr.uuid})
         except SSHCommandFailed as e:
             assert False, f"Failing to scan following a inflate error {e}"
-        assert not lvinflate in host.lvs(f"VG_XenStorage-{lvm_sr.uuid}"), "Inflate journal still exist following the scan"
+        assert lvinflate not in host.lvs(f"VG_XenStorage-{lvm_sr.uuid}"), \
+            "Inflate journal still exist following the scan"
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
@@ -124,7 +125,8 @@ class TestLVMSR:
             host.xe("sr-scan", {"uuid": lvm_sr.uuid})
         except SSHCommandFailed as e:
             assert False, f"Failing to scan following a inflate error {e}"
-        assert not lvinflate in host.lvs(f"VG_XenStorage-{lvm_sr.uuid}"), "Inflate journal still exist following the scan"
+        assert lvinflate not in host.lvs(f"VG_XenStorage-{lvm_sr.uuid}"), \
+            "Inflate journal still exist following the scan"
 
     # *** tests with reboots (longer tests).
 
