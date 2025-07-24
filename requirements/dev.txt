@@ -3,6 +3,7 @@ ansible>=5.0.1
 bs4>=0.0.1
 mypy
 flake8
+flake8-pyproject
 pydocstyle
 pyright
 pyyaml>=6.0
