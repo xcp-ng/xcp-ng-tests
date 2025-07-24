@@ -2,24 +2,28 @@ name: Check test-sequences consistency
 
 on: [push]
 
+permissions: {}
+
 jobs:
   jobs-check:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+      with:
+        persist-credentials: false
     - name: Install uv
-      uses: astral-sh/setup-uv@v6
+      uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
       with:
         version: "0.7.x"
     - name: Install dependencies
-      run: uv sync --frozen
+      run: uv sync --frozen --no-dev
     - name: Create a dummy data.py
       run: cp data.py-dist data.py
     - name: jobs-check
       run: |
         FAILURES=""
         for seq in $(find -name "*.lst"); do
-          if ! uv run pytest @$seq --collect-only --quiet; then
+          if ! uv run --no-dev pytest @$seq --collect-only --quiet; then
             FAILURES="$FAILURES $seq"
           fi
         done
