@@ -8,19 +8,13 @@ jobs:
   zizmor:
     name: zizmor latest
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write  # needed for SARIF uploads
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+      - uses: ./.github/actions/uv-setup/
         with:
-          version: "0.7.x"
-      - run: uvx zizmor --format=sarif . > results.sarif 
+          sync: false
+      - run: uvx zizmor --color=always .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
-      - uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f  # v3.28.18
-        with:
-          sarif_file: results.sarif
-          category: zizmor
