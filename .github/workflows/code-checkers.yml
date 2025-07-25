@@ -8,71 +8,43 @@ jobs:
   mypy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      with:
-        persist-credentials: false
-    - name: Install uv
-      uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
-      with:
-        version: "0.7.x"
-    - name: Install dependencies
-      run: uv sync --frozen
-    - name: Create a dummy data.py
-      run: cp data.py-dist data.py
-    - name: Install additional typing data and check with mypy
-      run: uv run mypy --install-types --non-interactive lib/ conftest.py pkgfixtures.py tests/
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup
+      - name: Create a dummy data.py
+        run: cp data.py-dist data.py
+      - run: mypy --install-types --non-interactive lib/ conftest.py pkgfixtures.py tests/
 
   pyright:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      with:
-        persist-credentials: false
-    - name: Install uv
-      uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
-      with:
-        version: "0.7.x"
-    - name: Install dependencies
-      run: uv sync --frozen
-    - name: Create a dummy data.py
-      run: cp data.py-dist data.py
-    - name: Check with pyright
-      run: uv run pyright lib/ conftest.py pkgfixtures.py # tests/
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup/
+      - name: Create a dummy data.py
+        run: cp data.py-dist data.py
+      - run: pyright lib/ conftest.py pkgfixtures.py # tests/
 
   ruff:
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write  # needed for SARIF uploads
+    env:
+      FORCE_COLOR: "1"
     steps:
-    - uses: actions/checkout@v2
-      with:
-        persist-credentials: false
-    - name: Install uv
-      uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
-      with:
-        version: "0.7.x"
-    - name: Install dependencies
-      run: uv sync --frozen
-    - name: Create a dummy data.py
-      run: cp data.py-dist data.py
-    - name: Check with ruff
-      run: uv run ruff check lib/ tests/ --output-format sarif > results.sarif  
-    - uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f  # v3.28.18
-      with:
-        sarif_file: results.sarif
-        category: ruff
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup/
+      - name: Create a dummy data.py
+        run: cp data.py-dist data.py
+      - run: ruff check lib/ tests/
 
   flake8:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      with:
-        persist-credentials: false
-    - name: Install uv
-      uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
-      with:
-        version: "0.7.x"
-    - name: Install dependencies
-      run: uv sync --frozen
-    - name: flake8
-      run: uv run flake8
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup/
+      - run: flake8
