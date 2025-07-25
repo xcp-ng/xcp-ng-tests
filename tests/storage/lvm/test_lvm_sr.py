@@ -71,18 +71,13 @@ class TestLVMSR:
     def test_failing_resize_on_inflate_after_setSize(self, host, lvm_sr, vm_on_lvm_sr, exit_on_fistpoint):
         vm = vm_on_lvm_sr
         lvinflate = ""
-        need_rescan = False
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
-        new_size = vdi.size() + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
+        new_size = vdi.get_virtual_size() + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
 
-        with FistPoint(vm.host, "LVHDRT_inflate_after_setSize"):
-            try:
-                vdi.resize(new_size)
-            except SSHCommandFailed as e:
-                logging.info(e)
-                need_rescan = True
+        with FistPoint(vm.host, "LVHDRT_inflate_after_setSize"), pytest.raises(SSHCommandFailed) as exc_info:
+            vdi.resize(new_size)
+        logging.info(exc_info)
 
-        assert need_rescan, "Resize did not make an error"
         lvlist = host.lvs(f"VG_XenStorage-{lvm_sr.uuid}")
         for lv in lvlist:
             if lv.startswith("inflate_"):
@@ -102,18 +97,13 @@ class TestLVMSR:
     def test_failing_resize_on_inflate_after_setSizePhys(self, host, lvm_sr, vm_on_lvm_sr, exit_on_fistpoint):
         vm = vm_on_lvm_sr
         lvinflate = ""
-        need_rescan = False
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
-        new_size = vdi.size() + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
+        new_size = vdi.get_virtual_size() + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
 
-        with FistPoint(vm.host, "LVHDRT_inflate_after_setSizePhys"):
-            try:
-                vdi.resize(new_size)
-            except SSHCommandFailed as e:
-                logging.info(e)
-                need_rescan = True
+        with FistPoint(vm.host, "LVHDRT_inflate_after_setSizePhys"), pytest.raises(SSHCommandFailed) as exc_info:
+            vdi.resize(new_size)
+        logging.info(exc_info)
 
-        assert need_rescan, "Resize did not make an error"
         lvlist = host.lvs(f"VG_XenStorage-{lvm_sr.uuid}")
         for lv in lvlist:
             if lv.startswith("inflate_"):

@@ -43,7 +43,7 @@ class VDI:
     def readonly(self) -> bool:
         return strtobool(self.param_get("read-only"))
 
-    def size(self) -> int:
+    def get_virtual_size(self) -> int:
         return int(self.param_get("virtual-size"))
 
     def resize(self, new_size: int) -> None:

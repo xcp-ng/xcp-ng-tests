@@ -82,29 +82,29 @@ class TestEXTSR:
     def test_resize(self, vm_on_ext_sr):
         vm = vm_on_ext_sr
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
-        old_size = vdi.size()
+        old_size = vdi.get_virtual_size()
         new_size = old_size + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
 
         vdi.resize(new_size)
 
-        assert vdi.size() == new_size
+        assert vdi.get_virtual_size() == new_size
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
     def test_failing_resize(self, host, ext_sr, vm_on_ext_sr, exit_on_fistpoint):
         vm = vm_on_ext_sr
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
-        old_size = vdi.size()
+        old_size = vdi.get_virtual_size()
         new_size = old_size + (1 * 1024 * 1024 * 1024) # Adding a 1GiB to size
 
         with FistPoint(vm.host, "LVHDRT_inflate_after_setSize"):
             try:
                 vdi.resize(new_size)
-            except Exception:
+            except SSHCommandFailed:
                 logging.info(f"Launching SR scan for {ext_sr} after failure")
                 host.xe("sr-scan", {"uuid": ext_sr})
 
-        assert vdi.size() == new_size
+        assert vdi.get_virtual_size() == new_size
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
