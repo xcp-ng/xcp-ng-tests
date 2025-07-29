@@ -94,6 +94,13 @@ def pytest_addoption(parser):
              "4KiB blocksize to be formatted and used in storage tests. "
              "Set it to 'auto' to let the fixtures auto-detect available disks."
     )
+    parser.addoption(
+        "--image-format",
+        action="append",
+        default=[],
+        help="Format of VDI to execute tests on."
+        "Example: vhd,qcow2"
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -105,6 +112,12 @@ def pytest_generate_tests(metafunc):
         if not vms:
             vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
+
+    if "image_format" in metafunc.fixturenames:
+        image_format = metafunc.config.getoption("image_format")
+        if len(image_format) == 0:
+            image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
+        metafunc.parametrize("image_format", image_format, scope="session")
 
 def pytest_collection_modifyitems(items, config):
     # Automatically mark tests based on fixtures they require.
