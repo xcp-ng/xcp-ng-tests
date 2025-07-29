@@ -190,6 +190,9 @@ class VM(BaseVM):
         self.wait_for_os_booted()
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
+    def wait_for_vm_running(self):
+        wait_for(self.is_running)
+
     def ssh_touch_file(self, filepath):
         logging.info("Create file on VM (%s)" % filepath)
         self.ssh(['touch', filepath])
@@ -506,6 +509,24 @@ class VM(BaseVM):
             self.ssh(['test ! -f ' + filepath])
         finally:
             snapshot.destroy(verify=True)
+
+    def vdi_resize(self, vdi_uuid: str, new_size: Optional[int] = None):
+        # Reference
+        # MAX_VHD_SIZE = 2088960 * 1024 * 1024 # 2088960 MB
+        # MIN_VHD_SIZE = 1 * 1024 * 1024 # 1MB
+
+        # Following assert may be removed in future if we support online vdi resize
+        assert self.is_halted(), "Expected halted, got running"
+
+        vdi = VDI(vdi_uuid, sr=self.get_sr())
+        if new_size is None:
+            # Resize by double, ideally it should be within min and max limits reference
+            vdi_size = int(vdi.param_get("virtual-size"))
+            new_size = vdi_size * 2
+
+        vdi.resize(new_size)
+        resized_vdi_size = int(vdi.param_get("virtual-size"))
+        assert resized_vdi_size == new_size, f"Expected {new_size}, got {resized_vdi_size}"
 
     def get_messages(self, name):
         args = {
