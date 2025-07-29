@@ -189,6 +189,23 @@ class TestLinstorSR:
         finally:
             vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_resize_vdi(self, vm_on_linstor_sr: VM) -> None:
+        vm = vm_on_linstor_sr
+        if vm.is_running():
+            vm.shutdown(verify=True)
+
+        for vdi in vm.vdis:
+            size = vdi.get_virtual_size()
+            vdi.resize(size * 2)
+            assert vdi.get_virtual_size() == size * 2
+
+        # Make sure the VM still starts up successfully after resizing
+        vm.start()
+        vm.wait_for_os_booted()
+        vm.shutdown(verify=True)
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
