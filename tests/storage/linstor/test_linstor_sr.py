@@ -140,6 +140,7 @@ def _get_diskful_hosts(host, controller_option, volume_name):
     attempt = 0
     retries = 3
     sleep_sec = 5
+
     while attempt < retries:
         try:
             # Find host where volume is UpToDate
@@ -153,11 +154,12 @@ def _get_diskful_hosts(host, controller_option, volume_name):
                 hostname = line.split('|')[2].strip()
                 diskfuls += hostname
             return diskfuls
-        except SSHCommandFailed:
+        except SSHCommandFailed as e:
+            logging.error("SSH Command Failed (attempt %d/%d): %s", attempt + 1, retries, e)
             attempt += 1
-        if attempt >= retries:
-            raise
-        time.sleep(sleep_sec)
+            if attempt >= retries:
+                raise
+            time.sleep(sleep_sec)
 
 def _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless):
     diskfuls = _get_diskful_hosts(host, controller_option, volume_name)
