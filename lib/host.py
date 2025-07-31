@@ -581,10 +581,11 @@ class Host:
         ]
         logging.debug("blockdevs found: %s", [disk["name"] for disk in self.block_devices_info])
 
-    def disks(self) -> list[DiskDevName]:
-        """ List of disks, e.g ['sda', 'sdb', 'nvme0n1']. """
+    def disks(self) -> list[Host.BlockDeviceInfo]:
+        """ List of BlockDeviceInfo for all disks. """
         # filter out partitions from block_devices
-        return sorted(disk["name"] for disk in self.block_devices_info if not disk["pkname"])
+        return sorted((disk for disk in self.block_devices_info if not disk["pkname"]),
+                      key=lambda disk: disk["name"])
 
     def disk_is_available(self, disk: DiskDevName) -> bool:
         """
