@@ -1,11 +1,12 @@
-name: Check jobs consistency
+name: GitHub Actions Security Analysis with zizmor 🌈
 
 on: [push]
 
 permissions: {}
 
 jobs:
-  jobs-check:
+  zizmor:
+    name: zizmor latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,7 +14,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
         with:
-          dev: false
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
-      - run: ./jobs.py check
+          sync: false
+      - run: uvx zizmor --color=always .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
