@@ -300,10 +300,11 @@ class VM(BaseVM):
             network_uuid = self.host.pool.network_named(network_name)
         assert network_uuid, f"No UUID given, and network name {network_name!r} not found"
         logging.info("Create VIF %d to network %r on VM %s", vif_num, network_uuid, self.uuid)
-        self.host.xe('vif-create', {'vm-uuid': self.uuid,
-                                    'device': str(vif_num),
-                                    'network-uuid': network_uuid,
-                                    })
+        vif_uuid = self.host.xe('vif-create', {'vm-uuid': self.uuid,
+                                               'device': str(vif_num),
+                                               'network-uuid': network_uuid,
+                                               })
+        return VIF(vif_uuid, self)
 
     def is_running_on_host(self, host):
         return self.is_running() and self.param_get('resident-on') == host.uuid
