@@ -3,9 +3,12 @@ import pytest
 import logging
 
 @pytest.fixture(scope='package')
-def ext_sr(host, sr_disk):
+def ext_sr(host, sr_disk, vdi_image_format):
     """ An EXT SR on first host. """
-    sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('ext', "EXT-local-SR-test", {
+        'device': '/dev/' + sr_disk,
+        'preferred-image-formats': vdi_image_format
+    })
     yield sr
     # teardown
     sr.destroy()
@@ -23,3 +26,7 @@ def vm_on_ext_sr(host, ext_sr, vm_ref):
     # teardown
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(params=["qcow2", "vhd"], scope="session")
+def vdi_image_format(request):
+    return request.param
