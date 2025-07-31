@@ -10,7 +10,7 @@ from tests.storage import vdi_is_open
 from .conftest import LINSTOR_PACKAGE
 
 # Requirements:
-# - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
+# - one pool of 3 or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
 # - access to XCP-ng RPM repository from the host
 
 class TestLinstorSRCreateDestroy:
@@ -20,23 +20,20 @@ class TestLinstorSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_without_linstor(self, host, lvm_disks, provisioning_type, storage_pool_name):
+    def test_create_sr_without_linstor(self, host_without_linstor, lvm_disks, provisioning_type, storage_pool_name):
         # This test must be the first in the series in this module
-        assert not host.is_package_installed('python-linstor'), \
-            "linstor must not be installed on the host at the beginning of the tests"
-        try:
+        # FIXME: why would it be?
+        host = host_without_linstor
+        with pytest.raises(SSHCommandFailed):
             sr = host.sr_create('linstor', 'LINSTOR-SR-test', {
                 'group-name': storage_pool_name,
                 'redundancy': '1',
                 'provisioning': provisioning_type
             }, shared=True)
-            try:
+            # if exception was not raised, cleanup
+            # FIXME: ignoring all exceptions looks like a problem here?
+            with contextlib.suppress(Exception):
                 sr.destroy()
-            except Exception:
-                pass
-            assert False, "SR creation should not have succeeded!"
-        except SSHCommandFailed as e:
-            logging.info("SR creation failed, as expected: {}".format(e))
 
     def test_create_and_destroy_sr(self, pool_with_linstor, provisioning_type, storage_pool_name):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
