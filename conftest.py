@@ -129,7 +129,6 @@ def pytest_collection_modifyitems(items, config):
         'windows_vm',
         'hostA2',
         'hostB1',
-        'sr_disk_4k',
         'unused_512B_disks',
         'unused_4k_disks',
     ]
@@ -414,30 +413,6 @@ def unused_4k_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
            }
     logging.debug("available 4k disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
     return ret
-
-@pytest.fixture(scope='session')
-def sr_disk_4k(pytestconfig, host: Host) -> Generator[DiskDevName]:
-    """
-    Disk DEVICE NAME with 4KB blocksize available on FIRST POOL MASTER.
-
-    Abort if not exactly one --sr_disk.  If --sr_disk=auto take any, else
-    return requested device (abort if not present).
-    """
-    disks = pytestconfig.getoption("sr_disk_4k")
-    if len(disks) != 1:
-        pytest.fail("This test requires exactly one --sr-disks-4k parameter")
-    disk = disks[0]
-    if disk == "auto":
-        logging.info(">> Check for the presence of a free 4KiB block device on the master host")
-        disks = host.available_disks(4096)
-        assert len(disks) > 0, "a free 4KiB block device is required on the master host"
-        disk = disks[0]
-        logging.info(f">> Found free 4KiB block device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
-    else:
-        logging.info(f">> Check that 4KiB block device {disk} is available on the master host")
-        assert disk in host.available_disks(4096), \
-            f"4KiB block device {disk} must be available for use on master host"
-    yield disk
 
 @pytest.fixture(scope='session')
 def pool_with_unused_512B_disk(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Pool:
