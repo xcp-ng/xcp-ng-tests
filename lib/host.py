@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shlex
 import tempfile
 import uuid
@@ -11,7 +12,7 @@ from packaging import version
 import lib.commands as commands
 import lib.pif as pif
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, TypedDict, Union, overload
 
 if TYPE_CHECKING:
     import lib.pool
@@ -52,6 +53,18 @@ def host_data(hostname_or_ip):
 class Host:
     xe_prefix = "host"
 
+    # Data extraction is automatic, no conversion from str is done.
+    BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
+                                                    "kname": str,
+                                                    "pkname": str,
+                                                    "size": str,
+                                                    "log-sec": str,
+                                                    "type": str,
+                                                    })
+    BLOCK_DEVICES_FIELDS = ','.join(k.upper() for k in BlockDeviceInfo.__annotations__)
+
+    block_devices_info: list[BlockDeviceInfo]
+
     def __init__(self, pool: 'lib.pool.Pool', hostname_or_ip):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
@@ -68,6 +81,8 @@ class Host:
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
+
+        self.rescan_block_devices_info()
 
     def __str__(self):
         return self.hostname_or_ip
@@ -547,13 +562,29 @@ class Host:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
         return pif.PIF(uuid, self)
 
+    def rescan_block_devices_info(self) -> None:
+        """
+        Initalize static informations about the disks.
+
+        Despite those being static, it can be necessary to rescan,
+        when we test how XCP-ng reacts to changes of hardware (or
+        reconfiguration of device blocksize).
+        """
+        output_string = self.ssh(["lsblk", "--pairs", "--bytes",
+                                  '-I', '8,259', # limit to: sd, blkext
+                                  "--output", Host.BLOCK_DEVICES_FIELDS])
+
+        self.block_devices_info = [
+            Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore[misc]
+                                  for key, value in re.findall(r'(\S+)=(".*?"|\S+)', line)})
+            for line in output_string.strip().splitlines()
+        ]
+        logging.debug("blockdevs found: %s", [disk["name"] for disk in self.block_devices_info])
+
     def disks(self) -> list[DiskDevName]:
         """ List of disks, e.g ['sda', 'sdb', 'nvme0n1']. """
-        disks = self.ssh(['lsblk', '--noheadings', '--nodeps',
-                          '-I', '8,259', # limit to: sd, blkext
-                          '--output', 'NAME']).splitlines()
-        disks.sort()
-        return disks
+        # filter out partitions from block_devices
+        return sorted(disk["name"] for disk in self.block_devices_info if not disk["pkname"])
 
     def disk_is_available(self, disk: DiskDevName) -> bool:
         """
@@ -574,15 +605,10 @@ class Host:
         Returns a list of disk names (eg.: ['sdb', 'sdc']) that don't have any mountpoint in
         the output of lsblk (including their children such as partitions or md RAID devices)
         """
-        avail_disks = []
-        blk_output = self.ssh(['lsblk', '--noheadings', '--nodeps',
-                               '-I', '8,259', # limit to: sd, blkext
-                               '--output', 'NAME,LOG-SEC']).splitlines()
-        for line in blk_output:
-            disk, sec_size = line.split()
-            if sec_size == str(blocksize):
-                avail_disks.append(disk)
-        return [disk for disk in avail_disks if self.disk_is_available(disk)]
+        blocksize_str = str(blocksize)
+        return [disk["name"] for disk in self.block_devices_info
+                if not disk["pkname"] and disk["log-sec"] == blocksize_str
+                and self.disk_is_available(disk["name"])]
 
     def file_exists(self, filepath, regular_file=True):
         option = '-f' if regular_file else '-e'
