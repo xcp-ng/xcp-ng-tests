@@ -15,6 +15,7 @@ from lib import pxe
 from lib.common import (
     callable_marker,
     DiskDevName,
+    HostAddress,
     is_uuid,
     prefix_object_name,
     setup_formatted_and_mounted_disk,
@@ -35,7 +36,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Dict, Generator
+from typing import Dict, Generator, Iterable
 
 # Do we cache VMs?
 try:
@@ -82,6 +83,14 @@ def pytest_addoption(parser):
         action="store",
         default=20,
         help="Max lines to output in a ssh log (0 if no limit)"
+    )
+    parser.addoption(
+        "--disks",
+        action="append",
+        default=[],
+        help="HOST:DISKS to authorize for use by tests. "
+             "DISKS is a possibly-empty comma-separated list. "
+             "No mention of a given host authorizes use of all its disks."
     )
     parser.addoption(
         "--sr-disk",
@@ -229,6 +238,14 @@ def hosts(pytestconfig) -> Generator[list[Host]]:
     cleanup_hosts()
 
 @pytest.fixture(scope='session')
+def pools_hosts_by_name_or_ip(hosts: list[Host]) -> Generator[dict[HostAddress, Host]]:
+    """All hosts of all pools, each indexed by their hostname_or_ip."""
+    yield {host.hostname_or_ip: host
+           for pool_master in hosts
+           for host in pool_master.pool.hosts
+           }
+
+@pytest.fixture(scope='session')
 def registered_xo_cli():
     # The fixture is not responsible for establishing the connection.
     # We just check that xo-cli is currently registered
@@ -340,11 +357,38 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def disks(hosts: list[Host]) -> dict[Host, list[Host.BlockDeviceInfo]]:
+def disks(pytestconfig, pools_hosts_by_name_or_ip: dict[HostAddress, Host]
+          ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all disks for on all hosts of first pool."""
-    ret = {host: host.disks()
-           for pool_master in hosts
-           for host in pool_master.pool.hosts
+    def _parse_disk_option(option_text: str) -> tuple[HostAddress, list[DiskDevName]]:
+        parsed = option_text.split(sep=":", maxsplit=1)
+        assert len(parsed) == 2, f"--disks option {option_text!r} is not <host>:<disk>[,<disk>]*"
+        host_address, disks_string = parsed
+        devices = disks_string.split(',') if disks_string else []
+        return host_address, devices
+
+    cli_disks = dict(_parse_disk_option(option_text)
+                     for option_text in pytestconfig.getoption("disks"))
+
+    def _host_disks(host: Host, hosts_cli_disks: list[DiskDevName] | None) -> Iterable[Host.BlockDeviceInfo]:
+        """Filter host disks according to list from `--cli` if given."""
+        host_disks = host.disks()
+        # no disk specified = allow all
+        if hosts_cli_disks is None:
+            yield from host_disks
+            return
+        # check all disks in --disks=host:... exist
+        for cli_disk in hosts_cli_disks:
+            for disk in host_disks:
+                if disk['name'] == cli_disk:
+                    yield disk
+                    break # names are unique, don't expect another one
+            else:
+                raise Exception(f"no {cli_disk!r} disk on host {host.hostname_or_ip}, "
+                                f"has {','.join(disk['name'] for disk in host_disks)}")
+
+    ret = {host: list(_host_disks(host, cli_disks.get(host.hostname_or_ip)))
+           for host in pools_hosts_by_name_or_ip.values()
            }
     logging.debug("disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
     return ret
