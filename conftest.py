@@ -409,41 +409,6 @@ def sr_disk_4k(pytestconfig, host: Host) -> Generator[DiskDevName]:
     yield disk
 
 @pytest.fixture(scope='session')
-def sr_disk_for_all_hosts(pytestconfig, request, host):
-    """
-    Disk DEVICE NAME available on all hosts of FIRST POOL.
-
-    Abort if not exactly one --sr_disk.  If --sr_disk=auto take any, else
-    return requested device (abort if not present).
-    """
-    disks = pytestconfig.getoption("sr_disk")
-    if len(disks) != 1:
-        pytest.fail("This test requires exactly one --sr-disk parameter")
-    disk = disks[0]
-    master_disks = host.available_disks()
-    assert len(master_disks) > 0, "a free disk device is required on the master host"
-
-    if disk != "auto":
-        assert disk in master_disks, \
-            f"disk or block device {disk} is either not present or already used on master host"
-        master_disks = [disk]
-
-    candidates = list(master_disks)
-    for h in host.pool.hosts[1:]:
-        other_disks = h.available_disks()
-        candidates = [d for d in candidates if d in other_disks]
-
-    if disk == "auto":
-        assert len(candidates) > 0, \
-            f"a free disk device is required on all pool members. Pool master has: {' '.join(master_disks)}."
-        logging.info(f">> Found free disk device(s) on all pool hosts: {' '.join(candidates)}. Using {candidates[0]}.")
-    else:
-        assert len(candidates) > 0, \
-            f"disk or block device {disk} was not found to be present and free on all hosts"
-        logging.info(f">> Disk or block device {disk} is present and free on all pool members")
-    yield candidates[0]
-
-@pytest.fixture(scope='session')
 def pool_with_unused_512B_disk(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Pool:
     """Returns the first pool, ensuring all hosts have at least one unused 512-bytes-blocks disk."""
     for h in host.pool.hosts:
