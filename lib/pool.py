@@ -5,7 +5,7 @@ import traceback
 from packaging import version
 
 import lib.commands as commands
-from lib.common import _param_get, _param_set, safe_split, wait_for, wait_for_not
+from lib.common import HostAddress, _param_get, _param_set, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
 
@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 class Pool:
     xe_prefix = "pool"
 
-    def __init__(self, master_hostname_or_ip: str) -> None:
+    def __init__(self, master_hostname_or_ip: HostAddress) -> None:
         master = Host(self, master_hostname_or_ip)
         assert master.is_master(), f"Host {master_hostname_or_ip} is not a master host. Aborting."
         self.master = master
