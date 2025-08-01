@@ -20,8 +20,9 @@ if TYPE_CHECKING:
 
 # package scope because previous test packages may have used the disk
 @pytest.fixture(scope='package')
-def sr_disk_wiped(host: Host, sr_disk: DiskDevName) -> Generator[DiskDevName]:
+def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[DiskDevName]:
     """A disk on MASTER HOST OF FIRST POOL which we wipe."""
+    sr_disk = unused_512B_disks[host][0]["name"]
     logging.info(">> wipe disk %s" % sr_disk)
     host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
     yield sr_disk
