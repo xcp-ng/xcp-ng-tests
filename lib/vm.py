@@ -19,6 +19,7 @@ from lib.common import (
 )
 from lib.snapshot import Snapshot
 from lib.vbd import VBD
+from lib.vdi import VDI
 from lib.vif import VIF
 
 from typing import TYPE_CHECKING, List, Literal, Optional, Union, overload
@@ -33,6 +34,15 @@ class VM(BaseVM):
         self.previous_host = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
+        try:
+            self.vdis = [VDI(vdi_uuid, host=host) for vdi_uuid in self.vdi_uuids()]
+        except commands.SSHCommandFailed as e:
+            # Doesn't work with Dom0 since `vm-disk-list` doesn't work on it so we create empty list
+            if e.stdout == "Error: No matching VMs found":
+                logging.info("Couldn't get disks list. We are Dom0. Continuing...")
+                self.vdis = []
+            else:
+                raise
 
     def power_state(self) -> str:
         return self.param_get('power-state')
@@ -286,6 +296,47 @@ class VM(BaseVM):
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
                                                        'new-name-label': 'Checkpoint of %s' % self.uuid}),
                         self.host)
+
+    def connect_vdi(self, vdi: VDI, device: str = "autodetect") -> str:
+        logging.info(f">> Plugging VDI {vdi.uuid} on VM {self.uuid}")
+        vbd_uuid = self.host.xe("vbd-create", {
+            "vdi-uuid": vdi.uuid,
+            "vm-uuid": self.uuid,
+            "device": device,
+        })
+        try:
+            self.host.xe("vbd-plug", {"uuid": vbd_uuid})
+        except commands.SSHCommandFailed:
+            self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
+            raise
+
+        self.vdis.append(vdi)
+
+        return vbd_uuid
+
+    def disconnect_vdi(self, vdi: VDI):
+        logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
+        assert vdi in self.vdis, "VDI {vdi.uuid} not in VM {self.uuid} VDI list"
+        vbd_uuid = self.host.xe("vbd-list", {
+            "vdi-uuid": vdi.uuid,
+            "vm-uuid": self.uuid
+        }, minimal=True)
+        try:
+            self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
+        except commands.SSHCommandFailed as e:
+            if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
+                logging.info(f"VBD {vbd_uuid} already unplugged")
+            else:
+                raise
+        self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
+        self.vdis.remove(vdi)
+
+    def destroy_vdi(self, vdi_uuid: str) -> None:
+        for vdi in self.vdis:
+            if vdi.uuid == vdi_uuid:
+                self.vdis.remove(vdi)
+                super().destroy_vdi(vdi_uuid)
+                break
 
     def vifs(self):
         _vifs = []
