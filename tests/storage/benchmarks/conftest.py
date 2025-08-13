@@ -16,7 +16,7 @@ from .helpers import load_results_from_csv, str_to_tuple
 MAX_LENGTH = 64 * (1024**3)  # 64GiB
 
 
-# use vhd, qcow2, raw... when image_format support will be available
+# TODO: use vhd, qcow2, raw... when image_format support will be available
 @pytest.fixture(scope="module", params=["vhd"])
 def image_format(request):
     return request.param
