@@ -92,21 +92,6 @@ def pytest_addoption(parser):
              "DISKS is a possibly-empty comma-separated list. "
              "No mention of a given host authorizes use of all its disks."
     )
-    parser.addoption(
-        "--sr-disk",
-        action="append",
-        default=[],
-        help="Name of an available disk (sdb) or partition device (sdb2) to be formatted and used in storage tests. "
-             "Set it to 'auto' to let the fixtures auto-detect available disks."
-    )
-    parser.addoption(
-        "--sr-disk-4k",
-        action="append",
-        default=[],
-        help="Name of an available disk (sdb) or partition device (sdb2) with "
-             "4KiB blocksize to be formatted and used in storage tests. "
-             "Set it to 'auto' to let the fixtures auto-detect available disks."
-    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
