@@ -20,7 +20,6 @@ JOBS = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": [
             "tests/misc",
@@ -46,7 +45,6 @@ JOBS = {
         "nb_pools": 2,
         "params": {
             "--vm[]": "multi/all_unix",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/misc", "tests/migration"],
         "markers": "multi_vms and not flaky and not reboot",
@@ -62,7 +60,6 @@ JOBS = {
         "nb_pools": 2,
         "params": {
             "--vm[]": "multi/all_windows",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/misc", "tests/migration"],
         "markers": "multi_vms and not flaky and not reboot",
@@ -88,7 +85,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks",
@@ -106,7 +102,6 @@ JOBS = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks",
@@ -123,7 +118,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "reboot and not flaky and not unused_4k_disks",
@@ -138,7 +132,6 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "quicktest and not unused_4k_disks",
@@ -154,7 +147,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage/linstor"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest",
@@ -171,7 +163,6 @@ JOBS = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage/linstor"],
         "markers": "",
@@ -187,7 +178,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage/linstor"],
         "markers": "reboot",
@@ -200,7 +190,6 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
-            "--sr-disk": "auto",
         },
         "paths": ["tests/storage/linstor"],
         "markers": "quicktest",
@@ -215,7 +204,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and unused_4k_disks and not reboot and not quicktest",
@@ -232,7 +220,6 @@ JOBS = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "unused_4k_disks",
@@ -248,7 +235,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "unused_4k_disks and reboot",
@@ -261,7 +247,6 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
-            "--sr-disk-4k": "auto",
         },
         "paths": ["tests/storage"],
         "markers": "unused_4k_disks and quicktest",
@@ -297,7 +282,6 @@ JOBS = {
         # nb_pools left to 1 so that the job can run on XCP-ng 8.2 with just one pool, but 2 are required in 8.3+
         "nb_pools": 1,
         "params": {
-            "--sr-disk": "auto",
             "--vm": "single/small_vm_efitools",
         },
         "paths": ["tests/uefi_sb/test_uefistored_cert_flow.py", "tests/uefi_sb/test_varstored_cert_flow.py"],
@@ -420,7 +404,6 @@ JOBS = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--sr-disk": "auto",
         },
         "paths": ["tests"],
         "markers": "flaky",
