@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import functools
 import logging
 import os
 
@@ -37,8 +38,12 @@ def lvm_disks(pool_with_unused_512B_disk: Pool,
     """
     hosts = pool_with_unused_512B_disk.hosts
 
+    @functools.cache
+    def host_devices(host: Host) -> list[str]:
+        return [os.path.join("/dev", disk["name"]) for disk in unused_512B_disks[host][0:1]]
+
     for host in hosts:
-        devices = [os.path.join("/dev", disk["name"]) for disk in unused_512B_disks[host][0:1]]
+        devices = host_devices(host)
         for device in devices:
             try:
                 host.ssh(['pvcreate', '-ff', '-y', device])
@@ -56,11 +61,12 @@ def lvm_disks(pool_with_unused_512B_disk: Pool,
         if provisioning_type == 'thin':
             host.ssh(['lvcreate', '-l', '100%FREE', '-T', STORAGE_POOL_NAME])
 
-    yield devices
+    # FIXME ought to provide storage_pool_name and get rid of that other fixture
+    yield None
 
     for host in hosts:
         host.ssh(['vgremove', '-f', GROUP_NAME])
-        for device in devices:
+        for device in host_devices(host):
             host.ssh(['pvremove', device])
 
 @pytest.fixture(scope="package")
