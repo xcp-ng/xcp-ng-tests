@@ -1,11 +1,20 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
+import os
 
 import lib.commands as commands
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
+
+from typing import TYPE_CHECKING, Generator
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.pool import Pool
 
 GROUP_NAME = 'linstor_group'
 STORAGE_POOL_NAME = f'{GROUP_NAME}/thin_device'
@@ -13,7 +22,9 @@ LINSTOR_RELEASE_PACKAGE = 'xcp-ng-release-linstor'
 LINSTOR_PACKAGE = 'xcp-ng-linstor'
 
 @pytest.fixture(scope='package')
-def lvm_disks(pool_with_unused_512B_disk, unused_512B_disks, provisioning_type):
+def lvm_disks(pool_with_unused_512B_disk: Pool,
+              unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+              provisioning_type: str) -> Generator[list[str]]:
     """
     Common LVM PVs on which a LV is created on each host of the pool.
 
@@ -27,7 +38,7 @@ def lvm_disks(pool_with_unused_512B_disk, unused_512B_disks, provisioning_type):
     hosts = pool_with_unused_512B_disk.hosts
 
     for host in hosts:
-        devices = [f"/dev/{disk}" for disk in unused_512B_disks[host][0:1]]
+        devices = [os.path.join("/dev", disk["name"]) for disk in unused_512B_disks[host][0:1]]
         for device in devices:
             try:
                 host.ssh(['pvcreate', '-ff', '-y', device])
