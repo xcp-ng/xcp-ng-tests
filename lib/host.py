@@ -82,6 +82,7 @@ class Host:
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
+        self._dom0: Optional[VM] = None
 
         self.rescan_block_devices_info()
 
@@ -722,3 +723,20 @@ class Host:
     def disable_hsts_header(self):
         self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
         self.restart_toolstack(verify=True)
+
+    def get_dom0_uuid(self):
+        return self.inventory["CONTROL_DOMAIN_UUID"]
+
+    def get_dom0_VM(self) -> VM:
+        if not self._dom0:
+            self._dom0 = VM(self.get_dom0_uuid(), self)
+        return self._dom0
+
+    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> Optional[SR]:
+        sr_uuid = self.xe("vdi-param-get", {
+            "param-name": "sr-uuid",
+            "uuid": vdi_uuid,
+        })
+        if not sr_uuid:
+            return None
+        return SR(sr_uuid, self.pool)
