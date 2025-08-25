@@ -1,11 +1,21 @@
+from __future__ import annotations
+
 import pytest
 
+import functools
 import logging
+import os
 
 import lib.commands as commands
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
+
+from typing import TYPE_CHECKING, Generator
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.pool import Pool
 
 GROUP_NAME = 'linstor_group'
 STORAGE_POOL_NAME = f'{GROUP_NAME}/thin_device'
@@ -13,11 +23,27 @@ LINSTOR_RELEASE_PACKAGE = 'xcp-ng-release-linstor'
 LINSTOR_PACKAGE = 'xcp-ng-linstor'
 
 @pytest.fixture(scope='package')
-def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
-    devices = [f"/dev/{disk}" for disk in sr_disks_for_all_hosts]
-    hosts = host.pool.hosts
+def lvm_disks(pool_with_unused_512B_disk: Pool,
+              unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+              provisioning_type: str) -> Generator[None]:
+    """
+    Common LVM PVs on which a LV is created on each host of the pool.
+
+    On each host in the pool, create PV on each of those disks whose
+    DEVICE NAME exists ACROSS THE WHOLE POOL. Then make a VG out of
+    all those, then a LV taking up the whole VG space.
+
+    Return the list of device node paths for that list of devices
+    used in all hosts.
+    """
+    hosts = pool_with_unused_512B_disk.hosts
+
+    @functools.cache
+    def host_devices(host: Host) -> list[str]:
+        return [os.path.join("/dev", disk["name"]) for disk in unused_512B_disks[host][0:1]]
 
     for host in hosts:
+        devices = host_devices(host)
         for device in devices:
             try:
                 host.ssh(['pvcreate', '-ff', '-y', device])
@@ -35,11 +61,12 @@ def lvm_disks(host, sr_disks_for_all_hosts, provisioning_type):
         if provisioning_type == 'thin':
             host.ssh(['lvcreate', '-l', '100%FREE', '-T', STORAGE_POOL_NAME])
 
-    yield devices
+    # FIXME ought to provide storage_pool_name and get rid of that other fixture
+    yield None
 
     for host in hosts:
         host.ssh(['vgremove', '-f', GROUP_NAME])
-        for device in devices:
+        for device in host_devices(host):
             host.ssh(['pvremove', device])
 
 @pytest.fixture(scope="package")

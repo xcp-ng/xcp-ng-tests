@@ -12,9 +12,9 @@ from .conftest import (
 
 # Requirements:
 # From --hosts parameter:
-# - host: a XCP-ng host, with the default SR being either a shared SR, or a local SR on the master host
-# From --sr-disk parameter:
-# - an additional unused disk for the SR
+# - host: a XCP-ng host, with:
+#   - the default SR being either a shared SR, or a local SR on the master host
+#   - an additional unused disk for the SR
 # From --vm parameter:
 # - A VM to import
 
