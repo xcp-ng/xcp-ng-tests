@@ -94,6 +94,13 @@ def pytest_addoption(parser):
              "4KiB blocksize to be formatted and used in storage tests. "
              "Set it to 'auto' to let the fixtures auto-detect available disks."
     )
+    parser.addoption(
+        "--image-format",
+        action="append",
+        default=[],
+        help="Format of VDI to execute tests on."
+        "Example: vhd,qcow2"
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -105,6 +112,12 @@ def pytest_generate_tests(metafunc):
         if not vms:
             vms = [None] # no --vm parameter does not mean skip the test, for us, it means use the default
         metafunc.parametrize("vm_ref", vms, indirect=True, scope="module")
+
+    if "image_format" in metafunc.fixturenames:
+        image_format = metafunc.config.getoption("image_format")
+        if len(image_format) == 0:
+            image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
+        metafunc.parametrize("image_format", image_format, scope="session")
 
 def pytest_collection_modifyitems(items, config):
     # Automatically mark tests based on fixtures they require.
@@ -304,6 +317,13 @@ def host_no_ipv6(host):
     if is_ipv6(host.hostname_or_ip):
         pytest.skip(f"This test requires an IPv4 XCP-ng")
 
+@pytest.fixture(scope="session")
+def shared_sr(host):
+    sr = host.pool.first_shared_sr()
+    assert sr, "No shared SR available on hosts"
+    logging.info(">> Shared SR on host present: {} of type {}".format(sr.uuid, sr.get_type()))
+    yield sr
+
 @pytest.fixture(scope='session')
 def local_sr_on_hostA1(hostA1):
     """ A local SR on the pool's master. """
@@ -311,7 +331,7 @@ def local_sr_on_hostA1(hostA1):
     assert len(srs) > 0, "a local SR is required on the pool's master"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostA1 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostA1 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
@@ -321,7 +341,7 @@ def local_sr_on_hostA2(hostA2):
     assert len(srs) > 0, "a local SR is required on the pool's second host"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostA2 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostA2 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
@@ -331,7 +351,7 @@ def local_sr_on_hostB1(hostB1):
     assert len(srs) > 0, "a local SR is required on the second pool's master"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostB1 present : %s" % sr.uuid)
+    logging.info(">> local SR on hostB1 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
