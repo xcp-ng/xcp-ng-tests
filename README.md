@@ -205,7 +205,7 @@ Here's an example of selection we can do thanks to the markers:
 
 ```
 # Run storage driver tests that either need no VM at all, or advise to use a small VM. Exclude tests that reboot the hosts.
-pytest tests/storage -m "(small_vm or no_vm) and not reboot" --hosts=ip_of_poolmaster1,ip_of_poolmaster2 --vm=http://path/to/a_small_vm.xva --sr-disk=auto
+pytest tests/storage -m "(small_vm or no_vm) and not reboot" --hosts=ip_of_poolmaster1,ip_of_poolmaster2 --vm=http://path/to/a_small_vm.xva
 ```
 
 Another example:

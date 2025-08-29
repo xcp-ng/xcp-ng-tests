@@ -4,9 +4,7 @@ import logging
 
 # Requirements:
 # From --hosts parameter:
-# - host: a XCP-ng host
-# From --sr-disk parameter:
-# - an additional unused disk to store the exported VM
+# - host: a XCP-ng host with an unused disk to store the exported VM
 # From --vm parameter:
 # - A VM to import and export
 

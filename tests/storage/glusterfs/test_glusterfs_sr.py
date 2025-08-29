@@ -10,7 +10,7 @@ from tests.storage import vdi_is_open
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
 # - access to XCP-ng RPM repository from the host
 
-@pytest.mark.usefixtures("sr_disk_for_all_hosts") # don't even run the tests if there's no free disk
+@pytest.mark.usefixtures("pool_with_unused_512B_disk") # don't even run the tests if there's no free disk
 class TestGlusterFSSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,
@@ -40,7 +40,6 @@ class TestGlusterFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("sr_disk_for_all_hosts", "glusterfs_sr")
 class TestGlusterFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, glusterfs_sr):

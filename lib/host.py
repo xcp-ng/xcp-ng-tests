@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shlex
 import tempfile
 import uuid
@@ -11,12 +12,13 @@ from packaging import version
 import lib.commands as commands
 import lib.pif as pif
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, TypedDict, Union, overload
 
 if TYPE_CHECKING:
-    import lib.pool
+    from lib.pool import Pool
 
 from lib.common import (
+    DiskDevName,
     _param_add,
     _param_clear,
     _param_get,
@@ -50,8 +52,21 @@ def host_data(hostname_or_ip):
 
 class Host:
     xe_prefix = "host"
+    pool: Pool
 
-    def __init__(self, pool: 'lib.pool.Pool', hostname_or_ip):
+    # Data extraction is automatic, no conversion from str is done.
+    BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
+                                                    "kname": str,
+                                                    "pkname": str,
+                                                    "size": str,
+                                                    "log-sec": str,
+                                                    "type": str,
+                                                    })
+    BLOCK_DEVICES_FIELDS = ','.join(k.upper() for k in BlockDeviceInfo.__annotations__)
+
+    block_devices_info: list[BlockDeviceInfo]
+
+    def __init__(self, pool: Pool, hostname_or_ip):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
         self.xo_srv_id: Optional[str] = None
@@ -68,6 +83,8 @@ class Host:
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
         self._dom0: Optional[VM] = None
+
+        self.rescan_block_devices_info()
 
     def __str__(self):
         return self.hostname_or_ip
@@ -547,21 +564,32 @@ class Host:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
         return pif.PIF(uuid, self)
 
-    def disks(self):
-        """ List of SCSI disks, e.g ['sda', 'sdb', 'nvme0n1']. """
-        disks = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME']).splitlines()
-        disks.sort()
-        return disks
-
-    def raw_disk_is_available(self, disk: str) -> bool:
+    def rescan_block_devices_info(self) -> None:
         """
-        Check if a raw disk (without any identifiable filesystem or partition label) is available.
+        Initalize static informations about the disks.
 
-        It suggests the disk is "raw" and likely unformatted thus available.
+        Despite those being static, it can be necessary to rescan,
+        when we test how XCP-ng reacts to changes of hardware (or
+        reconfiguration of device blocksize), or after a reboot.
         """
-        return self.ssh_with_result(['blkid', '/dev/' + disk]).returncode == 2
+        output_string = self.ssh(["lsblk", "--pairs", "--bytes",
+                                  '-I', '8,259', # limit to: sd, blkext
+                                  "--output", Host.BLOCK_DEVICES_FIELDS])
 
-    def disk_is_available(self, disk: str) -> bool:
+        self.block_devices_info = [
+            Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore[misc]
+                                  for key, value in re.findall(r'(\S+)=(".*?"|\S+)', line)})
+            for line in output_string.strip().splitlines()
+        ]
+        logging.debug("blockdevs found: %s", [disk["name"] for disk in self.block_devices_info])
+
+    def disks(self) -> list[Host.BlockDeviceInfo]:
+        """ List of BlockDeviceInfo for all disks. """
+        # filter out partitions from block_devices
+        return sorted((disk for disk in self.block_devices_info if not disk["pkname"]),
+                      key=lambda disk: disk["name"])
+
+    def disk_is_available(self, disk: DiskDevName) -> bool:
         """
         Check if a disk is unmounted and appears available for use.
 
@@ -571,24 +599,7 @@ class Host:
         Warn: This function may misclassify LVM_member disks (e.g. in XOSTOR, RAID, ZFS) as "available".
         Such disks may not have mountpoints but still be in use.
         """
-        return len(self.ssh(['lsblk', '-n', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
-
-    def available_disks(self, blocksize=512):
-        """
-        Return a list of available disks for formatting, creating SRs or such.
-
-        Returns a list of disk names (eg.: ['sdb', 'sdc']) that don't have any mountpoint in
-        the output of lsblk (including their children such as partitions or md RAID devices)
-        """
-        avail_disks = []
-        blk_output = self.ssh(['lsblk', '-nd', '-I', '8,259', '--output', 'NAME,LOG-SEC']).splitlines()
-        for line in blk_output:
-            line = line.split()
-            disk = line[0]
-            sec_size = line[1]
-            if sec_size == str(blocksize):
-                avail_disks.append(disk)
-        return [disk for disk in avail_disks if self.disk_is_available(disk)]
+        return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
     def file_exists(self, filepath, regular_file=True):
         option = '-f' if regular_file else '-e'

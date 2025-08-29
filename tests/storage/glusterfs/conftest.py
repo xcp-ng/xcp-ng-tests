@@ -72,13 +72,14 @@ def pool_with_glusterfs(pool_without_glusterfs, pool_with_saved_yum_state):
     pool.exec_on_hosts_on_error_continue(_teardown_host_with_glusterfs)
 
 @pytest.fixture(scope='package')
-def gluster_disk(host, sr_disk_for_all_hosts):
-    sr_disk = sr_disk_for_all_hosts
+def gluster_disk(pool_with_unused_512B_disk, unused_512B_disks):
+    pool = pool_with_unused_512B_disk
     mountpoint = '/mnt/sr_disk'
-    for h in host.pool.hosts:
+    for h in pool.hosts:
+        sr_disk = unused_512B_disks[h][0]["name"]
         setup_formatted_and_mounted_disk(h, sr_disk, 'xfs', mountpoint)
     yield
-    host.pool.exec_on_hosts_on_error_continue(
+    pool.exec_on_hosts_on_error_continue(
         lambda h: teardown_formatted_and_mounted_disk(h, mountpoint)
     )
 

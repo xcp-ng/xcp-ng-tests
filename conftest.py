@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import itertools
@@ -12,6 +14,8 @@ import lib.config as global_config
 from lib import pxe
 from lib.common import (
     callable_marker,
+    DiskDevName,
+    HostAddress,
     is_uuid,
     prefix_object_name,
     setup_formatted_and_mounted_disk,
@@ -21,6 +25,7 @@ from lib.common import (
     wait_for,
 )
 from lib.netutil import is_ipv6
+from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
@@ -31,7 +36,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Dict
+from typing import Dict, Generator, Iterable
 
 # Do we cache VMs?
 try:
@@ -80,19 +85,12 @@ def pytest_addoption(parser):
         help="Max lines to output in a ssh log (0 if no limit)"
     )
     parser.addoption(
-        "--sr-disk",
+        "--disks",
         action="append",
         default=[],
-        help="Name of an available disk (sdb) or partition device (sdb2) to be formatted and used in storage tests. "
-             "Set it to 'auto' to let the fixtures auto-detect available disks."
-    )
-    parser.addoption(
-        "--sr-disk-4k",
-        action="append",
-        default=[],
-        help="Name of an available disk (sdb) or partition device (sdb2) with "
-             "4KiB blocksize to be formatted and used in storage tests. "
-             "Set it to 'auto' to let the fixtures auto-detect available disks."
+        help="HOST:DISKS to authorize for use by tests. "
+             "DISKS is a possibly-empty comma-separated list. "
+             "No mention of a given host authorizes use of all its disks."
     )
     parser.addoption(
         "--image-format",
@@ -129,8 +127,8 @@ def pytest_collection_modifyitems(items, config):
         'windows_vm',
         'hostA2',
         'hostB1',
-        'sr_disk',
-        'sr_disk_4k'
+        'unused_512B_disks',
+        'unused_4k_disks',
     ]
 
     for item in items:
@@ -170,7 +168,7 @@ def pytest_runtest_makereport(item, call):
 # fixtures
 
 @pytest.fixture(scope='session')
-def hosts(pytestconfig):
+def hosts(pytestconfig) -> Generator[list[Host]]:
     nested_list = []
 
     def setup_host(hostname_or_ip, *, config=None):
@@ -235,6 +233,14 @@ def hosts(pytestconfig):
     yield host_list
 
     cleanup_hosts()
+
+@pytest.fixture(scope='session')
+def pools_hosts_by_name_or_ip(hosts: list[Host]) -> Generator[dict[HostAddress, Host]]:
+    """All hosts of all pools, each indexed by their hostname_or_ip."""
+    yield {host.hostname_or_ip: host
+           for pool_master in hosts
+           for host in pool_master.pool.hosts
+           }
 
 @pytest.fixture(scope='session')
 def registered_xo_cli():
@@ -355,103 +361,71 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def sr_disk(pytestconfig, host):
-    disks = pytestconfig.getoption("sr_disk")
-    if len(disks) != 1:
-        pytest.fail("This test requires exactly one --sr-disk parameter")
-    disk = disks[0]
-    if disk == "auto":
-        logging.info(">> Check for the presence of a free disk device on the master host")
-        disks = host.available_disks()
-        assert len(disks) > 0, "a free disk device is required on the master host"
-        disk = disks[0]
-        logging.info(f">> Found free disk device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
-    else:
-        logging.info(f">> Check that disk or block device {disk} is available on the master host")
-        assert disk in host.available_disks(), \
-            f"disk or block device {disk} is either not present or already used on master host"
-    yield disk
+def disks(pytestconfig, pools_hosts_by_name_or_ip: dict[HostAddress, Host]
+          ) -> dict[Host, list[Host.BlockDeviceInfo]]:
+    """Dict identifying names of all disks for on all hosts of first pool."""
+    def _parse_disk_option(option_text: str) -> tuple[HostAddress, list[DiskDevName]]:
+        parsed = option_text.split(sep=":", maxsplit=1)
+        assert len(parsed) == 2, f"--disks option {option_text!r} is not <host>:<disk>[,<disk>]*"
+        host_address, disks_string = parsed
+        devices = disks_string.split(',') if disks_string else []
+        return host_address, devices
+
+    cli_disks = dict(_parse_disk_option(option_text)
+                     for option_text in pytestconfig.getoption("disks"))
+
+    def _host_disks(host: Host, hosts_cli_disks: list[DiskDevName] | None) -> Iterable[Host.BlockDeviceInfo]:
+        """Filter host disks according to list from `--cli` if given."""
+        host_disks = host.disks()
+        # no disk specified = allow all
+        if hosts_cli_disks is None:
+            yield from host_disks
+            return
+        # check all disks in --disks=host:... exist
+        for cli_disk in hosts_cli_disks:
+            for disk in host_disks:
+                if disk['name'] == cli_disk:
+                    yield disk
+                    break # names are unique, don't expect another one
+            else:
+                raise Exception(f"no {cli_disk!r} disk on host {host.hostname_or_ip}, "
+                                f"has {','.join(disk['name'] for disk in host_disks)}")
+
+    ret = {host: list(_host_disks(host, cli_disks.get(host.hostname_or_ip)))
+           for host in pools_hosts_by_name_or_ip.values()
+           }
+    logging.debug("disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    return ret
 
 @pytest.fixture(scope='session')
-def sr_disk_4k(pytestconfig, host):
-    disks = pytestconfig.getoption("sr_disk_4k")
-    if len(disks) != 1:
-        pytest.fail("This test requires exactly one --sr-disks-4k parameter")
-    disk = disks[0]
-    if disk == "auto":
-        logging.info(">> Check for the presence of a free 4KiB block device on the master host")
-        disks = host.available_disks(4096)
-        assert len(disks) > 0, "a free 4KiB block device is required on the master host"
-        disk = disks[0]
-        logging.info(f">> Found free 4KiB block device(s) on hostA1: {' '.join(disks)}. Using {disk}.")
-    else:
-        logging.info(f">> Check that 4KiB block device {disk} is available on the master host")
-        assert disk in host.available_disks(4096), \
-            f"4KiB block device {disk} must be available for use on master host"
-    yield disk
+def unused_512B_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
+                      ) -> dict[Host, list[Host.BlockDeviceInfo]]:
+    """Dict identifying names of all 512-bytes-blocks disks for on all hosts of first pool."""
+    ret = {host: [disk for disk in host_disks
+                  if disk["log-sec"] == "512" and host.disk_is_available(disk["name"])]
+           for host, host_disks in disks.items()
+           }
+    logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    return ret
 
 @pytest.fixture(scope='session')
-def sr_disk_for_all_hosts(pytestconfig, request, host):
-    disks = pytestconfig.getoption("sr_disk")
-    if len(disks) != 1:
-        pytest.fail("This test requires exactly one --sr-disk parameter")
-    disk = disks[0]
-    master_disks = host.available_disks()
-    assert len(master_disks) > 0, "a free disk device is required on the master host"
-
-    if disk != "auto":
-        assert disk in master_disks, \
-            f"disk or block device {disk} is either not present or already used on master host"
-        master_disks = [disk]
-
-    candidates = list(master_disks)
-    for h in host.pool.hosts[1:]:
-        other_disks = h.available_disks()
-        candidates = [d for d in candidates if d in other_disks]
-
-    if disk == "auto":
-        assert len(candidates) > 0, \
-            f"a free disk device is required on all pool members. Pool master has: {' '.join(master_disks)}."
-        logging.info(f">> Found free disk device(s) on all pool hosts: {' '.join(candidates)}. Using {candidates[0]}.")
-    else:
-        assert len(candidates) > 0, \
-            f"disk or block device {disk} was not found to be present and free on all hosts"
-        logging.info(f">> Disk or block device {disk} is present and free on all pool members")
-    yield candidates[0]
+def unused_4k_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
+                    ) -> dict[Host, list[Host.BlockDeviceInfo]]:
+    """Dict identifying names of all 4K-blocks disks for on all hosts of first pool."""
+    ret = {host: [disk for disk in host_disks
+                  if disk["log-sec"] == "4096" and host.disk_is_available(disk["name"])]
+           for host, host_disks in disks.items()
+           }
+    logging.debug("available 4k disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    return ret
 
 @pytest.fixture(scope='session')
-def sr_disks_for_all_hosts(pytestconfig, request, host):
-    disks = pytestconfig.getoption("sr_disk")
-    assert len(disks) > 0, "This test requires at least one --sr-disk parameter"
-    # Fetch available disks on the master host
-    master_disks = host.available_disks()
-    assert len(master_disks) > 0, "a free disk device is required on the master host"
-
-    if "auto" in disks:
-        candidates = list(master_disks)
-    else:
-        # Validate that all specified disks exist on the master host
-        for disk in disks:
-            assert disk in master_disks, \
-                f"Disk or block device {disk} is either not present or already used on the master host"
-        candidates = list(disks)
-
-    # Check if all disks are available on all hosts in the pool
-    for h in host.pool.hosts[1:]:
-        other_disks = h.available_disks()
-        candidates = [d for d in candidates if d in other_disks]
-
-    if "auto" in disks:
-        # Automatically select disks if "auto" is passed
-        assert len(candidates) > 0, \
-            f"Free disk devices are required on all pool members. Pool master has: {' '.join(master_disks)}."
-        logging.info(">> Using free disk device(s) on all pool hosts: %s.", candidates)
-    else:
-        # Ensure specified disks are free on all hosts
-        assert len(candidates) == len(disks), \
-            f"Some specified disks ({', '.join(disks)}) are not free or available on all hosts."
-        logging.info(">> Disk(s) %s are present and free on all pool members", candidates)
-    yield candidates
+def pool_with_unused_512B_disk(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Pool:
+    """Returns the first pool, ensuring all hosts have at least one unused 512-bytes-blocks disk."""
+    for h in host.pool.hosts:
+        assert h in unused_512B_disks
+        assert unused_512B_disks[h], f"host {h} does not have any unused 512B-block disk"
+    return host.pool
 
 @pytest.fixture(scope='module')
 def vm_ref(request):
