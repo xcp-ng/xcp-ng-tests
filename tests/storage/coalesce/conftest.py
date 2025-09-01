@@ -51,3 +51,8 @@ def tapdev(local_sr_on_hostA1, vdi_with_vbd_on_dom0):
     sr_uuid = local_sr_on_hostA1.uuid
     vdi_uuid = vdi_with_vbd_on_dom0.uuid
     yield f"/dev/sm/backend/{sr_uuid}/{vdi_uuid}"
+
+@pytest.fixture(scope="package")
+def host_with_xxd(host):
+    host.yum_install(['vim-common'])
+    return host
