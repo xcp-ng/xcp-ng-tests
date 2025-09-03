@@ -7,7 +7,9 @@ from lib.vdi import VDI
 from typing import Literal
 
 def wait_for_vdi_coalesce(vdi: VDI):
-    wait_for_not(lambda: vdi.get_parent(), msg="Waiting for coalesce")
+    # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.
+    # And it is also necessary to allow a sufficiently long merge time which depends on the amount of data.
+    wait_for_not(lambda: vdi.get_parent(), msg="Waiting for coalesce", timeout_secs=7 * 60)
     logging.info("Coalesce done")
 
 def copy_data_to_tapdev(host: Host, data_file: str, tapdev: str, offset: int, length: int):
@@ -28,7 +30,7 @@ def get_data(host: Host, file: str, offset: int, length: int, checksum: bool = F
     cmd = ["xxd", "-p", "-seek", str(offset), "-len", str(length), file]
     if checksum:
         cmd = cmd + ["|", "sha256sum"]
-    return host.ssh(cmd)
+    return host.ssh(cmd, check=True)
 
 def get_hashed_data(host: Host, file: str, offset: int, length: int):
     return get_data(host, file, offset, length, True).split()[0]
