@@ -22,7 +22,7 @@ def install_certs_to_disks(pool, certs_dict, keys):
     for host in pool.hosts:
         logging.debug('Installing to host %s:' % host.hostname_or_ip)
         for key in keys:
-            value = certs_dict[key].auth
+            value = certs_dict[key].auth()
             with open(value, 'rb') as f:
                 hash = hashlib.md5(f.read()).hexdigest()
             logging.debug('    - key: %s, value: %s' % (key, hash))
@@ -50,7 +50,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         residence_host = vm.get_residence_host()
         logging.info('Check that the certs have been written on the disk of the host that started the VM.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
     def test_pool_certs_present_and_disk_certs_different(self, uefi_vm):
         vm = uefi_vm
@@ -65,7 +65,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         residence_host = vm.get_residence_host()
         logging.info('Check that the certs have been updated on the disk of the host that started the VM.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
     def test_pool_certs_absent_and_disk_certs_present(self, uefi_vm):
         vm = uefi_vm
@@ -78,7 +78,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         residence_host = vm.get_residence_host()
         logging.info('Check that the certs on disk have not changed after the VM started.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(residence_host, key, disk_auths[key].auth)
+            check_disk_cert_md5sum(residence_host, key, disk_auths[key].auth())
 
     def test_pool_certs_present_and_some_different_disk_certs_present(self, uefi_vm):
         vm = uefi_vm
@@ -93,7 +93,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         residence_host = vm.get_residence_host()
         logging.info('Check that the certs have been added or updated on the disk of the host that started the VM.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
     def test_pool_certs_present_except_dbx_and_disk_certs_different(self, uefi_vm):
         vm = uefi_vm
@@ -108,8 +108,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         residence_host = vm.get_residence_host()
         logging.info('Check that the certs have been updated on the disk of the host that started the VM, except dbx.')
         for key in ['PK', 'KEK', 'db']:
-            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
-        check_disk_cert_md5sum(residence_host, 'dbx', disk_auths[key].auth)
+            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
     def test_pool_certs_present_and_disk_certs_present_and_same(self, uefi_vm):
         vm = uefi_vm
@@ -122,7 +121,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         residence_host = vm.get_residence_host()
         logging.info('Check that the certs have been written on the disk of the host that started the VM.')
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth)
+            check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
 
 @pytest.mark.small_vm
@@ -144,7 +143,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM still has no certs")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_pool_certs_present_and_vm_certs_absent(self, uefi_vm):
         vm = uefi_vm
@@ -155,7 +154,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM got the pool certs")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
 
     def test_pool_certs_present_and_vm_certs_present(self, uefi_vm):
         vm = uefi_vm
@@ -168,7 +167,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs are unchanged")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
     def test_pools_certs_absent_and_vm_certs_present(self, uefi_vm):
         vm = uefi_vm
@@ -179,7 +178,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs are unchanged")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
     def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
         vm = uefi_vm
@@ -193,6 +192,6 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM db and dbx certs are unchanged and PK and KEK were updated")
         for key in ['PK', 'KEK']:
-            check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
         for key in ['db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth())

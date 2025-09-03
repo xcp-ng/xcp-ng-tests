@@ -22,7 +22,7 @@ def set_and_assert_var(vm, cert, new, should_pass):
 
     old = vm.get_efi_var(var, global_variable_guid)
 
-    signed = cert.sign_data(var, new, global_variable_guid)
+    signed = cert.sign_efi_sig_db(var, new, global_variable_guid)
 
     ok = True
     try:
@@ -48,7 +48,7 @@ def test_auth_variable(uefi_vm):
     try:
         vm.wait_for_vm_running_and_ssh_up()
 
-        cert = Certificate()
+        cert = Certificate.self_signed()
 
         # Set the variable
         set_and_assert_var(vm, cert, b'I am old news', should_pass=True)
@@ -63,7 +63,7 @@ def test_auth_variable(uefi_vm):
         set_and_assert_var(vm, cert, b'new data', should_pass=True)
 
         # Set the variable with new data, signed by a different cert
-        set_and_assert_var(vm, Certificate(), b'this should fail', should_pass=False)
+        set_and_assert_var(vm, Certificate.self_signed(), b'this should fail', should_pass=False)
     finally:
         vm.shutdown(verify=True)
 
@@ -74,7 +74,10 @@ def test_db_append(uefi_vm):
     """Pass if appending the DB succeeds. Otherwise, fail."""
     vm = uefi_vm
 
-    PK, KEK, db, db2 = EFIAuth("PK"), EFIAuth("KEK"), EFIAuth("db"), Certificate("db")
+    PK = EFIAuth.self_signed("PK")
+    KEK = EFIAuth.self_signed("KEK")
+    db = EFIAuth.self_signed("db")
+    db2 = Certificate.self_signed("db")
     PK.sign_auth(PK)
     PK.sign_auth(KEK)
     KEK.sign_auth(db)
@@ -91,7 +94,7 @@ def test_db_append(uefi_vm):
     assert old != b"", "db failed to install"
 
     vm_kek_key = vm.ssh(['mktemp'])
-    vm.scp(KEK.cert.key, vm_kek_key)
+    vm.scp(KEK.owner_cert().key, vm_kek_key)
 
     vm_db_cert = vm.ssh(['mktemp'])
     vm.scp(db2.pub, vm_db_cert)
