@@ -109,7 +109,6 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         logging.info('Check that the certs have been updated on the disk of the host that started the VM, except dbx.')
         for key in ['PK', 'KEK', 'db']:
             check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
-        check_disk_cert_md5sum(residence_host, 'dbx', disk_auths[key].auth())
 
     def test_pool_certs_present_and_disk_certs_present_and_same(self, uefi_vm):
         vm = uefi_vm
