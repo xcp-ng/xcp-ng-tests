@@ -142,13 +142,13 @@ class TestCertsMissingAndSbOn:
         vm = uefi_vm
         PK, KEK, _, _ = generate_keys()
         vm.install_uefi_certs([PK, KEK])
-        boot_and_check_sb_failed
+        boot_and_check_sb_failed(vm)
 
     def test_only_pk_and_db_present_but_sb_on(self, uefi_vm):
         vm = uefi_vm
         PK, _, db, _ = generate_keys()
         vm.install_uefi_certs([PK, db])
-        boot_and_check_sb_succeeded
+        boot_and_check_sb_failed(vm)
 
 
 @pytest.mark.small_vm
