@@ -110,6 +110,7 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
     def remove_linstor(host):
         logging.info(f"Cleaning up python-linstor from host {host}...")
         host.yum_remove(["python-linstor"])
+        host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(remove_linstor, pool.hosts)
