@@ -45,6 +45,13 @@ def host_with_saved_yum_state(host: Host) -> Generator[Host]:
     host.yum_restore_saved_state()
 
 @pytest.fixture(scope='package')
+def host_with_saved_yum_state_toolstack_restart(host):
+    host.yum_save_state()
+    yield host
+    host.yum_restore_saved_state()
+    host.restart_toolstack(verify=True)
+
+@pytest.fixture(scope='package')
 def pool_with_saved_yum_state(host: Host) -> Generator[Pool]:
     for h in host.pool.hosts:
         h.yum_save_state()
