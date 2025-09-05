@@ -36,6 +36,7 @@ def pool_with_moosefs_enabled(pool_with_moosefs_installed):
     pool.exec_on_hosts_on_error_rollback(enable_moosefs, disable_moosefs)
     yield pool
     pool.exec_on_hosts_on_error_continue(disable_moosefs)
+    pool.exec_on_hosts_on_error_continue(lambda h: h.restart_toolstack(verify=True))
 
 @pytest.fixture(scope='package')
 def moosefs_device_config():
