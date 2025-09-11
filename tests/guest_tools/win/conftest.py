@@ -63,6 +63,7 @@ def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
     install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
+    assert vm.are_windows_tools_working()
     yield vm
     snapshot.revert()
 
