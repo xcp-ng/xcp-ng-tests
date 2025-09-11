@@ -2,12 +2,16 @@ import pytest
 
 import logging
 
+from lib.vm import VM
+
 from . import PowerAction, wait_for_vm_running_and_ssh_up_without_tools
 from .guest_tools import (
     ERROR_INSTALL_FAILURE,
     install_guest_tools,
     uninstall_guest_tools,
 )
+
+from typing import Any, Tuple
 
 # Requirements:
 # - XCP-ng >= 8.2.
@@ -55,11 +59,11 @@ from .guest_tools import (
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindows:
-    def test_tools_after_reboot(self, vm_install_test_tools_per_test_class):
+    def test_tools_after_reboot(self, vm_install_test_tools_per_test_class: VM):
         vm = vm_install_test_tools_per_test_class
         assert vm.are_windows_tools_working()
 
-    def test_drivers_detected(self, vm_install_test_tools_per_test_class):
+    def test_drivers_detected(self, vm_install_test_tools_per_test_class: VM):
         vm = vm_install_test_tools_per_test_class
         assert vm.are_windows_tools_working()
 
@@ -67,7 +71,7 @@ class TestGuestToolsWindows:
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindowsDestructive:
-    def test_uninstall_tools(self, vm_install_test_tools_no_reboot):
+    def test_uninstall_tools(self, vm_install_test_tools_no_reboot: VM):
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -75,13 +79,15 @@ class TestGuestToolsWindowsDestructive:
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot):
+    def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot: VM):
         vm = vm_install_test_tools_no_reboot
         logging.info("Uninstall Windows PV drivers before rebooting")
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_install_with_other_tools(self, vm_install_other_drivers, guest_tools_iso):
+    def test_install_with_other_tools(
+        self, vm_install_other_drivers: Tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
+    ):
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
             pytest.xfail("Upgrades may require multiple reboots and are not testable yet")
