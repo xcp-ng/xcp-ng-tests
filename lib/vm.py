@@ -855,6 +855,43 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         logging.info(f"Marking VM {clone.uuid} as cached")
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
+    def set_memory_limits(
+        self,
+        *,
+        static_min: int | str | None = None,
+        static_max: int | str | None = None,
+        dynamic_min: int | str | None = None,
+        dynamic_max: int | str | None = None,
+    ):
+        # Take both int and str for the memory limits since the latter is what param_get() returns.
+        if static_min is None:
+            static_min = self.param_get("memory-static-min")
+        if static_max is None:
+            static_max = self.param_get("memory-static-max")
+        if dynamic_min is None:
+            dynamic_min = self.param_get("memory-dynamic-min")
+        if dynamic_max is None:
+            dynamic_max = self.param_get("memory-dynamic-max")
+        params = {
+            "uuid": self.uuid,
+            "static-min": str(static_min),
+            "static-max": str(static_max),
+            "dynamic-min": str(dynamic_min),
+            "dynamic-max": str(dynamic_max),
+        }
+        logging.info(
+            f"Updating memory limits for vm {self.uuid}: "
+            f"static min={static_min} "
+            f"max={static_max} "
+            f"dynamic min={dynamic_min} "
+            f"max={dynamic_max}"
+        )
+        return self.host.xe('vm-memory-limits-set', params)
+
+    def set_memory_target(self, target: int | str):
+        logging.info(f"Setting memory target for vm {self.uuid} to {target}")
+        return self.host.xe('vm-memory-target-set', {"uuid": self.uuid, "target": str(target)})
+
 
 def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
     vm_name = vm_def["name"]
