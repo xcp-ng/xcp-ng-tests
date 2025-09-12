@@ -186,7 +186,7 @@ class TestLinstorDisklessResource:
         # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
         output = host.ssh([
             "linstor-kv-tool", "--dump-volumes", "-g", sr_group_name,
-            "|", "grep", "volume-name", "|", "grep", vdi_uuid
+            "|", "grep", "volume-name", "|", "grep", f"/{vdi_uuid}/"
         ])
         volume_name = output.split(': ')[1].split('"')[1]
 
