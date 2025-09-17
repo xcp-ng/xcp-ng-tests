@@ -137,7 +137,7 @@ class TestLinstorSR:
 
 # --- Test diskless resources --------------------------------------------------
 
-def _get_diskful_hosts(host, controller_option, volume_name):
+def _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid):
     # TODO: If any resource is in a temporary creation state or unknown, then need to wait intelligently.
     attempt = 0
     retries = 3
@@ -145,6 +145,13 @@ def _get_diskful_hosts(host, controller_option, volume_name):
 
     while attempt < retries:
         try:
+            # Get volume name from VDI UUID
+            # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
+            volume_name = host.ssh([
+                "linstor-kv-tool", "--dump-volumes", "-g", sr_group_name,
+                "|", "grep", "volume-name", "|", "grep", f"/{vdi_uuid}/"
+            ]).split(': ')[1].split('"')[1]
+
             # Find host where volume is UpToDate
             # | {volume_name} | {host} | 7017 | Unused | Ok    |   UpToDate | 2023-10-24 18:52:05 |
             lines = host.ssh([
@@ -163,8 +170,8 @@ def _get_diskful_hosts(host, controller_option, volume_name):
                 raise
             time.sleep(sleep_sec)
 
-def _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless):
-    diskfuls = _get_diskful_hosts(host, controller_option, volume_name)
+def _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi_uuid, diskless):
+    diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid)
     for diskless_host in diskless:
         assert diskless_host.param_get("name-label").lower() not in diskfuls
 
@@ -181,16 +188,7 @@ class TestLinstorDisklessResource:
             controller_option += f"{member.hostname_or_ip},"
 
         sr_group_name = "xcp-sr-" + storage_pool_name.replace("/", "_")
-
-        # Get volume name from VDI uuid
-        # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
-        output = host.ssh([
-            "linstor-kv-tool", "--dump-volumes", "-g", sr_group_name,
-            "|", "grep", "volume-name", "|", "grep", f"/{vdi_uuid}/"
-        ])
-        volume_name = output.split(': ')[1].split('"')[1]
-
-        diskfuls = _get_diskful_hosts(host, controller_option, volume_name)
+        diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid)
         diskless = []
         for member in host.pool.hosts:
             if member.param_get("name-label").lower() not in diskfuls:
@@ -200,7 +198,7 @@ class TestLinstorDisklessResource:
         # Start VM on host with diskless resource
         vm.start(on=diskless[0].uuid)
         vm.wait_for_os_booted()
-        _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless)
+        _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi_uuid, diskless)
 
         vm.shutdown(verify=True)
-        _ensure_resource_remain_diskless(host, controller_option, volume_name, diskless)
+        _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi_uuid, diskless)
