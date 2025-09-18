@@ -38,11 +38,23 @@ def formatted_and_mounted_ext4_disk(host: Host, unused_512B_disks: dict[Host, li
     yield mountpoint
     teardown_formatted_and_mounted_disk(host, mountpoint)
 
-@pytest.fixture(scope='package')
-def host_with_saved_yum_state(host: Host) -> Generator[Host]:
-    host.yum_save_state()
-    yield host
-    host.yum_restore_saved_state()
+@pytest.fixture(scope="package")
+def host_with_saved_yum_state_factory(host):
+    def make(restart_toolstack):
+        host.yum_save_state()
+        yield host
+        host.yum_restore_saved_state()
+        if restart_toolstack:
+            host.restart_toolstack(verify=True)
+    return make
+
+@pytest.fixture(scope="package")
+def host_with_saved_yum_state(host_with_saved_yum_state_factory):
+    yield from host_with_saved_yum_state_factory(restart_toolstack=False)
+
+@pytest.fixture(scope="package")
+def host_with_saved_yum_state_toolstack_restart(host_with_saved_yum_state_factory):
+    yield from host_with_saved_yum_state_factory(restart_toolstack=True)
 
 @pytest.fixture(scope='package')
 def pool_with_saved_yum_state(host: Host) -> Generator[Pool]:
