@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from lib.sr import SR
 
 @pytest.fixture(scope='package')
-def host_with_xfsprogs(host):
+def host_with_xfsprogs(host, image_format):
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
         "xfsprogs must not be installed on the host at the beginning of the tests"
     host.yum_save_state()
@@ -21,11 +21,13 @@ def host_with_xfsprogs(host):
     host.yum_restore_saved_state()
 
 @pytest.fixture(scope='package')
-def xfs_sr(unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]], host_with_xfsprogs: Host
+def xfs_sr(unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]], host_with_xfsprogs: Host, image_format
            ) -> Generator[SR]:
     """ A XFS SR on first host. """
     sr_disk = unused_512B_disks[host_with_xfsprogs][0]["name"]
-    sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
+                                      {'device': '/dev/' + sr_disk,
+                                       'preferred-image-formats': image_format})
     yield sr
     # teardown
     sr.destroy()
