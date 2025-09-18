@@ -71,16 +71,29 @@ def lvm_disks(pool_with_unused_512B_disk: Pool,
 
 @pytest.fixture(scope="package")
 def storage_pool_name(provisioning_type):
+    # FIXME: this needs an explanation
     return GROUP_NAME if provisioning_type == "thick" else STORAGE_POOL_NAME
 
+# FIXME why having this feature of session scope?  Shouldn't it make
+# it impossible to run both thin and thick tests in the same session?
 @pytest.fixture(params=["thin"], scope="session")
 def provisioning_type(request):
     return request.param
 
+# FIXME: this feature has scope "package" but even test_linsor_sr file
+# includes tests that need *not* to have linstor installed.  Currently
+# pool_with_saved_yum_state's setup is being run for both thin and
+# thick, but with a single teardown at the end (which is even not what
+# --setup-plan claims it will do)?  Is there even a way to make this
+# work, with pool_with_saved_yum_state being of scope package anyway?
+# Possibly by grouping packages with identical package reqs into
+# searate sub-packages?
 @pytest.fixture(scope='package')
 def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
     import concurrent.futures
     pool = pool_with_saved_yum_state
+
+    # FIXME must check we have at least 3 hosts - hostA3 or a simple check here?
 
     def check_linstor_installed(host):
         if host.is_package_installed(LINSTOR_PACKAGE):
@@ -97,6 +110,7 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
         host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
         # Needed because the linstor driver is not in the xapi sm-plugins list
         # before installing the LINSTOR packages.
+        # FIXME: why multipathd?
         host.ssh(["systemctl", "restart", "multipathd"])
         host.restart_toolstack(verify=True)
 
@@ -104,15 +118,6 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
         executor.map(install_linstor, pool.hosts)
 
     yield pool
-
-    # Need to remove this package as we have separate run of `test_create_sr_without_linstor`
-    # for `thin` and `thick` `provisioning_type`.
-    def remove_linstor(host):
-        logging.info(f"Cleaning up python-linstor from host {host}...")
-        host.yum_remove(["python-linstor"])
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(remove_linstor, pool.hosts)
 
 @pytest.fixture(scope='package')
 def linstor_sr(pool_with_linstor, provisioning_type, storage_pool_name):
@@ -136,3 +141,9 @@ def vm_on_linstor_sr(host, linstor_sr, vm_ref):
     yield vm
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def host_without_linstor(host):
+    # FIXME: is that really the package to test?
+    assert not host.is_package_installed('python-linstor'), \
+        "linstor must not be installed on the host at the beginning of the tests"
