@@ -176,13 +176,23 @@ class VM(BaseVM):
         self.wait_for_os_booted()
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
-    def ssh_touch_file(self, filepath):
+    def touch_file(self, filepath):
+        """
+        Make sure that a file exists. Do not change file contents.
+
+        On Windows, it uses PowerShell path format and may not update timestamps.
+        """
         logging.info("Create file on VM (%s)" % filepath)
-        self.ssh(['touch', filepath])
-        if not self.is_windows:
+        if self.is_windows:
+            self.execute_powershell_script(f'New-Item -ErrorAction SilentlyContinue -Type File -Path {filepath}')
+        else:
+            self.ssh(['touch', filepath])
             self.ssh(['sync', filepath])
         logging.info("Check file created")
-        self.ssh(['test -f ' + filepath])
+        if self.is_windows:
+            assert self.file_exists(filepath)
+        else:
+            self.ssh(['test -f ' + filepath])
 
     def suspend(self, verify=False):
         logging.info("Suspend VM")
@@ -403,7 +413,18 @@ class VM(BaseVM):
             return pid
 
     def pid_exists(self, pid):
-        return self.ssh_with_result(['kill', '-s', '0', pid]).returncode == 0
+        if self.is_windows:
+            return strtobool(
+                self.execute_powershell_script(f'$null -ne (Get-Process -Id {pid} -ErrorAction SilentlyContinue)')
+            )
+        else:
+            return self.ssh_with_result(['kill', '-s', '0', pid]).returncode == 0
+
+    def kill_process(self, pid):
+        if self.is_windows:
+            self.execute_powershell_script(f'Get-Process -Id {pid} | Stop-Process')
+        else:
+            self.ssh(['kill ' + pid])
 
     def execute_script(self, script_contents, simple_output=True):
         with tempfile.NamedTemporaryFile('w') as f:
@@ -443,9 +464,16 @@ class VM(BaseVM):
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
     def file_exists(self, filepath, regular_file=True):
-        """Returns True if the file exists, otherwise returns False."""
-        option = '-f' if regular_file else '-e'
-        return self.ssh_with_result(['test', option, filepath]).returncode == 0
+        """
+        Returns True if the file exists, otherwise returns False.
+
+        regular_file does not apply to Windows.
+        """
+        if self.is_windows:
+            return strtobool(self.execute_powershell_script(f'Test-Path {filepath}'))
+        else:
+            option = '-f' if regular_file else '-e'
+            return self.ssh_with_result(['test', option, filepath]).returncode == 0
 
     def detect_package_manager(self):
         """ Heuristic to determine the package manager on a unix distro. """
@@ -472,13 +500,16 @@ class VM(BaseVM):
         self.wait_for_vm_running_and_ssh_up()
         snapshot = self.snapshot()
         try:
-            filepath = '/tmp/%s' % snapshot.uuid
-            self.ssh_touch_file(filepath)
+            if self.is_windows:
+                filepath = fr'$Env:Temp\{snapshot.uuid}'
+            else:
+                filepath = '/tmp/%s' % snapshot.uuid
+            self.touch_file(filepath)
             snapshot.revert()
             self.start()
             self.wait_for_vm_running_and_ssh_up()
             logging.info("Check file does not exist anymore")
-            self.ssh(['test ! -f ' + filepath])
+            assert not self.file_exists(filepath)
         finally:
             snapshot.destroy(verify=True)
 
@@ -767,15 +798,16 @@ class VM(BaseVM):
 
     def start_background_powershell(self, cmd: str):
         """
-        Run command under powershell in the background.
+        Run command under powershell in the background. Return the resulting PID.
 
         Backslash-safe.
         """
         assert self.is_windows
         encoded_command = commands.encode_powershell_command(cmd)
-        self.ssh(
+        return self.ssh(
             "powershell.exe -noprofile -noninteractive Invoke-WmiMethod -Class Win32_Process -Name Create "
-            f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\'"
+            f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\' \\|"
+            "Select-Object -Expand ProcessId"
         )
 
     def is_windows_pv_device_installed(self):
