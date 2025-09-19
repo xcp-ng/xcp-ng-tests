@@ -231,13 +231,19 @@ class Host:
             script.write('#!/usr/bin/env ' + shebang + '\n')
             script.write(script_contents)
             script.flush()
-            self.scp(script.name, script.name)
+            try:
+                remote_path = self.ssh("mktemp").strip()
+                self.scp(script.name, remote_path)
+                self.ssh(['chmod', '0755', remote_path])
+            except Exception as e:
+                logging.error("Failed to create temporary file. %s", e)
+                raise
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh([script.name], simple_output=simple_output)
+                return self.ssh([remote_path], simple_output=simple_output)
             finally:
-                self.ssh(['rm', '-f', script.name])
+                self.ssh(['rm', '-f', remote_path])
 
     def _get_xensource_inventory(self) -> Dict[str, str]:
         output = self.ssh(['cat', '/etc/xensource-inventory'])
