@@ -40,7 +40,7 @@ elseif ($MsiPath) {
     }
 }
 
-# HACK: Some installers (e.g. XCP-ng 8.2) install drivers using a separate services (XenInstall).
+# Some installers like XCP-ng 8.2 don't install their drivers using MSI but through their own service (XenInstall).
 # The drivers themselves also need time to detect devices and set up xenfilt.
 # In any case, leave some time for the installation to do its thing.
 Start-Sleep -Seconds 15
@@ -50,5 +50,6 @@ $nativeMethods::CMP_WaitNoPendingInstallEvents($nativeMethods::INFINITE)
 
 if ($Shutdown) {
     Write-Output "Shutting down"
-    shutdown.exe -s -f -t 5
+    Start-Sleep -Seconds 5
+    Stop-Computer -Force
 }
