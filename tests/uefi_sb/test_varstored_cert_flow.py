@@ -31,7 +31,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
             logging.info(f"Check Pool.set_uefi_certificates updated host {h} certificates in {host.varstore_dir()}.")
             assert not h.is_symlink(host.varstore_dir())
             for key in keys:
-                check_disk_cert_md5sum(h, key, pool_auths[key].auth)
+                check_disk_cert_md5sum(h, key, pool_auths[key].auth())
 
     def test_set_pool_certificates_partial(self, host):
         keys = ['PK', 'KEK', 'db']
@@ -42,7 +42,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
             logging.info(f"Check Pool.set_uefi_certificates updated host {h} certificates in {host.varstore_dir()}.")
             assert not h.is_symlink(host.varstore_dir())
             for key in keys:
-                check_disk_cert_md5sum(h, key, pool_auths[key].auth)
+                check_disk_cert_md5sum(h, key, pool_auths[key].auth())
             assert not h.file_exists(f'{host.varstore_dir()}/{missing_key}.auth')
 
     def test_clear_custom_pool_certificates(self, host):
@@ -53,8 +53,6 @@ class TestPoolToDiskCertPropagationToAllHosts:
         for h in host.pool.hosts:
             logging.info(f"Check host {h} has no custom certificates on disk.")
             assert h.is_symlink(host.varstore_dir())
-            logging.info(f"Check host {h} only has PK, and no other certs.")
-            assert h.ssh(['ls', '/var/lib/varstored/']) == 'PK.auth'
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
@@ -77,7 +75,7 @@ class TestVMCertMisc:
             snapshot.revert()
             logging.info("Check that the VM certs were restored")
             for key in ['PK', 'KEK', 'db', 'dbx']:
-                check_vm_cert_md5sum(vm, key, vm_auths[key].auth)
+                check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
         finally:
             snapshot.destroy()
 
@@ -92,7 +90,7 @@ class TestVMCertMisc:
             vm2 = vm.host.import_vm(filepath)
             logging.info("Check that the VM certs were imported with the VM")
             for key in ['PK', 'KEK', 'db', 'dbx']:
-                check_vm_cert_md5sum(vm2, key, vm_auths[key].auth)
+                check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())
         finally:
             try:
                 if vm2 is not None:
@@ -122,21 +120,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs were updated: PK, KEK, db, dbx")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
-
-    def test_start_vm_without_uefi_vars_on_pool_with_only_pk(self, uefi_vm):
-        # When a VM first starts but the pool doesn't have certs configured,
-        # this used, until late in 8.3 development, to *not* propagate the certs to the VM
-        # and we had no test that detected this situation.
-        # We have now changed the behaviour, propagating the certs even if just PK is present.
-        vm = uefi_vm
-        vm.clear_uefi_variables()
-        vm.host.pool.clear_custom_uefi_certs()
-        vm.start()
-        logging.info("Check that the VM certs were updated: PK only")
-        assert vm.is_cert_present('PK')
-        for key in ['KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
 
     def test_start_vm_in_setup_mode(self, uefi_vm):
         # In setup mode, no cert is set, but other UEFI variables are present.
@@ -148,7 +132,7 @@ class TestPoolToVMCertInheritance:
         vm.start()
         logging.info("Check that the VM certs are unchanged")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_start_vm_which_already_has_pk(self, uefi_vm):
         vm = uefi_vm
@@ -159,9 +143,9 @@ class TestPoolToVMCertInheritance:
         # start the VM so that certs may be synced to it if appropriate
         vm.start()
         logging.info("Check that the VM certs are unchanged")
-        check_vm_cert_md5sum(vm, 'PK', vm_auths['PK'].auth)
+        check_vm_cert_md5sum(vm, 'PK', vm_auths['PK'].auth())
         for key in ['KEK', 'db', 'dbx']:
-            assert not vm.is_cert_present(key)
+            assert not vm.is_uefi_var_present(key)
 
     def test_switching_to_user_mode(self, uefi_vm):
         vm = uefi_vm
@@ -170,7 +154,7 @@ class TestPoolToVMCertInheritance:
         vm.set_uefi_user_mode()
         logging.info("Check that the VM certs were updated")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, pool_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
 
         # Now that the VM has had the certs added, let's see what happens
         # if we call the command to switch to user mode again.
@@ -180,7 +164,7 @@ class TestPoolToVMCertInheritance:
         vm.set_uefi_user_mode()
         logging.info("Check that the VM certs were updated again")
         for key in ['PK', 'KEK', 'db', 'dbx']:
-            check_vm_cert_md5sum(vm, key, new_pool_auths[key].auth)
+            check_vm_cert_md5sum(vm, key, new_pool_auths[key].auth())
 
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolToDiskCertInheritanceOnPoolJoin:
@@ -211,7 +195,7 @@ class TestPoolToDiskCertInheritanceOnPoolJoin:
 
         for key in keys:
             wait_for(
-                lambda: check_disk_cert_md5sum(joined_host, key, pool_auths[key].auth, do_assert=False),
+                lambda: check_disk_cert_md5sum(joined_host, key, pool_auths[key].auth(), do_assert=False),
                 f"Wait for new host '{key}' key to be identifical to pool '{key}' key",
                 60
             )

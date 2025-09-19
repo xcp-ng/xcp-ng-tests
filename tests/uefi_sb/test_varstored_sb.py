@@ -2,6 +2,9 @@ import pytest
 
 import logging
 
+from lib.efi import EFIAuth, ms_certs
+from lib.vm import VM
+
 from .utils import (
     _test_key_exchanges,
     boot_and_check_no_sb_errors,
@@ -26,6 +29,7 @@ from .utils import (
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
+
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
 @pytest.mark.usefixtures("unix_vm")
@@ -37,7 +41,7 @@ class TestGuestLinuxUEFISecureBoot:
         yield
         revert_vm_state(vm, snapshot)
 
-    @pytest.mark.multi_vms # test that SB works on various UEFI unix/linux VMs, not just on `small_vm`
+    @pytest.mark.multi_vms  # test that SB works on various UEFI unix/linux VMs, not just on `small_vm`
     def test_boot_success_when_vm_db_set_and_images_signed(self, uefi_vm):
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
@@ -92,7 +96,7 @@ class TestGuestWindowsUEFISecureBoot:
         yield
         revert_vm_state(vm, snapshot)
 
-    @pytest.mark.small_vm # test on the smallest Windows VM, if that means anything with Windows
+    @pytest.mark.small_vm  # test on the smallest Windows VM, if that means anything with Windows
     def test_windows_fails(self, uefi_vm):
         vm = uefi_vm
         PK, KEK, db, _ = generate_keys(self_signed=True)
@@ -100,7 +104,7 @@ class TestGuestWindowsUEFISecureBoot:
         vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
-    @pytest.mark.multi_vms # test that SB works on every Windows VM we have
+    @pytest.mark.multi_vms  # test that SB works on every Windows VM we have
     def test_windows_succeeds(self, uefi_vm):
         vm = uefi_vm
         vm.param_set('platform', True, key='secureboot')
@@ -138,13 +142,14 @@ class TestCertsMissingAndSbOn:
         vm = uefi_vm
         PK, KEK, _, _ = generate_keys()
         vm.install_uefi_certs([PK, KEK])
-        boot_and_check_sb_failed
+        boot_and_check_sb_failed(vm)
 
     def test_only_pk_and_db_present_but_sb_on(self, uefi_vm):
         vm = uefi_vm
         PK, _, db, _ = generate_keys()
         vm.install_uefi_certs([PK, db])
-        boot_and_check_sb_succeeded
+        boot_and_check_sb_failed(vm)
+
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
@@ -161,3 +166,106 @@ class TestUEFIKeyExchange:
         vm.set_uefi_setup_mode()
 
         _test_key_exchanges(vm)
+
+
+@pytest.mark.small_vm
+@pytest.mark.usefixtures("host_at_least_8_3")
+@pytest.mark.usefixtures("windows_vm")
+class TestGuestWindowsUEFIKeyUpgrade:
+    @pytest.fixture(autouse=True)
+    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+        vm, snapshot = uefi_vm_and_snapshot
+        yield
+        revert_vm_state(vm, snapshot)
+
+    def install_old_certs(self, vm: VM):
+        """Populate a key set that looks like the old defaults."""
+
+        PK = EFIAuth.self_signed("PK")
+        KEK = EFIAuth.self_signed("KEK", other_certs=[ms_certs.kek_ms_2011()])
+        db = EFIAuth("db", other_certs=[ms_certs.db_uefi_2011(), ms_certs.db_win_2011()])
+        # Some test VMs don't like an empty dbx when their own dbx is empty, so just put whatever in there
+        dbx = EFIAuth.self_signed("dbx")
+
+        PK.sign_auth(PK)
+        PK.sign_auth(KEK)
+        KEK.sign_auth(db)
+        KEK.sign_auth(dbx)
+
+        vm.install_uefi_certs([PK, KEK, db, dbx])
+        return [PK, KEK, db, dbx]
+
+    def install_new_certs(self, vm: VM, signer: EFIAuth):
+        """Populate a key set that looks like the new defaults with 2023 MS keys."""
+
+        newPK = EFIAuth.self_signed("PK")
+        newKEK = EFIAuth("KEK", other_certs=[ms_certs.kek_ms_2011(), ms_certs.kek_ms_2023()])
+        newdb = EFIAuth(
+            "db",
+            other_certs=[
+                ms_certs.db_win_2011(),
+                ms_certs.db_win_2023(),
+                ms_certs.db_uefi_2011(),
+                ms_certs.db_uefi_2023(),
+                ms_certs.db_oprom_2023(),
+            ],
+        )
+        newdbx = EFIAuth("dbx")
+
+        newPK.sign_auth(newPK)
+        # Technically, there's no need to sign the other databases since we're setting them from Dom0.
+        # If signing with the old PK works, there'd be no need to test signing with the new PK.
+        # We use an invalid signer to test scenarios where the user mixes and matches default and custom keys.
+        signer.sign_auth(newKEK)
+        signer.sign_auth(newdb)
+        signer.sign_auth(newdbx)
+
+        vm.install_uefi_certs([newPK, newKEK, newdb, newdbx])
+
+    def test_key_upgrade(self, uefi_vm: VM):
+        vm = uefi_vm
+        vm.param_set("platform", True, key="secureboot")
+        assert not vm.get_vtpm_uuid()
+        vm.create_vtpm()
+
+        PK, _, _, _ = self.install_old_certs(vm)
+        boot_and_check_sb_succeeded(vm)
+
+        vm.shutdown(verify=True)
+
+        self.install_new_certs(vm, PK)
+        boot_and_check_sb_succeeded(vm)
+
+    def test_key_upgrade_bitlocker(self, uefi_vm: VM):
+        vm = uefi_vm
+        vm.param_set("platform", True, key="secureboot")
+        assert not vm.get_vtpm_uuid()
+        vm.create_vtpm()
+
+        PK, _, _, _ = self.install_old_certs(vm)
+        boot_and_check_sb_succeeded(vm)
+
+        vm.execute_powershell_script("Add-WindowsFeature BitLocker,EnhancedStorage")
+        vm.reboot(verify=True)
+
+        vm.execute_powershell_script("Enable-BitLocker $Env:SystemDrive -TpmProtector -UsedSpaceOnly")
+        # Confirm if PCR7 is bound.
+        assert (
+            vm.execute_powershell_script(
+                r"""Get-CimInstance -Namespace Root\CIMV2\Security\MicrosoftVolumeEncryption `
+-Query "select * from Win32_EncryptableVolume where VolumeType=0" |
+Invoke-CimMethod -MethodName GetSecureBootBindingState |
+Where-Object ReturnValue -eq 0 |
+Select-Object -ExpandProperty BindingState"""
+            )
+            == "3"
+        )  # Bound
+        vm.execute_powershell_script("Suspend-BitLocker $Env:SystemDrive")
+        vm.shutdown(verify=True)
+
+        self.install_new_certs(vm, PK)
+        boot_and_check_sb_succeeded(vm)
+
+        # After Enable-BitLocker, Windows would boot into encryption test.
+        # If the test failed, Windows would cancel the encryption and give the status FullyDecrypted.
+        assert vm.execute_powershell_script("(Get-BitLockerVolume $Env:SystemDrive).VolumeStatus") != "FullyDecrypted"
