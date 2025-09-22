@@ -180,7 +180,6 @@ class TestGuestWindowsUEFIKeyUpgrade:
 
     def install_old_certs(self, vm: VM):
         """Populate a key set that looks like the old defaults."""
-
         PK = EFIAuth.self_signed("PK")
         KEK = EFIAuth.self_signed("KEK", other_certs=[ms_certs.kek_ms_2011()])
         db = EFIAuth("db", other_certs=[ms_certs.db_uefi_2011(), ms_certs.db_win_2011()])
@@ -197,7 +196,6 @@ class TestGuestWindowsUEFIKeyUpgrade:
 
     def install_new_certs(self, vm: VM, signer: EFIAuth):
         """Populate a key set that looks like the new defaults with 2023 MS keys."""
-
         newPK = EFIAuth.self_signed("PK")
         newKEK = EFIAuth("KEK", other_certs=[ms_certs.kek_ms_2011(), ms_certs.kek_ms_2023()])
         newdb = EFIAuth(
