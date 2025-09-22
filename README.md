@@ -102,13 +102,13 @@ installation of the dependencies.
 The base dependencies can be installed with
 
 ~~~sh
-./pip_install_pyproject.py
+pip install -r requirements/base.txt
 ~~~
 
 Optionally, you can install the development dependencies with
 
 ~~~sh
-./pip_install_pyproject.py dev
+pip install -r requirements/dev.txt
 ~~~
 
 ### Adding python dependencies
