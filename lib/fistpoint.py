@@ -1,5 +1,6 @@
 import logging
 
+from lib.commands import SSHCommandFailed
 from lib.host import Host
 
 from typing import Final
@@ -58,7 +59,11 @@ class FistPoint:
 
     def disable(self):
         logging.info(f"Disabling fistpoint {self.fistpointName}")
-        self.host.ssh(["rm", self._get_path(self.fistpointName)])
+        try:
+            self.host.ssh(["rm", self._get_path(self.fistpointName)])
+        except SSHCommandFailed as e:
+            logging.info(f"Failed trying to disable fistpoint {self._get_path(self.fistpointName)} with error {e}")
+            raise
 
     def __enter__(self):
         self.enable()
