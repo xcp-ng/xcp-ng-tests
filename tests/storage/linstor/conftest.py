@@ -82,14 +82,14 @@ def pool_with_linstor(hostA2, lvm_disks, pool_with_saved_yum_state):
     import concurrent.futures
     pool = pool_with_saved_yum_state
 
-    def check_linstor_installed(host):
+    def assert_linstor_not_installed(host):
         if host.is_package_installed(LINSTOR_PACKAGE):
             raise Exception(
                 f'{LINSTOR_PACKAGE} is already installed on host {host}. This should not be the case.'
             )
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(check_linstor_installed, pool.hosts)
+        executor.map(assert_linstor_not_installed, pool.hosts)
 
     def install_linstor(host):
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
