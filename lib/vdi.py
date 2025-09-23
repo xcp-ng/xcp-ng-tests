@@ -43,6 +43,13 @@ class VDI:
     def readonly(self) -> bool:
         return strtobool(self.param_get("read-only"))
 
+    def get_virtual_size(self) -> int:
+        return int(self.param_get("virtual-size"))
+
+    def resize(self, new_size: int) -> None:
+        logging.info(f"Resizing VDI {self.uuid} to {new_size}")
+        self.sr.pool.master.xe("vdi-resize", {"uuid": self.uuid, "disk-size": str(new_size)})
+
     def __str__(self):
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 

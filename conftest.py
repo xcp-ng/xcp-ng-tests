@@ -744,6 +744,15 @@ def nfs_iso_sr(host, nfs_iso_device_config):
     # teardown
     sr.forget()
 
+@pytest.fixture(scope='function')
+def exit_on_fistpoint(host):
+    from lib.fistpoint import FistPoint
+    logging.info(">> Enabling exit on fistpoint")
+    FistPoint.enable_exit_on_fistpoint(host)
+    yield
+    logging.info("<< Disabling exit on fistpoint")
+    FistPoint.disable_exit_on_fistpoint(host)
+
 @pytest.fixture(scope='module')
 def cifs_iso_sr(host, cifs_iso_device_config):
     """ A Samba/CIFS SR. """
