@@ -38,11 +38,36 @@ def formatted_and_mounted_ext4_disk(host: Host, unused_512B_disks: dict[Host, li
     yield mountpoint
     teardown_formatted_and_mounted_disk(host, mountpoint)
 
-@pytest.fixture(scope='package')
-def host_with_saved_yum_state(host: Host) -> Generator[Host]:
+def _host_with_saved_yum_state(host: Host, restart_toolstack: bool) -> Generator[Host]:
+    """
+    Saves the yum state and restores the saved state on teardown.
+
+    It also optionally restarts the toolstack.
+    Fixtures using this function should not be used concurrently in the same test run.
+    """
     host.yum_save_state()
     yield host
     host.yum_restore_saved_state()
+    if restart_toolstack:
+        host.restart_toolstack(verify=True)
+
+@pytest.fixture(scope='package')
+def host_with_saved_yum_state(host: Host) -> Generator[Host]:
+    """
+    Saves the yum state and then restore it on teardown.
+
+    Should not be used concurrently with another "host_with_saved_yum_state" fixture
+    """
+    yield from _host_with_saved_yum_state(host, False)
+
+@pytest.fixture(scope='package')
+def host_with_saved_yum_state_toolstack_restart(host: Host) -> Generator[Host]:
+    """
+    Saves the yum state then restore it and restarts the toolstack on teardown.
+
+    Should not be used concurrently with another "host_with_saved_yum_state" fixture
+    """
+    yield from _host_with_saved_yum_state(host, True)
 
 @pytest.fixture(scope='package')
 def pool_with_saved_yum_state(host: Host) -> Generator[Pool]:

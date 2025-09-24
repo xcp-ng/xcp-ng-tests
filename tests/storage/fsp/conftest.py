@@ -1,7 +1,7 @@
 import pytest
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
-from pkgfixtures import host_with_saved_yum_state
+from pkgfixtures import host_with_saved_yum_state_toolstack_restart
 
 FSP_REPO_NAME = 'runx'
 
@@ -10,8 +10,8 @@ FSP_PACKAGES = ['xcp-ng-xapi-storage']
 DIRECTORIES_PATH = 'directories'
 
 @pytest.fixture(scope='package')
-def host_with_runx_repo(host_with_saved_yum_state):
-    host = host_with_saved_yum_state
+def host_with_runx_repo(host_with_saved_yum_state_toolstack_restart):
+    host = host_with_saved_yum_state_toolstack_restart
     host.add_xcpng_repo(FSP_REPO_NAME, 'vates')
     yield host
     # teardown

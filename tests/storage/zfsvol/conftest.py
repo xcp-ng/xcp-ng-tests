@@ -3,11 +3,11 @@ import pytest
 import logging
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
-from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
+from pkgfixtures import host_with_saved_yum_state_toolstack_restart, sr_disk_wiped
 
 @pytest.fixture(scope='package')
-def host_with_zfsvol(host_with_saved_yum_state):
-    host = host_with_saved_yum_state
+def host_with_zfsvol(host_with_saved_yum_state_toolstack_restart):
+    host = host_with_saved_yum_state_toolstack_restart
     host.yum_install(['xcp-ng-xapi-storage-volume-zfsvol'])
     host.restart_toolstack(verify=True)
     yield host
