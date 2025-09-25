@@ -102,13 +102,13 @@ installation of the dependencies.
 The base dependencies can be installed with
 
 ~~~sh
-./pip_install_pyproject.py
+pip install -r requirements/base.txt
 ~~~
 
 Optionally, you can install the development dependencies with
 
 ~~~sh
-./pip_install_pyproject.py dev
+pip install -r requirements/dev.txt
 ~~~
 
 ### Adding python dependencies
@@ -351,6 +351,22 @@ It is automatically executed after every pull request or commit pushed to this r
 
 #### More
 Check `./jobs.py --help` and `./jobs.py {command name} --help`.
+
+## Development
+
+This projects uses multiple code checkers to ensure a high quality and coherence of the code.
+The checkers are run in the CI on github and will report any failure in the PRs.
+
+To run the checkers locally, you need to install the dev dependencies, and run these commands:
+
+```sh
+mypy --install-types --non-interactive lib/ conftest.py pkgfixtures.py tests/
+pyright lib/ conftest.py pkgfixtures.py
+ruff check lib/ tests/
+flake8
+```
+
+The code checker diagnostics can also be shown directly in your IDE or text editor.
 
 ## VM setup
 Many tests expect VMs with:
