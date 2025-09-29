@@ -26,6 +26,7 @@ from .utils import (
 # From --vm parameter
 # - A UEFI VM to import
 #   Some tests are Linux-only and some tests are Windows-only.
+#   The Windows tests here (e.g. test_key_upgrade_bitlocker) require Windows Server.
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
