@@ -157,10 +157,21 @@ class VM(BaseVM):
             return False
 
     def is_management_agent_up(self):
+        """Check for management agent features required by the tests."""
         return (
             self.param_get("PV-drivers-version", "major", accept_unknown_key=True) is not None
             # HACK: workaround for Windows XS guest agents not updating major version after resume
             or self.param_get("PV-drivers-version", "xenbus", accept_unknown_key=True) is not None
+        ) and (
+            # These checks are required to verify that the VM's support for power actions is really online. These
+            # features are provided by a service independent from the management agent, and which starts after the PV
+            # drivers have started.
+            # Only check Windows VMs for this to avoid breaking power actions on old Linux VMs.
+            not self.is_windows
+            or (
+                strtobool(self.param_get("other", "feature-poweroff", accept_unknown_key=True))
+                and strtobool(self.param_get("other", "feature-reboot", accept_unknown_key=True))
+            )
         )
 
     def wait_for_os_booted(self):
