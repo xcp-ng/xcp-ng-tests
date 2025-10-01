@@ -31,8 +31,8 @@ def xfs_sr(unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]], host_with_
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_xfs_sr(xfs_sr):
-    vdi = xfs_sr.create_vdi('XFS-local-VDI-test')
+def vdi_on_xfs_sr(xfs_sr: 'SR'):
+    vdi = xfs_sr.create_vdi('XFS-local-VDI-test', virtual_size='1GiB')
     yield vdi
     vdi.destroy()
 
