@@ -7,12 +7,10 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
-from tests.storage import vdi_is_open
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.host import Host
+from lib.host import Host
+from lib.vdi import VDI
+from lib.vm import VM
+from tests.storage import CoalesceOperation, coalesce_integrity, vdi_is_open
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -83,6 +81,11 @@ class TestXFSSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, vdi_op: CoalesceOperation):
+        coalesce_integrity(storage_test_vm, vdi_on_xfs_sr, vdi_op)
 
     # *** tests with reboots (longer tests).
 
