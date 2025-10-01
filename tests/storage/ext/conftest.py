@@ -20,8 +20,8 @@ def ext_sr(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_ext_sr(ext_sr):
-    vdi = ext_sr.create_vdi('EXT-local-VDI-test')
+def vdi_on_ext_sr(ext_sr: 'SR'):
+    vdi = ext_sr.create_vdi('EXT-local-VDI-test', virtual_size='1GiB')
     yield vdi
     vdi.destroy()
 
