@@ -3,6 +3,7 @@ import pytest
 import logging
 
 from lib import config
+from lib.sr import SR
 
 @pytest.fixture(scope='package')
 def lvmoiscsi_device_config():
@@ -17,7 +18,7 @@ def lvmoiscsi_sr(host, lvmoiscsi_device_config):
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_lvmoiscsi_sr(lvmoiscsi_sr):
+def vdi_on_lvmoiscsi_sr(lvmoiscsi_sr: SR):
     vdi = lvmoiscsi_sr.create_vdi('lvmoiscsi-VDI-test')
     yield vdi
     vdi.destroy()
