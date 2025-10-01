@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 import pytest
 
-import logging
-import time
-
-from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
-from tests.storage import vdi_is_open
+from lib.vdi import VDI
+from lib.vm import VM
+from tests.storage import CoalesceOperation, coalesce_integrity
 
 # Requirements:
 # - one XCP-ng host >= 8.3 with an additional unused disk for the SR
@@ -57,6 +57,11 @@ class TestZfsvolVm:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot"])  # "clone" requires a snapshot
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfsvol_sr: VDI, vdi_op: CoalesceOperation):
+        coalesce_integrity(storage_test_vm, vdi_on_zfsvol_sr, vdi_op)
 
     # *** tests with reboots (longer tests).
 
