@@ -5,12 +5,8 @@ import pytest
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.vdi import VDI
-from tests.storage import vdi_is_open
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.vm import VM
+from lib.vm import VM
+from tests.storage import CoalesceOperation, coalesce_integrity, vdi_is_open
 
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
@@ -96,6 +92,12 @@ class TestNFSSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
+    @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
+    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation):
+        coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op)
 
     # *** tests with reboots (longer tests).
 
