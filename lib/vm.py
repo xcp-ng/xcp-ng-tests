@@ -310,11 +310,12 @@ class VM(BaseVM):
             "vm-uuid": self.uuid,
             "device": device,
         })
-        try:
-            self.host.xe("vbd-plug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed:
-            self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
-            raise
+        if self.is_running():
+            try:
+                self.host.xe("vbd-plug", {"uuid": vbd_uuid})
+            except commands.SSHCommandFailed:
+                self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
+                raise
 
         self.vdis.append(vdi)
 
@@ -327,13 +328,14 @@ class VM(BaseVM):
             "vdi-uuid": vdi.uuid,
             "vm-uuid": self.uuid
         }, minimal=True)
-        try:
-            self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed as e:
-            if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
-                logging.info(f"VBD {vbd_uuid} already unplugged")
-            else:
-                raise
+        if self.is_running():
+            try:
+                self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
+            except commands.SSHCommandFailed as e:
+                if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
+                    logging.info(f"VBD {vbd_uuid} already unplugged")
+                else:
+                    raise
         self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
         self.vdis.remove(vdi)
 
