@@ -5,6 +5,11 @@ import logging
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state_toolstack_restart, sr_disk_wiped
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.sr import SR
+
 @pytest.fixture(scope='package')
 def host_with_zfsvol(host_with_saved_yum_state_toolstack_restart):
     host = host_with_saved_yum_state_toolstack_restart
@@ -23,8 +28,8 @@ def zfsvol_sr(host, sr_disk_wiped, host_with_zfsvol):
     host.ssh(["wipefs", "-a", device])
 
 @pytest.fixture(scope='module')
-def vdi_on_zfsvol_sr(zfsvol_sr):
-    vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test')
+def vdi_on_zfsvol_sr(zfsvol_sr: 'SR'):
+    vdi = zfsvol_sr.create_vdi('ZFS-local-VDI-test', virtual_size='1GiB')
     yield vdi
     vdi.destroy()
 
