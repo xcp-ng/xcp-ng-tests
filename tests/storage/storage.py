@@ -1,6 +1,16 @@
+import logging
+
 from lib.commands import SSHCommandFailed
-from lib.common import strtobool, wait_for
+from lib.common import strtobool, wait_for, wait_for_not
 from lib.sr import SR
+from lib.vdi import VDI
+
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.vm import VM
+
 
 def try_to_create_sr_with_missing_device(sr_type, label, host):
     try:
@@ -72,3 +82,8 @@ print(sr_ref)
         'vdiUuid': vdi.uuid,
         'srRef': master.execute_script(get_sr_ref, shebang='python')
     }))
+
+
+def install_randstream(vm: 'VM'):
+    logging.debug("Installing randstream")
+    vm.ssh("wget -nv https://github.com/xcp-ng/randstream/releases/download/0.3.1/randstream-0.3.1-x86_64-unknown-linux-musl.tar.gz -O - | tar -xzC /usr/bin/ ./randstream")  # noqa: E501
