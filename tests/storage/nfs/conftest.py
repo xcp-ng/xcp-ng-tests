@@ -4,6 +4,11 @@ import logging
 
 from lib import config
 
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from lib.sr import SR
+
 # --- Dispatch fixture for NFS versions ----------------------------------------
 
 @pytest.fixture
@@ -25,8 +30,8 @@ def nfs_sr(host, nfs_device_config):
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_nfs_sr(nfs_sr):
-    vdi = nfs_sr.create_vdi('NFS-VDI-test')
+def vdi_on_nfs_sr(nfs_sr: 'SR'):
+    vdi = nfs_sr.create_vdi('NFS-VDI-test', virtual_size='1GiB')
     yield vdi
     vdi.destroy()
 
@@ -54,7 +59,7 @@ def nfs4_sr(host, nfs4_device_config):
 
 @pytest.fixture(scope='module')
 def vdi_on_nfs4_sr(nfs4_sr):
-    vdi = nfs4_sr.create_vdi('NFS4-VDI-test')
+    vdi = nfs4_sr.create_vdi('NFS4-VDI-test', virtual_size='1GiB')
     yield vdi
     vdi.destroy()
 

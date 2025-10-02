@@ -20,8 +20,8 @@ def lvm_sr(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_lvm_sr(lvm_sr):
-    vdi = lvm_sr.create_vdi('LVM-local-VDI-test')
+def vdi_on_lvm_sr(lvm_sr: 'SR'):
+    vdi = lvm_sr.create_vdi('LVM-local-VDI-test', virtual_size='1GiB')
     yield vdi
     vdi.destroy()
 

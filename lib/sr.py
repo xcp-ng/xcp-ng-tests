@@ -166,7 +166,7 @@ class SR:
             self._type = self.pool.master.xe("sr-param-get", {"uuid": self.uuid, "param-name": "type"})
         return self._type
 
-    def create_vdi(self, name_label: str, virtual_size: int = 64, image_format: Optional[str] = None) -> VDI:
+    def create_vdi(self, name_label: str, virtual_size: int | str = 64, image_format: Optional[str] = None) -> VDI:
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
         args = {
             'name-label': prefix_object_name(name_label),

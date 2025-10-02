@@ -1,7 +1,14 @@
 import pytest
 
 from lib.common import vm_image, wait_for
+from lib.vdi import VDI
 from tests.storage import vdi_is_open
+from tests.storage.storage import install_randstream, operation_on_vdi, wait_for_vdi_coalesce
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.vm import VM
 
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
@@ -54,6 +61,33 @@ class TestNFSSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
+    @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
+    def test_coalesce(self, unix_vm: 'VM', dispatch_nfs: 'VDI', vdi_op):
+        vm = unix_vm
+        vdi = dispatch_nfs
+        vm.connect_vdi(vdi, 'xvdb')
+        new_vdi = None
+        try:
+            vm.start()
+            vm.wait_for_vm_running_and_ssh_up()
+            install_randstream(vm)
+            vm.ssh("randstream generate -v /dev/xvdb")
+            vm.ssh("randstream validate -v --expected-checksum 65280014 /dev/xvdb")
+            new_vdi = operation_on_vdi(vm.host, vdi.uuid, vdi_op)
+            vm.ssh("randstream generate -v --seed 1 --size 128Mi /dev/xvdb")
+            vm.ssh("randstream validate -v --expected-checksum ad2ca9af /dev/xvdb")
+            vm.host.xe("vdi-destroy", {"uuid": new_vdi.uuid})
+            new_vdi = None
+            wait_for_vdi_coalesce(vdi)
+            vm.ssh("randstream validate -v --expected-checksum ad2ca9af /dev/xvdb")
+        finally:
+            vm.shutdown()
+            vm.disconnect_vdi(vdi)
+            if new_vdi is not None:
+                new_vdi.destroy()
 
     # *** tests with reboots (longer tests).
 
