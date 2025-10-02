@@ -1,6 +1,8 @@
 import pytest
 
 from lib.common import vm_image, wait_for
+from lib.vdi import VDI
+from lib.vm import VM
 from tests.storage import vdi_is_open
 
 # Requirements:
@@ -50,6 +52,31 @@ class TestLVMOISCSISR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
+    def test_coalesce(self, storage_test_vm: 'VM', vdi_on_lvmoiscsi_sr: 'VDI', vdi_op):
+        vm = storage_test_vm
+        vdi = vdi_on_lvmoiscsi_sr
+        vm.connect_vdi(vdi, 'xvdb')
+        new_vdi = None
+        try:
+            vm.ssh("randstream generate -v /dev/xvdb")
+            vm.ssh("randstream validate -v --expected-checksum 65280014 /dev/xvdb")
+            match vdi_op:
+                case 'clone': new_vdi = vdi.clone()
+                case 'snapshot': new_vdi = vdi.snapshot()
+                case _: raise pytest.fail(f"unexpected vdi operation: {vdi_op}")
+            vm.ssh("randstream generate -v --seed 1 --size 128Mi /dev/xvdb")
+            vm.ssh("randstream validate -v --expected-checksum ad2ca9af /dev/xvdb")
+            new_vdi.destroy()
+            new_vdi = None
+            vdi.wait_for_coalesce()
+            vm.ssh("randstream validate -v --expected-checksum ad2ca9af /dev/xvdb")
+        finally:
+            vm.disconnect_vdi(vdi)
+            if new_vdi is not None:
+                new_vdi.destroy()
 
     # *** tests with reboots (longer tests).
 
