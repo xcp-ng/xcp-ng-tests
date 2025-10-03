@@ -183,25 +183,25 @@ DEFAULT_SR = 'default'
 CACHE_IMPORTED_VM = False
 
 # Default NFS device config:
-NFS_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+NFS_DEVICE_CONFIG: dict[str, str] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path/to/shared/mount' # Path to shared mountpoint
 }
 
 # Default NFS4+ only device config:
-NFS4_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+NFS4_DEVICE_CONFIG: dict[str, str] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
 #    'serverpath': '/path_to_shared_mount' # Path to shared mountpoint
 #    'nfsversion': '4.1'
 }
 
 # Default NFS ISO device config:
-NFS_ISO_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+NFS_ISO_DEVICE_CONFIG: dict[str, str] = {
 #    'location': '10.0.0.2:/path/to/shared/mount' # URL/Hostname of NFS server and path to shared mountpoint
 }
 
 # Default CIFS ISO device config:
-CIFS_ISO_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+CIFS_ISO_DEVICE_CONFIG: dict[str, str] = {
 #    'location': r'\\10.0.0.2\<shared folder name>',
 #    'username': '<user>',
 #    'cifspassword': '<password>',
@@ -209,18 +209,18 @@ CIFS_ISO_DEVICE_CONFIG: dict[str, dict[str, str]] = {
 #    'vers': '<1.0> or <3.0>'
 }
 
-CEPHFS_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+CEPHFS_DEVICE_CONFIG: dict[str, str] = {
 #    'server': '10.0.0.2',
 #    'serverpath': '/vms'
 }
 
-MOOSEFS_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+MOOSEFS_DEVICE_CONFIG: dict[str, str] = {
 #    'masterhost': 'mfsmaster',
 #    'masterport': '9421',
 #    'rootpath': '/vms'
 }
 
-LVMOISCSI_DEVICE_CONFIG: dict[str, dict[str, str]] = {
+LVMOISCSI_DEVICE_CONFIG: dict[str, str] = {
 #    'target': '192.168.1.1',
 #    'port': '3260',
 #    'targetIQN': 'target.example',

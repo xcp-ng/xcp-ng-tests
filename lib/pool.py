@@ -118,7 +118,7 @@ class Pool:
             return SR(uuids[0], self)
         return None
 
-    def get_vdi_sr_uuid(self, vdi_uuid):
+    def get_vdi_sr_uuid(self, vdi_uuid: str) -> str:
         return self.master.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
 
     def get_iso_sr(self):
