@@ -322,7 +322,7 @@ class VM(BaseVM):
 
     def disconnect_vdi(self, vdi: VDI):
         logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
-        assert vdi in self.vdis, "VDI {vdi.uuid} not in VM {self.uuid} VDI list"
+        assert vdi in self.vdis, f"VDI {vdi.uuid} not in VM {self.uuid} VDI list"
         vbd_uuid = self.host.xe("vbd-list", {
             "vdi-uuid": vdi.uuid,
             "vm-uuid": self.uuid
