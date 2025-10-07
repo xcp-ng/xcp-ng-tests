@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 
 [[package]]
@@ -293,6 +293,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/75/b0/2cc025864c9f43cabfff2b116b6db1431e6c5d1ca67f29a97cd2b1a41ba4/legacycrypt-0.3.tar.gz", hash = "sha256:e76e7fd25666a451428b20d5afbbecf3654565b2e11511b53226be955c4d2292", size = 9147, upload-time = "2019-05-28T09:07:12.086Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c9/05/3ba583d3551c562e11377558f7fd92dbb7a2abcff85ccf2d8aa2b908726a/legacycrypt-0.3-py3-none-any.whl", hash = "sha256:b5e373506ccb442f8d715e29fa75f53a11bbec3ca0d7b63445f4dbb656555218", size = 22281, upload-time = "2019-05-28T09:07:04.992Z" },
+]
+
+[[package]]
+name = "libarchive-c"
+version = "5.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/23/e72434d5457c24113e0c22605cbf7dd806a2561294a335047f5aa8ddc1ca/libarchive_c-5.3.tar.gz", hash = "sha256:5ddb42f1a245c927e7686545da77159859d5d4c6d00163c59daff4df314dae82", size = 54349, upload-time = "2025-05-22T08:08:04.604Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/3f/ff00c588ebd7eae46a9d6223389f5ae28a3af4b6d975c0f2a6d86b1342b9/libarchive_c-5.3-py3-none-any.whl", hash = "sha256:651550a6ec39266b78f81414140a1e04776c935e72dfc70f1d7c8e0a3672ffba", size = 17035, upload-time = "2025-05-22T08:08:03.045Z" },
 ]
 
 [[package]]
@@ -687,6 +696,7 @@ dev = [
     { name = "bs4" },
     { name = "flake8" },
     { name = "flake8-pyproject" },
+    { name = "libarchive-c" },
     { name = "mypy" },
     { name = "pydocstyle" },
     { name = "pyright" },
@@ -714,6 +724,7 @@ dev = [
     { name = "bs4", specifier = ">=0.0.1" },
     { name = "flake8" },
     { name = "flake8-pyproject" },
+    { name = "libarchive-c", specifier = "==5.3" },
     { name = "mypy" },
     { name = "pydocstyle" },
     { name = "pyright" },
