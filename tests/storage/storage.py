@@ -24,24 +24,57 @@ def try_to_create_sr_with_missing_device(sr_type, label, host):
         return
     assert False, 'SR creation should not have succeeded!'
 
-def cold_migration_then_come_back(vm, prov_host, dest_host, dest_sr):
+def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR):
     """ Storage migration of a shutdown VM, then migrate it back. """
     prov_sr = vm.get_sr()
+    vdi_name = None
+
+    if not vm.is_windows:
+        # the vdi will be destroyed with the vm
+        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi_name = vdi.name()
+        vm.connect_vdi(vdi, 'xvdb')
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        install_randstream(vm)
+        logging.info("Generate /dev/xvdb content")
+        vm.ssh("randstream generate -v /dev/xvdb")
+        logging.info("Validate /dev/xvdb")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} /dev/xvdb")
+        vm.shutdown(verify=True)
+
     assert vm.is_halted()
+
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
     wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
+
     # Start VM to make sure it works
     vm.start(on=dest_host.uuid)
-    vm.wait_for_os_booted()
+    if vm.is_windows:
+        vm.wait_for_os_booted()
+    else:
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Validate /dev/xvdb")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} /dev/xvdb")
     vm.shutdown(verify=True)
+
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
     wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
+
     # Start VM to make sure it works
     vm.start(on=prov_host.uuid)
-    vm.wait_for_os_booted()
+    if vm.is_windows:
+        vm.wait_for_os_booted()
+    else:
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info("Validate /dev/xvdb")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} /dev/xvdb")
     vm.shutdown(verify=True)
+
+    if vdi_name is not None:
+        vm.destroy_vdi_by_name(vdi_name)
 
 def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR):
     prov_sr = vm.get_sr()
