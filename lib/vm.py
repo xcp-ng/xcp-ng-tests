@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import logging
 import os
 import tempfile
@@ -345,6 +347,14 @@ class VM(BaseVM):
                 self.vdis.remove(vdi)
                 super().destroy_vdi(vdi_uuid)
                 break
+
+    def destroy_vdi_by_name(self, name: str) -> None:
+        for vdi in self.vdis:
+            if vdi.name() == name:
+                self.vdis.remove(vdi)
+                super().destroy_vdi(vdi.uuid)
+                return
+        raise pytest.fail(f"No VDI named '{name}' in vm {self.uuid}")
 
     def create_vdis_list(self) -> None:
         """ Used to redo the VDIs list of the VM when reverting a snapshot. """
