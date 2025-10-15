@@ -1,16 +1,36 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
+from dataclasses import dataclass
 
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
+
+from typing import TYPE_CHECKING, Generator
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.pool import Pool
+    from lib.sr import SR
+    from lib.vdi import VDI
+    from lib.vm import VM
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
 
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 
-def _setup_host_with_glusterfs(host):
+@dataclass
+class GlusterFsConfig:
+    uninstall_glusterfs: bool = True
+
+@pytest.fixture(scope='package')
+def _glusterfs_config() -> GlusterFsConfig:
+    return GlusterFsConfig()
+
+def _setup_host_with_glusterfs(host: Host):
     for service in ['iptables', 'ip6tables']:
         host.ssh(['cp', '/etc/sysconfig/%s' % service, '/etc/sysconfig/%s.orig' % service])
 
@@ -30,12 +50,17 @@ def _setup_host_with_glusterfs(host):
 
     host.ssh(['systemctl', 'enable', '--now', 'glusterd.service'])
 
-def _teardown_host_with_glusterfs(host):
+def _uninstall_host_glusterfs(host: Host):
     errors = []
     errors += exec_nofail(lambda: host.ssh(['systemctl', 'disable', '--now', 'glusterd.service']))
 
     # Remove any remaining gluster-related data to avoid issues in future test runs
     errors += exec_nofail(lambda: host.ssh(['rm', '-rf', '/var/lib/glusterd']))
+
+    raise_errors(errors)
+
+def _restore_host_iptables(host: Host):
+    errors = []
 
     iptables = 'ip6tables' if is_ipv6(host.hostname_or_ip) else 'iptables'
     for h in host.pool.hosts:
@@ -56,7 +81,7 @@ def _teardown_host_with_glusterfs(host):
     raise_errors(errors)
 
 @pytest.fixture(scope='package')
-def pool_without_glusterfs(host):
+def pool_without_glusterfs(host: Host) -> Generator[Pool]:
     for h in host.pool.hosts:
         if h.file_exists('/usr/sbin/glusterd'):
             raise Exception(
@@ -65,28 +90,57 @@ def pool_without_glusterfs(host):
     yield host.pool
 
 @pytest.fixture(scope='package')
-def pool_with_glusterfs(pool_without_glusterfs, pool_with_saved_yum_state):
+def pool_with_glusterfs(
+    pool_without_glusterfs: Pool,
+    pool_with_saved_yum_state: Pool,
+    _glusterfs_config: GlusterFsConfig
+) -> Generator[Pool]:
+
+    def _host_rollback(host: Host):
+        _uninstall_host_glusterfs(host)
+        _restore_host_iptables(host)
+
+    def _disable_yum_rollback(host: Host):
+        host.saved_rollback_id = None
+
     pool = pool_with_saved_yum_state
-    pool.exec_on_hosts_on_error_rollback(_setup_host_with_glusterfs, _teardown_host_with_glusterfs)
+    pool.exec_on_hosts_on_error_rollback(_setup_host_with_glusterfs, _host_rollback)
+
     yield pool
-    pool.exec_on_hosts_on_error_continue(_teardown_host_with_glusterfs)
+
+    if not _glusterfs_config.uninstall_glusterfs:
+        pool.exec_on_hosts_on_error_continue(_disable_yum_rollback)
+        return
+
+    pool.exec_on_hosts_on_error_continue(_uninstall_host_glusterfs)
+    pool.exec_on_hosts_on_error_continue(_restore_host_iptables)
 
 @pytest.fixture(scope='package')
-def gluster_disk(pool_with_unused_512B_disk, unused_512B_disks):
+def gluster_disk(
+    pool_with_unused_512B_disk: Pool,
+    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+    _glusterfs_config: GlusterFsConfig,
+) -> Generator[None]:
     pool = pool_with_unused_512B_disk
     mountpoint = '/mnt/sr_disk'
     for h in pool.hosts:
         sr_disk = unused_512B_disks[h][0]["name"]
         setup_formatted_and_mounted_disk(h, sr_disk, 'xfs', mountpoint)
+
     yield
+
+    if not _glusterfs_config.uninstall_glusterfs:
+        logging.warning("<< leave fstab and keep mountpoints place for manual cleanup")
+        return
+
     pool.exec_on_hosts_on_error_continue(
         lambda h: teardown_formatted_and_mounted_disk(h, mountpoint)
     )
 
-def _fallback_gluster_teardown(host):
+def _fallback_gluster_teardown(host: Host):
     # See: https://microdevsys.com/wp/volume-delete-volume-failed-some-of-the-peers-are-down/
     # Remove all peers and bricks from the hosts volume and then stop and destroy volume.
-    def teardown_for_host(h):
+    def teardown_for_host(h: Host):
         logging.info("< Fallback teardown on host: %s" % h)
         hosts = h.pool.hosts
 
@@ -123,7 +177,12 @@ def _fallback_gluster_teardown(host):
                 pass
 
 @pytest.fixture(scope='package')
-def gluster_volume_started(host, hostA2, gluster_disk):
+def gluster_volume_started(
+    host: Host,
+    hostA2: Host,
+    gluster_disk: None,
+    _glusterfs_config: GlusterFsConfig
+) -> Generator[None]:
     hosts = host.pool.hosts
 
     if is_ipv6(host.hostname_or_ip):
@@ -157,7 +216,13 @@ def gluster_volume_started(host, hostA2, gluster_disk):
     host.ssh(['gluster', 'volume', 'set', 'vol0', 'network.ping-timeout', '5'])
 
     host.ssh(['gluster', 'volume', 'start', 'vol0'])
+
     yield
+
+    if not _glusterfs_config.uninstall_glusterfs:
+        logging.warning("<< leave gluster volume vol0 in place for manual cleanup")
+        return
+
     logging.info("<< stop and delete gluster volume vol0")
     try:
         host.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
@@ -173,7 +238,7 @@ def gluster_volume_started(host, hostA2, gluster_disk):
 
 
 @pytest.fixture(scope='package')
-def glusterfs_device_config(host):
+def glusterfs_device_config(host: Host) -> dict[str, str]:
     backup_servers = []
     for h in host.pool.hosts[1:]:
         backup_servers.append(h.hostname_or_ip)
@@ -184,22 +249,32 @@ def glusterfs_device_config(host):
     }
 
 @pytest.fixture(scope='package')
-def glusterfs_sr(host, pool_with_glusterfs, gluster_volume_started, glusterfs_device_config):
+def glusterfs_sr(
+    host: Host,
+    pool_with_glusterfs: Pool,
+    gluster_volume_started: None,
+    glusterfs_device_config: dict[str, str],
+    _glusterfs_config: GlusterFsConfig
+) -> Generator[SR]:
     """ A GlusterFS SR on first host. """
     # Create the SR
     sr = host.sr_create('glusterfs', "GlusterFS-SR-test", glusterfs_device_config, shared=True)
     yield sr
     # teardown
-    sr.destroy()
+    try:
+        sr.destroy()
+    except Exception as e:
+        _glusterfs_config.uninstall_glusterfs = False
+        raise pytest.fail("Could not destroy glusterfs SR, leaving packages in place for manual cleanup") from e
 
 @pytest.fixture(scope='module')
-def vdi_on_glusterfs_sr(glusterfs_sr):
+def vdi_on_glusterfs_sr(glusterfs_sr: SR) -> Generator[VDI]:
     vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test')
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_glusterfs_sr(host, glusterfs_sr, vm_ref):
+def vm_on_glusterfs_sr(host: Host, glusterfs_sr: SR, vm_ref: str) -> Generator[VM]:
     vm = host.import_vm(vm_ref, sr_uuid=glusterfs_sr.uuid)
     yield vm
     # teardown
