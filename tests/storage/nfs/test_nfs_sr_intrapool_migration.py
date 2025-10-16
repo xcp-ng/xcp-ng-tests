@@ -15,15 +15,18 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 # Make sure these fixtures are called before the parametrized one
 @pytest.mark.usefixtures('vm_ref')
 class Test:
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_live_intrapool_shared_migration(self, host, hostA2, dispatch_nfs):
         sr = dispatch_nfs.get_sr()
         live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, sr)
 
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_cold_intrapool_migration(self, host, hostA2, dispatch_nfs, local_sr_on_hostA2):
         cold_migration_then_come_back(dispatch_nfs, host, hostA2, local_sr_on_hostA2)
 
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_live_intrapool_migration(self, host, hostA2, dispatch_nfs, local_sr_on_hostA2):
         live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, local_sr_on_hostA2)

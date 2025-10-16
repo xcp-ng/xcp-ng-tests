@@ -7,12 +7,12 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 from tests.storage import vdi_is_open
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.host import Host
+from tests.storage.storage import install_randstream
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -27,7 +27,8 @@ class TestXFSSRCreateDestroy:
 
     def test_create_xfs_sr_without_xfsprogs(self,
                                             host: Host,
-                                            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
+                                            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                                            image_format: str
                                             ) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
@@ -35,7 +36,10 @@ class TestXFSSRCreateDestroy:
         sr_disk = unused_512B_disks[host][0]["name"]
         sr = None
         try:
-            sr = host.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
+            sr = host.sr_create('xfs', "XFS-local-SR-test", {
+                'device': '/dev/' + sr_disk,
+                'preferred-image-formats': image_format
+            })
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:
@@ -65,6 +69,13 @@ class TestXFSSR:
     def test_vdi_is_not_open(self, vdi_on_xfs_sr):
         assert not vdi_is_open(vdi_on_xfs_sr)
 
+    def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: str):
+        fmt = vdi_on_xfs_sr.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
+
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_xfs_sr):
@@ -83,6 +94,89 @@ class TestXFSSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, vdi_op):
+        vm = storage_test_vm
+        vdi = vdi_on_xfs_sr
+        vm.connect_vdi(vdi, 'xvdb')
+        new_vdi = None
+        try:
+            vm.ssh("randstream generate -v /dev/xvdb")
+            vm.ssh("randstream validate -v --expected-checksum 65280014 /dev/xvdb")
+            match vdi_op:
+                case 'clone': new_vdi = vdi.clone()
+                case 'snapshot': new_vdi = vdi.snapshot()
+                case _: raise pytest.fail(f"unexpected vdi operation: {vdi_op}")
+            vm.ssh("randstream generate -v --seed 1 --size 128Mi /dev/xvdb")
+            vm.ssh("randstream validate -v --expected-checksum ad2ca9af /dev/xvdb")
+            new_vdi.destroy()
+            new_vdi = None
+            vdi.wait_for_coalesce()
+            vm.ssh("randstream validate -v --expected-checksum ad2ca9af /dev/xvdb")
+        finally:
+            vm.disconnect_vdi(vdi)
+            if new_vdi is not None:
+                new_vdi.destroy()
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, vm_on_xfs_sr: VM, compression):
+        vm = vm_on_xfs_sr
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        install_randstream(vm)
+        # 500MiB, so we have some data to check and some empty spaces in the exported image
+        vm.ssh("randstream generate -v --size 500MiB /root/data")
+        vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+        vm.shutdown(verify=True)
+        xva_path = f'/tmp/{vm.uuid}.xva'
+        imported_vm = None
+        try:
+            vm.export(xva_path, compression)
+            # check that the zero blocks are not part of the result. Most of the data is from the random stream, so
+            # compression has little effect. We just check the result is between 500 and 700 MiB
+            size_mb = int(vm.host.ssh(f'du -sm {xva_path}').split()[0])
+            assert 500 < size_mb < 700, f"unexpected xva size: {size_mb}"
+            imported_vm = vm.host.import_vm(xva_path, vm.vdis[0].sr.uuid)
+            imported_vm.start()
+            imported_vm.wait_for_vm_running_and_ssh_up()
+            imported_vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+        finally:
+            if imported_vm is not None:
+                imported_vm.destroy()
+            vm.host.ssh(f'rm -f {xva_path}')
+
+    @pytest.mark.small_vm
+    def test_vdi_export_import(self, storage_test_vm: VM, xfs_sr: SR, image_format: str):
+        vm = storage_test_vm
+        sr = xfs_sr
+        vdi = sr.create_vdi(image_format=image_format)
+        image_path = f'/tmp/{vdi.uuid}.{image_format}'
+        try:
+            vm.connect_vdi(vdi, 'xvdb')
+            # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
+            vm.ssh("randstream generate -v --size 200MiB /dev/xvdb")
+            vm.ssh("randstream generate -v --seed 1 --position 500MiB --size 200MiB /dev/xvdb")
+            vm.ssh("randstream validate -v --size 200MiB --expected-checksum c6310c52 /dev/xvdb")
+            vm.ssh("randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e /dev/xvdb")
+            vm.disconnect_vdi(vdi)
+            vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+            vdi = vdi.destroy()
+            # check that the zero blocks are not part of the result
+            size_mb = int(vm.host.ssh(f'du -sm {image_path}').split()[0])
+            assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
+            vdi = sr.create_vdi(image_format=image_format)
+            vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+            vm.connect_vdi(vdi, 'xvdb')
+            vm.ssh("randstream validate -v --size 200MiB --expected-checksum c6310c52 /dev/xvdb")
+            vm.ssh("randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e /dev/xvdb")
+        finally:
+            if vdi is not None:
+                vm.disconnect_vdi(vdi)
+                vdi.destroy()
+            vm.host.ssh(f'rm -f {image_path}')
 
     # *** tests with reboots (longer tests).
 

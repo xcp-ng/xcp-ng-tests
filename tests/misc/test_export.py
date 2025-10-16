@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
+
+from lib.host import Host
 
 # Requirements:
 # From --hosts parameter:
@@ -8,7 +12,7 @@ import logging
 # From --vm parameter:
 # - A VM to import and export
 
-def export_test(host, vm, filepath, compress='none'):
+def export_test(host: Host, vm, filepath, compress='none'):
     vm.export(filepath, compress)
     assert host.file_exists(filepath)
 

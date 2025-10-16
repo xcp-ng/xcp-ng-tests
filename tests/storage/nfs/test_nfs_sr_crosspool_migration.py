@@ -15,10 +15,12 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 # Make sure these fixtures are called before the parametrized one
 @pytest.mark.usefixtures('vm_ref')
 class Test:
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_cold_crosspool_migration(self, host, hostB1, dispatch_nfs, local_sr_on_hostB1):
         cold_migration_then_come_back(dispatch_nfs, host, hostB1, local_sr_on_hostB1)
 
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_live_crosspool_migration(self, host, hostB1, dispatch_nfs, local_sr_on_hostB1):
         live_storage_migration_then_come_back(dispatch_nfs, host, hostB1, local_sr_on_hostB1)
