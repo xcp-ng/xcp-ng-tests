@@ -231,13 +231,19 @@ class Host:
             script.write('#!/usr/bin/env ' + shebang + '\n')
             script.write(script_contents)
             script.flush()
-            self.scp(script.name, script.name)
+            try:
+                remote_path = self.ssh("mktemp").strip()
+                self.scp(script.name, remote_path)
+                self.ssh(['chmod', '0755', remote_path])
+            except Exception as e:
+                logging.error("Failed to create temporary file. %s", e)
+                raise
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh([script.name], simple_output=simple_output)
+                return self.ssh([remote_path], simple_output=simple_output)
             finally:
-                self.ssh(['rm', '-f', script.name])
+                self.ssh(['rm', '-f', remote_path])
 
     def _get_xensource_inventory(self) -> Dict[str, str]:
         output = self.ssh(['cat', '/etc/xensource-inventory'])
@@ -659,8 +665,12 @@ class Host:
                 self.xe('sr-list', {'host': hostname, 'content-type': 'user', 'minimal': 'true'}),
                 ','
             )
-            assert local_sr_uuids, f"DEFAULT_SR=='local' so there must be a local SR on host {self}"
-            sr_uuid = local_sr_uuids[0]
+            # We don't want a SR added by the test, so choose one that already existed
+            pre_existing_local_sr_uuids = sorted(set(self.pool.pre_existing_sr_uuids) & set(local_sr_uuids))
+            assert pre_existing_local_sr_uuids, (
+                f"DEFAULT_SR=='local' so there must be a pre-existing local SR on host {self}"
+            )
+            sr_uuid = pre_existing_local_sr_uuids[0]
         elif DEFAULT_SR == 'default':
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
@@ -673,8 +683,13 @@ class Host:
     def hostname(self):
         return self.ssh(['hostname'])
 
-    def call_plugin(self, plugin_name, function, args=None):
-        params = {'host-uuid': self.uuid, 'plugin': plugin_name, 'fn': function}
+    def call_plugin(self, plugin_name: str, function: str,
+                    args: Optional[Dict[str, str]] = None) -> str:
+        params: Dict[str, str | bool] = {
+            'host-uuid': self.uuid,
+            'plugin': plugin_name,
+            'fn': function
+        }
         if args is not None:
             for k, v in args.items():
                 params['args:%s' % k] = v

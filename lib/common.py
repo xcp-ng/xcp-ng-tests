@@ -7,9 +7,12 @@ import inspect
 import itertools
 import logging
 import os
+import random
+import string
 import sys
 import time
 import traceback
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
@@ -21,6 +24,11 @@ from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeAlias, 
 
 if TYPE_CHECKING:
     import lib.host
+
+KiB = 2**10
+MiB = KiB**2
+GiB = KiB**3
+TiB = KiB**4
 
 T = TypeVar("T")
 
@@ -173,7 +181,13 @@ def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
     host.ssh(['rm', '-rf', mountpoint]) # Remove any existing leftover to ensure rmdir will not fail in teardown
     host.ssh(['mkdir', '-p', mountpoint])
     host.ssh(['cp', '-f', '/etc/fstab', '/etc/fstab.orig'])
-    host.ssh(['echo', f'{device} {mountpoint} {fs_type} defaults 0 0', '>>/etc/fstab'])
+    ssh_client = host.ssh(['echo', '$SSH_CLIENT']).split()[0]
+    now = datetime.now().isoformat()
+    host.ssh([
+        'echo',
+        f'"# added by {ssh_client} on {now}\n{device} {mountpoint} {fs_type} defaults 0 0"',
+        '>>/etc/fstab',
+    ])
     try:
         host.ssh(['mount', mountpoint])
     except Exception:
@@ -232,6 +246,14 @@ def url_download(url: str, filename: str) -> None:
         for chunk in r.iter_content(chunk_size=128):
             fd.write(chunk)
     os.rename(tempfilename, filename)
+
+def randid(length=6):
+    """
+    Generates a random string of a specified length.
+    The string consists of lowercase letters, uppercase letters, and digits.
+    """
+    characters = string.ascii_lowercase + string.digits
+    return ''.join(random.choices(characters, k=length))
 
 @overload
 def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,

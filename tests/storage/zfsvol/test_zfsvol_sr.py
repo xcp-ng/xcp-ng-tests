@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import pytest
 
-import logging
-import time
-
-from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
-from tests.storage import vdi_is_open
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
+from tests.storage import CoalesceOperation, XVACompression, coalesce_integrity, xva_export_import
 
 # Requirements:
 # - one XCP-ng host >= 8.3 with an additional unused disk for the SR
@@ -57,6 +58,48 @@ class TestZfsvolVm:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot"])  # "clone" requires a snapshot
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfsvol_sr: VDI, vdi_op: CoalesceOperation):
+        coalesce_integrity(storage_test_vm, vdi_on_zfsvol_sr, vdi_op)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression):
+        xva_export_import(vm_on_zfsvol_sr, compression)
+
+    @pytest.mark.small_vm
+    def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: str):
+        vm = storage_test_vm
+        sr = zfsvol_sr
+        vdi = sr.create_vdi(image_format=image_format)
+        image_path = f'/tmp/{vdi.uuid}.{image_format}'
+        try:
+            vm.connect_vdi(vdi, 'xvdb')
+            # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
+            vm.ssh("randstream generate -v --size 200MiB /dev/xvdb")
+            vm.ssh("randstream generate -v --seed 1 --position 500MiB --size 200MiB /dev/xvdb")
+            vm.ssh("randstream validate -v --size 200MiB --expected-checksum c6310c52 /dev/xvdb")
+            vm.ssh("randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e /dev/xvdb")
+            vm.disconnect_vdi(vdi)
+            vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+            vdi = vdi.destroy()
+            # check that the zero blocks are not part of the result
+            if image_format != 'vhd':
+                # FIXME: this is broken with vhd, skip for now (XCPNG-2631)
+                size_mb = int(vm.host.ssh(f'du -sm {image_path}').split()[0])
+                assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
+            vdi = sr.create_vdi(image_format=image_format)
+            vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+            vm.connect_vdi(vdi, 'xvdb')
+            vm.ssh("randstream validate -v --size 200MiB --expected-checksum c6310c52 /dev/xvdb")
+            vm.ssh("randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e /dev/xvdb")
+        finally:
+            if vdi is not None:
+                vm.disconnect_vdi(vdi)
+                vdi.destroy()
+            vm.host.ssh(f'rm -f {image_path}')
 
     # *** tests with reboots (longer tests).
 

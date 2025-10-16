@@ -7,13 +7,20 @@ import logging
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.fistpoint import FistPoint
+from lib.host import Host
+from lib.sr import SR
 from lib.vdi import VDI
-from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.host import Host
+from lib.vm import VM
+from tests.storage import (
+    CoalesceOperation,
+    ImageFormat,
+    XVACompression,
+    coalesce_integrity,
+    try_to_create_sr_with_missing_device,
+    vdi_export_import,
+    vdi_is_open,
+    xva_export_import,
+)
 
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
@@ -77,6 +84,20 @@ class TestEXTSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_ext_sr: VDI, vdi_op: CoalesceOperation):
+        coalesce_integrity(storage_test_vm, vdi_on_ext_sr, vdi_op)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, vm_on_ext_sr: VM, compression: XVACompression):
+        xva_export_import(vm_on_ext_sr, compression)
+
+    @pytest.mark.small_vm
+    def test_vdi_export_import(self, storage_test_vm: VM, ext_sr: SR, image_format: ImageFormat):
+        vdi_export_import(storage_test_vm, ext_sr, image_format)
 
     # *** tests with reboots (longer tests).
 

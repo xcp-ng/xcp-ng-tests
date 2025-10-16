@@ -28,6 +28,7 @@ dev = [
     "ruff",
     "types-requests",
     "typing-extensions",
+    "libarchive-c==5.3",
 ]
 
 [tool.pyright]

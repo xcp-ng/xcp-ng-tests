@@ -4,6 +4,8 @@ import pytest
 
 import logging
 
+from lib.sr import SR
+
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 
@@ -54,7 +56,7 @@ def zfs_sr(host: Host, image_format: str, zpool_vol0: None) -> Generator[SR]:
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_zfs_sr(zfs_sr):
+def vdi_on_zfs_sr(zfs_sr: SR):
     vdi = zfs_sr.create_vdi('ZFS-local-VDI-test')
     yield vdi
     vdi.destroy()

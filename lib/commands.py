@@ -190,12 +190,12 @@ def ssh_with_result(hostname_or_ip, cmd, suppress_fingerprint_warnings=True,
     assert False, "unexpected type"
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
-    opts = '-o "BatchMode yes"'
+    opts = ['-o', 'BatchMode=yes']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
+        opts = ['-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', '-o', 'UserKnownHostsFile=/dev/null']
 
     ip = wrap_ip(hostname_or_ip)
     if local_dest:
@@ -203,10 +203,9 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
     else:
         dest = 'root@{}:{}'.format(ip, dest)
 
-    command = "scp {} {} {}".format(opts, src, dest)
+    command = ['scp'] + opts + [src, dest]
     res = subprocess.run(
         command,
-        shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False

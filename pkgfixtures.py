@@ -22,7 +22,9 @@ if TYPE_CHECKING:
 @pytest.fixture(scope='package')
 def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[DiskDevName]:
     """A disk on MASTER HOST OF FIRST POOL which we wipe."""
-    sr_disk = unused_512B_disks[host][0]["name"]
+    host_disks = unused_512B_disks[host]
+    assert host_disks, f"No 512B disk available on host {host}"
+    sr_disk = host_disks[0]["name"]
     logging.info(">> wipe disk %s" % sr_disk)
     host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
     yield sr_disk
@@ -33,7 +35,9 @@ def formatted_and_mounted_ext4_disk(host: Host, unused_512B_disks: dict[Host, li
                                     ) -> Generator[str]:
     """Mountpoint for newly-formatted disk on MASTER HOST OF FIRST POOL."""
     mountpoint = '/var/tmp/sr_disk_mountpoint'
-    sr_disk = unused_512B_disks[host][0]["name"]
+    host_disks = unused_512B_disks[host]
+    assert host_disks, f"No 512B disk available on host {host}"
+    sr_disk = host_disks[0]["name"]
     setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
     yield mountpoint
     teardown_formatted_and_mounted_disk(host, mountpoint)

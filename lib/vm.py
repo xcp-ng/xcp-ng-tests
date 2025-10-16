@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 import logging
 import os
 import tempfile
+import uuid
 
 import lib.commands as commands
 import lib.efi as efi
@@ -157,10 +160,21 @@ class VM(BaseVM):
             return False
 
     def is_management_agent_up(self):
+        """Check for management agent features required by the tests."""
         return (
             self.param_get("PV-drivers-version", "major", accept_unknown_key=True) is not None
             # HACK: workaround for Windows XS guest agents not updating major version after resume
             or self.param_get("PV-drivers-version", "xenbus", accept_unknown_key=True) is not None
+        ) and (
+            # These checks are required to verify that the VM's support for power actions is really online. These
+            # features are provided by a service independent from the management agent, and which starts after the PV
+            # drivers have started.
+            # Only check Windows VMs for this to avoid breaking power actions on old Linux VMs.
+            not self.is_windows
+            or (
+                strtobool(self.param_get("other", "feature-poweroff", accept_unknown_key=True))
+                and strtobool(self.param_get("other", "feature-reboot", accept_unknown_key=True))
+            )
         )
 
     def wait_for_os_booted(self):
@@ -298,11 +312,12 @@ class VM(BaseVM):
             "vm-uuid": self.uuid,
             "device": device,
         })
-        try:
-            self.host.xe("vbd-plug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed:
-            self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
-            raise
+        if self.is_running():
+            try:
+                self.host.xe("vbd-plug", {"uuid": vbd_uuid})
+            except commands.SSHCommandFailed:
+                self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
+                raise
 
         self.vdis.append(vdi)
 
@@ -310,18 +325,19 @@ class VM(BaseVM):
 
     def disconnect_vdi(self, vdi: VDI):
         logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
-        assert vdi in self.vdis, "VDI {vdi.uuid} not in VM {self.uuid} VDI list"
+        assert vdi in self.vdis, f"VDI {vdi.uuid} not in VM {self.uuid} VDI list"
         vbd_uuid = self.host.xe("vbd-list", {
             "vdi-uuid": vdi.uuid,
             "vm-uuid": self.uuid
         }, minimal=True)
-        try:
-            self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed as e:
-            if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
-                logging.info(f"VBD {vbd_uuid} already unplugged")
-            else:
-                raise
+        if self.is_running():
+            try:
+                self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
+            except commands.SSHCommandFailed as e:
+                if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
+                    logging.info(f"VBD {vbd_uuid} already unplugged")
+                else:
+                    raise
         self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
         self.vdis.remove(vdi)
 
@@ -331,6 +347,14 @@ class VM(BaseVM):
                 self.vdis.remove(vdi)
                 super().destroy_vdi(vdi_uuid)
                 break
+
+    def destroy_vdi_by_name(self, name: str) -> None:
+        for vdi in self.vdis:
+            if vdi.name() == name:
+                self.vdis.remove(vdi)
+                super().destroy_vdi(vdi.uuid)
+                return
+        raise pytest.fail(f"No VDI named '{name}' in vm {self.uuid}")
 
     def create_vdis_list(self) -> None:
         """ Used to redo the VDIs list of the VM when reverting a snapshot. """
@@ -362,10 +386,10 @@ class VM(BaseVM):
                                     'network-uuid': network_uuid,
                                     })
 
-    def is_running_on_host(self, host):
+    def is_running_on_host(self, host: Host) -> bool:
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
-    def get_residence_host(self):
+    def get_residence_host(self) -> Host:
         assert self.is_running()
         host_uuid = self.param_get('resident-on')
         return self.host.pool.get_host_by_uuid(host_uuid)
@@ -618,6 +642,16 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
+    def set_variable_from_file(
+        self, filepath: str, variable_guid: str | uuid.UUID, variable_name: str, attr: int | str
+    ):
+        dest = self.host.ssh(['mktemp'])
+        try:
+            self.host.scp(filepath, dest)
+            self.host.ssh(['varstore-set', self.uuid, str(variable_guid), variable_name, str(attr), dest])
+        finally:
+            self.host.ssh(['rm', '-f', dest])
+
     def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
         Install UEFI certs to the VM's NVRAM store.
@@ -631,15 +665,7 @@ class VM(BaseVM):
             assert auth.name in ['PK', 'KEK', 'db', 'dbx']
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
-            dest = self.host.ssh(['mktemp'])
-            try:
-                self.host.scp(auth.auth(), dest)
-                self.host.ssh([
-                    'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
-                    str(efi.EFI_AT_ATTRS), dest
-                ])
-            finally:
-                self.host.ssh(['rm', '-f', dest])
+            self.set_variable_from_file(auth.auth(), auth.guid.as_str(), auth.name, efi.EFI_AT_ATTRS)
 
     def booted_with_secureboot(self):
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
