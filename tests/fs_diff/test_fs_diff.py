@@ -1,6 +1,6 @@
 import os
-import subprocess
 
+from lib.commands import local_cmd
 from lib.host import Host
 
 from typing import List
@@ -15,13 +15,11 @@ def test_fs_diff(hosts: List[Host]) -> None:
 
     fsdiff = os.path.realpath(f"{os.path.dirname(__file__)}/../../scripts/xcpng-fs-diff.py")
 
-    process = subprocess.Popen(
-        [fsdiff, "--reference-host", f"{hosts[0]}", "--test-host", f"{hosts[1]}", "--json-output"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    stdout, _ = process.communicate()
+    res = local_cmd([fsdiff, "--reference-host", f"{hosts[0]}",
+                             "--test-host", f"{hosts[1]}",
+                             "--json-output"])
 
-    if process.returncode != 0:
-        print(stdout.decode())
+    if res.returncode != 0:
+        print(res.stdout)
 
-    assert process.returncode == 0
+    assert res.returncode == 0

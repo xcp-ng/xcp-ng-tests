@@ -1,7 +1,5 @@
 import pytest
 
-import subprocess
-
 from lib.common import Defer
 from lib.host import Host
 
