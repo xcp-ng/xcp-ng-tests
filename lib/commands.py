@@ -27,10 +27,10 @@ class SSHCommandFailed(BaseCommandFailed):
         )
 
 class LocalCommandFailed(BaseCommandFailed):
-    def __init__(self, returncode, stdout, cmd):
-        msg_end = f": {stdout}" if stdout else "."
+    def __init__(self, returncode, stderr, cmd):
+        msg_end = f": {stderr}" if stderr else "."
         super(LocalCommandFailed, self).__init__(
-            returncode, stdout, cmd,
+            returncode, stderr, cmd,
             f'Local command ({cmd}) failed with return code {returncode}{msg_end}'
         )
 
@@ -46,8 +46,9 @@ class SSHResult(BaseCmdResult):
         super(SSHResult, self).__init__(returncode, stdout)
 
 class LocalCommandResult(BaseCmdResult):
-    def __init__(self, returncode, stdout):
+    def __init__(self, returncode, stdout, stderr):
         super(LocalCommandResult, self).__init__(returncode, stdout)
+        self.stderr = stderr
 
 def _ellide_log_lines(log):
     if log == '':
@@ -244,18 +245,19 @@ def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
 
     return res
 
-def local_cmd(cmd, check=True, decode=True):
+def local_cmd(cmd, check=True, decode=True) -> LocalCommandResult:
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,
         check=False
     )
 
     # get a decoded version of the output in any case, replacing potential errors
-    output_for_logs = res.stdout.decode(errors='replace').strip()
+    stdout_for_logs = res.stdout.decode(errors='replace').strip()
+    stderr_for_logs = res.stderr.decode(errors='replace').strip()
 
     output = res.stdout
     if decode:
@@ -263,12 +265,14 @@ def local_cmd(cmd, check=True, decode=True):
 
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
-    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(stdout_for_logs)}")
 
     if res.returncode and check:
-        raise LocalCommandFailed(res.returncode, output_for_logs, command)
+        logging.warning(f"[local] stderr:{_ellide_log_lines(stderr_for_logs)}")
+        raise LocalCommandFailed(res.returncode, stderr_for_logs, command)
 
-    return LocalCommandResult(res.returncode, output)
+    stderr = res.stderr.decode()
+    return LocalCommandResult(res.returncode, output, stderr)
 
 def encode_powershell_command(cmd: str):
     return base64.b64encode(cmd.encode("utf-16-le")).decode("ascii")

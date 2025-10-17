@@ -1,7 +1,6 @@
 import pytest
 
 import hashlib
-import subprocess
 
 from lib import commands
 
@@ -35,10 +34,10 @@ def test_access_links(host, command_id, url_id):
 
     # Verify the download worked by comparing with local download
     # This ensures the content is accessible and identical from both locations
-    local_result = commands.local_cmd(COMMAND)
+    local_result = commands.local_cmd(COMMAND, check=False)
 
     assert local_result.returncode == 0, (
-        f"Failed to fetch URL locally: {local_result.stderr}"
+        f"Failed to fetch URL locally: {local_result.stdout}"
     )
 
     # Extract checksums

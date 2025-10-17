@@ -6,7 +6,6 @@ import logging
 import os
 import random
 import string
-import subprocess
 import sys
 import tempfile
 import time
@@ -17,7 +16,7 @@ from packaging import version
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
-from lib.commands import SSHCommandFailed, scp, ssh
+from lib.commands import SSHCommandFailed, scp, ssh, local_cmd
 from lib.common import is_uuid, wait_for
 from lib.host import host_data
 from lib.pool import Pool
@@ -27,9 +26,8 @@ logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
 def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
     password = host_data(hostname_or_ip)['password']
-    cmd = ['openssl', 'passwd', '-6', password]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE)
-    encrypted_password = res.stdout.decode().strip()
+    algorithm_option = '-6' # SHA512
+    encrypted_password = local_cmd(['openssl', 'passwd', algorithm_option, password]).stdout.strip()
     if target_hostname is None:
         target_hostname = "xcp-ng-" + "".join(
             random.choice(string.ascii_lowercase) for i in range(5)
@@ -70,7 +68,9 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
             raise Exception(f"Unknown action: `{action}`")
 
 def is_ip_active(ip):
-    return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
+    # 3 tries with a timeout of 10 sec for each ICMP request
+    return local_cmd(['ping', '-c', '3', '-W', '10', ip],
+                     check=False).returncode == 0
 
 def is_ssh_up(ip):
     try:
@@ -201,7 +201,7 @@ def main():
             "Waiting for the installation process to complete and the VM to reboot and be up", 3600, 10
         )
         vm_ip_address = get_new_host_ip(mac_address)
-        logging.info('The IP address of the installed XCP-ng is: ' + vm_ip_address)
+        logging.info(f'The IP address of the installed XCP-ng is: {vm_ip_address}')
         wait_for(lambda: is_new_host_ready(vm_ip_address), "Waiting for XAPI to be ready", 600, 10)
         pool2 = Pool(vm_ip_address)
         host2 = pool2.master

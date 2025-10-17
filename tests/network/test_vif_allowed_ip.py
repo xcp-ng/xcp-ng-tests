@@ -3,12 +3,16 @@ import pytest
 import ipaddress
 import os
 
+from lib.commands import local_cmd
+
 # Requirements:
 # - one XCP-ng host (--host) >= 8.2 (>= 8.3 for the CIDR tests) with no SDN controller configured
 # - a VM (--vm)
 
 def ip_responsive(ip):
-    return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
+    # 3 tries with a timeout of 10 sec for each ICMP request
+    return local_cmd(['ping', '-c', '3', '-W', '10', ip],
+                     check=False).returncode == 0
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_no_sdn_controller")

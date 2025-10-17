@@ -1,7 +1,6 @@
 import pytest
 
-import subprocess
-
+from lib.commands import local_cmd
 from lib.netutil import wrap_ip
 
 # This test installs netdata and netdata-ui packages, verifies the service status,
@@ -17,13 +16,9 @@ class TestsNetdata:
         url = f"http://{wrap_ip(host.hostname_or_ip)}:{port}"
         if path is not None:
             url += f"/{path}"
-        process = subprocess.Popen(
-            ["curl", "-XGET", "-k", "-I", "-s", url],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        stdout, _ = process.communicate()
-        return stdout.decode().splitlines()
+
+        res = local_cmd(["curl", "-XGET", "-k", "-I", "-s", url])
+        return res.stdout.strip().splitlines()
 
     # Verify the ActiveState for the netdata service
     def test_netdata_service(self, host):
