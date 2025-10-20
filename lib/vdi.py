@@ -50,6 +50,9 @@ class VDI:
         logging.info(f"Resizing VDI {self.uuid} to {new_size}")
         self.sr.pool.master.xe("vdi-resize", {"uuid": self.uuid, "disk-size": str(new_size)})
 
+    def export(self, path: str, image_format="vhd"):
+        self.sr.pool.master.xe("vdi-export", {"uuid": self.uuid, "format": image_format, "filename": path})
+
     def __str__(self):
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 

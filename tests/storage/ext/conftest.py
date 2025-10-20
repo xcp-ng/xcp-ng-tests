@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     from lib.sr import SR
 
 @pytest.fixture(scope='package')
-def ext_sr(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[SR]:
+def ext_sr(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]], image_format: str) -> Generator[SR]:
     """ An EXT SR on first host. """
     sr_disk = unused_512B_disks[host][0]["name"]
-    sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk, "preferred-image-formats": image_format})
     yield sr
     # teardown
     sr.destroy()

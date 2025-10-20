@@ -66,6 +66,12 @@ class TestEXTSR:
         finally:
             vm.shutdown(verify=True)
 
+    def test_export(self, vm_on_ext_sr):
+        vm = vm_on_ext_sr
+        vdi = vm.vdis[0]
+
+        vdi.export("/root/test_dams.vhd", image_format="vhd")
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.small_vm
