@@ -10,6 +10,7 @@ from . import (
     enable_testsign,
     insert_cd_safe,
     wait_for_vm_running_and_ssh_up_without_tools,
+    wait_for_vm_xenvif_offboard,
 )
 
 from typing import Any, Dict
@@ -79,3 +80,4 @@ def uninstall_guest_tools(vm: VM, action: PowerAction):
     if action == PowerAction.Reboot:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+        wait_for_vm_xenvif_offboard(vm)
