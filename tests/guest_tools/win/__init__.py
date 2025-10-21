@@ -3,7 +3,7 @@ import logging
 import re
 import time
 
-from data import ISO_DOWNLOAD_URL
+from data import ISO_DOWNLOAD_URL, TEST_DNS_SERVER
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
 from lib.host import Host
@@ -144,4 +144,22 @@ def vif_set_dns(vif: VIF, nameservers: List[str]):
 Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
 Get-DnsClientServerAddress -AddressFamily IPv4 |
 Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
+    )
+
+
+def set_vm_dns(vm: VM):
+    logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
+    vif = vm.vifs()[0]
+    assert TEST_DNS_SERVER not in vif_get_dns(vif)
+    vif_set_dns(vif, [TEST_DNS_SERVER])
+
+
+def check_vm_dns(vm: VM):
+    # The restore task takes time to fire so wait for it
+    vif = vm.vifs()[0]
+    wait_for(
+        lambda: TEST_DNS_SERVER in vif_get_dns(vif),
+        f"Check VM DNS contains {TEST_DNS_SERVER}",
+        timeout_secs=300,
+        retry_delay_secs=30,
     )
