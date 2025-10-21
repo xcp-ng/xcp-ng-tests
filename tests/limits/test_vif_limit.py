@@ -33,12 +33,16 @@ class TestVIFLimit:
         existing_vifs = len(vm.vifs())
 
         logging.info(f'Get {VCPUS} vCPUs for the VM')
+        original_vcpus_max = vm.param_get('VCPUs-max')
+        original_vcpus_at_startup = vm.param_get('VCPUs-at-startup')
         vm.param_set('VCPUs-max', VCPUS)
         vm.param_set('VCPUs-at-startup', VCPUS)
 
         logging.info('Create VIFs before starting the VM')
+        vifs = []
         for i in range(existing_vifs, VIF_LIMIT):
-            vm.create_vif(i, network_uuid=network_uuid)
+            vif = vm.create_vif(i, network_uuid=network_uuid)
+            vifs.append(vif)
 
         vm.start()
         vm.wait_for_os_booted()
@@ -92,4 +96,9 @@ class TestVIFLimit:
             logging.info(stdout)
         finally:
             vm.ssh(['pkill iperf3 || true'])
+            vm.shutdown(verify=True)
+            vm.param_set('VCPUs-at-startup', original_vcpus_at_startup)
+            vm.param_set('VCPUs-max', original_vcpus_max)
+            for vif in vifs:
+                vif.destroy()
             host.ssh('killall iperf3 || true')
