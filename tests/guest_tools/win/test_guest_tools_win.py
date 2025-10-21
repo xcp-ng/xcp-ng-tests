@@ -12,6 +12,7 @@ from . import (
     PowerAction,
     check_vm_dns,
     set_vm_dns,
+    vif_has_rss,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
 from .guest_tools import (
@@ -82,6 +83,17 @@ class TestGuestToolsWindows:
             time.sleep(5)
             vif.plug()
         wait_for(vm.is_ssh_up, "Wait for SSH up")
+
+    def test_rss(self, vm_install_test_tools_per_test_class: VM):
+        """
+        Receive-side scaling is known to be broken on some driver versions.
+
+        Test that RSS is functional for each NIC.
+        """
+        vm = vm_install_test_tools_per_test_class
+        vifs = vm.vifs()
+        for vif in vifs:
+            assert vif_has_rss(vif)
 
 
 @pytest.mark.multi_vms
