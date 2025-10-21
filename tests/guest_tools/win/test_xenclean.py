@@ -27,7 +27,8 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
     xenclean_cmd = f"Set-Location C:\\; {xenclean_path} -NoReboot -Confirm:$false; {WINDOWS_SHUTDOWN_COMMAND}"
     vm.start_background_powershell(xenclean_cmd)
 
-    wait_for(vm.is_halted, "Wait for VM halted")
+    # XenClean sometimes takes a bit long due to all the calls to the uninstallers. We need an extended timeout.
+    wait_for(vm.is_halted, "Wait for VM halted", timeout_secs=900)
     vm.eject_cd()
 
     vm.start()
