@@ -253,3 +253,6 @@ IMAGE_EQUIVS: dict[str, str] = {
 #    'install.test::Nested::install[bios-830-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb':
 #    'install.test::Nested::install[bios-830-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
 }
+
+# This should be a working DNS server that's not used by any VM images.
+TEST_DNS_SERVER = "1.1.1.1"
