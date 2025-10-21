@@ -6,9 +6,18 @@ from pathlib import PureWindowsPath
 from lib.common import wait_for
 from lib.vm import VM
 
-from . import WINDOWS_SHUTDOWN_COMMAND, insert_cd_safe, wait_for_vm_running_and_ssh_up_without_tools
+from . import (
+    WINDOWS_SHUTDOWN_COMMAND,
+    check_vm_dns,
+    insert_cd_safe,
+    set_vm_dns,
+    wait_for_vm_running_and_ssh_up_without_tools,
+)
 
 from typing import Any, Dict, Tuple
+
+# Test uninstallation of other drivers using the XenClean program.
+
 
 def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
     insert_cd_safe(vm, guest_tools_iso["name"])
@@ -46,15 +55,22 @@ class TestXenClean:
         # HACK: In some cases, vm.reboot(verify=False) followed by vm.insert_cd() (as called by run_xenclean)
         # may cause the VM to hang at the BIOS screen; wait for VM start to avoid this issue.
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+
+        set_vm_dns(vm)
         logging.info("XenClean with test tools")
         run_xenclean(vm, guest_tools_iso)
+        logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
+        check_vm_dns(vm)
 
     def test_xenclean_with_other_tools(self, vm_install_other_drivers: Tuple[VM, Dict], guest_tools_iso):
         vm, param = vm_install_other_drivers
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
-            return
+
+        set_vm_dns(vm)
         logging.info("XenClean with other tools")
         run_xenclean(vm, guest_tools_iso)
+        logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
+        check_vm_dns(vm)
