@@ -147,6 +147,19 @@ Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
     )
 
 
+def wait_for_vm_xenvif_offboard(vm: VM):
+    # Xenvif offboard will reset the NIC, so need to wait for it to disappear first
+    wait_for(
+        lambda: strtobool(
+            vm.execute_powershell_script(
+                r'$null -eq (Get-ScheduledTask "Copy-XenVifSettings" -ErrorAction SilentlyContinue)', simple_output=True
+            )
+        ),
+        timeout_secs=300,
+        retry_delay_secs=30,
+    )
+
+
 def set_vm_dns(vm: VM):
     logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
     vif = vm.vifs()[0]

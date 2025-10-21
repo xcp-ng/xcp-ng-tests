@@ -12,6 +12,7 @@ from . import (
     insert_cd_safe,
     set_vm_dns,
     wait_for_vm_running_and_ssh_up_without_tools,
+    wait_for_vm_xenvif_offboard,
 )
 
 from typing import Any, Dict, Tuple
@@ -33,6 +34,7 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
 
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
+    wait_for_vm_xenvif_offboard(vm)
 
 
 @pytest.mark.multi_vms
