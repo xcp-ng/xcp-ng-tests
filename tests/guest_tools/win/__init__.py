@@ -5,12 +5,13 @@ import time
 
 from data import ISO_DOWNLOAD_URL
 from lib.commands import SSHCommandFailed
-from lib.common import wait_for
+from lib.common import strtobool, wait_for
 from lib.host import Host
 from lib.sr import SR
+from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -104,3 +105,43 @@ def insert_cd_safe(vm: VM, vdi_name: str, cd_path="D:/", retries=2):
             wait_for(vm.is_halted, "Wait for VM halted")
 
     raise TimeoutError(f"Waiting for CD at {cd_path} failed")
+
+
+def vif_get_mac_without_separator(vif: VIF):
+    mac = vif.param_get("MAC")
+    assert mac is not None
+    return mac.replace(":", "")
+
+
+def vif_has_rss(vif: VIF):
+    # Even if the Xenvif hash setting request fails, Windows can still report the NIC as having RSS enabled as long as
+    # the relevant OIDs are supported (Get-NetAdapterRss reports Enabled as True and Profile as Default).
+    # We need to explicitly check MaxProcessors to see if the hash setting request has really succeeded.
+    mac = vif_get_mac_without_separator(vif)
+    return strtobool(
+        vif.vm.execute_powershell_script(
+            rf"""(Get-NetAdapter |
+Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
+Get-NetAdapterRss).MaxProcessors -gt 0"""
+        )
+    )
+
+
+def vif_get_dns(vif: VIF):
+    mac = vif_get_mac_without_separator(vif)
+    return vif.vm.execute_powershell_script(
+        rf"""Import-Module DnsClient; Get-NetAdapter |
+Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
+Get-DnsClientServerAddress -AddressFamily IPv4 |
+Select-Object -ExpandProperty ServerAddresses"""
+    ).splitlines()
+
+
+def vif_set_dns(vif: VIF, nameservers: List[str]):
+    mac = vif_get_mac_without_separator(vif)
+    vif.vm.execute_powershell_script(
+        rf"""Import-Module DnsClient; Get-NetAdapter |
+Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
+Get-DnsClientServerAddress -AddressFamily IPv4 |
+Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
+    )
