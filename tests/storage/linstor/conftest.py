@@ -3,12 +3,15 @@ from __future__ import annotations
 import pytest
 
 import functools
+import json
 import logging
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import lib.commands as commands
 from lib import config
+from lib.common import safe_split
 
 try:
     from data import LINSTOR_REDUNDANCY  # type: ignore
@@ -186,9 +189,25 @@ def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI, None, None]:
     yield vdi
     vdi.destroy()
 
+@contextmanager
+def _vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    """
+    Context manager to provide the fixture lifecycle on a VM on a Linstor SR
+    with different scopes without repeating the code.
+    """
+    vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
+    try:
+        yield vm
+    finally:
+        logging.info("<< Destroy VM")
+        vm.destroy(verify=True)
+
 @pytest.fixture(scope='module')
 def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
-    vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
-    yield vm
-    logging.info("<< Destroy VM")
-    vm.destroy(verify=True)
+    with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
+        yield vm
+
+@pytest.fixture(scope='function')
+def vm_on_linstor_sr_function(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
+        yield vm
