@@ -49,31 +49,31 @@ _tempdir = _EfiGlobalTempdir()
 
 
 class _SecureBootCertList:
-    _prefix = Path(__file__).parent / '../contrib/secureboot_certs'
+    _prefix = Path(__file__).parent / '../contrib'
 
     def kek_ms_2011(self):
-        return str(self._prefix / "KEK/Certificates/MicCorKEKCA2011_2011-06-24.der")
+        return str(self._prefix / "secureboot_objects/KEK/Certificates/MicCorKEKCA2011_2011-06-24.der")
 
     def kek_ms_2023(self):
-        return str(self._prefix / "KEK/Certificates/microsoft corporation kek 2k ca 2023.der")
+        return str(self._prefix / "secureboot_objects/KEK/Certificates/microsoft corporation kek 2k ca 2023.der")
 
     def db_win_2011(self):
-        return str(self._prefix / "DB/Certificates/MicWinProPCA2011_2011-10-19.der")
+        return str(self._prefix / "secureboot_objects/DB/Certificates/MicWinProPCA2011_2011-10-19.der")
 
     def db_uefi_2011(self):
-        return str(self._prefix / "DB/Certificates/MicCorUEFCA2011_2011-06-27.der")
+        return str(self._prefix / "secureboot_objects/DB/Certificates/MicCorUEFCA2011_2011-06-27.der")
 
     def db_win_2023(self):
-        return str(self._prefix / "DB/Certificates/windows uefi ca 2023.der")
+        return str(self._prefix / "secureboot_objects/DB/Certificates/windows uefi ca 2023.der")
 
     def db_uefi_2023(self):
-        return str(self._prefix / "DB/Certificates/microsoft uefi ca 2023.der")
+        return str(self._prefix / "secureboot_objects/DB/Certificates/microsoft uefi ca 2023.der")
 
     def db_oprom_2023(self):
-        return str(self._prefix / "DB/Certificates/microsoft option rom uefi ca 2023.der")
+        return str(self._prefix / "secureboot_objects/DB/Certificates/microsoft option rom uefi ca 2023.der")
 
 
-ms_certs = _SecureBootCertList()
+SB_CERTS = _SecureBootCertList()
 
 
 class GUID(UUID):

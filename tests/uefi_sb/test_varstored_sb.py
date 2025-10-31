@@ -2,7 +2,7 @@ import pytest
 
 import logging
 
-from lib.efi import EFIAuth, ms_certs
+from lib.efi import SB_CERTS, EFIAuth
 from lib.vm import VM
 
 from .utils import (
@@ -182,8 +182,8 @@ class TestGuestWindowsUEFIKeyUpgrade:
     def install_old_certs(self, vm: VM):
         """Populate a key set that looks like the old defaults."""
         PK = EFIAuth.self_signed("PK")
-        KEK = EFIAuth.self_signed("KEK", other_certs=[ms_certs.kek_ms_2011()])
-        db = EFIAuth("db", other_certs=[ms_certs.db_uefi_2011(), ms_certs.db_win_2011()])
+        KEK = EFIAuth.self_signed("KEK", other_certs=[SB_CERTS.kek_ms_2011()])
+        db = EFIAuth("db", other_certs=[SB_CERTS.db_uefi_2011(), SB_CERTS.db_win_2011()])
         # Some test VMs don't like an empty dbx when their own dbx is empty, so just put whatever in there
         dbx = EFIAuth.self_signed("dbx")
 
@@ -198,15 +198,15 @@ class TestGuestWindowsUEFIKeyUpgrade:
     def install_new_certs(self, vm: VM, signer: EFIAuth):
         """Populate a key set that looks like the new defaults with 2023 MS keys."""
         newPK = EFIAuth.self_signed("PK")
-        newKEK = EFIAuth("KEK", other_certs=[ms_certs.kek_ms_2011(), ms_certs.kek_ms_2023()])
+        newKEK = EFIAuth("KEK", other_certs=[SB_CERTS.kek_ms_2011(), SB_CERTS.kek_ms_2023()])
         newdb = EFIAuth(
             "db",
             other_certs=[
-                ms_certs.db_win_2011(),
-                ms_certs.db_win_2023(),
-                ms_certs.db_uefi_2011(),
-                ms_certs.db_uefi_2023(),
-                ms_certs.db_oprom_2023(),
+                SB_CERTS.db_win_2011(),
+                SB_CERTS.db_win_2023(),
+                SB_CERTS.db_uefi_2011(),
+                SB_CERTS.db_uefi_2023(),
+                SB_CERTS.db_oprom_2023(),
             ],
         )
         newdbx = EFIAuth("dbx")
