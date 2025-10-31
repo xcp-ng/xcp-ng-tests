@@ -72,6 +72,12 @@ class _SecureBootCertList:
     def db_oprom_2023(self):
         return str(self._prefix / "secureboot_objects/DB/Certificates/microsoft option rom uefi ca 2023.der")
 
+    def dbx_hashes_ms_amd64(self):
+        return str(self._prefix / "secureboot_objects/DBX/amd64/DBXUpdate.bin")
+
+    def dbx_poison(self):
+        return str(self._prefix / "varstored/dbx_poison.auth")
+
 
 SB_CERTS = _SecureBootCertList()
 
@@ -90,7 +96,9 @@ global_variable_guid = GUID('8be4df61-93ca-11d2-aa0d-00e098032b8c')
 image_security_database_guid = GUID('d719b2cb-3d3a-4596-a3bc-dad00e67656f')
 
 # Variable attributes for time based authentication attrs
+# Refer to https://uefi.org/specs/UEFI/2.11/08_Services_Runtime_Services.html#getvariable
 EFI_AT_ATTRS = 0x27
+EFI_VARIABLE_APPEND_WRITE = 0x40
 
 time_seed = datetime.now()
 time_offset = 1

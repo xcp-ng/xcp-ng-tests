@@ -2,7 +2,8 @@ import pytest
 
 import logging
 
-from lib.efi import SB_CERTS, EFIAuth
+from lib.commands import SSHCommandFailed
+from lib.efi import EFI_AT_ATTRS, EFI_VARIABLE_APPEND_WRITE, SB_CERTS, EFIAuth, image_security_database_guid
 from lib.vm import VM
 
 from .utils import (
@@ -86,6 +87,45 @@ class TestGuestLinuxUEFISecureBoot:
         vm.wait_for_vm_running_and_ssh_up()
         logging.info("Check that SB is NOT enabled according to the OS.")
         assert not vm.booted_with_secureboot()
+
+    def test_append_with_default(self, uefi_vm: VM):
+        vm = uefi_vm
+        vm.host.pool.clear_custom_uefi_certs()
+        vm.set_uefi_user_mode()
+        vm.set_variable_from_file(
+            SB_CERTS.dbx_hashes_ms_amd64(),
+            image_security_database_guid,
+            "dbx",
+            EFI_AT_ATTRS | EFI_VARIABLE_APPEND_WRITE,
+        )
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+
+    def test_append_with_poison(self, uefi_vm: VM):
+        """
+        Context: https://xcp-ng.org/blog/2025/10/30/xcp-ng-8-3-varstored-update-unbootable-vm-risk-and-remediation/
+
+        In short, the dbx variable previously used in the bad update did not use the Microsoft owner GUID, preventing
+        deduplication of EFI signature data entries during an append call. Normally, this would not cause the VM to
+        crash; except varstored does not check for the variable data length on append, triggering the issue.
+        """
+        vm = uefi_vm
+        vm.host.pool.clear_custom_uefi_certs()
+        vm.set_uefi_user_mode()
+        vm.set_variable_from_file(SB_CERTS.dbx_poison(), image_security_database_guid, "dbx", EFI_AT_ATTRS)
+        try:
+            vm.set_variable_from_file(
+                SB_CERTS.dbx_hashes_ms_amd64(),
+                image_security_database_guid,
+                "dbx",
+                EFI_AT_ATTRS | EFI_VARIABLE_APPEND_WRITE,
+            )
+        except SSHCommandFailed:
+            # Appending the MS dbx may succeed or fail, doesn't matter, as appending the poison may not necessarily take
+            # dbx over the DATA_LIMIT. The important thing is that the VM boots up following this append attempt.
+            pass
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
 
 
 @pytest.mark.usefixtures("host_at_least_8_3")
