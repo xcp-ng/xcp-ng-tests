@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import datetime
 import itertools
 import logging
 import os
@@ -44,6 +45,13 @@ try:
 except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
+
+# Session-level tracking for failed tests and their associated hosts
+FAILED_TESTS_HOSTS = {}  # {test_nodeid: set(Host)}
+SESSION_HAS_FAILURES = False
+
+# Path to timestamp file on remote hosts for log extraction
+HOST_TIMESTAMPS_FILE = "/tmp/pytest-timestamps.log"
 
 # pytest hooks
 
@@ -98,6 +106,18 @@ def pytest_addoption(parser):
         default=[],
         help="Format of VDI to execute tests on."
         "Example: vhd,qcow2"
+    )
+    parser.addoption(
+        "--collect-logs-on-failure",
+        action="store_true",
+        default=True,
+        help="Automatically collect xen-bugtool logs from hosts when tests fail (default: True)"
+    )
+    parser.addoption(
+        "--no-collect-logs-on-failure",
+        action="store_false",
+        dest="collect_logs_on_failure",
+        help="Disable automatic log collection on test failure"
     )
 
 def pytest_configure(config):
@@ -760,3 +780,171 @@ def cifs_iso_sr(host, cifs_iso_device_config):
     yield sr
     # teardown
     sr.forget()
+
+
+# Session-scoped fixture to create a shared log directory for all artifacts
+@pytest.fixture(scope='session')
+def session_log_dir():
+    """
+    Create and return a session-wide log directory for storing all test artifacts.
+    The directory is created at session start and shared by all fixtures.
+
+    Directory naming includes BUILD_NUMBER if running in Jenkins CI environment.
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # BUILD_NUMBER and WORKSPACE are specific to Jenkins
+    build_number = os.environ.get('BUILD_NUMBER')
+    if build_number:
+        logging.debug(f"Use Jenkins CI build number: {build_number}")
+        workspace = os.environ.get('WORKSPACE')
+        log_dir = f"{workspace}/report_{build_number}"
+    else:
+        log_dir = f"pytest-logs/report_{timestamp}"
+
+    # postpone directory creation only if some test failed
+    return log_dir
+
+
+# Record test timestamps to easily extract logs
+@pytest.fixture(scope='class', autouse=True)
+def bugreport_timestamp(request, host):
+    class_name = request.module.__name__
+    logging.debug(f"Record timestamp (begin): {class_name}")
+    host.ssh(f"echo begin {class_name} $(date '+%s') >> {HOST_TIMESTAMPS_FILE}")
+    yield
+    logging.debug(f"Record timestamp (end): {class_name}")
+    host.ssh(f"echo end   {class_name} $(date '+%s') >> {HOST_TIMESTAMPS_FILE}")
+
+
+def _introspect_test_fixtures(request):
+    """
+    Introspect test fixtures to find Host objects.
+    Returns test_hosts set.
+    """
+    # Collect all Host and VM objects used by this test from its fixtures
+    test_hosts = set()
+
+    # Check all fixtures used by this test
+    # XXX: this is a bit hard to understand but this introspection of fixtures
+    #      is the best way to gather VMs and Hosts. Other alternatives require,
+    #      maintenance, boilerplate and are more prone to miss some cases.
+    for fixturename in getattr(request, 'fixturenames', []):
+        try:
+            fixture_value = request.getfixturevalue(fixturename)
+            # Check if fixture is a Host
+            if isinstance(fixture_value, Host):
+                test_hosts.add(fixture_value)
+            # Check if fixture is a list of hosts
+            elif isinstance(fixture_value, list) and all(isinstance(h, Host) for h in fixture_value):
+                test_hosts.update(fixture_value)
+            # Check if fixture is a dict
+            elif isinstance(fixture_value, dict):
+                logging.warning("dictionnary in fixtures case not handled")
+            # Check if fixture has a 'host' attribute (like SR, Pool objects)
+            elif hasattr(fixture_value, 'host') and isinstance(fixture_value.host, Host):
+                test_hosts.add(fixture_value.host)
+            # Check if fixture is a Pool
+            elif hasattr(fixture_value, 'hosts') and isinstance(fixture_value.hosts, list):
+                test_hosts.update(h for h in fixture_value.hosts if isinstance(h, Host))
+        except Exception:
+            # Some fixtures may not be available yet or may fail to load
+            pass
+
+    return test_hosts
+
+@pytest.fixture(scope='function', autouse=True)
+def track_test_host(request, session_log_dir):
+    """
+    Track which hosts are used by each test.
+    On test failure, record the test and its hosts for later log collection and console capture.
+    """
+    global FAILED_TESTS_HOSTS, SESSION_HAS_FAILURES
+
+    yield
+
+    # After test completes, check if it failed
+    report = request.node.stash.get(PHASE_REPORT_KEY, None)
+    if report and "call" in report and report["call"].failed:
+        test_nodeid = request.node.nodeid
+
+        # Only introspect fixtures if test failed (performance optimization)
+        test_hosts = _introspect_test_fixtures(request)
+
+        logging.warning(f"Test failed: {test_nodeid}, "
+                        f"used hosts: {[h.hostname_or_ip for h in test_hosts]}")
+
+        if test_hosts:
+            FAILED_TESTS_HOSTS[test_nodeid] = test_hosts
+            SESSION_HAS_FAILURES = True
+
+@pytest.fixture(scope='session', autouse=True)
+def collect_logs_on_session_failure(request, hosts, session_log_dir):
+    """
+    Collect xen-bugtool logs from hosts at the end of the test session if any tests failed.
+    Only collects from hosts that were actually used by failed tests.
+    """
+    global FAILED_TESTS_HOSTS, SESSION_HAS_FAILURES
+
+    yield  # Let all tests run first
+
+    # Check if log collection is enabled
+    collect_logs = request.config.getoption("--collect-logs-on-failure", default=True)
+    if not collect_logs:
+        return
+
+    if not SESSION_HAS_FAILURES and not FAILED_TESTS_HOSTS:
+        return
+
+    # Get unique set of hosts that had failures
+    failed_hosts = set()
+    for test_hosts in FAILED_TESTS_HOSTS.values():
+        failed_hosts.update(test_hosts)
+
+    if not failed_hosts:
+        logging.debug("Tests failed but no hosts were tracked. Collecting logs from all configured hosts.")
+        failed_hosts = set(hosts)
+
+    logging.debug("Collecting logs from {len(failed_hosts)} host(s) due to test failures...")
+
+    # Use the session-wide log directory (already created by session_log_dir fixture)
+    # This ensures logs are saved alongside console captures
+    log_dir = session_log_dir
+    os.makedirs(log_dir, exist_ok=True)
+
+    for host in failed_hosts:
+        try:
+            logging.debug(f"Collecting logs from host {host.hostname_or_ip}...")
+
+            # Run xen-bugtool on the host
+            result = host.ssh(['xen-bugtool', '-y', '-s'], check=True)
+            filepath = result.strip()
+            assert filepath.endswith('.tar.bz2'), f"expect a .tar.bz2 archive: {filepath}"
+
+            filename = os.path.basename(filepath)
+
+            # Construct local filename with host identifier
+            local_filename = f"{host.hostname_or_ip.replace(':', '_')}_{filename}"
+            local_path = os.path.join(log_dir, local_filename)
+
+            # Download the archive from host
+            logging.debug(f"Downloading {filepath} to {local_path}...")
+            host.scp(filepath, local_path, local_dest=True, check=True)
+
+            # Download the timestamp file if it exists
+            local_timestamp_filename = f"{host.hostname_or_ip.replace(':', '_')}_pytest-timestamps.log"
+            local_timestamp_path = os.path.join(log_dir, local_timestamp_filename)
+            try:
+                host.scp(HOST_TIMESTAMPS_FILE, local_timestamp_path, local_dest=True, check=False)
+                logging.debug(f"Timestamp file downloaded to: {local_timestamp_path}")
+            except Exception as ts_e:
+                logging.debug(f"Could not download timestamp file (may not exist): {ts_e}")
+
+            # Clean up archive from host
+            logging.info(f"Cleaning up {filepath} from host...")
+            host.ssh(['rm', '-f', filepath])
+
+        except Exception as e:
+            logging.error(f"Failed to collect logs from host {host.hostname_or_ip}: {e}")
+
+    logging.info(f"Log collection complete. Logs saved to: {log_dir}")
