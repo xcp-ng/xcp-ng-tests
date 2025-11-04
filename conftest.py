@@ -13,6 +13,7 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
+from lib import commands
 from lib.common import (
     callable_marker,
     DiskDevName,
@@ -46,8 +47,9 @@ except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
 
-# Session-level tracking for failed tests and their associated hosts
+# Session-level tracking for failed tests and their associated hosts/VMs
 FAILED_TESTS_HOSTS = {}  # {test_nodeid: set(Host)}
+FAILED_TESTS_VMS = {}    # {test_nodeid: set(VM)}
 SESSION_HAS_FAILURES = False
 
 # Path to timestamp file on remote hosts for log extraction
@@ -123,6 +125,12 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
+
+    # Register custom markers
+    config.addinivalue_line(
+        "markers",
+        "capture_console: Capture VM console screenshots on test failure (opt-in for critical tests)"
+    )
 
 def pytest_generate_tests(metafunc):
     if "vm_ref" in metafunc.fixturenames:
@@ -781,7 +789,6 @@ def cifs_iso_sr(host, cifs_iso_device_config):
     # teardown
     sr.forget()
 
-
 # Session-scoped fixture to create a shared log directory for all artifacts
 @pytest.fixture(scope='session')
 def session_log_dir():
@@ -805,6 +812,49 @@ def session_log_dir():
     # postpone directory creation only if some test failed
     return log_dir
 
+# Helper function for immediate console capture
+def capture_vm_console(vm: VM, log_dir: str) -> str:
+    import sys
+
+    # Path to console capture Python script
+    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'capture-console.py')
+
+    if not os.path.exists(script_path):
+        raise FileNotFoundError(f"Console capture script not found at {script_path}")
+
+    host_ip = vm.host.hostname_or_ip
+    vm_uuid = vm.uuid
+
+    try:
+        vm_name = vm.name() if hasattr(vm, 'name') and callable(vm.name) else vm_uuid[:8]
+    except Exception:
+        vm_name = vm_uuid[:8]
+
+    # Generate output filename with VM info
+    output_filename = f"{host_ip.replace(':', '_')}_vm_{vm_name}_{vm_uuid[:8]}_console.png"
+    output_path = os.path.join(log_dir, output_filename)
+
+    logging.debug(f"Capturing console for VM {vm_name} ({vm_uuid}) in {output_path}...")
+
+    # Get credentials from data.py
+    from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER
+
+    # Build command to call Python script directly (XOLite mode)
+    cmd = [
+        sys.executable,  # Use same Python interpreter as current process
+        script_path,
+        '--host', host_ip,
+        '--vm-uuid', vm_uuid,
+        output_filename,
+        '--output-dir', log_dir,
+        '--user', HOST_DEFAULT_USER,
+        '--password', HOST_DEFAULT_PASSWORD
+    ]
+
+    # Run the capture script
+    result = commands.local_cmd(cmd, check=True)
+
+    return output_path
 
 # Record test timestamps to easily extract logs
 @pytest.fixture(scope='class', autouse=True)
@@ -829,11 +879,12 @@ def check_bug_reports(host):
 
 def _introspect_test_fixtures(request):
     """
-    Introspect test fixtures to find Host objects.
-    Returns test_hosts set.
+    Introspect test fixtures to find Host and VM objects.
+    Returns (test_hosts, test_vms) sets.
     """
     # Collect all Host and VM objects used by this test from its fixtures
     test_hosts = set()
+    test_vms = set()
 
     # Check all fixtures used by this test
     # XXX: this is a bit hard to understand but this introspection of fixtures
@@ -845,9 +896,18 @@ def _introspect_test_fixtures(request):
             # Check if fixture is a Host
             if isinstance(fixture_value, Host):
                 test_hosts.add(fixture_value)
-            # Check if fixture is a list of hosts
-            elif isinstance(fixture_value, list) and all(isinstance(h, Host) for h in fixture_value):
-                test_hosts.update(fixture_value)
+            # Check if fixture is a VM
+            elif isinstance(fixture_value, VM):
+                test_vms.add(fixture_value)
+                test_hosts.add(fixture_value.host)
+            # Check if fixture is a list
+            elif isinstance(fixture_value, list):
+                for item in fixture_value:
+                    if isinstance(item, Host):
+                        test_hosts.add(item)
+                    elif isinstance(item, VM):
+                        test_vms.add(item)
+                        test_hosts.add(item.host)
             # Check if fixture is a dict
             elif isinstance(fixture_value, dict):
                 logging.warning("dictionnary in fixtures case not handled")
@@ -861,15 +921,15 @@ def _introspect_test_fixtures(request):
             # Some fixtures may not be available yet or may fail to load
             pass
 
-    return test_hosts
+    return test_hosts, test_vms
 
 @pytest.fixture(scope='function', autouse=True)
 def track_test_host(request, session_log_dir):
     """
-    Track which hosts are used by each test.
-    On test failure, record the test and its hosts for later log collection and console capture.
+    Track which hosts and VMs are used by each test.
+    On test failure, record the test and its hosts/VMs for later log collection and console capture.
     """
-    global FAILED_TESTS_HOSTS, SESSION_HAS_FAILURES
+    global FAILED_TESTS_HOSTS, FAILED_TESTS_VMS, SESSION_HAS_FAILURES
 
     yield
 
@@ -879,14 +939,32 @@ def track_test_host(request, session_log_dir):
         test_nodeid = request.node.nodeid
 
         # Only introspect fixtures if test failed (performance optimization)
-        test_hosts = _introspect_test_fixtures(request)
+        test_hosts, test_vms = _introspect_test_fixtures(request)
 
-        logging.warning(f"Test failed: {test_nodeid}, "
-                        f"used hosts: {[h.hostname_or_ip for h in test_hosts]}")
+        logging.debug(f"Test failed: {test_nodeid}, "
+                      f"used hosts: {[h.hostname_or_ip for h in test_hosts]}, "
+                      f"VMs: {[vm.uuid for vm in test_vms]}")
 
         if test_hosts:
             FAILED_TESTS_HOSTS[test_nodeid] = test_hosts
             SESSION_HAS_FAILURES = True
+        if test_vms:
+            FAILED_TESTS_VMS[test_nodeid] = test_vms
+
+            # Check if test/class has capture_console marker for console screenshots
+            has_console_marker = request.node.get_closest_marker("capture_console") is not None
+            if has_console_marker:
+                logging.debug("Capturing console NOW...")
+
+                # Capture console for each VM immediately (while VM is still alive)
+                # Use the session-wide log directory
+                for vm in test_vms:
+                    try:
+                        os.makedirs(session_log_dir, exist_ok=True)
+                        screenshot_path = capture_vm_console(vm, session_log_dir)
+                        logging.debug(f"Console captured: {screenshot_path}")
+                    except Exception as e:
+                        logging.error(f"Failed to capture console for VM {vm.uuid}: {e}")
 
 @pytest.fixture(scope='session', autouse=True)
 def collect_logs_on_session_failure(request, hosts, session_log_dir):
