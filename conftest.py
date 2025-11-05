@@ -816,6 +816,16 @@ def bugreport_timestamp(request, host):
     logging.debug(f"Record timestamp (end): {class_name}")
     host.ssh(f"echo end   {class_name} $(date '+%s') >> {HOST_TIMESTAMPS_FILE}")
 
+@pytest.fixture(scope='session', autouse=True)
+def check_bug_reports(host):
+    """
+    That could be the sign of interrupted tests and some cleanup might be
+    required. We don't want to accumulate too much of these files.
+    """
+    output = host.ssh("find /var/opt/xen/bug-report/ -type f 2> /dev/null | wc -l")
+    count = int(output)
+    if count > 3: # arbitrary number; this should let a developer work on that host without warnings
+        logging.warning(f"Cleanup needed. {count} bug report(s) have been found on host.")
 
 def _introspect_test_fixtures(request):
     """
