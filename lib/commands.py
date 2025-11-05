@@ -73,6 +73,8 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         opts.append('-o "StrictHostKeyChecking no"')
         opts.append('-o "LogLevel ERROR"')
         opts.append('-o "UserKnownHostsFile /dev/null"')
+    if background:
+        opts.append('-f')
 
     if isinstance(cmd, str):
         command = cmd
