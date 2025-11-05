@@ -6,9 +6,13 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
+from lib.vm import VM
 from tests.storage import vdi_is_open
 
 from .conftest import LINSTOR_PACKAGE
+
+from typing import Tuple
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
@@ -54,11 +58,11 @@ class TestLinstorSRCreateDestroy:
         sr.destroy(verify=True)
 
 
-def get_drbd_status(host, resource):
+def get_drbd_status(host: Host, resource: str):
     logging.debug(f"[{host}] Fetching DRBD status for resource `{resource}`...")
     return json.loads(host.ssh(["drbdsetup", "status", resource, "--json"]))
 
-def get_corrupted_resources(host, resource):
+def get_corrupted_resources(host: Host, resource: str):
     return [
         (
             res.get("name", ""),
@@ -71,7 +75,7 @@ def get_corrupted_resources(host, resource):
         if peer.get("out-of-sync", 0) > 0
     ]
 
-def wait_sync(host, resource):
+def wait_drbd_sync(host: Host, resource: str):
     logging.info(f"[{host}] Waiting for DRBD sync on resource `{resource}`...")
     host.ssh(["drbdadm", "wait-sync", resource])
 
@@ -113,7 +117,9 @@ class TestLinstorSR:
             vm.shutdown(verify=True)
 
     @pytest.mark.small_vm
-    def test_resynchronization(self, host_and_corrupted_vdi_on_linstor_sr):
+    def test_resynchronization(
+        self, host_and_corrupted_vdi_on_linstor_sr: Tuple[VM, Host, str]
+    ):
         (vm, host, resource_name) = host_and_corrupted_vdi_on_linstor_sr
         hostname = host.hostname()
 
@@ -136,7 +142,7 @@ class TestLinstorSR:
             logging.info(f"`drbdadm verify` attempt {attempt}/{max_attempts}")
             logging.info(f"[{other_host}] Running DRBD verify for `{resource_name}`...")
             other_host.ssh(["drbdadm", "verify", f"{resource_name}:{hostname}/0"])
-            wait_sync(other_host, resource_name)
+            wait_drbd_sync(other_host, resource_name)
 
             corrupted_resources = get_corrupted_resources(other_host, resource_name)
             if not corrupted_resources:
@@ -156,7 +162,7 @@ class TestLinstorSR:
             f"{resource_name}:{hostname}/0",
             "--reset-bitmap=no"
         ])
-        wait_sync(other_host, resource_name)
+        wait_drbd_sync(other_host, resource_name)
         if get_corrupted_resources(other_host, resource_name):
             pytest.fail("Corrupted resource did not get fixed")
 

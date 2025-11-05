@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import lib.commands as commands
 from lib.common import safe_split
+from lib.sr import SR
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
@@ -176,7 +177,7 @@ def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str):
     vm.destroy(verify=True)
 
 @pytest.fixture(scope='function')
-def host_and_corrupted_vdi_on_linstor_sr(host, linstor_sr, vm_ref):
+def host_and_corrupted_vdi_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str):
     vm: VM = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
     pool: Pool = host.pool
     master: Host = pool.master
