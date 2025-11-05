@@ -62,6 +62,30 @@ Build number assigned by Jenkins CI will be used to name the default directory, 
 
 # extract_logs.py
 
+extract_logs scripts is able to extract logs from syslogs type logs between 2 epochs.
+The script expect the "basename" and is able to search through rotated and compressed files if found.
+
+Exemple of use:
+
+```
+$ cd <PATH_TO_ARTEFACTS>/
+$ head -n6 10.1.30.1_pytest-timestamps.log
+begin tests.misc.test_basic_without_ssh 1762249737
+end tests.misc.test_basic_without_ssh 1762249802
+begin tests.misc.test_log_collection 1762262235
+end tests.misc.test_log_collection 1762262236
+begin tests.misc.test_log_collection 1762262824
+end tests.misc.test_log_collection 1762262826
+
+# 1762262824 and 1762262826 are the timestamps we are interested in:
+
+$ tar xf 10.1.30.1_bug-report-20251110113603.tar.bz2
+$ cd bug-report-20251110113603
+$ ~/src/xcp-ng-tests/scripts/extract-log.py var/log/xensource.log 1762262824 1762262826
+...
+
+```
+
 # install_xcpng.py
 
 # get_xva_bridge.sh / set_xva_bridge.sh
