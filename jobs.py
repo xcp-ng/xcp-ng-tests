@@ -446,6 +446,15 @@ JOBS = {
         "nb_pools": 2,
         "params": {},
         "paths": ["tests/misc/test_pool.py"],
+    },
+    "no_auto": {
+        "description": "Tests for special purposes",
+        "requirements": [
+            "1 XCP-ng host >= 8.2"
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/misc/test_log_collection.py"],
     }
 }
 

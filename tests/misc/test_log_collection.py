@@ -47,6 +47,7 @@ class TestLogCollection:
 class TestWithConsoleCapture:
     """Tests in this class will capture VM console screenshots on failure."""
 
+    @pytest.mark.small_vm
     def test_vm_failure_with_console(self, running_vm: VM):
         """This test fails with a running VM - console will be captured."""
         vm = running_vm
@@ -55,6 +56,7 @@ class TestWithConsoleCapture:
         # This will fail and trigger both log collection AND console capture
         assert False, "Intentional failure to test console capture"
 
+    @pytest.mark.small_vm
     def test_vm_passing_no_console(self, running_vm: VM):
         """This test passes - no console capture needed."""
         vm = running_vm
