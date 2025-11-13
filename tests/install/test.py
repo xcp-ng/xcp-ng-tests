@@ -7,6 +7,7 @@ from data import ISO_IMAGES, NETWORKS
 from lib import commands, installer, pxe
 from lib.common import safe_split, wait_for
 from lib.installer import AnswerFile
+from lib.netutil import wait_for_ssh
 from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
@@ -187,10 +188,7 @@ class TestNested:
             assert len(ips) == 1
             host_vm.ip = ips[0]
 
-            wait_for(
-                lambda: commands.local_cmd(
-                    ["nc", "-zw5", host_vm.ip, "22"], check=False).returncode == 0,
-                "Wait for ssh back up on Host VM", retry_delay_secs=5, timeout_secs=4 * 60)
+            wait_for_ssh(host_vm.ip, host_desc="host VM")
 
             logging.info("Checking installed version (expecting %r %r)",
                          expected_dist, expected_rel)

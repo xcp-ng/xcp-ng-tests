@@ -5,7 +5,6 @@ import subprocess
 
 import lib.config as config
 from lib.common import HostAddress
-from lib.netutil import wrap_ip
 
 from typing import List, Literal, Union, overload
 
@@ -191,6 +190,9 @@ def ssh_with_result(hostname_or_ip, cmd, suppress_fingerprint_warnings=True,
     assert False, "unexpected type"
 
 def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
+    # local import to avoid cyclic import; lib.netutils also import lib.commands
+    from lib.netutil import wrap_ip
+
     opts = '-o "BatchMode yes"'
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints

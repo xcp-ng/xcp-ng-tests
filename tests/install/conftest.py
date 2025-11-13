@@ -11,6 +11,7 @@ from lib import installer, pxe
 from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
+from lib.netutil import wait_for_ssh
 
 from typing import Generator, Sequence, Union
 
@@ -292,10 +293,7 @@ def vm_booted_with_installer(host, create_vms, remastered_iso):
             host_vm.ip = ips[0]
 
             # host may not be up if ARP cache was filled
-            wait_for(lambda: local_cmd(["ping", "-c1", host_vm.ip], check=False),
-                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: local_cmd(["nc", "-zw5", host_vm.ip, "22"], check=False),
-                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+            wait_for_ssh(host_vm.ip)
 
             yield host_vm
 
