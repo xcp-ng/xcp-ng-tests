@@ -31,7 +31,7 @@ from lib.common import (
     wait_for,
 )
 from lib.host import Host
-from lib.netutil import is_ipv6
+from lib.netutil import is_ipv6, wait_for_ssh
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vbd import VBD
@@ -333,9 +333,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
             assert len(ips) == 1
             host_vm.ip = ips[0]
 
-            wait_for(lambda: commands.local_cmd(['nc', '-zw5', str(host_vm.ip), '22'],
-                                                check=False, simple_output=False).returncode == 0,
-                     "Wait for ssh up on nested host", retry_delay_secs=5)
+            wait_for_ssh(host_vm.ip, host_desc="nested host")
 
             hostname_or_ip = host_vm.ip
 

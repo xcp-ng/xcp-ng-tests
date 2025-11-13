@@ -8,7 +8,6 @@ import subprocess
 import tempfile
 
 import lib.config as config
-from lib.netutil import wrap_ip
 
 from typing import TYPE_CHECKING, Generic, List, Literal, TypeVar, overload
 
@@ -263,6 +262,9 @@ def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, suppress_fingerpri
 
 def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         suppress_fingerprint_warnings: bool = True, local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
+    # local import to avoid cyclic import; lib.netutils also import lib.commands
+    from lib.netutil import wrap_ip
+
     opts = ['-o', 'BatchMode=yes']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
