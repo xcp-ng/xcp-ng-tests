@@ -33,6 +33,7 @@ from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
 from lib.xo import xo_cli
+from lib.serial_console_logger import SerialConsoleLogger
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
@@ -812,6 +813,113 @@ def session_log_dir():
 
     # postpone directory creation only if some test failed
     return log_dir
+
+# Serial console logging fixtures
+
+@pytest.fixture(scope='module')
+def unix_vm_with_serial_console(imported_vm: VM, host: Host):
+    vm = imported_vm
+
+    if not vm.is_running():
+        vm.start()
+    vm.wait_for_os_booted()
+
+    # TODO: to be replaced by a knock_port() once PR is merged
+    wait_for(lambda: not os.system(f"ping -c1 {vm.ip} > /dev/null 2>&1"),
+             "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+    wait_for(lambda: not os.system(f"nc -zw5 {vm.ip} 22"),
+             "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+
+    # Detect distro
+    distro = vm.distro()
+    if not distro:
+        distro = vm.ssh('([ -e /etc/os-release ] && . /etc/os-release && echo $ID) ||'
+                        ' ([ -e /etc/centos-release ] && echo centos)',
+                        check=False)
+
+    logging.info(f"Modify Linux/FreeBSD to log on console ('{distro}' detected)", )
+
+    if distro == "alpine":
+        vm.ssh('export F=/boot/extlinux.conf ; '
+               '[ -f ${F} ] && '
+               ' ( grep -q "APPEND.*console=ttyS" ${F} || '
+               '   sed -i "/APPEND.*root=/ { s/$/ console=ttyS,115200/; s/ quiet / /}" ${F} )',
+               check=False)
+        # For alpine-mini (Alpine Linux UEFI)
+        vm.ssh('export F=/etc/default/grub ; '
+               '[ -f ${F} ] && '
+               ' ( grep -q " console=ttyS" ${F} || '
+               '   sed -i \'/^GRUB_CMDLINE_LINUX_DEFAULT/ { s/ quiet / /; s/ *"$/ console=ttyS,115200"/ }\' ${F} ) && '
+               ' grub-mkconfig -o /boot/grub/grub.cfg',
+               check=False)
+    elif distro == "almalinux":
+        vm.ssh('export F=/etc/default/grub ; '
+               '[ -f ${F} ] && '
+               ' ( grep -q " console=ttyS" ${F} || '
+               '   sed -i \'/^GRUB_CMDLINE_LINUX=/ { s/[ ]*quiet[ ]*/ / ; s/"$/ console=ttyS,115200"/ }\' ${F} ) && '
+               ' grub2-mkconfig -o /boot/grub2/grub.cfg',
+               check=False)
+    elif distro == "debian":
+        vm.ssh('echo GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS,115200" > /etc/default/grub.d/console.cfg &&'
+               ' grub-mkconfig -o /boot/grub/grub.cfg',
+               check=False)
+    elif distro == "ubuntu":
+        vm.ssh('echo GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS,115200" > /etc/default/grub.d/console.cfg &&'
+               ' update-grub',
+               check=False)
+    elif distro == "centos":
+        vm.ssh('sed -i "/^[[:space:]]*kernel / { s/ *quiet */ /; s/$/ console=ttyS,115200/ }" /boot/grub/grub.conf',
+               check=False)
+    elif distro == "opensuse-leap":
+        vm.ssh('export F=/etc/default/grub ; '
+               '[ -f ${F} ] && '
+               ' ( grep -q " console=ttyS" ${F} || '
+               '   sed -i \'/^GRUB_CMDLINE_LINUX_DEFAULT/ { '
+               '         s/ *quiet */ /; s/ *splash=silent */ /; s/ *"$/ console=ttyS,115200"/ }\' ${F} ) && '
+               ' grub2-mkconfig -o /boot/grub2/grub.cfg',
+               check=False)
+    else:
+        logging.warning("Unknown system '$vm_id'")
+
+    # Need a reboot for VM to take into account
+    vm.reboot()
+    vm.wait_for_os_booted()
+
+    yield vm
+
+@pytest.fixture(scope='session')
+def serial_console_logger_session(request, session_log_dir):
+    logger = SerialConsoleLogger(session_log_dir, scope="session")
+    yield logger
+    logger.cleanup()
+
+@pytest.fixture(scope='class')
+def serial_console_logger_class(request, session_log_dir):
+    logger = SerialConsoleLogger(session_log_dir, scope="class")
+    yield logger
+    logger.cleanup()
+
+@pytest.fixture(scope='function', autouse=True)
+def track_vms_for_session_logger(request, serial_console_logger_session):
+    _, test_vms = _introspect_test_fixtures(request)
+    logger = serial_console_logger_session
+    for vm in test_vms:
+        try:
+            logger.add_vm(vm)
+        except Exception:
+            pass
+    yield
+
+@pytest.fixture(scope='function', autouse=True)
+def track_vms_for_class_logger(request, serial_console_logger_class):
+    _, test_vms = _introspect_test_fixtures(request)
+    logger = serial_console_logger_class
+    for vm in test_vms:
+        try:
+            logger.add_vm(vm)
+        except Exception:
+            pass
+    yield
 
 # Helper function for immediate console capture
 def capture_vm_console(vm: VM, log_dir: str) -> str:
