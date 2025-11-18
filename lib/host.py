@@ -665,8 +665,12 @@ class Host:
                 self.xe('sr-list', {'host': hostname, 'content-type': 'user', 'minimal': 'true'}),
                 ','
             )
-            assert local_sr_uuids, f"DEFAULT_SR=='local' so there must be a local SR on host {self}"
-            sr_uuid = local_sr_uuids[0]
+            # We don't want a SR added by the test, so choose one that already existed
+            pre_existing_local_sr_uuids = sorted(set(self.pool.pre_existing_sr_uuids) & set(local_sr_uuids))
+            assert pre_existing_local_sr_uuids, (
+                f"DEFAULT_SR=='local' so there must be a pre-existing local SR on host {self}"
+            )
+            sr_uuid = pre_existing_local_sr_uuids[0]
         elif DEFAULT_SR == 'default':
             sr_uuid = self.pool.param_get('default-SR')
             assert sr_uuid, f"DEFAULT_SR='default' so there must be a default SR on the pool of host {self}"
