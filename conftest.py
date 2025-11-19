@@ -32,6 +32,8 @@ from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
+from lib.unixvm import UnixVM
+from lib.windowsvm import WindowsVM
 from lib.xo import xo_cli
 from lib.serial_console_logger import SerialConsoleLogger
 
@@ -817,7 +819,7 @@ def session_log_dir():
 # Serial console logging fixtures
 
 @pytest.fixture(scope='module')
-def unix_vm_with_serial_console(imported_vm: VM, host: Host):
+def unix_vm_with_serial_console(imported_vm: VM, host: Host) -> Generator[UnixVM, None, None]:
     vm = imported_vm
 
     if not vm.is_running():
@@ -830,56 +832,10 @@ def unix_vm_with_serial_console(imported_vm: VM, host: Host):
     wait_for(lambda: not os.system(f"nc -zw5 {vm.ip} 22"),
              "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
 
-    # Detect distro
-    distro = vm.distro()
-    if not distro:
-        distro = vm.ssh('([ -e /etc/os-release ] && . /etc/os-release && echo $ID) ||'
-                        ' ([ -e /etc/centos-release ] && echo centos)',
-                        check=False)
-
-    logging.info(f"Modify Linux/FreeBSD to log on console ('{distro}' detected)", )
-
-    if distro == "alpine":
-        vm.ssh('export F=/boot/extlinux.conf ; '
-               '[ -f ${F} ] && '
-               ' ( grep -q "APPEND.*console=ttyS" ${F} || '
-               '   sed -i "/APPEND.*root=/ { s/$/ console=ttyS,115200/; s/ quiet / /}" ${F} )',
-               check=False)
-        # For alpine-mini (Alpine Linux UEFI)
-        vm.ssh('export F=/etc/default/grub ; '
-               '[ -f ${F} ] && '
-               ' ( grep -q " console=ttyS" ${F} || '
-               '   sed -i \'/^GRUB_CMDLINE_LINUX_DEFAULT/ { s/ quiet / /; s/ *"$/ console=ttyS,115200"/ }\' ${F} ) && '
-               ' grub-mkconfig -o /boot/grub/grub.cfg',
-               check=False)
-    elif distro == "almalinux":
-        vm.ssh('export F=/etc/default/grub ; '
-               '[ -f ${F} ] && '
-               ' ( grep -q " console=ttyS" ${F} || '
-               '   sed -i \'/^GRUB_CMDLINE_LINUX=/ { s/[ ]*quiet[ ]*/ / ; s/"$/ console=ttyS,115200"/ }\' ${F} ) && '
-               ' grub2-mkconfig -o /boot/grub2/grub.cfg',
-               check=False)
-    elif distro == "debian":
-        vm.ssh('echo GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS,115200" > /etc/default/grub.d/console.cfg &&'
-               ' grub-mkconfig -o /boot/grub/grub.cfg',
-               check=False)
-    elif distro == "ubuntu":
-        vm.ssh('echo GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS,115200" > /etc/default/grub.d/console.cfg &&'
-               ' update-grub',
-               check=False)
-    elif distro == "centos":
-        vm.ssh('sed -i "/^[[:space:]]*kernel / { s/ *quiet */ /; s/$/ console=ttyS,115200/ }" /boot/grub/grub.conf',
-               check=False)
-    elif distro == "opensuse-leap":
-        vm.ssh('export F=/etc/default/grub ; '
-               '[ -f ${F} ] && '
-               ' ( grep -q " console=ttyS" ${F} || '
-               '   sed -i \'/^GRUB_CMDLINE_LINUX_DEFAULT/ { '
-               '         s/ *quiet */ /; s/ *splash=silent */ /; s/ *"$/ console=ttyS,115200"/ }\' ${F} ) && '
-               ' grub2-mkconfig -o /boot/grub2/grub.cfg',
-               check=False)
-    else:
-        logging.warning("Unknown system '$vm_id'")
+    # Auto-detect distro and convert to distro-specific class
+    vm = UnixVM.from_vm_auto_detect(vm)
+    logging.info(f"Serial console will be configured for {vm.__class__.__name__}")
+    vm.configure_serial_console()
 
     # Need a reboot for VM to take into account
     vm.reboot()
