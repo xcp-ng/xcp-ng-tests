@@ -6,7 +6,6 @@ import argparse
 import dataclasses
 import itertools
 import logging
-import os
 import tempfile
 from collections import defaultdict
 
@@ -15,7 +14,7 @@ from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
 from packaging import version
 
 import lib.config as global_config
-from lib import commands, pxe
+from lib import pxe
 from lib.common import (
     Defer,
     DiskDevName,
@@ -24,9 +23,7 @@ from lib.common import (
     is_uuid,
     parse_size,
     prefix_object_name,
-    setup_formatted_and_mounted_disk,
     shortened_nodeid,
-    teardown_formatted_and_mounted_disk,
     vm_image,
     wait_for,
 )
@@ -42,7 +39,9 @@ from lib.xo import _allow_xo_cli, xo_cli
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
-from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
+# Linters might be confused by that and see these imports as unused. The `noqa` suppresses the
+# false-positive warnings.
+from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped  # noqa
 
 from typing import Any, Dict, Generator, Iterable, List, Optional
 
