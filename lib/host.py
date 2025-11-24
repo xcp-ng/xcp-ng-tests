@@ -551,9 +551,9 @@ class Host:
                 raise
         if verify:
             wait_for_not(self.is_enabled, "Wait for host down")
-            wait_for(lambda: commands.local_cmd(['ping', '-c1', self.hostname_or_ip]).returncode == 0,
+            wait_for(lambda: commands.local_cmd(['ping', '-c1', self.hostname_or_ip], simple_output=False).returncode == 0,
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: commands.local_cmd(['nc', '-zw5', self.hostname_or_ip, '22']).returncode == 0,
+            wait_for(lambda: commands.local_cmd(['nc', '-zw5', self.hostname_or_ip, '22'], simple_output=False).returncode == 0,
                      "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
             wait_for(self.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 

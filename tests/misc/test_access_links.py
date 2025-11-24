@@ -34,7 +34,7 @@ def test_access_links(host, command_id, url_id):
 
     # Verify the download worked by comparing with local download
     # This ensures the content is accessible and identical from both locations
-    local_result = commands.local_cmd(COMMAND, check=False)
+    local_result = commands.local_cmd(COMMAND, check=False, simple_output=False)
 
     assert local_result.returncode == 0, (
         f"Failed to fetch URL locally: {local_result.stdout}"

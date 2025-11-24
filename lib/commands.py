@@ -245,7 +245,24 @@ def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
 
     return res
 
-def local_cmd(cmd, check=True, decode=True) -> LocalCommandResult:
+@overload
+def local_cmd(cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+              decode: Literal[True] = True) -> str:
+    ...
+@overload
+def local_cmd(cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+              decode: Literal[False]) -> bytes:
+    ...
+@overload
+def local_cmd(cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+              decode: bool = True) -> LocalCommandResult:
+    ...
+@overload
+def local_cmd(cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+              decode: bool = True) -> Union[str, bytes, LocalCommandResult]:
+    ...
+
+def local_cmd(cmd, check=True, simple_output=True, decode=True):
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
@@ -259,10 +276,6 @@ def local_cmd(cmd, check=True, decode=True) -> LocalCommandResult:
     stdout_for_logs = res.stdout.decode(errors='replace').strip()
     stderr_for_logs = res.stderr.decode(errors='replace').strip()
 
-    output = res.stdout
-    if decode:
-        output = output.decode()
-
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
     logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(stdout_for_logs)}")
@@ -270,6 +283,12 @@ def local_cmd(cmd, check=True, decode=True) -> LocalCommandResult:
     if res.returncode and check:
         logging.warning(f"[local] stderr:{_ellide_log_lines(stderr_for_logs)}")
         raise LocalCommandFailed(res.returncode, stderr_for_logs, command)
+
+    output: Union[bytes, str] = res.stdout
+    if decode:
+        output = output.decode()
+    if simple_output:
+        return output.strip()
 
     stderr = res.stderr.decode()
     return LocalCommandResult(res.returncode, output, stderr)

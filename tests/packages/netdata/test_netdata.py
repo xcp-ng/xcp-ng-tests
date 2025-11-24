@@ -18,7 +18,7 @@ class TestsNetdata:
             url += f"/{path}"
 
         res = local_cmd(["curl", "-XGET", "-k", "-I", "-s", url])
-        return res.stdout.strip().splitlines()
+        return res.splitlines()
 
     # Verify the ActiveState for the netdata service
     def test_netdata_service(self, host):

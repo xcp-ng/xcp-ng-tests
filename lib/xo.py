@@ -27,7 +27,7 @@ def xo_cli(action, args={}, check=True, simple_output=True, use_json=False):
         run_array += ['--json']
     run_array += ["%s=%s" % (key, value) for key, value in args.items()]
 
-    res = commands.local_cmd(run_array, check=check)
+    res = commands.local_cmd(run_array, check=check, simple_output=False)
 
     if simple_output:
         output = res.stdout.strip()

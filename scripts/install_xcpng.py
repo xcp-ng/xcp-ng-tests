@@ -27,7 +27,7 @@ logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
     password = host_data(hostname_or_ip)['password']
     algorithm_option = '-6' # SHA512
-    encrypted_password = local_cmd(['openssl', 'passwd', algorithm_option, password]).stdout.strip()
+    encrypted_password = local_cmd(['openssl', 'passwd', algorithm_option, password])
     if target_hostname is None:
         target_hostname = "xcp-ng-" + "".join(
             random.choice(string.ascii_lowercase) for i in range(5)
@@ -70,7 +70,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
 def is_ip_active(ip):
     # 3 tries with a timeout of 10 sec for each ICMP request
     return local_cmd(['ping', '-c', '3', '-W', '10', ip],
-                     check=False).returncode == 0
+                     check=False, simple_output=False).returncode == 0
 
 def is_ssh_up(ip):
     try:

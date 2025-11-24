@@ -12,7 +12,7 @@ from lib.commands import local_cmd
 def ip_responsive(ip):
     # 3 tries with a timeout of 10 sec for each ICMP request
     return local_cmd(['ping', '-c', '3', '-W', '10', ip],
-                     check=False).returncode == 0
+                     check=False, simple_output=False).returncode == 0
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_no_sdn_controller")
