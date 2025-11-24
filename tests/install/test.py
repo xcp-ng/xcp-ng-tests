@@ -198,7 +198,7 @@ class TestNested:
 
             wait_for(
                 lambda: commands.local_cmd(
-                    ["nc", "-zw5", ip, "22"], check=False).returncode == 0,
+                    ["nc", "-zw5", ip, "22"], check=False, simple_output=False).returncode == 0,
                 "Wait for ssh back up on Host VM", retry_delay_secs=5, timeout_secs=4 * 60)
 
             logging.info("Checking installed version (expecting %r %r)",

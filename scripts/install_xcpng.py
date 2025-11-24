@@ -29,7 +29,7 @@ def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, tar
                         hdd: str, netinstall_gpg_check: str) -> None:
     password = host_data(hostname_or_ip)['password']
     algorithm_option = '-6' # SHA512
-    encrypted_password = local_cmd(['openssl', 'passwd', algorithm_option, password]).stdout.strip()
+    encrypted_password = local_cmd(['openssl', 'passwd', algorithm_option, password])
     if target_hostname is None:
         target_hostname = "xcp-ng-" + "".join(
             random.choice(string.ascii_lowercase) for i in range(5)
@@ -72,7 +72,7 @@ def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, tar
 def is_ip_active(ip: str) -> bool:
     # 3 tries with a timeout of 10 sec for each ICMP request
     return local_cmd(['ping', '-c', '3', '-W', '10', ip],
-                     check=False).returncode == 0
+                     check=False, simple_output=False).returncode == 0
 
 def is_ssh_up(ip: str) -> bool:
     try:

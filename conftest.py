@@ -334,7 +334,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
             host_vm.ip = ips[0]
 
             wait_for(lambda: commands.local_cmd(['nc', '-zw5', str(host_vm.ip), '22'],
-                                                check=False).returncode == 0,
+                                                check=False, simple_output=False).returncode == 0,
                      "Wait for ssh up on nested host", retry_delay_secs=5)
 
             hostname_or_ip = host_vm.ip

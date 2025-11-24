@@ -17,7 +17,7 @@ def test_fs_diff(hosts: List[Host]) -> None:
 
     res = local_cmd([fsdiff, "--reference-host", f"{hosts[0]}",
                              "--test-host", f"{hosts[1]}",
-                             "--json-output"])
+                             "--json-output"], simple_output=False)
 
     if res.returncode != 0:
         print(res.stdout)

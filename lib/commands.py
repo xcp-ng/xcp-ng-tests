@@ -320,22 +320,43 @@ def sftp(
 
 @overload
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: Literal[True] = True,
+    cmd: List[str], *, check: bool = True, simple_output: Literal[True] = True, decode: Literal[True] = True,
+    cwd: str | os.PathLike[str] | None = None,
+) -> str:
+    ...
+
+@overload
+def local_cmd(
+    cmd: List[str], *, check: bool = True, simple_output: Literal[True] = True, decode: Literal[False],
+    cwd: str | os.PathLike[str] | None = None,
+) -> bytes:
+    ...
+
+@overload
+def local_cmd(
+    cmd: List[str], *, check: bool = True, simple_output: Literal[False], decode: Literal[True] = True,
     cwd: str | os.PathLike[str] | None = None,
 ) -> LocalCommandResult[str]:
     ...
 
 @overload
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: Literal[False],
+    cmd: List[str], *, check: bool = True, simple_output: Literal[False], decode: Literal[False],
     cwd: str | os.PathLike[str] | None = None,
 ) -> LocalCommandResult[bytes]:
     ...
 
+@overload
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: bool = True,
+    cmd: List[str], *, check: bool = True, simple_output: bool = True, decode: bool = True,
     cwd: str | os.PathLike[str] | None = None,
-) -> LocalCommandResult[str] | LocalCommandResult[bytes]:
+) -> str | bytes | LocalCommandResult[str] | LocalCommandResult[bytes]:
+    ...
+
+def local_cmd(
+    cmd: List[str], *, check: bool = True, simple_output: bool = True, decode: bool = True,
+    cwd: str | os.PathLike[str] | None = None,
+) -> str | bytes | LocalCommandResult[str] | LocalCommandResult[bytes]:
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
@@ -357,6 +378,9 @@ def local_cmd(
     if res.returncode and check:
         logging.warning(f"[local] stderr:{_ellide_log_lines(stderr_for_logs)}")
         raise LocalCommandFailed(res.returncode, stderr_for_logs, command)
+
+    if simple_output:
+        return res.stdout.decode().strip() if decode else res.stdout.strip()
 
     stderr = res.stderr.decode()
     if decode:

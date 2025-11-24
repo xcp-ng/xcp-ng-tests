@@ -38,7 +38,7 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
         cmd += ['--json']
     cmd += ["%s=%s" % (key, value) for key, value in args.items()]
 
-    res = local_cmd(cmd, check=check)
+    res = local_cmd(cmd, check=check, simple_output=False)
 
     if use_json:
         return json.loads(res.stdout)
