@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import uuid
 
 import lib.commands as commands
 import lib.efi as efi
@@ -629,6 +630,16 @@ class VM(BaseVM):
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
+    def set_variable_from_file(
+        self, filepath: str, variable_guid: str | uuid.UUID, variable_name: str, attr: int | str
+    ):
+        dest = self.host.ssh(['mktemp'])
+        try:
+            self.host.scp(filepath, dest)
+            self.host.ssh(['varstore-set', self.uuid, str(variable_guid), variable_name, str(attr), dest])
+        finally:
+            self.host.ssh(['rm', '-f', dest])
+
     def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
         Install UEFI certs to the VM's NVRAM store.
@@ -642,15 +653,7 @@ class VM(BaseVM):
             assert auth.name in ['PK', 'KEK', 'db', 'dbx']
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
-            dest = self.host.ssh(['mktemp'])
-            try:
-                self.host.scp(auth.auth(), dest)
-                self.host.ssh([
-                    'varstore-set', self.uuid, auth.guid.as_str(), auth.name,
-                    str(efi.EFI_AT_ATTRS), dest
-                ])
-            finally:
-                self.host.ssh(['rm', '-f', dest])
+            self.set_variable_from_file(auth.auth(), auth.guid.as_str(), auth.name, efi.EFI_AT_ATTRS)
 
     def booted_with_secureboot(self):
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
