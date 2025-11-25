@@ -5,8 +5,7 @@ from pathlib import PureWindowsPath
 
 from lib.common import wait_for
 from lib.vm import VM
-
-from . import (
+from lib.windows import (
     WINDOWS_SHUTDOWN_COMMAND,
     check_vm_dns,
     insert_cd_safe,
