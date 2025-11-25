@@ -6,8 +6,7 @@ import time
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
 from lib.vm import VM
-
-from . import (
+from lib.windows import (
     WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
     check_vm_dns,
@@ -15,7 +14,7 @@ from . import (
     vif_has_rss,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
-from .guest_tools import (
+from lib.windows.guest_tools import (
     ERROR_INSTALL_FAILURE,
     install_guest_tools,
     uninstall_guest_tools,
