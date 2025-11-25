@@ -38,7 +38,7 @@ jobs:
       - uses: ./.github/actions/uv-setup/
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
-      - run: ruff check lib/ tests/
+      - run: ruff check conftest.py lib/ tests/
 
   flake8:
     runs-on: ubuntu-latest
