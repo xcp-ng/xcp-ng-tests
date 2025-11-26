@@ -15,7 +15,7 @@ from uuid import UUID
 
 import requests
 
-import lib.commands as commands
+import lib.netutil as netutil
 
 from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeAlias, TypeVar, Union, cast, overload
 
@@ -256,7 +256,7 @@ def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str
         args['param-key'] = key
     try:
         value = host.xe(f'{xe_prefix}-param-get', args)
-    except commands.SSHCommandFailed as e:
+    except netutil.SSHCommandFailed as e:
         if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
             value = None
         else:
@@ -286,7 +286,7 @@ def _param_remove(host, xe_prefix, uuid, param_name, key, accept_unknown_key=Fal
     args = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
     try:
         host.xe(f'{xe_prefix}-param-remove', args)
-    except commands.SSHCommandFailed as e:
+    except netutil.SSHCommandFailed as e:
         if not accept_unknown_key or e.stdout != "Error: Key %s not found in map" % key:
             raise
 

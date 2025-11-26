@@ -5,7 +5,7 @@ import json
 import subprocess
 import sys
 
-from lib.commands import ssh
+from lib.netutil import ssh
 
 JOBS = {
     "main": {

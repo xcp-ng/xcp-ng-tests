@@ -16,9 +16,9 @@ from packaging import version
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
-from lib.commands import SSHCommandFailed, scp, ssh, local_cmd
 from lib.common import is_uuid, wait_for
 from lib.host import host_data
+from lib.netutil import SSHCommandFailed, local_cmd, ssh
 from lib.pool import Pool
 from lib.vm import VM
 

@@ -9,7 +9,7 @@ import uuid
 
 from packaging import version
 
-import lib.commands as commands
+import lib.netutil as netutil
 import lib.pif as pif
 
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, TypedDict, Union, overload
@@ -104,7 +104,7 @@ class Host:
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: bool = True) -> commands.SSHResult:
+            decode: bool = True) -> netutil.SSHResult:
         ...
 
     @overload
@@ -116,21 +116,21 @@ class Host:
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+            -> Union[str, bytes, netutil.SSHResult, None]:
         ...
 
     def ssh(self, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
             background=False, decode=True):
-        return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
-                            suppress_fingerprint_warnings=suppress_fingerprint_warnings,
-                            background=background, decode=decode)
+        return netutil.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
+                           suppress_fingerprint_warnings=suppress_fingerprint_warnings,
+                           background=background, decode=decode)
 
-    def ssh_with_result(self, cmd) -> commands.SSHResult:
+    def ssh_with_result(self, cmd) -> netutil.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return commands.ssh_with_result(self.hostname_or_ip, cmd)
+        return netutil.ssh_with_result(self.hostname_or_ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
-        return commands.scp(
+        return netutil.scp(
             self.hostname_or_ip, src, dest, check=check,
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
@@ -142,11 +142,11 @@ class Host:
 
     @overload
     def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
-           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult:
+           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> netutil.SSHResult:
         ...
 
     def xe(self, action, args={}, *, check=True, simple_output=True, minimal=False, force=False) \
-            -> Union[str, commands.SSHResult]:
+            -> Union[str, netutil.SSHResult]:
         maybe_param_minimal = ['--minimal'] if minimal else []
         maybe_param_force = ['--force'] if force else []
 
@@ -167,7 +167,7 @@ class Host:
             check=check,
             simple_output=simple_output
         )
-        assert isinstance(result, (str, commands.SSHResult))
+        assert isinstance(result, (str, netutil.SSHResult))
 
         return result
 
@@ -426,7 +426,7 @@ class Host:
     def is_enabled(self) -> bool:
         try:
             return strtobool(self.param_get('enabled'))
-        except commands.SSHCommandFailed:
+        except netutil.SSHCommandFailed:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
@@ -436,7 +436,7 @@ class Host:
             self.ssh(['yum', 'check-update'])
             # returned 0, else there would have been a SSHCommandFailed
             return False
-        except commands.SSHCommandFailed as e:
+        except netutil.SSHCommandFailed as e:
             if e.returncode == 100:
                 return True
             else:
@@ -458,7 +458,7 @@ class Host:
         """
         try:
             history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
-        except commands.SSHCommandFailed:
+        except netutil.SSHCommandFailed:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
             # To workaround this, create transactions: install and remove a small package.
@@ -545,7 +545,7 @@ class Host:
         logging.info("Reboot host %s" % self)
         try:
             self.ssh(['reboot'])
-        except commands.SSHCommandFailed as e:
+        except netutil.SSHCommandFailed as e:
             # ssh connection may get killed by the reboot and terminate with an error code
             if "closed by remote host" not in e.stdout:
                 raise

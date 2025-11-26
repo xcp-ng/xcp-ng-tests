@@ -1,5 +1,5 @@
-from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
+from lib.netutil import SSHCommandFailed
 from lib.sr import SR
 
 def try_to_create_sr_with_missing_device(sr_type, label, host):

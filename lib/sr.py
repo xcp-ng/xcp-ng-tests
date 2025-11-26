@@ -1,7 +1,7 @@
 import logging
 import time
 
-import lib.commands as commands
+import lib.netutil as netutil
 from lib.common import (
     prefix_object_name,
     safe_split,
@@ -34,7 +34,7 @@ class SR:
     def unplug_pbd(self, pbd_uuid, force=False):
         try:
             self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
-        except commands.SSHCommandFailed as e:
+        except netutil.SSHCommandFailed as e:
             # We must be sure to execute correctly "unplug" on unplugged VDIs without error
             # if force is set.
             if not force:
@@ -88,7 +88,7 @@ class SR:
                 # This may not be enough in some cases
                 # (when VDIs to GC are not all leafs and would require several runs)
                 self.pool.master.xe('sr-destroy', {'uuid': self.uuid})
-            except commands.SSHCommandFailed as e:
+            except netutil.SSHCommandFailed as e:
                 if "the SR is not empty" not in e.stdout:
                     raise
                 else:
@@ -97,7 +97,7 @@ class SR:
                         self.plug_pbds()
                         # rescan for an up to date list of VDIs
                         self.scan()
-                    except commands.SSHCommandFailed:
+                    except netutil.SSHCommandFailed:
                         raise Exception("SR destroy failed and then pbd-plug failed too. Can't continue further.")
                     output = self.vdi_uuids(managed=True)
                     if len(output) > 0:
@@ -187,6 +187,6 @@ class SR:
         try:
             output = self.pool.master.ssh(['/opt/xensource/debug/quicktest', '-sr', self.uuid])
             logging.info(f"Quicktest output: {output}")
-        except commands.SSHCommandFailed as e:
+        except netutil.SSHCommandFailed as e:
             logging.error(f"Quicktest output: {e.stdout}")
             raise

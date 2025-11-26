@@ -6,6 +6,7 @@ import tempfile
 
 import lib.commands as commands
 import lib.efi as efi
+import lib.netutil as netutil
 from lib.basevm import BaseVM
 from lib.common import (
     PackageManagerEnum,
@@ -111,7 +112,7 @@ class VM(BaseVM):
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: bool = True) -> commands.SSHResult:
+            background: Literal[False] = False, decode: bool = True) -> netutil.SSHResult:
         ...
 
     @overload
@@ -121,25 +122,25 @@ class VM(BaseVM):
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check=True, simple_output=True, background=False, decode=True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+            -> Union[str, bytes, netutil.SSHResult, None]:
         ...
 
     def ssh(self, cmd, *, check=True, simple_output=True, background=False, decode=True):
         # raises by default for any nonzero return code
         assert self.ip is not None
-        return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
-                            decode=decode)
+        return netutil.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
+                           decode=decode)
 
-    def ssh_with_result(self, cmd) -> commands.SSHResult:
+    def ssh_with_result(self, cmd) -> netutil.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return commands.ssh_with_result(self.ip, cmd)
+        return netutil.ssh_with_result(self.ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
         # Stop execution if scp() is used on Windows VMs as some OpenSSH releases for Windows don't
         # have support for the scp legacy protocol. Callers must use vm.sftp_put() instead
         assert not self.is_windows, "You cannot use scp() on Windows VMs. Please use vm.sftp_put() instead"
 
-        return commands.scp(
+        return netutil.scp(
             self.ip, src, dest, check=check,
             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
             local_dest=local_dest
@@ -147,12 +148,12 @@ class VM(BaseVM):
 
     def sftp_put(self, src, dest, check=True, suppress_fingerprint_warnings=True):
         cmd = f"put {src} {dest}"
-        return commands.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
+        return netutil.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
 
     def is_ssh_up(self):
         try:
             return self.ssh_with_result(['true']).returncode == 0
-        except commands.SSHCommandFailed:
+        except netutil.SSHCommandFailed:
             # probably not up yet
             return False
 
@@ -311,7 +312,7 @@ class VM(BaseVM):
         })
         try:
             self.host.xe("vbd-plug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed:
+        except netutil.SSHCommandFailed:
             self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
             raise
 
@@ -328,7 +329,7 @@ class VM(BaseVM):
         }, minimal=True)
         try:
             self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed as e:
+        except netutil.SSHCommandFailed as e:
             if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
                 logging.info(f"VBD {vbd_uuid} already unplugged")
             else:
@@ -347,7 +348,7 @@ class VM(BaseVM):
         """ Used to redo the VDIs list of the VM when reverting a snapshot. """
         try:
             self.vdis = [VDI(vdi_uuid, host=self.host) for vdi_uuid in self.vdi_uuids()]
-        except commands.SSHCommandFailed as e:
+        except netutil.SSHCommandFailed as e:
             # Doesn't work with Dom0 since `vm-disk-list` doesn't work on it so we create empty list
             if e.stdout == "Error: No matching VMs found":
                 logging.info("Couldn't get disks list. We are Dom0. Continuing...")
@@ -748,7 +749,7 @@ class VM(BaseVM):
     @overload
     def execute_powershell_script(self, script_contents: str,
                                   simple_output: Literal[False],
-                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> commands.SSHResult:
+                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> netutil.SSHResult:
         ...
 
     def execute_powershell_script(

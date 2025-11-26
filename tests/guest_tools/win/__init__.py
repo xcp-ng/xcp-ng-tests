@@ -4,9 +4,9 @@ import re
 import time
 
 from data import ISO_DOWNLOAD_URL
-from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.host import Host
+from lib.netutil import SSHCommandFailed
 from lib.sr import SR
 from lib.vm import VM
 

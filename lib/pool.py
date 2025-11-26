@@ -4,7 +4,7 @@ import traceback
 
 from packaging import version
 
-import lib.commands as commands
+import lib.netutil as netutil
 from lib.common import HostAddress, _param_get, _param_set, safe_split, wait_for, wait_for_not
 from lib.efi import EFIAuth
 from lib.host import Host
@@ -23,8 +23,8 @@ class Pool:
 
         # wait for XAPI startup to be done, or we can get "Connection
         # refused (calling connect )" when calling self.hosts_uuids()
-        wait_for(lambda: commands.ssh_with_result(master_hostname_or_ip,
-                                                  ['xapi-wait-init-complete', '60']).returncode == 0,
+        wait_for(lambda: netutil.ssh_with_result(master_hostname_or_ip,
+                                                 ['xapi-wait-init-complete', '60']).returncode == 0,
                  f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
                  timeout_secs=30 * 60)
 
@@ -183,7 +183,7 @@ class Pool:
             tmp_file = saved_certs[cert]
             try:
                 self.master.ssh(['secureboot-certs', 'extract', cert, tmp_file])
-            except commands.SSHCommandFailed as e:
+            except netutil.SSHCommandFailed as e:
                 if "does not exist in XAPI pool DB" in e.stdout:
                     # there's no cert to save
                     self.master.ssh(['rm', '-f', tmp_file])
