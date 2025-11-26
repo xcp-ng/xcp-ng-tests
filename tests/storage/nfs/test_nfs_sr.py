@@ -23,6 +23,7 @@ class TestNFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
+@pytest.mark.usefixtures('image_format')
 class TestNFSSR:
     @pytest.mark.quicktest
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
@@ -67,6 +68,14 @@ class TestNFSSR:
             member.call_plugin("nfs-on-slave", "check", {"path": vdi_path})
 
         vm.shutdown(verify=True)
+
+    @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
+    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: str):
+        fmt = dispatch_nfs.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
