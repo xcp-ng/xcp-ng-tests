@@ -5,13 +5,12 @@ import pytest
 import logging
 from dataclasses import dataclass
 
-from typing import TYPE_CHECKING, Generator
+from lib.host import Host
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.sr import SR
-    from lib.vdi import VDI
-    from lib.vm import VM
+from typing import Generator
 
 @dataclass
 class XfsConfig:

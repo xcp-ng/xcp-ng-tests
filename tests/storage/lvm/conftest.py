@@ -4,11 +4,10 @@ import pytest
 
 import logging
 
-from typing import TYPE_CHECKING, Generator
+from lib.host import Host
+from lib.sr import SR
 
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.sr import SR
+from typing import Generator
 
 @pytest.fixture(scope='package')
 def lvm_sr(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[SR]:
@@ -20,7 +19,7 @@ def lvm_sr(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_lvm_sr(lvm_sr):
+def vdi_on_lvm_sr(lvm_sr: SR):
     vdi = lvm_sr.create_vdi('LVM-local-VDI-test')
     yield vdi
     vdi.destroy()
