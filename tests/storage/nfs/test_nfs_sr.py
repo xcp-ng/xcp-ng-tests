@@ -12,6 +12,7 @@ from tests.storage import CoalesceOperation, coalesce_integrity, vdi_is_open
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
 
 class TestNFSSRCreateDestroy:
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_device_config', 'nfs4_device_config'], indirect=True)
     def test_create_and_destroy_sr(self, host, dispatch_nfs):
         device_config = dispatch_nfs
@@ -25,17 +26,20 @@ class TestNFSSRCreateDestroy:
 
 class TestNFSSR:
     @pytest.mark.quicktest
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
     def test_quicktest(self, dispatch_nfs):
         sr = dispatch_nfs
         sr.run_quicktest()
 
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     def test_vdi_is_not_open(self, dispatch_nfs):
         vdi = dispatch_nfs
         assert not vdi_is_open(vdi)
 
     @pytest.mark.small_vm
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.usefixtures('hostA2')
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
@@ -68,10 +72,20 @@ class TestNFSSR:
 
         vm.shutdown(verify=True)
 
+    @pytest.mark.usefixtures('image_format')
+    @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
+    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: str):
+        fmt = dispatch_nfs.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
+
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_start_and_shutdown_VM(self, dispatch_nfs):
         vm = dispatch_nfs
@@ -83,6 +97,7 @@ class TestNFSSR:
     @pytest.mark.big_vm
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_snapshot(self, dispatch_nfs):
         vm = dispatch_nfs
@@ -94,6 +109,7 @@ class TestNFSSR:
             vm.shutdown(verify=True)
 
     @pytest.mark.small_vm
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
     def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation):
@@ -105,6 +121,7 @@ class TestNFSSR:
     @pytest.mark.small_vm
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_reboot(self, host, dispatch_nfs):
         vm = dispatch_nfs
