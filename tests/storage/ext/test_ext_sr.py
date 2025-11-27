@@ -4,9 +4,9 @@ import pytest
 
 import logging
 
-from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.fistpoint import FistPoint
+from lib.netutil import SSHCommandFailed
 from lib.vdi import VDI
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 

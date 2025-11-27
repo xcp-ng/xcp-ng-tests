@@ -3,11 +3,11 @@ import pytest
 import logging
 from uuid import uuid4
 
+import lib.netutil as netutil
 from data import ISO_IMAGES, NETWORKS
 from lib import commands, installer, pxe
 from lib.common import safe_split, wait_for
 from lib.installer import AnswerFile
-from lib.netutil import wait_for_ssh
 from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
@@ -188,12 +188,12 @@ class TestNested:
             assert len(ips) == 1
             host_vm.ip = ips[0]
 
-            wait_for_ssh(host_vm.ip, host_desc="host VM")
+            netutil.wait_for_ssh(host_vm.ip, host_desc="host VM")
 
             logging.info("Checking installed version (expecting %r %r)",
                          expected_dist, expected_rel)
-            lsb_dist = commands.ssh(host_vm.ip, ["lsb_release", "-si"])
-            lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
+            lsb_dist = netutil.ssh(host_vm.ip, ["lsb_release", "-si"])
+            lsb_rel = netutil.ssh(host_vm.ip, ["lsb_release", "-sr"])
             assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
             # pool master must be reachable here
@@ -266,7 +266,7 @@ class TestNested:
                 # SSH to be checked before host is down, and require
                 # ssh retries
                 pool.master.ssh(["poweroff"])
-            except commands.SSHCommandFailed as e:
+            except netutil.SSHCommandFailed as e:
                 # ignore connection closed by reboot
                 if e.returncode == 255 and "closed by remote host" in e.stdout:
                     logging.info("sshd closed the connection")

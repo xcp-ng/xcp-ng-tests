@@ -2,8 +2,8 @@ import pytest
 
 import logging
 
-from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.netutil import SSHCommandFailed
 from tests.storage import vdi_is_open
 
 # Requirements:

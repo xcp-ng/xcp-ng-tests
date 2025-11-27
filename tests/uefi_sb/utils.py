@@ -1,9 +1,9 @@
 import hashlib
 import logging
 
-from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.efi import EFI_AT_ATTRS_BYTES, EFIAuth, get_md5sum_from_auth, get_secure_boot_guid
+from lib.netutil import SSHCommandFailed
 
 from typing import Literal, overload
 

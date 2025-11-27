@@ -7,6 +7,7 @@ import logging
 import os
 
 import lib.commands as commands
+import lib.netutil as netutil
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
@@ -47,7 +48,7 @@ def lvm_disks(pool_with_unused_512B_disk: Pool,
         for device in devices:
             try:
                 host.ssh(['pvcreate', '-ff', '-y', device])
-            except commands.SSHCommandFailed as e:
+            except netutil.SSHCommandFailed as e:
                 if e.stdout.endswith('Mounted filesystem?'):
                     host.ssh(['vgremove', '-f', GROUP_NAME, '-y'])
                     host.ssh(['pvcreate', '-ff', '-y', device])

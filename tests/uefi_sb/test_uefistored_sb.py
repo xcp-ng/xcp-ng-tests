@@ -2,8 +2,8 @@ import pytest
 
 import logging
 
-from lib.commands import SSHCommandFailed
 from lib.common import wait_for
+from lib.netutil import SSHCommandFailed
 
 from .utils import (
     VM_SECURE_BOOT_FAILED,

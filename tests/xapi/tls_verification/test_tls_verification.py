@@ -2,8 +2,8 @@ import pytest
 
 import logging
 
-from lib.commands import SSHCommandFailed
 from lib.common import strtobool
+from lib.netutil import SSHCommandFailed
 
 # Requirements:
 # From --hosts parameter:

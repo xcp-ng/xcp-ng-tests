@@ -1,7 +1,7 @@
 import logging
 
-from lib.commands import SSHCommandFailed
 from lib.host import Host
+from lib.netutil import SSHCommandFailed
 
 from typing import Final
 
