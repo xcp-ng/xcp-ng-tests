@@ -18,8 +18,8 @@ def _header_equal(header, name, value):
 def test_fileserver_redirect_https(host):
     path = "/path/to/dir/file.txt"
     ip = wrap_ip(host.hostname_or_ip)
-    output = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
-    lines = output.stdout.strip().splitlines()
+    res = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
+    lines = res.stdout.splitlines()
     assert lines[0].strip() == "HTTP/1.1 301 Moved Permanently"
     assert _header_equal(lines[2], "location", "https://" + ip + path)
 
@@ -29,10 +29,10 @@ class TestHSTS:
     HSTS_HEADER_VALUE = "max-age=63072000"
 
     def __get_header(host):
-        output = commands.local_cmd(
+        res = commands.local_cmd(
             ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
         )
-        return output.stdout.strip().splitlines()
+        return res.stdout.splitlines()
 
     def test_fileserver_hsts_default(self, host):
         # By default HSTS header should not be set
