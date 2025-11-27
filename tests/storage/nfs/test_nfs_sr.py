@@ -6,11 +6,13 @@ from lib.common import vm_image, wait_for
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import vdi_is_open
+from tests.storage.storage import install_randstream
 
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
 
 class TestNFSSRCreateDestroy:
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_device_config', 'nfs4_device_config'], indirect=True)
     def test_create_and_destroy_sr(self, host, dispatch_nfs):
         device_config = dispatch_nfs
@@ -24,20 +26,32 @@ class TestNFSSRCreateDestroy:
 
 class TestNFSSR:
     @pytest.mark.quicktest
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
     def test_quicktest(self, dispatch_nfs):
         sr = dispatch_nfs
         sr.run_quicktest()
 
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     def test_vdi_is_not_open(self, dispatch_nfs):
         vdi = dispatch_nfs
         assert not vdi_is_open(vdi)
 
+    @pytest.mark.usefixtures('image_format')
+    @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
+    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: str):
+        fmt = dispatch_nfs.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
+
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_start_and_shutdown_VM(self, dispatch_nfs):
         vm = dispatch_nfs
@@ -49,6 +63,7 @@ class TestNFSSR:
     @pytest.mark.big_vm
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_snapshot(self, dispatch_nfs):
         vm = dispatch_nfs
@@ -60,6 +75,7 @@ class TestNFSSR:
             vm.shutdown(verify=True)
 
     @pytest.mark.small_vm
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
     def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op):
@@ -85,12 +101,45 @@ class TestNFSSR:
             if new_vdi is not None:
                 new_vdi.destroy()
 
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, dispatch_nfs: VM, compression):
+        vm = dispatch_nfs
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        install_randstream(vm)
+        # 500MiB, so we have some data to check and some empty spaces in the exported image
+        vm.ssh("randstream generate -v --size 500MiB /root/data")
+        vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+        vm.shutdown(verify=True)
+        xva_path = f'/tmp/{vm.uuid}.xva'
+        imported_vm = None
+        try:
+            vm.export(xva_path, compression)
+            # check that the zero blocks are not part of the result. Most of the data is from the random stream, so
+            # compression has little effect. We just check the result is between 500 and 700 MiB
+            size_mb = int(vm.host.ssh(f'du -sm {xva_path}').split()[0])
+            assert 500 < size_mb < 700, f"unexpected xva size: {size_mb}"
+            imported_vm = vm.host.import_vm(xva_path, vm.vdis[0].sr.uuid)
+            imported_vm.start()
+            imported_vm.wait_for_vm_running_and_ssh_up()
+            imported_vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+        finally:
+            if imported_vm is not None:
+                imported_vm.destroy()
+            vm.host.ssh(f'rm -f {xva_path}')
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_reboot(self, host, dispatch_nfs):
         vm = dispatch_nfs
