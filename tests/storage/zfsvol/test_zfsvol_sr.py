@@ -5,7 +5,7 @@ import pytest
 from lib.common import vm_image, wait_for
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import CoalesceOperation, coalesce_integrity
+from tests.storage import CoalesceOperation, XVACompression, coalesce_integrity, xva_export_import
 
 # Requirements:
 # - one XCP-ng host >= 8.3 with an additional unused disk for the SR
@@ -62,6 +62,11 @@ class TestZfsvolVm:
     @pytest.mark.parametrize("vdi_op", ["snapshot"])  # "clone" requires a snapshot
     def test_coalesce(self, storage_test_vm: VM, vdi_on_zfsvol_sr: VDI, vdi_op: CoalesceOperation):
         coalesce_integrity(storage_test_vm, vdi_on_zfsvol_sr, vdi_op)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression):
+        xva_export_import(vm_on_zfsvol_sr, compression)
 
     # *** tests with reboots (longer tests).
 
