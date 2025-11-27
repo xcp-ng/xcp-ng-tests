@@ -215,3 +215,33 @@ def xva_export_import(vm: VM, compression: XVACompression):
         if imported_vm is not None:
             imported_vm.destroy()
         vm.host.ssh(f'rm -f {xva_path}')
+
+ImageFormat = Literal['vhd', 'qcow2']
+
+def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
+    vdi = sr.create_vdi(image_format=image_format)
+    image_path = f'/tmp/{vdi.uuid}.{image_format}'
+    try:
+        vm.connect_vdi(vdi, 'xvdb')
+        # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
+        vm.ssh("randstream generate -v --size 200MiB /dev/xvdb")
+        # use a different seed to not write the same data (default seed is 0)
+        vm.ssh("randstream generate -v --seed 1 --position 500MiB --size 200MiB /dev/xvdb")
+        vm.ssh("randstream validate -v --size 200MiB --expected-checksum c6310c52 /dev/xvdb")
+        vm.ssh("randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e /dev/xvdb")
+        vm.disconnect_vdi(vdi)
+        vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+        vdi = vdi.destroy()
+        # check that the zero blocks are not part of the result
+        size_mb = int(vm.host.ssh(f'du -sm {image_path}').split()[0])
+        assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
+        vdi = sr.create_vdi(image_format=image_format)
+        vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+        vm.connect_vdi(vdi, 'xvdb')
+        vm.ssh("randstream validate -v --size 200MiB --expected-checksum c6310c52 /dev/xvdb")
+        vm.ssh("randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e /dev/xvdb")
+    finally:
+        if vdi is not None:
+            vm.disconnect_vdi(vdi)
+            vdi.destroy()
+        vm.host.ssh(f'rm -f {image_path}')
