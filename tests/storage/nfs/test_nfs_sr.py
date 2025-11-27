@@ -4,12 +4,15 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import (
     CoalesceOperation,
+    ImageFormat,
     XVACompression,
     coalesce_integrity,
+    vdi_export_import,
     vdi_is_open,
     xva_export_import,
 )
@@ -121,6 +124,13 @@ class TestNFSSR:
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression):
         xva_export_import(dispatch_nfs, compression)
+
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('image_format')
+    @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
+    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat):
+        vdi_export_import(storage_test_vm, dispatch_nfs, image_format)
 
     # *** tests with reboots (longer tests).
 
