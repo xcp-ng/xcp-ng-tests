@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+import logging
+
 from lib.common import vm_image, wait_for
+from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import CoalesceOperation, XVACompression, coalesce_integrity, xva_export_import
+from tests.storage import CoalesceOperation, ImageFormat, XVACompression, coalesce_integrity, xva_export_import
 
 # Requirements:
 # - one XCP-ng host >= 8.3 with an additional unused disk for the SR
@@ -67,6 +70,40 @@ class TestZfsvolVm:
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression):
         xva_export_import(vm_on_zfsvol_sr, compression)
+
+    @pytest.mark.small_vm
+    def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat):
+        vm = storage_test_vm
+        sr = zfsvol_sr
+        vdi = sr.create_vdi(image_format=image_format)
+        image_path = f'/tmp/{vdi.uuid}.{image_format}'
+        try:
+            vbd = vm.connect_vdi(vdi)
+            dev = f'/dev/{vbd.param_get("device")}'
+            # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
+            vm.ssh(f"randstream generate -v --size 200MiB {dev}")
+            vm.ssh(f"randstream generate -v --seed 1 --position 500MiB --size 200MiB {dev}")
+            vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
+            vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+            vm.disconnect_vdi(vdi)
+            vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+            vdi = vdi.destroy()
+            # check that the zero blocks are not part of the result
+            size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
+            if image_format == 'vhd':
+                logging.warning(f"FIXME: this is broken with vhd, skip for now (XCPNG-2631). File size is {size_mb}MB")
+            else:
+                assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
+            vdi = sr.create_vdi(image_format=image_format)
+            vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
+            vm.connect_vdi(vdi, 'xvdb')
+            vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
+            vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+        finally:
+            if vdi is not None:
+                vm.disconnect_vdi(vdi)
+                vdi.destroy()
+            vm.host.ssh(f'rm -f {image_path}')
 
     # *** tests with reboots (longer tests).
 
