@@ -88,7 +88,7 @@ class BaseVM:
     def all_vdis_on_sr(self, sr) -> bool:
         return all(self.host.pool.get_vdi_sr_uuid(vdi_uuid) == sr.uuid for vdi_uuid in self.vdi_uuids())
 
-    def get_sr(self):
+    def get_sr(self) -> SR:
         # in this method we assume the SR of the first VDI is the VM SR
         vdis = self.vdi_uuids()
         assert len(vdis) > 0, "Don't ask for the SR of a VM without VDIs!"
