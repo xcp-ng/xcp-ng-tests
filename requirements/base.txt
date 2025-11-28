@@ -7,3 +7,6 @@ pluggy>=1.1.0
 pytest>=8.0.0
 pytest-dependency
 requests
+websockets
+Pillow
+asyncvnc2
