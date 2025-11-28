@@ -1,5 +1,7 @@
 import json
-import subprocess
+
+from lib import commands
+from lib.commands import LocalCommandResult
 
 from typing import Any, Dict, Literal, Union, overload
 
@@ -13,28 +15,26 @@ def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple
     ...
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[False],
-           use_json: bool = False) -> subprocess.CompletedProcess:
+           use_json: bool = False) -> LocalCommandResult:
     ...
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: bool = True,
-           use_json: bool = False) -> Union[subprocess.CompletedProcess, Any, str]:
+           use_json: bool = False) -> Union[LocalCommandResult, Any, str]:
     ...
 def xo_cli(action, args={}, check=True, simple_output=True, use_json=False):
     run_array = ['xo-cli', action]
     if use_json:
         run_array += ['--json']
     run_array += ["%s=%s" % (key, value) for key, value in args.items()]
-    res = subprocess.run(
-        run_array,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=check
-    )
+
+    res = commands.local_cmd(run_array, check=check, simple_output=False)
+
     if simple_output:
-        output = res.stdout.decode().strip()
+        output = res.stdout.strip()
         if use_json:
             return json.loads(output)
         return output
+
     return res
 
 def xo_object_exists(uuid):

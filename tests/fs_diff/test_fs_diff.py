@@ -1,7 +1,8 @@
 import pytest
 
 import os
-import subprocess
+
+from lib.commands import local_cmd
 
 # Requirements:
 # - 2 XCP-ng host of same version
@@ -14,13 +15,11 @@ def test_fs_diff(hosts):
 
     fsdiff = os.path.realpath(f"{os.path.dirname(__file__)}/../../scripts/xcpng-fs-diff.py")
 
-    process = subprocess.Popen(
-        [fsdiff, "--reference-host", f"{hosts[0]}", "--test-host", f"{hosts[1]}", "--json-output"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    stdout, _ = process.communicate()
+    res = local_cmd([fsdiff, "--reference-host", f"{hosts[0]}",
+                             "--test-host", f"{hosts[1]}",
+                             "--json-output"], simple_output=False)
 
-    if process.returncode != 0:
-        print(stdout.decode())
+    if res.returncode != 0:
+        print(res.stdout)
 
-    assert process.returncode == 0
+    assert res.returncode == 0

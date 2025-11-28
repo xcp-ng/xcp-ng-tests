@@ -1,7 +1,5 @@
 import pytest
 
-import subprocess
-
 from lib.host import Host
 
 # This smoke test runs xen-bugtool and verifies that the archive it generates

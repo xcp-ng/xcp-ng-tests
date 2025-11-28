@@ -468,6 +468,7 @@ class EFIAuth:
         Returns path to signed image.
         """
         assert self._owner_cert is not None
+        assert self._owner_cert.key is not None
         if shutil.which('sbsign'):
             signed = get_signed_name(image)
             commands.local_cmd([
