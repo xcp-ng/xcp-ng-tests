@@ -35,6 +35,7 @@ class Pool:
                 self.hosts.append(host)
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs: Optional[Dict[str, Any]] = None
+        self.pre_existing_sr_uuids = safe_split(self.master.xe('sr-list', {'minimal': 'true'}), ',')
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self.master, Pool.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
