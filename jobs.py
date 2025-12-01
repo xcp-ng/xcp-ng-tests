@@ -454,7 +454,8 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {},
-        "paths": ["tests/misc/test_log_collection.py"],
+        "paths": ["tests/misc/test_log_collection.py",
+                  "tests/misc/test_serial_console_logging.py"],
     }
 }
 

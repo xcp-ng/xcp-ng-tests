@@ -32,7 +32,10 @@ from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
+from lib.unixvm import UnixVM
+from lib.windowsvm import WindowsVM
 from lib.xo import xo_cli
+from lib.serial_console_logger import SerialConsoleLogger
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
@@ -812,6 +815,67 @@ def session_log_dir():
 
     # postpone directory creation only if some test failed
     return log_dir
+
+# Serial console logging fixtures
+
+@pytest.fixture(scope='module')
+def unix_vm_with_serial_console(imported_vm: VM, host: Host) -> Generator[UnixVM, None, None]:
+    vm = imported_vm
+
+    if not vm.is_running():
+        vm.start()
+    vm.wait_for_os_booted()
+
+    # TODO: to be replaced by a knock_port() once PR is merged
+    wait_for(lambda: not os.system(f"ping -c1 {vm.ip} > /dev/null 2>&1"),
+             "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+    wait_for(lambda: not os.system(f"nc -zw5 {vm.ip} 22"),
+             "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+
+    # Auto-detect distro and convert to distro-specific class
+    vm = UnixVM.from_vm_auto_detect(vm)
+    logging.info(f"Serial console will be configured for {vm.__class__.__name__}")
+    vm.configure_serial_console()
+
+    # Need a reboot for VM to take into account
+    vm.reboot()
+    vm.wait_for_os_booted()
+
+    yield vm
+
+@pytest.fixture(scope='session')
+def serial_console_logger_session(request, session_log_dir):
+    logger = SerialConsoleLogger(session_log_dir, scope="session")
+    yield logger
+    logger.cleanup()
+
+@pytest.fixture(scope='class')
+def serial_console_logger_class(request, session_log_dir):
+    logger = SerialConsoleLogger(session_log_dir, scope="class")
+    yield logger
+    logger.cleanup()
+
+@pytest.fixture(scope='function', autouse=True)
+def track_vms_for_session_logger(request, serial_console_logger_session):
+    _, test_vms = _introspect_test_fixtures(request)
+    logger = serial_console_logger_session
+    for vm in test_vms:
+        try:
+            logger.add_vm(vm)
+        except Exception:
+            pass
+    yield
+
+@pytest.fixture(scope='function', autouse=True)
+def track_vms_for_class_logger(request, serial_console_logger_class):
+    _, test_vms = _introspect_test_fixtures(request)
+    logger = serial_console_logger_class
+    for vm in test_vms:
+        try:
+            logger.add_vm(vm)
+        except Exception:
+            pass
+    yield
 
 # Helper function for immediate console capture
 def capture_vm_console(vm: VM, log_dir: str) -> str:
