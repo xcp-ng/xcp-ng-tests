@@ -28,17 +28,32 @@ class TestEXTSRCreateDestroy:
     def test_create_sr_with_missing_device(self, host):
         try_to_create_sr_with_missing_device('ext', 'EXT-local-SR-test', host)
 
-    def test_create_and_destroy_sr(self, host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> None:
+    def test_create_and_destroy_sr(self, host: Host,
+                                   unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                                   image_format: str
+                                   ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr_disk = unused_512B_disks[host][0]["name"]
-        sr = host.sr_create('ext', "EXT-local-SR-test", {'device': '/dev/' + sr_disk}, verify=True)
+        sr = host.sr_create('ext', "EXT-local-SR-test",
+                            {'device': '/dev/' + sr_disk,
+                             'preferred-image-formats': image_format}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-@pytest.mark.usefixtures("ext_sr")
+# We want to skip class tests for qcow2 if the SM does not support qcow2
+@pytest.fixture(scope="class")
+def for_qcow2_vdi_image_format(vdi_on_ext_sr: VDI, image_format: str):
+    # only check qcow2-specific behavior
+    if image_format != "qcow2":
+        return
+    # feature-detect: if the SM doesn't report image-format, skip this check
+    if not vdi_on_ext_sr.get_image_format():
+        pytest.skip("SM does not report sm-config:image-format; skipping qcow2 format check")
+
+@pytest.mark.usefixtures("for_qcow2_vdi_image_format", "ext_sr")
 class TestEXTSR:
     @pytest.mark.quicktest
     def test_quicktest(self, ext_sr):
