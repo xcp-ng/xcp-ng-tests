@@ -7,6 +7,12 @@ class VIF:
         self.uuid = uuid
         self.vm = vm
 
+    def plug(self):
+        self.vm.host.xe("vif-plug", {'uuid': self.uuid})
+
+    def unplug(self):
+        self.vm.host.xe("vif-unplug", {'uuid': self.uuid})
+
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self.vm.host, VIF.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
