@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import traceback
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
@@ -173,7 +174,13 @@ def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
     host.ssh(['rm', '-rf', mountpoint]) # Remove any existing leftover to ensure rmdir will not fail in teardown
     host.ssh(['mkdir', '-p', mountpoint])
     host.ssh(['cp', '-f', '/etc/fstab', '/etc/fstab.orig'])
-    host.ssh(['echo', f'{device} {mountpoint} {fs_type} defaults 0 0', '>>/etc/fstab'])
+    ssh_client = host.ssh(['echo', '$SSH_CLIENT']).split()[0]
+    now = datetime.now().isoformat()
+    host.ssh([
+        'echo',
+        f'"# added by {ssh_client} on {now}\n{device} {mountpoint} {fs_type} defaults 0 0"',
+        '>>/etc/fstab',
+    ])
     try:
         host.ssh(['mount', mountpoint])
     except Exception:
