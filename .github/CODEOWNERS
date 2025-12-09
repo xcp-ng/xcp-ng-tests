@@ -1,3 +1,5 @@
+* @xcp-ng/os-platform-release
+
 tests/storage/ @xcp-ng/os-platform-release @xcp-ng/storage
 
 tests/guest_tools/ @xcp-ng/os-platform-release @xcp-ng/hypervisor-kernel
@@ -5,5 +7,3 @@ tests/xen/ @xcp-ng/os-platform-release @xcp-ng/hypervisor-kernel
 
 tests/xapi/ @xcp-ng/os-platform-release @xcp-ng/xapi-network
 tests/network/ @xcp-ng/os-platform-release @xcp-ng/xapi-network
-
-* @xcp-ng/os-platform-release
