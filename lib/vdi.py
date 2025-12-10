@@ -2,11 +2,13 @@ import logging
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool, wait_for_not
 
-from typing import TYPE_CHECKING, Literal, Optional, overload
+from typing import TYPE_CHECKING, Callable, Literal, Optional, TypeVar, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.sr import SR
+
+R = TypeVar("R")
 
 class VDI:
     xe_prefix = "vdi"
@@ -94,8 +96,13 @@ class VDI:
         _param_remove(self.sr.pool.master, self.xe_prefix, self.uuid,
                       param_name, key, accept_unknown_key)
 
-    def wait_for_coalesce(self):
+    def wait_for_coalesce(self, fn: Callable[[], R] | None = None) -> R | None:
+        previous_parent = self.get_parent()
+        ret = None
+        if fn is not None:
+            ret = fn()
         # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.
         # And it is also necessary to allow a sufficiently long merge time which depends on the amount of data.
-        wait_for_not(lambda: self.get_parent(), msg="Waiting for coalesce", timeout_secs=7 * 60)
+        wait_for_not(lambda: self.get_parent() != previous_parent, msg="Waiting for coalesce", timeout_secs=10 * 60)
         logging.info("Coalesce done")
+        return ret

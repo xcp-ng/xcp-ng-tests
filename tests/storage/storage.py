@@ -118,9 +118,7 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation):
             case 'snapshot': new_vdi = vdi.snapshot()
         vm.ssh(f"randstream generate -v --seed 1 --size 128Mi {dev}")
         vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
-        new_vdi.destroy()
-        new_vdi = None
-        vdi.wait_for_coalesce()
+        new_vdi = vdi.wait_for_coalesce(new_vdi.destroy)
         vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
     finally:
         vm.disconnect_vdi(vdi)
