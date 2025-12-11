@@ -1,7 +1,10 @@
 import pytest
 
 from lib.common import vm_image, wait_for
+from lib.vdi import VDI
+from lib.vm import VM
 from tests.storage import vdi_is_open
+from tests.storage.storage import CoalesceOperation, coalesce_integrity
 
 # Requirements:
 # - one XCP-ng host >= 8.2
@@ -50,6 +53,11 @@ class TestLVMOISCSISR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
+    def test_coalesce(self, storage_test_vm: 'VM', vdi_on_lvmoiscsi_sr: 'VDI', vdi_op: CoalesceOperation):
+        coalesce_integrity(storage_test_vm, vdi_on_lvmoiscsi_sr, vdi_op)
 
     # *** tests with reboots (longer tests).
 

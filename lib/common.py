@@ -23,6 +23,11 @@ from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, TypeAlias, 
 if TYPE_CHECKING:
     import lib.host
 
+KiB = 2**10
+MiB = KiB**2
+GiB = KiB**3
+TiB = KiB**4
+
 T = TypeVar("T")
 
 HostAddress: TypeAlias = str
