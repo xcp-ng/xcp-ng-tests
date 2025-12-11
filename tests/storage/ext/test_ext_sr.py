@@ -12,9 +12,11 @@ from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import (
     CoalesceOperation,
+    XVACompression,
     coalesce_integrity,
     try_to_create_sr_with_missing_device,
     vdi_is_open,
+    xva_export_import,
 )
 
 # Requirements:
@@ -72,6 +74,11 @@ class TestEXTSR:
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
     def test_coalesce(self, storage_test_vm: VM, vdi_on_ext_sr: VDI, vdi_op: CoalesceOperation):
         coalesce_integrity(storage_test_vm, vdi_on_ext_sr, vdi_op)
+
+    @pytest.mark.small_vm
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, vm_on_ext_sr: VM, compression: XVACompression):
+        xva_export_import(vm_on_ext_sr, compression)
 
     # *** tests with reboots (longer tests).
 
