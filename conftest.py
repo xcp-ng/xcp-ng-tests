@@ -469,7 +469,7 @@ def imported_vm(host, vm_ref):
 
     yield vm
     # teardown
-    if not is_uuid(vm_ref):
+    if CACHE_IMPORTED_VM or not is_uuid(vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 

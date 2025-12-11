@@ -10,6 +10,7 @@ from . import (
     enable_testsign,
     insert_cd_safe,
     wait_for_vm_running_and_ssh_up_without_tools,
+    wait_for_vm_xenvif_offboard,
 )
 
 from typing import Any, Dict
@@ -57,7 +58,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
             install_cmd += WINDOWS_SHUTDOWN_COMMAND
         vm.start_background_powershell(install_cmd)
         if action != PowerAction.Nothing:
-            wait_for(vm.is_halted, "Wait for VM halted")
+            wait_for(vm.is_halted, "Wait for VM halted", timeout_secs=600)
         if action == PowerAction.Reboot:
             vm.start()
             wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -75,7 +76,8 @@ def uninstall_guest_tools(vm: VM, action: PowerAction):
         uninstall_cmd += WINDOWS_SHUTDOWN_COMMAND
     vm.start_background_powershell(uninstall_cmd)
     if action != PowerAction.Nothing:
-        wait_for(vm.is_halted, "Wait for VM halted")
+        wait_for(vm.is_halted, "Wait for VM halted", timeout_secs=600)
     if action == PowerAction.Reboot:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+        wait_for_vm_xenvif_offboard(vm)
