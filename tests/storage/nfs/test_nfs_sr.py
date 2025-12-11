@@ -27,6 +27,17 @@ class TestNFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
+# We want to skip class tests for qcow2 if the SM does not support qcow2
+@pytest.fixture(scope="class")
+def require_qcow2_image_format(vdi_on_nfs4_sr: VDI, image_format: str):
+    # only check qcow2-specific behavior
+    if image_format != "qcow2":
+        return
+    # feature-detect: if the SM doesn't report image-format, skip this check
+    if not vdi_on_nfs4_sr.get_image_format():
+        pytest.skip("SM does not report sm-config:image-format; skipping qcow2 format check")
+
+@pytest.mark.usefixtures("require_qcow2_image_format")
 class TestNFSSR:
     @pytest.mark.quicktest
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
