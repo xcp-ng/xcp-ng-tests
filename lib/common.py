@@ -7,6 +7,8 @@ import inspect
 import itertools
 import logging
 import os
+import random
+import string
 import sys
 import time
 import traceback
@@ -244,6 +246,14 @@ def url_download(url: str, filename: str) -> None:
         for chunk in r.iter_content(chunk_size=128):
             fd.write(chunk)
     os.rename(tempfilename, filename)
+
+def randid(length=6):
+    """
+    Generates a random string of a specified length.
+    The string consists of lowercase letters, uppercase letters, and digits.
+    """
+    characters = string.ascii_lowercase + string.digits
+    return ''.join(random.choices(characters, k=length))
 
 @overload
 def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
