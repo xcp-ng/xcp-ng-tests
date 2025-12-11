@@ -13,6 +13,10 @@ dependencies = [
     "pytest>=8.0.0",
     "pytest-dependency",
     "requests",
+    # For console capture
+    "websockets",
+    "Pillow",
+    "asyncvnc2",
 ]
 
 [dependency-groups]

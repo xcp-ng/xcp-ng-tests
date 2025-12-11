@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+import datetime
 import itertools
 import logging
 import os
+import sys
 import tempfile
 
 import git
@@ -12,6 +14,7 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
+from lib import commands
 from lib.common import (
     callable_marker,
     DiskDevName,
@@ -44,6 +47,14 @@ try:
 except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
+
+# Session-level tracking for failed tests and their associated hosts/VMs
+FAILED_TESTS_HOSTS = {}  # {test_nodeid: set(Host)}
+FAILED_TESTS_VMS = {}    # {test_nodeid: set(VM)}
+SESSION_HAS_FAILURES = False
+
+# Path to timestamp file on remote hosts for log extraction
+HOST_TIMESTAMPS_FILE = "/tmp/pytest-timestamps.log"
 
 # pytest hooks
 
@@ -99,10 +110,28 @@ def pytest_addoption(parser):
         help="Format of VDI to execute tests on."
         "Example: vhd,qcow2"
     )
+    parser.addoption(
+        "--collect-logs-on-failure",
+        action="store_true",
+        default=True,
+        help="Automatically collect xen-bugtool logs from hosts when tests fail (default: True)"
+    )
+    parser.addoption(
+        "--no-collect-logs-on-failure",
+        action="store_false",
+        dest="collect_logs_on_failure",
+        help="Disable automatic log collection on test failure"
+    )
 
 def pytest_configure(config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
+
+    # Register custom markers
+    config.addinivalue_line(
+        "markers",
+        "capture_console: Capture VM console screenshots on test failure (opt-in for critical tests)"
+    )
 
 def pytest_generate_tests(metafunc):
     if "vm_ref" in metafunc.fixturenames:
@@ -760,3 +789,249 @@ def cifs_iso_sr(host, cifs_iso_device_config):
     yield sr
     # teardown
     sr.forget()
+
+# Session-scoped fixture to create a shared log directory for all artifacts
+@pytest.fixture(scope='session')
+def session_log_dir():
+    """
+    Create and return a session-wide log directory for storing all test artifacts.
+    The directory is created at session start and shared by all fixtures.
+
+    Directory naming includes BUILD_NUMBER if running in Jenkins CI environment.
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # BUILD_NUMBER and WORKSPACE are specific to Jenkins
+    build_number = os.environ.get('BUILD_NUMBER')
+    if build_number:
+        logging.debug(f"Use Jenkins CI build number: {build_number}")
+        workspace = os.environ.get('WORKSPACE')
+        log_dir = f"{workspace}/report_{build_number}"
+    else:
+        log_dir = f"pytest-logs/report_{timestamp}"
+
+    # postpone directory creation only if some test failed
+    return log_dir
+
+# Helper function for immediate console capture
+def capture_vm_console(vm: VM, log_dir: str) -> str:
+
+    # Path to console capture Python script
+    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'capture-console.py')
+    if not os.path.exists(script_path):
+        raise FileNotFoundError(f"Console capture script not found at {script_path}")
+
+    host_ip = vm.host.hostname_or_ip
+    vm_uuid = vm.uuid
+
+    try:
+        vm_name = vm.name() if hasattr(vm, 'name') and callable(vm.name) else vm_uuid[:8]
+    except Exception:
+        vm_name = vm_uuid[:8]
+
+    # Generate output filename with VM info
+    output_filename = f"{host_ip.replace(':', '_')}_vm_{vm_name}_{vm_uuid[:8]}_console.png"
+    output_path = os.path.join(log_dir, output_filename)
+
+    logging.debug(f"Capturing console for VM {vm_name} ({vm_uuid}) in {output_path}...")
+
+    # Get credentials from data.py
+    from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER
+
+    # Build command to call Python script directly (XOLite mode)
+    cmd = [
+        sys.executable,  # Use same Python interpreter as current process
+        script_path,
+        '--host', host_ip,
+        '--vm-uuid', vm_uuid,
+        output_filename,
+        '--output-dir', log_dir,
+        '--user', HOST_DEFAULT_USER,
+        '--password', HOST_DEFAULT_PASSWORD
+    ]
+
+    # Run the capture script
+    result = commands.local_cmd(cmd, check=True)
+
+    return output_path
+
+# Record test timestamps to easily extract logs
+@pytest.fixture(scope='class', autouse=True)
+def bugreport_timestamp(request, host):
+    class_name = request.module.__name__
+    logging.debug(f"Record timestamp (begin): {class_name}")
+    host.ssh(f"echo begin {class_name} $(date '+%s') >> {HOST_TIMESTAMPS_FILE}")
+    yield
+    logging.debug(f"Record timestamp (end): {class_name}")
+    host.ssh(f"echo end   {class_name} $(date '+%s') >> {HOST_TIMESTAMPS_FILE}")
+
+@pytest.fixture(scope='session', autouse=True)
+def check_bug_reports(host):
+    """
+    That could be the sign of interrupted tests and some cleanup might be
+    required. We don't want to accumulate too much of these files.
+    """
+    output = host.ssh("find /var/opt/xen/bug-report/ -type f 2> /dev/null | wc -l")
+    count = int(output)
+    if count > 3: # arbitrary number; this should let a developer work on that host without warnings
+        logging.warning(f"Cleanup needed. {count} bug report(s) have been found on host.")
+
+def _introspect_test_fixtures(request):
+    """
+    Introspect test fixtures to find Host and VM objects.
+    Returns (test_hosts, test_vms) sets.
+    """
+    # Collect all Host and VM objects used by this test from its fixtures
+    test_hosts = set()
+    test_vms = set()
+
+    # Check all fixtures used by this test
+    # XXX: this is a bit hard to understand but this introspection of fixtures
+    #      is the best way to gather VMs and Hosts. Other alternatives require,
+    #      maintenance, boilerplate and are more prone to miss some cases.
+    for fixturename in getattr(request, 'fixturenames', []):
+        try:
+            fixture_value = request.getfixturevalue(fixturename)
+            # Check if fixture is a Host
+            if isinstance(fixture_value, Host):
+                test_hosts.add(fixture_value)
+            # Check if fixture is a VM
+            elif isinstance(fixture_value, VM):
+                test_vms.add(fixture_value)
+                test_hosts.add(fixture_value.host)
+            # Check if fixture is a list
+            elif isinstance(fixture_value, list):
+                for item in fixture_value:
+                    if isinstance(item, Host):
+                        test_hosts.add(item)
+                    elif isinstance(item, VM):
+                        test_vms.add(item)
+                        test_hosts.add(item.host)
+            # Check if fixture is a dict
+            elif isinstance(fixture_value, dict):
+                logging.warning("dictionnary in fixtures case not handled")
+            # Check if fixture has a 'host' attribute (like SR, Pool objects)
+            elif hasattr(fixture_value, 'host') and isinstance(fixture_value.host, Host):
+                test_hosts.add(fixture_value.host)
+            # Check if fixture is a Pool
+            elif hasattr(fixture_value, 'hosts') and isinstance(fixture_value.hosts, list):
+                test_hosts.update(h for h in fixture_value.hosts if isinstance(h, Host))
+        except Exception:
+            # Some fixtures may not be available yet or may fail to load
+            pass
+
+    return test_hosts, test_vms
+
+@pytest.fixture(scope='function', autouse=True)
+def track_test_host(request, session_log_dir):
+    """
+    Track which hosts and VMs are used by each test.
+    On test failure, record the test and its hosts/VMs for later log collection and console capture.
+    """
+    global FAILED_TESTS_HOSTS, FAILED_TESTS_VMS, SESSION_HAS_FAILURES
+
+    yield
+
+    # After test completes, check if it failed
+    report = request.node.stash.get(PHASE_REPORT_KEY, None)
+    if report and "call" in report and report["call"].failed:
+        test_nodeid = request.node.nodeid
+
+        # Only introspect fixtures if test failed (performance optimization)
+        test_hosts, test_vms = _introspect_test_fixtures(request)
+
+        logging.debug(f"Test failed: {test_nodeid}, "
+                      f"used hosts: {[h.hostname_or_ip for h in test_hosts]}, "
+                      f"VMs: {[vm.uuid for vm in test_vms]}")
+
+        if test_hosts:
+            FAILED_TESTS_HOSTS[test_nodeid] = test_hosts
+            SESSION_HAS_FAILURES = True
+        if test_vms:
+            FAILED_TESTS_VMS[test_nodeid] = test_vms
+
+            # Check if test/class has capture_console marker for console screenshots
+            has_console_marker = request.node.get_closest_marker("capture_console") is not None
+            if has_console_marker:
+                logging.debug("Capturing console NOW...")
+
+                # Capture console for each VM immediately (while VM is still alive)
+                # Use the session-wide log directory
+                for vm in test_vms:
+                    try:
+                        os.makedirs(session_log_dir, exist_ok=True)
+                        screenshot_path = capture_vm_console(vm, session_log_dir)
+                        logging.debug(f"Console captured: {screenshot_path}")
+                    except Exception as e:
+                        logging.error(f"Failed to capture console for VM {vm.uuid}: {e}")
+
+@pytest.fixture(scope='session', autouse=True)
+def collect_logs_on_session_failure(request, hosts, session_log_dir):
+    """
+    Collect xen-bugtool logs from hosts at the end of the test session if any tests failed.
+    Only collects from hosts that were actually used by failed tests.
+    """
+    global FAILED_TESTS_HOSTS, SESSION_HAS_FAILURES
+
+    yield  # Let all tests run first
+
+    # Check if log collection is enabled
+    collect_logs = request.config.getoption("--collect-logs-on-failure", default=True)
+    if not collect_logs:
+        return
+
+    if not SESSION_HAS_FAILURES and not FAILED_TESTS_HOSTS:
+        return
+
+    # Get unique set of hosts that had failures
+    failed_hosts = set()
+    for test_hosts in FAILED_TESTS_HOSTS.values():
+        failed_hosts.update(test_hosts)
+
+    if not failed_hosts:
+        logging.debug("Tests failed but no hosts were tracked. Collecting logs from all configured hosts.")
+        failed_hosts = set(hosts)
+
+    logging.debug("Collecting logs from {len(failed_hosts)} host(s) due to test failures...")
+
+    # Use the session-wide log directory (already created by session_log_dir fixture)
+    # This ensures logs are saved alongside console captures
+    log_dir = session_log_dir
+    os.makedirs(log_dir, exist_ok=True)
+
+    for host in failed_hosts:
+        try:
+            logging.debug(f"Collecting logs from host {host.hostname_or_ip}...")
+
+            # Run xen-bugtool on the host
+            result = host.ssh(['xen-bugtool', '-y', '-s'], check=True)
+            filepath = result.strip()
+            assert filepath.endswith('.tar.bz2'), f"expect a .tar.bz2 archive: {filepath}"
+
+            filename = os.path.basename(filepath)
+
+            # Construct local filename with host identifier
+            local_filename = f"{host.hostname_or_ip.replace(':', '_')}_{filename}"
+            local_path = os.path.join(log_dir, local_filename)
+
+            # Download the archive from host
+            logging.debug(f"Downloading {filepath} to {local_path}...")
+            host.scp(filepath, local_path, local_dest=True, check=True)
+
+            # Download the timestamp file if it exists
+            local_timestamp_filename = f"{host.hostname_or_ip.replace(':', '_')}_pytest-timestamps.log"
+            local_timestamp_path = os.path.join(log_dir, local_timestamp_filename)
+            try:
+                host.scp(HOST_TIMESTAMPS_FILE, local_timestamp_path, local_dest=True, check=False)
+                logging.debug(f"Timestamp file downloaded to: {local_timestamp_path}")
+            except Exception as ts_e:
+                logging.debug(f"Could not download timestamp file (may not exist): {ts_e}")
+
+            # Clean up archive from host
+            logging.info(f"Cleaning up {filepath} from host...")
+            host.ssh(['rm', '-f', filepath])
+
+        except Exception as e:
+            logging.error(f"Failed to collect logs from host {host.hostname_or_ip}: {e}")
+
+    logging.info(f"Log collection complete. Logs saved to: {log_dir}")

@@ -52,6 +52,7 @@ from .guest_tools import (
 #   └───install-drivers.ps1
 
 
+@pytest.mark.capture_console
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindows:
@@ -64,6 +65,7 @@ class TestGuestToolsWindows:
         assert vm.are_windows_tools_working()
 
 
+@pytest.mark.capture_console
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindowsDestructive:
