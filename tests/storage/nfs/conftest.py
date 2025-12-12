@@ -17,8 +17,9 @@ def nfs_device_config():
     return config.sr_device_config("NFS_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
-def nfs_sr(host, nfs_device_config):
+def nfs_sr(host, nfs_device_config, image_format: str):
     """ A NFS SR on first host. """
+    nfs_device_config['preferred-image-formats'] = image_format
     sr = host.sr_create('nfs', "NFS-SR-test", nfs_device_config, shared=True)
     yield sr
     # teardown
@@ -45,8 +46,9 @@ def nfs4_device_config():
     return config.sr_device_config("NFS4_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
-def nfs4_sr(host, nfs4_device_config):
+def nfs4_sr(host, nfs4_device_config, image_format: str):
     """ A NFS4+ SR on first host. """
+    nfs4_device_config['preferred-image-formats'] = image_format
     sr = host.sr_create('nfs', "NFS4-SR-test", nfs4_device_config, shared=True)
     yield sr
     # teardown

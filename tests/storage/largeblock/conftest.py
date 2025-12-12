@@ -11,10 +11,14 @@ if TYPE_CHECKING:
     from lib.sr import SR
 
 @pytest.fixture(scope='package')
-def largeblock_sr(host: Host, unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[SR]:
+def largeblock_sr(host: Host,
+                  unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                  image_format: str) -> Generator[SR]:
     """ A LARGEBLOCK SR on first host. """
     sr_disk = unused_4k_disks[host][0]["name"]
-    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
+                        {'device': '/dev/' + sr_disk,
+                         'preferred-image-formats': image_format})
     yield sr
     # teardown
     sr.destroy()
