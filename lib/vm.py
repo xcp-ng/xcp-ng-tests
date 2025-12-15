@@ -343,7 +343,7 @@ class VM(BaseVM):
         for vdi in self.vdis:
             if vdi.uuid == vdi_uuid:
                 self.vdis.remove(vdi)
-                super().destroy_vdi(vdi_uuid)
+                vdi.destroy()
                 break
 
     def create_vdis_list(self) -> None:
