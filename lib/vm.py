@@ -303,7 +303,7 @@ class VM(BaseVM):
                                                        'new-name-label': 'Checkpoint of %s' % self.uuid}),
                         self.host, self)
 
-    def connect_vdi(self, vdi: VDI, device: str = "autodetect") -> str:
+    def connect_vdi(self, vdi: VDI, device: str = "autodetect") -> VBD:
         logging.info(f">> Plugging VDI {vdi.uuid} on VM {self.uuid}")
         vbd_uuid = self.host.xe("vbd-create", {
             "vdi-uuid": vdi.uuid,
@@ -318,7 +318,7 @@ class VM(BaseVM):
 
         self.vdis.append(vdi)
 
-        return vbd_uuid
+        return VBD(vbd_uuid, self, vdi)
 
     def disconnect_vdi(self, vdi: VDI):
         logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
