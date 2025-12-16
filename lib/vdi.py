@@ -1,6 +1,15 @@
 import logging
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool, wait_for_not
+from lib.common import (
+    _param_add,
+    _param_clear,
+    _param_get,
+    _param_remove,
+    _param_set,
+    ensure_type,
+    strtobool,
+    wait_for_not,
+)
 
 from typing import TYPE_CHECKING, Callable, Literal, Optional, TypeVar, overload
 
@@ -9,6 +18,8 @@ if TYPE_CHECKING:
     from lib.sr import SR
 
 R = TypeVar("R")
+
+ImageFormat = Literal['vhd', 'qcow2']
 
 class VDI:
     xe_prefix = "vdi"
@@ -62,8 +73,11 @@ class VDI:
     def get_parent(self) -> Optional[str]:
         return self.param_get("sm-config", key="vhd-parent", accept_unknown_key=True)
 
-    def get_image_format(self) -> Optional[str]:
-        return self.param_get("sm-config", key="image-format", accept_unknown_key=True)
+    def get_image_format(self) -> ImageFormat | None:
+        v = self.param_get("sm-config", key="image-format", accept_unknown_key=True)
+        if v is None:
+            return None
+        return ensure_type(ImageFormat, v)
 
     @overload
     def param_get(self, param_name: str, key: Optional[str] = ...,
