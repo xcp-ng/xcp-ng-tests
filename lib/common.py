@@ -20,8 +20,6 @@ from uuid import UUID
 import requests
 from pydantic import TypeAdapter
 
-import lib.commands as commands
-
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -324,6 +322,7 @@ def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str
 def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
                accept_unknown_key: bool = False) -> Optional[str]:
     """ Common implementation for param_get. """
+    import lib.commands as commands
     args: Dict[str, Union[str, bool]] = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
@@ -356,6 +355,7 @@ def _param_add(host, xe_prefix, uuid, param_name, value, key=None):
 
 def _param_remove(host, xe_prefix, uuid, param_name, key, accept_unknown_key=False):
     """ Common implementation for param_remove. """
+    import lib.commands as commands
     args = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
     try:
         host.xe(f'{xe_prefix}-param-remove', args)
