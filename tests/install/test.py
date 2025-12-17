@@ -45,6 +45,7 @@ class TestNested:
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("iso_version", (
+        "90nightly",
         "83nightly", "830net",
         "830",
         "82nightly",
@@ -102,6 +103,7 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
+        "90nightly",
         "83nightly", "830net",
         "830",
         "82nightly",
@@ -294,6 +296,7 @@ class TestNested:
     @pytest.mark.parametrize("package_source", ("iso", "net"))
     @pytest.mark.parametrize("machine", ("host1", "host2"))
     @pytest.mark.parametrize("version", (
+        "90nightly",
         "83nightly", "830net",
         "830",
         "82nightly",

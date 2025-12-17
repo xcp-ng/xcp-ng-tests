@@ -129,6 +129,9 @@ ISO_IMAGES_CACHE = "/home/user/iso"
 # If 'net-only' is set to 'True' only source of type URL will be possible.
 # By default the parameter is set to False.
 ISO_IMAGES: dict[str, "IsoImageDef"] = {
+    '90nightly': {'path': os.environ.get("XCPNG90_NIGHTLY",
+                                         "http://unconfigured.iso"),
+                  'unsigned': True},
     '83nightly': {'path': os.environ.get("XCPNG83_NIGHTLY",
                                          "http://unconfigured.iso"),
                   'unsigned': True},
