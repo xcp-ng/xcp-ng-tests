@@ -257,6 +257,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
 
         # do remaster
         local_cmd([iso_remaster,
+                   "-z", "zstd",
                    "--install-patcher", img_patcher_script,
                    "--iso-patcher", iso_patcher_script,
                    iso_file, remastered_iso
