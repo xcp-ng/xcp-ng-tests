@@ -7,3 +7,4 @@ pluggy>=1.1.0
 pytest>=8.0.0
 pytest-dependency
 requests
+xcp-efivar-utils @ git+https://github.com/xcp-ng/xcp-efivar-utils.git@03f745b9de3e38ee49f8f109429bef9a0db514ee

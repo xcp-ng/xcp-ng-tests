@@ -1,27 +1,30 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
-
 import atexit
 import copy
 import hashlib
 import logging
 import os
 import shutil
-import struct
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory, mkstemp
-from uuid import UUID
 
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
-from cryptography.hazmat.primitives.serialization.pkcs7 import PKCS7PrivateKeyTypes
+from xcp_efivar_utils.efi import (
+    EFI_CERT_X509_GUID,
+    EFI_VARIABLE_SECUREBOOT_KEYS,
+    SECURE_BOOT_VARIABLES,
+    make_efi_signature_data_x509,
+    make_efi_signature_list,
+    make_efi_variable_authentication_2,
+)
+from xcp_efivar_utils.utils import read_certificate_as_der
 
 import lib.commands as commands
 
-from typing import Iterable, Literal, Optional, Self, Union, cast
+from typing import Iterable, Literal, Optional, Self, Union
+
+# Test library for EFI
+
 
 class _EfiGlobalTempdir:
     _instance = None
@@ -80,138 +83,18 @@ class _SecureBootCertList:
 
 
 SB_CERTS = _SecureBootCertList()
-
-
-class GUID(UUID):
-    def as_bytes(self):
-        return self.bytes_le
-
-    def as_str(self):
-        return str(self)
-
-
 EFI_HEADER_MAGIC = 'MZ'
+TEST_OWNER_GUID = uuid.UUID('fdd69fa4-3e66-11eb-8c1b-983b8fb6dacd')
 
-global_variable_guid = GUID('8be4df61-93ca-11d2-aa0d-00e098032b8c')
-image_security_database_guid = GUID('d719b2cb-3d3a-4596-a3bc-dad00e67656f')
-
-# Variable attributes for time based authentication attrs
-# Refer to https://uefi.org/specs/UEFI/2.11/08_Services_Runtime_Services.html#getvariable
-EFI_AT_ATTRS = 0x27
-EFI_VARIABLE_APPEND_WRITE = 0x40
 
 time_seed = datetime.now()
 time_offset = 1
 
-p7_out = ''
 
-WIN_CERT_TYPE_EFI_GUID = 0x0EF1
-
-u8 = 'B'
-u16 = 'H'
-u32 = 'I'
-EFI_GUID = '16s'
-
-
-def efi_pack(*args):
-    """
-    Return bytes of an EFI struct (little endian).
-
-    EFI structs are all packed as little endian.
-    """
-    return struct.pack('<' + args[0], *args[1:])
-
-
-def pack_guid(data1, data2, data3, data4):
-    return b''.join([
-        struct.pack(u32, data1),
-        struct.pack(u16, data2),
-        struct.pack(u16, data3),
-        bytes(data4),
-    ])
-
-
-EFI_AT_ATTRS_BYTES = efi_pack(u32, EFI_AT_ATTRS)
-
-EFI_CERT_PKCS7_GUID = pack_guid(
-    0x4AAFD29D,
-    0x68DF,
-    0x49EE,
-    [0x8A, 0xA9, 0x34, 0x7D, 0x37, 0x56, 0x65, 0xA7],
-)
-
-VATES_GUID = pack_guid(0xFDD69FA4, 0x3E66, 0x11EB, [0x8C, 0x1B, 0x98, 0x3B, 0x8F, 0xB6, 0xDA, 0xCD])
-
-EFI_CERT_X509_GUID = pack_guid(0xA5C059A1, 0x94E4, 0x4AA7, [0x87, 0xB5, 0xAB, 0x15, 0x5C, 0x2B, 0xF0, 0x72])
-
-WIN_CERTIFICATE = ''.join([u32, u16, u16])
-WIN_CERTIFICATE_UEFI_GUID = ''.join([WIN_CERTIFICATE, EFI_GUID])
-WIN_CERTIFICATE_UEFI_GUID_offset = struct.calcsize(WIN_CERTIFICATE_UEFI_GUID)
-
-EFI_TIME = ''.join([
-    u16,  # Year
-    u8,  # Month
-    u8,  # Day
-    u8,  # Hour
-    u8,  # Minute
-    u8,  # Second
-    u8,  # Pad1
-    u32,  # Nanosecond
-    u16,  # TimeZone
-    u8,  # Daylight
-    u8,  # Pad2
-])
-
-EFI_VARIABLE_AUTHENTICATION_2 = ''.join([EFI_TIME, WIN_CERTIFICATE_UEFI_GUID])
-EFI_SIGNATURE_DATA = EFI_GUID
-EFI_SIGNATURE_DATA_size = struct.calcsize(EFI_SIGNATURE_DATA)
-EFI_SIGNATURE_LIST = ''.join([EFI_GUID, u32, u32, u32])
-EFI_SIGNATURE_LIST_size = struct.calcsize(EFI_SIGNATURE_LIST)
-EFI_SIGNATURE_DATA_offset = 16
-
-SECURE_BOOT_VARIABLES = {"PK", "KEK", "db", "dbx"}
-
-
-def get_secure_boot_guid(variable: str) -> GUID:
-    """Return the GUID for an EFI secure boot variable."""
-    return {
-        'PK': global_variable_guid,
-        'KEK': global_variable_guid,
-        'db': image_security_database_guid,
-        'dbx': image_security_database_guid,
-    }[variable]
-
-
-def cert_to_efi_sig_list(cert):
-    """Return an ESL from a PEM cert."""
-    with open(cert, 'rb') as f:
-        cert_raw = f.read()
-        # Cert files can come in either PEM or DER form, and we can't assume
-        # that they come in a specific form. Since `cryptography` doesn't have
-        # a way to detect cert format, we have to detect it ourselves.
-        try:
-            cert = x509.load_pem_x509_certificate(cert_raw)
-        except ValueError:
-            cert = x509.load_der_x509_certificate(cert_raw)
-        der = cert.public_bytes(Encoding.DER)
-
-    signature_type = EFI_CERT_X509_GUID
-    signature_list_size = len(der) + EFI_SIGNATURE_LIST_size + EFI_SIGNATURE_DATA_size
-    signature_header_size = 0
-    signature_size = signature_list_size - EFI_SIGNATURE_LIST_size
-    signature_owner = VATES_GUID
-
-    return (
-        efi_pack(
-            EFI_SIGNATURE_LIST,
-            bytes(signature_type),
-            signature_list_size,
-            signature_header_size,
-            signature_size,
-        )
-        + efi_pack(EFI_SIGNATURE_DATA, bytes(signature_owner))
-        + der
-    )
+def timestamp():
+    global time_offset
+    time_offset += 1
+    return time_seed + timedelta(seconds=time_offset)
 
 
 def certs_to_sig_db(certs) -> bytes:
@@ -219,103 +102,16 @@ def certs_to_sig_db(certs) -> bytes:
     if isinstance(certs, str):
         certs = [certs]
 
-    db = b''
+    esls = []
 
     for i, cert in enumerate(certs):
-        tmp = cert_to_efi_sig_list(cert)
+        cert_bytes = read_certificate_as_der(cert, _tempdir.get().name)
+        tmp = make_efi_signature_data_x509(TEST_OWNER_GUID, cert_bytes)
         logging.debug('Size of Cert %d: %d' % (i, len(tmp)))
-        db += tmp
+        # Each cert must be in its own ESL, all of which are concatenated at the end
+        esls.append(make_efi_signature_list(EFI_CERT_X509_GUID, [tmp]))
 
-    return db
-
-
-def sign_efi_sig_db(
-    sig_db: bytes, var: str, key: str, cert: str, time: Optional[datetime] = None, guid: Optional[GUID] = None
-):
-    """Return a pkcs7 SignedData from a UEFI signature database."""
-    global p7_out
-
-    if guid is None:
-        guid = get_secure_boot_guid(var)
-
-    if time is None:
-        time = datetime.now()
-
-    timestamp = efi_pack(
-        EFI_TIME,
-        time.year,
-        time.month,
-        time.day,
-        time.hour,
-        time.minute,
-        time.second,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
-
-    logging.debug(
-        'Timestamp is %d-%d-%d %02d:%02d:%02d' % (time.year, time.month, time.day, time.hour, time.minute, time.second)
-    )
-
-    var_utf16 = var.encode('utf-16-le')
-    attributes = EFI_AT_ATTRS_BYTES
-
-    # From UEFI spec (2.6):
-    #    digest = hash (VariableName, VendorGuid, Attributes, TimeStamp,
-    #                   DataNew_variable_content)
-    payload = var_utf16 + guid.as_bytes() + attributes + timestamp + sig_db
-
-    logging.debug('Signature DB Size: %d' % len(sig_db))
-    logging.debug('Authentication Payload size %d' % len(payload))
-
-    p7 = sign(payload, key, cert)
-
-    if p7_out:
-        with open(p7_out, 'wb') as f:
-            f.write(p7)
-
-    return create_auth2_header(p7, timestamp) + p7 + sig_db
-
-
-def sign(payload: bytes, key_file: str, cert_file: str):
-    """Returns a signed PKCS7 of payload signed by key and cert."""
-    with open(key_file, 'rb') as f:
-        priv_key = cast(PKCS7PrivateKeyTypes, serialization.load_pem_private_key(f.read(), password=None))
-
-    with open(cert_file, 'rb') as f:
-        cert = x509.load_pem_x509_certificate(f.read())
-
-    options = [
-        pkcs7.PKCS7Options.DetachedSignature,
-        pkcs7.PKCS7Options.Binary,
-        pkcs7.PKCS7Options.NoAttributes,
-    ]
-
-    return (
-        pkcs7.PKCS7SignatureBuilder()
-        .set_data(payload)
-        .add_signer(cert, priv_key, hashes.SHA256())
-        .sign(serialization.Encoding.DER, options)
-    )
-
-
-def create_auth2_header(sig_db: bytes, timestamp: bytes):
-    """Return an EFI_AUTHENTICATE_VARIABLE_2 from a signature database."""
-    length = len(sig_db) + WIN_CERTIFICATE_UEFI_GUID_offset
-    revision = 0x200
-    win_cert = efi_pack(WIN_CERTIFICATE, length, revision, WIN_CERT_TYPE_EFI_GUID)
-    auth_info = win_cert + EFI_CERT_PKCS7_GUID
-
-    return timestamp + auth_info
-
-
-def timestamp():
-    global time_offset
-    time_offset += 1
-    return time_seed + timedelta(seconds=time_offset)
+    return b"".join(esls)
 
 
 def get_signed_name(image: str):
@@ -372,17 +168,30 @@ class Certificate:
         pub = _tempdir.getfile(suffix='.pem')
         key = _tempdir.getfile(suffix='.pem')
 
+        # fmt: off
         commands.local_cmd([
             'openssl', 'req', '-new', '-x509', '-newkey', 'rsa:2048',
             '-subj', '/CN=%s/' % common_name, '-nodes', '-keyout',
             key, '-sha256', '-days', '3650', '-out', pub
         ])
+        # fmt: on
 
         return cls(pub, key)
 
-    def sign_efi_sig_db(self, var: str, data: bytes, guid: Optional[GUID]):
+    def sign_efi_sig_db(self, var: str, data: bytes, guid: Optional[uuid.UUID]):
         assert self.key is not None
-        return sign_efi_sig_db(data, var, self.key, self.pub, time=timestamp(), guid=guid)
+        authvar, _, _, _ = make_efi_variable_authentication_2(
+            var,
+            guid if guid else SECURE_BOOT_VARIABLES[var],
+            [data],
+            timestamp(),
+            EFI_VARIABLE_SECUREBOOT_KEYS,
+            False,
+            self.pub,
+            self.key,
+            _tempdir.get().name,
+        )
+        return authvar
 
     def copy(self):
         newpub = _tempdir.getfile(suffix='.pem')
@@ -409,11 +218,13 @@ class EFIAuth:
         assert name in SECURE_BOOT_VARIABLES
         assert owner_cert is None or owner_cert.key is not None, "owner cert must have private key"
         self.name = name
-        self.guid = get_secure_boot_guid(self.name)
+        self.guid = SECURE_BOOT_VARIABLES[self.name]
         self._owner_cert = owner_cert
         self._other_certs = list(other_certs or [])
         self._efi_signature_list = self._get_efi_signature_list()
+        # Byte contents of the authenticated variable
         self._auth_data = None
+        # File path of the authenticated variable
         self._auth = _tempdir.getfile(suffix='.auth')
 
     @classmethod
@@ -470,10 +281,11 @@ class EFIAuth:
         assert self._owner_cert is not None
         if shutil.which('sbsign'):
             signed = get_signed_name(image)
+            # fmt: off
             commands.local_cmd([
-                'sbsign', '--key', self._owner_cert.key, '--cert', self._owner_cert.pub,
-                image, '--output', signed
+                'sbsign', '--key', self._owner_cert.key, '--cert', self._owner_cert.pub, image, '--output', signed
             ])
+            # fmt: on
         else:
             signed = pesign(self._owner_cert.key, self._owner_cert.pub, self.name, image)
 
@@ -548,61 +360,10 @@ def esl_from_auth_bytes(auth_data: bytes) -> bytes:
     Warning: This will break if used on any ESL containing certs of non-X509 GUID type.
              All of the certs used in Secure Boot are X509 GUID type.
     """
-    return auth_data[auth_data.index(EFI_CERT_X509_GUID):]
+    # fmt: off
+    return auth_data[auth_data.index(EFI_CERT_X509_GUID.bytes_le):]
+    # fmt: on
 
 
 def get_md5sum_from_auth(auth: str):
     return hashlib.md5(esl_from_auth_file(auth)).hexdigest()
-
-
-if __name__ == '__main__':
-    import argparse
-    import sys
-
-    epilog = '''
-Examples:
-
-    # Create a PK.auth (self-signed)
-    {prog} -k PK.key -c PK.cert PK PK.auth PK.cert
-
-    # Create a KEK.auth
-    {prog} -k PK.key -c PK.cert KEK KEK.auth KEK.cert
-
-    # Create a db.auth
-    {prog} -k KEK.key -c KEK.cert db db.auth db.cert
-'''.format(prog=sys.argv[0])
-
-    parser = argparse.ArgumentParser(
-        description='Create signed UEFI secure boot variables',
-        epilog=epilog,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument('-k', '--key', type=str, help='The signers key')
-    parser.add_argument('-c', '--cert', type=str, help='The signers cert (PEM)')
-    parser.add_argument('--log', type=str, choices=['DEBUG', 'INFO'])
-    parser.add_argument(
-        '--p7',
-        type=str,
-        help='Output the intermediary p7 data object (useful for debug)',
-    )
-    parser.add_argument(
-        'var',
-        type=str,
-        choices=['PK', 'KEK', 'db', 'dbx'],
-        help='The variable name for the cert',
-    )
-    parser.add_argument('outputfile', type=str, help='The name of the output file')
-    parser.add_argument('certs', nargs='+', help='The new certs for the variable')
-    args = parser.parse_args()
-
-    if args.log:
-        logging.basicConfig(format='%(levelname)s:%(message)s', level=getattr(logging, args.log.upper()))
-
-    if args.p7:
-        p7_out = args.p7
-
-    db = certs_to_sig_db(args.certs)
-    auth = sign_efi_sig_db(db, args.var, args.key, args.cert)
-
-    with open(args.outputfile, 'wb') as f:
-        f.write(auth)

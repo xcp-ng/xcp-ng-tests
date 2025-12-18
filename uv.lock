@@ -676,6 +676,14 @@ wheels = [
 ]
 
 [[package]]
+name = "xcp-efivar-utils"
+version = "0.1.dev7+g03f745b9d"
+source = { git = "https://github.com/xcp-ng/xcp-efivar-utils.git?rev=03f745b9de3e38ee49f8f109429bef9a0db514ee#03f745b9de3e38ee49f8f109429bef9a0db514ee" }
+dependencies = [
+    { name = "xenapi" },
+]
+
+[[package]]
 name = "xcp-ng-tests"
 version = "0.1.0"
 source = { virtual = "." }
@@ -688,6 +696,7 @@ dependencies = [
     { name = "pytest" },
     { name = "pytest-dependency" },
     { name = "requests" },
+    { name = "xcp-efivar-utils" },
 ]
 
 [package.dev-dependencies]
@@ -716,6 +725,7 @@ requires-dist = [
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-dependency" },
     { name = "requests" },
+    { name = "xcp-efivar-utils", git = "https://github.com/xcp-ng/xcp-efivar-utils.git?rev=03f745b9de3e38ee49f8f109429bef9a0db514ee" },
 ]
 
 [package.metadata.requires-dev]
@@ -732,4 +742,13 @@ dev = [
     { name = "ruff" },
     { name = "types-requests" },
     { name = "typing-extensions" },
+]
+
+[[package]]
+name = "xenapi"
+version = "25.38.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/f3/11ba926d32c76bf9f95ca9a3f96b44870decfc0ec30abaf40ecf8e49c732/xenapi-25.38.0.tar.gz", hash = "sha256:ac32a2dc3dcc335d9717522ab988ddcb9eb9b94ec0440e9e96bd8544caf6b584", size = 6722, upload-time = "2025-11-27T11:20:06.181Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/93/5d/68893a13abb9166445c2aec91a34e320083900cc181a0e78dc6255247dea/xenapi-25.38.0-py3-none-any.whl", hash = "sha256:6d2348f8860e953168dd35688503397e1d043595143b9884e7f0c111c15542b4", size = 5958, upload-time = "2025-11-27T11:20:05.105Z" },
 ]

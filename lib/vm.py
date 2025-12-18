@@ -520,12 +520,12 @@ class VM(BaseVM):
                 signed = db.sign_image(local_bin)
                 self.scp(signed, remote_bin)
 
-    def set_efi_var(self, var: str, guid: efi.GUID, attrs: bytes, data: bytes):
+    def set_efi_var(self, var: str, guid: uuid.UUID, attrs: bytes, data: bytes):
         """Sets the data and attrs for an EFI variable and GUID."""
         assert len(attrs) == 4
 
-        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid.as_str())
-        tmp_efivarfs = '/tmp/%s-%s' % (var, guid.as_str())
+        efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid)
+        tmp_efivarfs = '/tmp/%s-%s' % (var, guid)
 
         if self.file_exists(efivarfs):
             self.ssh(['chattr', '-i', efivarfs])
@@ -653,7 +653,7 @@ class VM(BaseVM):
             assert auth.name in ['PK', 'KEK', 'db', 'dbx']
         logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
         for auth in auths:
-            self.set_variable_from_file(auth.auth(), auth.guid.as_str(), auth.name, efi.EFI_AT_ATTRS)
+            self.set_variable_from_file(auth.auth(), auth.guid, auth.name, efi.EFI_VARIABLE_SECUREBOOT_KEYS)
 
     def booted_with_secureboot(self):
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
@@ -738,7 +738,7 @@ class VM(BaseVM):
         self.host.ssh(["varstore-sb-state", self.uuid, "user"])
 
     def is_uefi_var_present(self, varname):
-        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(varname).as_str(), varname],
+        res = self.host.ssh(['varstore-get', self.uuid, str(efi.SECURE_BOOT_VARIABLES[varname]), varname],
                             check=False, simple_output=False, decode=False)
         return res.returncode == 0
 
