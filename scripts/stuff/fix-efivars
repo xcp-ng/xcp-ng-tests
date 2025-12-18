@@ -1,0 +1,576 @@
+#!/usr/bin/env python3
+
+import argparse
+import base64
+import logging
+import struct
+import sys
+import time
+import uuid
+
+from efivar_utils.utils import unserialize_data, unserialize_struct
+from efivar_utils.xapi import (
+    get_pool_certs,
+    get_pool_ref,
+    xapi_session,
+)
+
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+# Repair tool to delete variables affected by the varstored append data limit issue.
+# It also deletes the Secure Boot variable if it contains the varstored-1.2.0-3.1 variables, in order to allow existing
+# VMs to receive dbx updates from Microsoft.
+# Serialization code adapted from varstored.
+
+# KEK/db/dbx containing the XCP-ng signature owner should be deleted.
+# We only match the 16-byte signature owner to cover as many signature data entries as possible.
+
+XCPNG_SIGNATURE_OWNER = uuid.UUID("9be025e2-415b-435d-ad61-6b3e094fc28d").bytes_le
+
+DB_MAGIC = b"VARS"
+DB_HEADER_LEN = len(DB_MAGIC) + struct.calcsize("<IQQ")
+if DB_HEADER_LEN != 24:
+    raise RuntimeError(f"Unexpected DB_HEADER_LEN {DB_HEADER_LEN}")
+DB_VERSION = 2
+
+HEADER_STRUCT = struct.Struct("<4sIQQ")
+if HEADER_STRUCT.size != 24:
+    raise RuntimeError(f"Unexpected HEADER_STRUCT size {HEADER_STRUCT.size}")
+
+ANCILLARY_DATA_LEN_V2 = 8 + 0x104
+ANCILLARY_DATA_LEN = ANCILLARY_DATA_LEN_V2
+
+PPI_VDATA = struct.Struct("<I256s")
+
+EFI_VARIABLE_TAIL = struct.Struct("<16sI16s32s")
+VARIABLE_SIZE = struct.calcsize("<QQ") + EFI_VARIABLE_TAIL.size
+if VARIABLE_SIZE != 84:
+    raise RuntimeError(f"Unexpected VARIABLE_SIZE {VARIABLE_SIZE}")
+
+EFI_VARIABLE_NON_VOLATILE = 0x00000001
+
+NVRAM_KEY = "EFI-variables"
+
+# Limits specified by varstored v1.3.0
+NAME_LIMIT = 4096  # Maximum length of name
+DATA_LIMIT = 57344  # Maximum length of a single variable
+TOTAL_LIMIT = 131072  # Maximum total storage
+
+VARIABLE_SIZE_OVERHEAD = 128
+MAX_VARIABLE_COUNT = TOTAL_LIMIT // VARIABLE_SIZE_OVERHEAD
+
+# Don't touch anything not in this list
+KNOWN_VARIABLES = [
+    (uuid.UUID("8be4df61-93ca-11d2-aa0d-00e098032b8c"), "KEK"),
+    (uuid.UUID("d719b2cb-3d3a-4596-a3bc-dad00e67656f"), "db"),
+    (uuid.UUID("d719b2cb-3d3a-4596-a3bc-dad00e67656f"), "dbx"),
+]
+
+
+class EfiVariable:
+    def __init__(
+        self,
+        name: bytes,
+        data: bytes,
+        guid: bytes,
+        attr: int,
+        timestamp: bytes,
+        cert: bytes,
+    ) -> None:
+        self.name = name
+        self.data = data
+        self.guid = guid
+        self.attr = attr
+        self.timestamp = timestamp
+        self.cert = cert
+
+        self.display_name = self.name.decode("utf-16le")
+        self.display_guid = uuid.UUID(bytes_le=self.guid)
+
+    @staticmethod
+    def unserialize_variables(buf: bytes, count: int, rem: int):
+        for i in range(count):
+            logging.debug("variable %d", i)
+
+            if rem < VARIABLE_SIZE:
+                raise ValueError(f"Invalid rem {rem}")
+            rem -= VARIABLE_SIZE
+
+            buf, name = unserialize_data(buf, rem, NAME_LIMIT)
+            logging.debug("    name %s", name.decode("utf-16le"))
+            rem -= len(name)
+
+            buf, data = unserialize_data(buf, rem, DATA_LIMIT)
+            logging.debug("    datalen %d", len(data))
+            rem -= len(data)
+
+            buf, guid, attr, timestamp, cert = unserialize_struct(EFI_VARIABLE_TAIL, buf)
+
+            variable = EfiVariable(
+                name=name,
+                data=data,
+                guid=guid,
+                attr=attr,
+                timestamp=timestamp,
+                cert=cert,
+            )
+
+            logging.debug(
+                "    %s %s len %d attr %x timestamp %s",
+                variable.display_guid,
+                variable.display_name,
+                len(variable.data),
+                variable.attr,
+                variable.timestamp,
+            )
+            # logging.debug("    content: %s", base64.b64encode(data).decode())
+            logging.debug("    rem %d", rem)
+
+            yield variable
+
+        if rem:
+            raise ValueError(f"More data than expected: {rem}")
+
+
+class EfiVariables:
+    def __init__(
+        self,
+        version: int,
+        variables: Iterable[EfiVariable],
+        mor_key: bytes,
+        ppi_vdata: Tuple[int, bytes],
+    ) -> None:
+        self.version = version
+        self.variables = list(variables)
+        if version == 2:
+            if len(mor_key) != 8:
+                raise ValueError("Invalid mor_key")
+            self._mor_key = mor_key
+            if ppi_vdata is None or len(ppi_vdata[1]) != 256:
+                raise ValueError("Invalid ppi_vdata")
+            self._ppi_vdata = ppi_vdata
+        else:
+            self._mor_key = b""
+            self._ppi_vdata = (0, b"")
+
+    @property
+    def mor_key(self) -> bytes:
+        if self.version != 2:
+            raise KeyError("Inaccessible mor_key: version is not 2")
+        return self._mor_key
+
+    @property
+    def ppi_vdata(self) -> Tuple[int, bytes]:
+        if self.version != 2:
+            raise KeyError("Inaccessible ppi_vdata: version is not 2")
+        return self._ppi_vdata
+
+    @staticmethod
+    def xapidb_parse_blob(buf: bytes):
+        buflen = len(buf)
+
+        (buf, magic, version, count, datalen) = unserialize_struct(HEADER_STRUCT, buf)
+        if magic != DB_MAGIC:
+            raise ValueError("Invalid init magic")
+        logging.debug("version %d, count %d, datalen %d", version, count, datalen)
+        if version > DB_VERSION:
+            raise ValueError("Unsupported init version")
+        if count > MAX_VARIABLE_COUNT:
+            raise ValueError(f"Invalid variable count {count} > {MAX_VARIABLE_COUNT}")
+
+        buflen -= DB_HEADER_LEN
+
+        mor_key = b""
+        ppi_vdata = (0, b"")
+        if version == 2:
+            if buflen < ANCILLARY_DATA_LEN_V2:
+                raise ValueError("Init file size is invalid")
+
+            mor_key = buf[:8]
+            buf = buf[8:]
+
+            buf, ppi_vdata_idx, ppi_vdata_func = unserialize_struct(PPI_VDATA, buf)
+            ppi_vdata = ppi_vdata_idx, ppi_vdata_func
+
+            buflen -= ANCILLARY_DATA_LEN_V2
+
+        return EfiVariables(
+            version=version,
+            variables=EfiVariable.unserialize_variables(buf, count, buflen),
+            mor_key=mor_key,
+            ppi_vdata=ppi_vdata,
+        )
+
+    def var_count(self, only_nv: bool):
+        result = 0
+
+        for variable in self.variables:
+            if only_nv and (variable.attr & EFI_VARIABLE_NON_VOLATILE) == 0:
+                continue
+
+            result += 1
+
+        return result
+
+    def data_len(self, only_nv: bool):
+        result = 0
+
+        for variable in self.variables:
+            if only_nv and (variable.attr & EFI_VARIABLE_NON_VOLATILE) == 0:
+                continue
+
+            result += VARIABLE_SIZE
+            result += len(variable.name)
+            result += len(variable.data)
+
+        return result
+
+    def xapidb_serialize_variables(self, only_nv: bool):
+        out = b""
+
+        var_count = self.var_count(only_nv)
+        data_len = self.data_len(only_nv)
+        logging.debug("%d vars (total %d bytes)", var_count, data_len)
+        out += HEADER_STRUCT.pack(DB_MAGIC, self.version, var_count, data_len)
+        if self.version == 2:
+            out += self.mor_key
+            out += PPI_VDATA.pack(*self.ppi_vdata)
+
+        for variable in self.variables:
+            if only_nv and (variable.attr & EFI_VARIABLE_NON_VOLATILE) == 0:
+                continue
+
+            variable_bytes = b""
+
+            variable_bytes += struct.pack("<Q", len(variable.name))
+            variable_bytes += variable.name
+
+            variable_bytes += struct.pack("<Q", len(variable.data))
+            variable_bytes += variable.data
+
+            variable_bytes += EFI_VARIABLE_TAIL.pack(variable.guid, variable.attr, variable.timestamp, variable.cert)
+
+            logging.debug("variable %s len %d", variable.display_name, len(variable_bytes))
+            out += variable_bytes
+
+        supposed_size = HEADER_STRUCT.size + data_len
+        if self.version == 2:
+            supposed_size += len(self.mor_key) + PPI_VDATA.size
+        if supposed_size != len(out):
+            raise RuntimeError(f"supposed size {supposed_size} did not match output length {len(out)}")
+        return out
+
+
+def filter_variables(variables: Iterable[EfiVariable]):
+    """
+    Delete oversized variables. Report outdated and oversized variables.
+
+    Returns a tuple (fixed_variables, all_outdated_count, oversize_count) where:
+    - fixed_variables is a list of variables that are not oversized and therefore can be committed to NVRAM
+    - all_outdated_count is the count of variables that are outdated and need replacement.
+    - oversize_count is the count of variables that are oversized and were deleted from fixed_variables.
+    """
+    fixed_variables: List[EfiVariable] = []
+    all_outdated_count = 0
+    oversize_count = 0
+
+    for variable in variables:
+        if len(variable.data) > DATA_LIMIT:
+            logging.info(
+                "Variable exceeds limit: %s %s (%d > %d)",
+                variable.display_guid,
+                variable.display_name,
+                len(variable.data),
+                DATA_LIMIT,
+            )
+            needs_fix = True
+            needs_delete = True
+        elif (
+            variable.display_guid,
+            variable.display_name,
+        ) in KNOWN_VARIABLES and XCPNG_SIGNATURE_OWNER in variable.data:
+            logging.info("Variable contains bogus data: %s %s", variable.display_guid, variable.display_name)
+            needs_fix = True
+            needs_delete = False
+        else:
+            needs_fix = False
+            needs_delete = False
+
+        if needs_fix:
+            all_outdated_count += 1
+
+        if needs_delete:
+            oversize_count += 1
+        else:
+            fixed_variables.append(variable)
+
+    return (fixed_variables, all_outdated_count, oversize_count)
+
+
+def probe_vm_type(session, vm_ref):
+    vm_type = "VM"
+    should_skip = False
+    is_fixable = True
+    if session.xenapi.VM.get_is_control_domain(vm_ref):
+        vm_type = "control domain"
+        should_skip = True
+    elif session.xenapi.VM.get_is_default_template(vm_ref):
+        vm_type = "default template"
+        should_skip = True
+    elif session.xenapi.VM.get_is_a_snapshot(vm_ref):
+        vm_type = "snapshot"
+        is_fixable = False
+    elif session.xenapi.VM.get_is_a_template(vm_ref):
+        vm_type = "template"
+    return vm_type, should_skip, is_fixable
+
+
+def do_scan_vm(
+    session,
+    *,
+    vm_ref: Any,
+    fix: bool = False,
+    backup_path: Optional[str] = None,
+    overwrite_backup: bool = False,
+    dry_run: bool = False,
+):
+    vm_uuid = session.xenapi.VM.get_uuid(vm_ref)
+
+    vm_type, should_skip, is_fixable = probe_vm_type(session, vm_ref)
+    if should_skip:
+        logging.info("Skipping %s %s", vm_type, vm_uuid)
+        return 0
+    else:
+        logging.info("Scanning %s %s", vm_type, vm_uuid)
+
+    nvram: Dict[str, str] = session.xenapi.VM.get_NVRAM(vm_ref)
+    efivars = nvram.get(NVRAM_KEY)
+    if not efivars:
+        logging.debug("EFI vars are empty")
+        return 0
+
+    if fix:
+        backup_path = backup_path or f"{vm_uuid}.{int(time.time())}.efivars.b64"
+        print(f"Backing up existing variables to {backup_path}", file=sys.stderr)
+        with open(backup_path, "w" if overwrite_backup else "x") as backup:
+            backup.write(efivars)
+
+    parsed = EfiVariables.xapidb_parse_blob(base64.b64decode(efivars, validate=True))
+
+    fixed_variables, all_outdated_count, oversize_count = filter_variables(parsed.variables)
+
+    if fix:
+        parsed.variables = fixed_variables
+
+        fixed_names = [(var.display_guid, var.display_name) for var in parsed.variables]
+        if len(set(fixed_names)) != len(fixed_names):
+            raise RuntimeError("Found duplicate variable in fixed result")
+
+        fixed = parsed.xapidb_serialize_variables(False)
+        verify = EfiVariables.xapidb_parse_blob(fixed)
+        if verify is None:
+            raise RuntimeError("Cannot parse fixed blob")
+        if len(verify.variables) != len(parsed.variables):
+            raise RuntimeError(f"Fixed blob length {len(verify.variables)} != {len(parsed.variables)}")
+        for var_verify, var_parsed in zip(verify.variables, parsed.variables):
+            if (
+                var_verify.name != var_parsed.name
+                or var_verify.guid != var_parsed.guid
+                or var_verify.attr != var_parsed.attr
+            ):
+                raise RuntimeError("Copied variable did not match previous")
+
+        if all_outdated_count:
+            if not is_fixable:
+                raise RuntimeError(f"Refusing to fix unfixable {vm_type} {vm_uuid}")
+            power_state = session.xenapi.VM.get_power_state(vm_ref)
+            if power_state != "Halted":
+                raise RuntimeError(f"{vm_type} {vm_uuid} is {power_state}, expected Halted; refusing to fix")
+            if not dry_run:
+                if oversize_count:
+                    session.xenapi.VM.remove_from_NVRAM(vm_ref, NVRAM_KEY)
+                    session.xenapi.VM.add_to_NVRAM(vm_ref, NVRAM_KEY, base64.b64encode(fixed).decode())
+                session.xenapi.VM.set_uefi_mode(vm_ref, "user")
+
+    if all_outdated_count:
+        if not is_fixable:
+            trailer_message = f"This {vm_type} should be deleted to avoid creating affected VMs from it in the future."
+        elif fix:
+            trailer_message = f"{vm_type} has been propagated with pool certs."
+        else:
+            trailer_message = f"{vm_type} needs propagating with pool certs."
+
+        if is_fixable and fix and dry_run:
+            trailer_message += " (dry-run)"
+
+        print(
+            f"{'Fixed' if fix else 'Found'} "
+            + f"{all_outdated_count} affected variable(s) ("
+            + f"{oversize_count} oversized"
+            + f") in {vm_type} {vm_uuid} - "
+            + trailer_message,
+            file=sys.stderr,
+        )
+
+    return all_outdated_count
+
+
+def do_scan_pool(session, *, pool_ref: Any):
+    print("Scanning pool certs", file=sys.stderr)
+    pool_certs, _ = get_pool_certs(session, pool_ref)
+
+    pool_needs_fix = False
+    for name, value in pool_certs.items():
+        if any(name == var[1] for var in KNOWN_VARIABLES) and XCPNG_SIGNATURE_OWNER in value:
+            print(
+                f"Found pool UEFI variable {name} which needs fixing",
+                file=sys.stderr,
+            )
+            pool_needs_fix = True
+    if pool_needs_fix:
+        print(
+            "Please update varstored to a release higher or equal than 1.2.0-3.3, and scan again. "
+            "If the message persists, run 'secureboot-certs clear' and scan again to list affected VMs if there are "
+            "any.",
+            file=sys.stderr,
+        )
+        return
+
+    print("Scanning all VMs", file=sys.stderr)
+    affected_vms = 0
+    for vm_ref in session.xenapi.VM.get_all():
+        if do_scan_vm(session, vm_ref=vm_ref, fix=False):
+            affected_vms += 1
+
+    print(f"Pool scanning done, found {affected_vms} affected VMs", file=sys.stderr)
+
+
+def do_restore_backup(
+    session,
+    *,
+    vm_ref: Any,
+    restore_path: str,
+    backup_path: Optional[str] = None,
+    overwrite_backup: bool = False,
+    dry_run: bool = False,
+):
+    vm_uuid = session.xenapi.VM.get_uuid(vm_ref)
+
+    nvram: Dict[str, str] = session.xenapi.VM.get_NVRAM(vm_ref)
+    efivars = nvram.get(NVRAM_KEY)
+    if efivars:
+        backup_path = backup_path or f"{vm_uuid}.{int(time.time())}.efivars.b64"
+        print(f"Backing up existing variables to {backup_path}", file=sys.stderr)
+        with open(backup_path, "w" if overwrite_backup else "x") as backup:
+            backup.write(efivars)
+    else:
+        logging.debug("EFI vars are empty, no backup is made")
+
+    with open(restore_path, "r") as restore_file:
+        restore = base64.b64decode(restore_file.read(), validate=True)
+
+        try:
+            _ = EfiVariables.xapidb_parse_blob(restore)
+        except Exception as e:
+            raise ValueError("Restore blob failed validation") from e
+
+        power_state = session.xenapi.VM.get_power_state(vm_ref)
+        if power_state != "Halted":
+            raise RuntimeError(f"{vm_uuid} is {power_state}, expected Halted; refusing to fix")
+
+        if not dry_run:
+            session.xenapi.VM.remove_from_NVRAM(vm_ref, NVRAM_KEY)
+            session.xenapi.VM.add_to_NVRAM(vm_ref, NVRAM_KEY, base64.b64encode(restore).decode())
+
+    print("Restore OK", file=sys.stderr)
+
+
+def scan_vm(args: argparse.Namespace):
+    if not args.verbose:
+        logging.getLogger().setLevel(logging.INFO)
+    with xapi_session() as session:
+        vm_ref = session.xenapi.VM.get_by_uuid(args.vm_uuid)
+        do_scan_vm(
+            session,
+            vm_ref=vm_ref,
+            fix=args.fix,
+            backup_path=args.backup,
+            overwrite_backup=args.overwrite_backup,
+            dry_run=args.dry_run,
+        )
+
+
+def scan_pool(args: argparse.Namespace):
+    if not args.verbose:
+        logging.getLogger().setLevel(logging.WARN)
+    with xapi_session() as session:
+        pool_ref = get_pool_ref(session, args.pool_uuid)
+        do_scan_pool(session, pool_ref=pool_ref)
+
+
+def restore_backup(args: argparse.Namespace):
+    with xapi_session() as session:
+        vm_ref = session.xenapi.VM.get_by_uuid(args.vm_uuid)
+        do_restore_backup(
+            session,
+            vm_ref=vm_ref,
+            restore_path=args.restore_from,
+            backup_path=args.backup,
+            overwrite_backup=args.overwrite_backup,
+            dry_run=args.dry_run,
+        )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", action="store_true", help="print detailed info")
+    subparsers = parser.add_subparsers()
+
+    parser_vm = subparsers.add_parser("check-vm")
+    parser_vm.add_argument("vm_uuid", help="UUID of VM to scan or fix")
+    parser_vm.add_argument(
+        "--fix", action="store_true", help="fix the NVRAM (instead of just printing invalid variables)"
+    )
+    parser_vm.add_argument(
+        "--backup",
+        help="path to back up current NVRAM to (default 'VM_UUID-TIMESTAMP.efivars.b64')",
+        metavar="BACKUP_PATH",
+    )
+    parser_vm.add_argument("--overwrite-backup", action="store_true", help="overwrite existing backup")
+    parser_vm.add_argument("--dry-run", action="store_true", help="don't fix the NVRAM for real; just take a backup")
+    parser_vm.set_defaults(func=scan_vm)
+
+    parser_pool = subparsers.add_parser("scan-pool")
+    parser_pool.add_argument("--pool-uuid", help="UUID of pool to scan")
+    parser_pool.set_defaults(func=scan_pool)
+
+    parser_restore_backup = subparsers.add_parser("restore-efivar-backup")
+    parser_restore_backup.add_argument("vm_uuid", help="UUID of VM to restore NVRAM")
+    parser_restore_backup.add_argument(
+        "--restore-from", help="path to restore NVRAM from", metavar="RESTORE_PATH", required=True
+    )
+    parser_restore_backup.add_argument(
+        "--backup",
+        help="path to back up current NVRAM to (default 'VM_UUID-TIMESTAMP.efivars.b64')",
+        metavar="BACKUP_PATH",
+    )
+    parser_restore_backup.add_argument("--overwrite-backup", action="store_true", help="overwrite existing backup")
+    parser_restore_backup.add_argument(
+        "--dry-run", action="store_true", help="don't restore the NVRAM for real; just take a backup"
+    )
+    parser_restore_backup.set_defaults(func=restore_backup)
+
+    args = parser.parse_args()
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    func = getattr(args, "func", None)
+    if func:
+        args.func(args)
+    else:
+        parser.print_help()
+        exit(1)
+
+
+if __name__ == "__main__":
+    main()

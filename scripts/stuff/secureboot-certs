@@ -1,0 +1,660 @@
+#!/usr/bin/env python3
+
+"""
+This script installs UEFI certificates for XCP-ng hosts.
+"""
+
+__author__ = "Bobby Eshleman"
+__copyright__ = "Copyright 2021, Vates SAS"
+__license__ = "GPLv2"
+__maintainer__ = "Bobby Eshleman"
+__email__ = "bobbyeshleman@gmail.com"
+__status__ = "Production"
+
+
+import argparse
+import atexit
+import base64
+import io
+import logging
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import uuid
+from urllib import request
+
+from efivar_utils.efi import (
+    EFI_CERT_SHA256_GUID,
+    EFI_CERT_TYPE_PKCS7_GUID,
+    EFI_CERT_X509_GUID,
+    EFI_SIGNATURE_LIST,
+    EFI_TIME,
+    WIN_CERTIFICATE_UEFI_GUID,
+    efi_time_to_timestamp,
+)
+from efivar_utils.utils import unserialize_struct
+from efivar_utils.xapi import (
+    get_pool_certs,
+    get_pool_ref,
+    xapi_session,
+)
+
+DEFAULT_USER_AGENT = "Mozilla/5.0 - Open source hypervisor"
+
+DEFAULT_AUTH_PATHS = {
+    "PK": "/usr/share/varstored/PK.auth",
+    "KEK": "/usr/share/varstored/KEK.auth",
+    "db": "/usr/share/varstored/db.auth",
+    "dbx": "/usr/share/varstored/dbx.auth",
+}
+
+
+def cd_tempdir():
+    """Change directories to a temporary directory.
+
+    Usage:
+
+    ```
+        prevdir = cd_tempdir()
+
+        # Do stuff inside temporary directory
+        ...
+
+        # Return to previous directory
+        os.chdir(prevdir)
+    ```
+
+    All temporary directories are automatically cleaned up upon program exit.
+
+    Return the name of the current directory.
+    """
+    prevdir = os.path.abspath(os.curdir)
+    tempdir = tempfile.mkdtemp()
+    os.chdir(tempdir)
+
+    # cleanup on program exit
+    atexit.register(lambda: shutil.rmtree(tempdir))
+
+    return prevdir
+
+
+class Actions:
+    CLEAR = "clear"
+    INSTALL = "install"
+    REPORT = "report"
+    EXTRACT = "extract"
+
+
+class Urls:
+    dbx = (
+        "https://github.com/microsoft/secureboot_objects/raw/refs/heads/main/PostSignedObjects/DBX/amd64/DBXUpdate.bin"
+    )
+
+
+def report_esls(buf: bytes):
+    while buf:
+        print("\t--------------------")
+
+        _, sigtype, esl_size, sigheader_size, siglen = unserialize_struct(EFI_SIGNATURE_LIST, buf)
+        siglist = buf[EFI_SIGNATURE_LIST.size + sigheader_size : esl_size]
+        buf = buf[esl_size:]
+
+        sigtype = uuid.UUID(bytes_le=sigtype)
+        if sigtype == EFI_CERT_SHA256_GUID:
+            assert siglen == 48 and len(siglist) % siglen == 0
+            print("\t- EFI_SIGNATURE_LIST of type EFI_CERT_SHA256_GUID (%d hashes)" % (esl_size // siglen))
+        elif sigtype == EFI_CERT_X509_GUID:
+            assert len(siglist) == siglen
+            print("\t- EFI_SIGNATURE_LIST of type EFI_CERT_X509_GUID")
+
+            owner = siglist[:16]
+            cert = siglist[16:]
+
+            print("\t  Signature owner: %s" % uuid.UUID(bytes_le=owner))
+            subprocess.run(
+                [
+                    "openssl",
+                    "x509",
+                    "-inform",
+                    "DER",
+                    "-noout",
+                    "-text",
+                    "-certopt",
+                    "no_header,no_version,no_serial,no_signame,no_pubkey,no_sigdump,no_extensions",
+                ],
+                input=cert,
+            )
+
+
+def report_auth(auth: bytes):
+    _timestamp = unserialize_struct(EFI_TIME, auth)
+    auth = _timestamp[0]
+    print("\tTimestamp: %s" % efi_time_to_timestamp(*_timestamp[1:]))
+
+    auth, win_cert_len, _win_cert_rev, _win_cert_type, _efi_cert_type = unserialize_struct(
+        WIN_CERTIFICATE_UEFI_GUID, auth
+    )
+    _signature = auth[0 : win_cert_len - WIN_CERTIFICATE_UEFI_GUID.size]
+    report_esls(auth[win_cert_len - WIN_CERTIFICATE_UEFI_GUID.size :])
+    print("\t--------------------")
+
+
+def download(url, fname=None, tempdir=False, user_agent=DEFAULT_USER_AGENT):
+    """Download a file.
+
+    url:   the url to the remote file.
+    fname: the name to rename the file to upon download.
+    tempdir: If True, place file in a temporary directory.
+             Otherwise, place in current directory.
+
+    Returns absolute path to downloaded file.
+    """
+    if fname is None:
+        fname = os.path.basename(url)
+    d = None
+    if tempdir:
+        d = cd_tempdir()
+
+    dest = None
+    try:
+        print("Downloading %s..." % url)
+
+        req = request.Request(url)
+        # For an unknown reason, microsoft.com reliably rejects the request User
+        # Agent with error 403 (but oddly doesn't block the python-requests User
+        # Agent). To avoid issues, just use the well-known Mozilla User Agent.
+        if user_agent:
+            req.add_header("User-Agent", user_agent)
+
+        # These two headers are simply the defaults used by the requests library,
+        # which is known to work.  There is no deeper rationale for these exact
+        # headers.
+        req.add_header("Accept", "*/*")
+        req.add_header("Connection", "keep-alive")
+
+        resp = request.urlopen(req)
+        data = resp.read()
+
+        with open(fname, "wb") as f:
+            f.write(data)
+
+        # Get abspath in temp dir before returning to original directory
+        # (only matters if tempdir == True, but also correct if False)
+        dest = os.path.abspath(fname)
+    except request.HTTPError as e:
+        print(
+            (
+                "error: unable to retrieve certificate from URL: %s. "
+                "Error message: %s.\n\nIf the download was blocked with a 403 "
+                "HTTP error, you may retry with a different user agent:\n"
+                'secureboot-certs install --user-agent="Mozilla/5.0 '
+                'My custom user agent"\n\n'
+                "If this still doesn't work, you can download and install the "
+                "certificates manually:\n"
+                "https://xcp-ng.org/docs/guides.html#install-the-default-uefi-certificates-manually"
+            )
+            % (url, e)
+        )
+    finally:
+        if d:
+            os.chdir(d)
+    return dest
+
+
+def convert_der_to_pem(der):
+    der = os.path.abspath(der)
+    d = cd_tempdir()
+
+    # Attempt to convert file foo.der -> foo.crt
+    pem = der.replace(".der", "") + ".crt"
+    pem = os.path.abspath(os.path.basename(pem))
+
+    try:
+        subprocess.check_call(
+            [
+                "openssl",
+                "x509",
+                "-in",
+                der,
+                "-inform",
+                "DER",
+                "-outform",
+                "PEM",
+                "-out",
+                pem,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    finally:
+        os.chdir(d)
+    return pem
+
+
+def create_auth(signing_key, signing_cert, var, *certs):
+    auth = var + ".auth"
+
+    if any([signing_key, signing_cert]) and not all([signing_key, signing_cert]):
+        raise RuntimeError(("signing_key and signing_cert must either both be None or both be defined"))
+    if signing_key and signing_cert:
+        subprocess.check_call(
+            ["/opt/xensource/libexec/create-auth", "-k", signing_key, "-c", signing_cert, var, auth] + list(certs),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    else:
+        subprocess.check_call(
+            ["/opt/xensource/libexec/create-auth", var, auth] + list(certs),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    return os.path.abspath(auth)
+
+
+def clear(session):
+    for pool_ref in session.xenapi.pool.get_all():
+        pool_uuid = session.xenapi.pool.get_uuid(pool_ref)
+        session.xenapi.pool.set_custom_uefi_certificates(pool_ref, "")
+        print("Cleared certificates from XAPI DB for pool %s." % pool_uuid)
+
+
+def create_tarball(paths):
+    tarball = io.BytesIO()
+    with tarfile.open(mode="w", fileobj=tarball) as tar:
+        for name, path in paths.items():
+            if not is_auth(path):
+                raise RuntimeError("error: %s is not an auth file" % path)
+            tar.add(path, arcname="%s.auth" % name)
+    return tarball
+
+
+def getpath(args, name):
+    val = getattr(args, name)
+    user_agent = getattr(args, "user_agent") if getattr(args, "user_agent") is not None else DEFAULT_USER_AGENT
+    if os.path.exists(val):
+        if os.stat(val).st_size <= 0:
+            logging.debug("file %s is empty, skipping..." % val)
+            return None
+        logging.debug("using file %s for %s" % (val, name))
+        return os.path.abspath(val)
+    elif val == "default":
+        logging.debug("%s for %s" % (val, name))
+        return DEFAULT_AUTH_PATHS.get(name)
+    elif name == "dbx" and val == "latest":
+        return download(Urls.dbx, "dbx.auth", user_agent=user_agent)
+    elif name == "dbx" and val == "none":
+        logging.debug("No path for dbx, set dbx to 'none'")
+        return None
+    else:
+        print("error: file %s does not exist, and is not option 'default'" % val)
+        sys.exit(1)
+
+
+def validate_args(args):
+    valid_values = {
+        "PK": ["default"],
+        "KEK": ["default"],
+        "db": ["default"],
+        "dbx": ["default", "latest", "none"],
+    }
+
+    for name in ["PK", "KEK", "db", "dbx"]:
+        value = getattr(args, name)
+        if value not in valid_values[name] and not os.path.exists(value):
+            print("error: file %s does not exist." % value)
+            sys.exit(1)
+
+    if os.path.exists(args.PK) and not is_auth(args.PK) and not getattr(args, "pk_priv", False):
+        print("error: setting a custom PK requires supplying its private half to --pk-priv.")
+        sys.exit(1)
+
+
+def extract(session, args):
+    pool_ref = get_pool_ref(session, None)
+    certs, _ = get_pool_certs(session, pool_ref)
+    cert = certs.get(args.cert)
+
+    if not cert:
+        print("error: cert %s does not exist in XAPI pool DB." % args.cert)
+        sys.exit(1)
+
+    with open(args.filename, "wb") as f:
+        f.write(cert)
+
+
+def install(session, args):
+    validate_args(args)
+
+    paths = dict()
+    for name in ["PK", "KEK", "db", "dbx"]:
+        p = getpath(args, name)
+        if not p:
+            continue
+        if name == "PK" and getattr(args, "pk_priv", False):
+            priv = os.path.abspath(args.pk_priv)
+        else:
+            priv = None
+        paths[name] = convert_to_auth(name, p, priv)
+
+    tarball = create_tarball(paths)
+    data = base64.b64encode(tarball.getvalue())
+    tarball.close()
+
+    pool_ref = get_pool_ref(session, None)
+    if not pool_ref:
+        print("Could not retrieve pool from XAPI")
+        sys.exit(1)
+    session.xenapi.pool.set_custom_uefi_certificates(pool_ref, data)
+    print("Successfully installed custom certificates to the XAPI DB for pool.")
+
+
+def convert_to_auth(var, path, priv=None):
+    """Return an auth file created from an X509 cert or auth file.
+
+    If path points to an auth file already, its path will be returned without
+    modification.
+
+    If it is a DER X509, it will be converted into a new PEM file prior to
+    building the auth file (create-auth requires PEM certs).  The original DER
+    file will be unaffected.
+
+    If it is already a PEM, no conversion will be required.
+
+    Arguments:
+        var - the name of the UEFI variable
+        path - a path to an auth, X509 DER, or X509 PEM file.
+        priv - the private half of the cert.  Only used for self-signing PK.
+    """
+    if is_auth(path):
+        logging.debug("Using auth directly: %s" % path)
+        return path
+    elif is_der(path):
+        pem = convert_der_to_pem(path)
+        logging.debug("Creating auth %s from DER %s" % (var, path))
+    elif is_pem(path):
+        pem = path
+        logging.debug("Creating auth %s from PEM %s" % (var, path))
+    else:
+        print("file %s is not a valid auth file or x509 certificate" % path)
+        sys.exit(1)
+
+    prevdir = cd_tempdir()
+    if priv:
+        # priv is only used for self-signing the PK as required
+        # by the spec and varstored.
+        auth = create_auth(priv, pem, var, pem)
+    else:
+        auth = create_auth(None, None, var, pem)
+    os.chdir(prevdir)
+    return auth
+
+
+def is_auth(path):
+    """Return True if path is an EFI auth file, otherwise returns False."""
+    with open(path, "rb") as f:
+        auth = f.read()
+
+    # Validate the timestamp
+    auth, year, month, day, hour, minute, seconds, pad1, nanosecond, tz, daylight, pad2 = unserialize_struct(
+        EFI_TIME, auth
+    )
+    try:
+        _ = efi_time_to_timestamp(year, month, day, hour, minute, seconds, pad1, nanosecond, tz, daylight, pad2)
+    except ValueError:
+        return False
+    if pad1 != 0 or nanosecond != 0 or tz != 0 or daylight != 0 or pad2 != 0:
+        return False
+
+    auth, win_cert_len, win_cert_rev, win_cert_type, efi_cert_type = unserialize_struct(WIN_CERTIFICATE_UEFI_GUID, auth)
+
+    # ESL length is calculated by subtracting win_cert_len, so this is as much as we can do
+    if win_cert_len < WIN_CERTIFICATE_UEFI_GUID.size:
+        return False
+    if len(auth) < (win_cert_len - WIN_CERTIFICATE_UEFI_GUID.size):
+        return False
+
+    if win_cert_rev != 0x200:
+        return False
+    if win_cert_type != 0x0EF1:
+        return False
+    if uuid.UUID(bytes_le=efi_cert_type) != EFI_CERT_TYPE_PKCS7_GUID:  # noqa: SIM103
+        return False
+
+    return True
+
+
+def is_der(path):
+    """Return True if path is a DER-encoded X509 certificate, otherwise return False."""
+    return is_cert_type(path, "DER")
+
+
+def is_pem(path):
+    """Return True if path is a PEM format X509 certificate, otherwise return False."""
+    return is_cert_type(path, "PEM")
+
+
+def is_cert_type(path, t):
+    """
+    Return True if path is a cert of type t, otherwise return False.
+
+    Arguments:
+        t: must be "DER" or "PEM"
+
+    """
+    if t not in ("DER", "PEM"):
+        raise RuntimeError("arg %s is not DER or PEM" % t)
+
+    with open(path, "rb") as f:
+        data = f.read()
+
+    p = subprocess.Popen(
+        ["openssl", "x509", "-inform", t, "-noout"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    if p.stdin:
+        p.stdin.write(data)
+    p.wait()
+
+    return p.returncode == 0
+
+
+def find(strings, substr):
+    for item in strings:
+        if substr in item:
+            return item
+    return None
+
+
+def print_cert(path, auth):
+    print("\t====================")
+    print("\tAuth file: %s" % os.path.basename(path))
+    print("\t====================")
+    report_auth(auth)
+    print()
+
+
+def report(session):
+    try:
+        print("\n{} -- Report".format(os.path.basename(sys.argv[0])))
+        pool_ref = get_pool_ref(session, None)
+        pool_uuid = session.xenapi.pool.get_uuid(pool_ref)
+        certs, custom = get_pool_certs(session, pool_ref)
+        print("Certificate Info for pool %s:" % pool_uuid)
+        print("\tCertificate state: %s\n" % ("Custom" if custom else "Default",))
+        print("\tCertificates (%s): %s\n" % (len(certs), ", ".join(certs.keys())))
+        for name in ["PK", "KEK", "db", "dbx"]:
+            auth = certs.get(name)
+            if auth:
+                print_cert(name, auth)
+    except IOError:
+        # This technique taken from: https://docs.python.org/3/library/signal.html#note-on-sigpipe
+        # Redirect further stdout flushing (like the broken pipe err message) to /dev/null
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Configure guest UEFI certificates for an XCP-ng system.")
+
+    parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="Debug output.",
+    )
+
+    action_parsers = parser.add_subparsers()
+    install_parser = action_parsers.add_parser(
+        Actions.INSTALL,
+        help="Install UEFI certificates to the pool.",
+        description=(
+            "Install UEFI certificates to the pool.\n\n"
+            "If no arguments are passed to '{} {}', then the default PK, KEK, "
+            "db and dbx will be installed.".format(os.path.basename(sys.argv[0]), Actions.INSTALL)
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+
+Certificate / auth file URLs:
+dbx: {}
+""".format(Urls.dbx),
+    )
+    install_parser.set_defaults(action=Actions.INSTALL)
+
+    install_parser.add_argument(
+        "--user-agent",
+        help="Sets a custom user agent to download default certificates from the Internet.",
+        default=DEFAULT_USER_AGENT,
+        nargs="?",
+    )
+    install_parser.add_argument(
+        "PK",
+        metavar="PK",
+        help=(
+            "'default' for the default XCP-ng PK or a path to a custom auth file. "
+            "If a custom file it must be an EFI .auth file, "
+            "a DER-encoded X509 certificate, or a PEM X509 certificate."
+        ),
+        default="default",
+        nargs="?",
+    )
+    install_parser.add_argument(
+        "--pk-priv",
+        help=("The private half of the PK certificate.  Required for custom PK certificates."),
+    )
+    install_parser.add_argument(
+        "KEK",
+        metavar="KEK",
+        help=(
+            "'default' for the default Microsoft certs or a path to a custom auth file. "
+            "If a custom file it must be an EFI .auth file, "
+            "a DER-encoded X509 certificate, or a PEM X509 certificate."
+        ),
+        default="default",
+        nargs="?",
+    )
+    install_parser.add_argument(
+        "db",
+        metavar="db",
+        help=(
+            "'default' for the default Microsoft certs or a path to a custom auth file. "
+            "If a custom file it must be an EFI .auth file, "
+            "a DER-encoded X509 certificate, or a PEM X509 certificate."
+        ),
+        default="default",
+        nargs="?",
+    )
+    install_parser.add_argument(
+        "dbx",
+        metavar="dbx",
+        help="""
+'default' for the default dbx, 'latest' for the most recent UEFI dbx, a path to
+a custom auth file, or 'none' for no dbx.
+
+If a custom file, it must be an EFI .auth file, a DER-encoded X509 certificate,
+or a PEM X509 certificate.
+
+The 'default' and 'latest' dbx revoke any software that hasn't implemented the
+most recent security fixes, which may include some OS distributions (even if
+they're totally updated, depending how recently the vulnerability was
+discovered). Because it varies per distribution, check if your guest
+distributions are updated to pass the most recent UEFI revocation before
+installing the latest dbx.
+
+Notes:
+
+- 'latest' dbx variable contents are downloaded from the Internet, and
+therefore require network access.
+
+- Choosing 'none' allows attackers to simply load vulnerable binaries that
+were previously signed but later revoked, and therefore bypass Secure Boot
+protection.
+
+- Guests may extend, replace, or modify the dbx for the VM in which they run if
+the default KEK is used, even if dbx is set to 'none'.
+
+For older dbx files, see: https://uefi.org/revocationlistfile/archive. They may
+be passed to {} as custom auth files.
+""".format(os.path.basename(sys.argv[0])),
+        default="default",
+        nargs="?",
+    )
+
+    clear_parser = action_parsers.add_parser(
+        Actions.CLEAR,
+        help=(
+            "Remove all user-installed UEFI certificates from the pool. "
+            "The pool will use the default certificates found in "
+            "/usr/share/varstored, if they are present. "
+        ),
+    )
+    clear_parser.set_defaults(action=Actions.CLEAR)
+
+    report_parser = action_parsers.add_parser(
+        Actions.REPORT,
+        help=("View a report containing information about the active UEFI certificates for the pool."),
+    )
+    report_parser.set_defaults(action=Actions.REPORT)
+
+    extract_parser = action_parsers.add_parser(
+        Actions.EXTRACT,
+        help=("Extract a certificate (.auth file) from XAPI and save it to disk."),
+    )
+    extract_parser.set_defaults(action=Actions.EXTRACT)
+    extract_parser.add_argument(
+        "cert",
+        choices=["PK", "KEK", "db", "dbx"],
+        help="The certificate (.auth file) to be extracted from XAPI.",
+    )
+    extract_parser.add_argument(
+        "filename",
+        help="The output file name.",
+    )
+
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.WARNING)
+
+    action = getattr(args, "func", None)
+    if not action:
+        parser.print_help()
+        sys.exit(1)
+    with xapi_session() as session:
+        if action == Actions.CLEAR:
+            clear(session)
+        elif action == Actions.INSTALL:
+            install(session, args)
+        elif action == Actions.REPORT:
+            report(session)
+        elif action == Actions.EXTRACT:
+            extract(session, args)
+        else:
+            parser.print_help()
+            sys.exit(1)
