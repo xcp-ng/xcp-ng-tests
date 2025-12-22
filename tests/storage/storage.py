@@ -1,6 +1,14 @@
+from __future__ import annotations
+
+import logging
+
 from lib.commands import SSHCommandFailed
-from lib.common import strtobool, wait_for
-from lib.sr import SR
+from lib.common import strtobool, wait_for, wait_for_not
+from lib.host import Host
+from lib.vdi import VDI
+from lib.vm import VM
+
+from typing import Literal
 
 def try_to_create_sr_with_missing_device(sr_type, label, host):
     try:
@@ -72,3 +80,47 @@ print(sr_ref)
         'vdiUuid': vdi.uuid,
         'srRef': master.execute_script(get_sr_ref, shebang='python')
     }))
+
+
+def install_randstream(vm: 'VM'):
+    BASE_URL = 'https://github.com/xcp-ng/randstream/releases/download'
+    VERSION = '0.3.1'
+    CHECKSUM = {
+        'Linux': '71fb54390c590e08d40330aed2818afc49f63fac69314148c7fa5eb35ff1babb',
+    }
+    TARGET_TRIPLE = {
+        'Linux': 'x86_64-unknown-linux-musl',
+    }
+    logging.debug("Installing randstream")
+    if vm.is_windows:
+        raise ValueError("Windows is not currently supported")
+    else:
+        os = vm.ssh('uname -s')
+        assert os in CHECKSUM, f"{os} is not currently supported"
+        tt = TARGET_TRIPLE[os]
+        cs = CHECKSUM[os]
+        fn = '/tmp/randstream.tgz'
+        vm.ssh(f"echo '{cs}  -' > {fn}.sum && wget -nv {BASE_URL}/{VERSION}/randstream-{VERSION}-{tt}.tar.gz -O - | tee {fn} | sha256sum -c {fn}.sum && tar -xzf {fn} -C /usr/bin/ ./randstream")  # noqa: E501
+        vm.ssh(f"rm -f {fn} {fn}.sum")
+
+CoalesceOperation = Literal['snapshot', 'clone']
+
+def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation):
+    vbd = vm.connect_vdi(vdi)
+    dev = f'/dev/{vbd.param_get("device")}'
+    new_vdi = None
+    try:
+        vm.ssh(f"randstream generate -v {dev}")
+        # default seed is 0
+        vm.ssh(f"randstream validate -v --expected-checksum 65280014 {dev}")
+        match vdi_op:
+            case 'clone': new_vdi = vdi.clone()
+            case 'snapshot': new_vdi = vdi.snapshot()
+        vm.ssh(f"randstream generate -v --seed 1 --size 128Mi {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
+        new_vdi = vdi.wait_for_coalesce(new_vdi.destroy)
+        vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
+    finally:
+        vm.disconnect_vdi(vdi)
+        if new_vdi is not None:
+            new_vdi.destroy()
