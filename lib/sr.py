@@ -11,9 +11,7 @@ from lib.common import (
     wait_for,
     wait_for_not,
 )
-from lib.vdi import VDI
-
-from typing import Optional
+from lib.vdi import VDI, ImageFormat
 
 class SR:
     def __init__(self, uuid, pool):
@@ -169,7 +167,7 @@ class SR:
         return self._type
 
     def create_vdi(
-        self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: Optional[str] = None
+        self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
         name_label = name_label or f'test-vdi-{randid()}'
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)

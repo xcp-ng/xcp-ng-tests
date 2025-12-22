@@ -6,7 +6,7 @@ from lib.commands import SSHCommandFailed
 from lib.common import GiB, strtobool, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 from typing import Literal
@@ -219,8 +219,6 @@ def xva_export_import(vm: VM, compression: XVACompression):
         if imported_vm is not None:
             imported_vm.destroy()
         vm.host.ssh(f'rm -f {xva_path}')
-
-ImageFormat = Literal['vhd', 'qcow2']
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
     vdi = sr.create_vdi(image_format=image_format)

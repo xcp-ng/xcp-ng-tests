@@ -10,6 +10,7 @@ dependencies = [
     "legacycrypt",
     "packaging>=20.7",
     "pluggy>=1.1.0",
+    "pydantic",
     "pytest>=8.0.0",
     "pytest-dependency",
     "requests",
