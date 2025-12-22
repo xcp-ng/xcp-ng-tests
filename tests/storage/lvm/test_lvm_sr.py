@@ -35,10 +35,16 @@ class TestLVMSRCreateDestroy:
     def test_create_sr_with_missing_device(self, host):
         try_to_create_sr_with_missing_device('lvm', 'LVM-local-SR-test', host)
 
-    def test_create_and_destroy_sr(self, host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> None:
+    def test_create_and_destroy_sr(self, host: Host,
+                                   unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                                   image_format: str
+                                   ) -> None:
         sr_disk = unused_512B_disks[host][0]["name"]
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('lvm', "LVM-local-SR-test", {'device': '/dev/' + sr_disk}, verify=True)
+        sr = host.sr_create('lvm', "LVM-local-SR-test", {
+            'device': '/dev/' + sr_disk,
+            'preferred-image-formats': image_format
+        }, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
@@ -53,6 +59,13 @@ class TestLVMSR:
 
     def test_vdi_is_not_open(self, vdi_on_lvm_sr):
         assert not vdi_is_open(vdi_on_lvm_sr)
+
+    def test_vdi_image_format(self, vdi_on_lvm_sr: VDI, image_format: str):
+        fmt = vdi_on_lvm_sr.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales

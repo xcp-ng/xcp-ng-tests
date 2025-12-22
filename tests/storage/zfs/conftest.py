@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
@@ -7,6 +9,12 @@ from lib.sr import SR
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 
+from typing import TYPE_CHECKING, Generator
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.sr import SR
+
 POOL_NAME = 'pool0'
 POOL_PATH = '/' + POOL_NAME
 
@@ -15,8 +23,15 @@ def host_without_zfs(host):
     assert not host.file_exists('/usr/sbin/zpool'), \
         "zfs must not be installed on the host at the beginning of the tests"
 
+# NOTE: @pytest.mark.usefixtures does not parametrize this fixture.
+# To recreate host_with_zfs for each image_format value, accept
+# image_format in the fixture arguments.
+# ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
 @pytest.fixture(scope='package')
-def host_with_zfs(host_without_zfs, host_with_saved_yum_state):
+def host_with_zfs(host_without_zfs: Host,
+                  host_with_saved_yum_state: Host,
+                  image_format: str
+                  ) -> Generator[Host]:
     host = host_with_saved_yum_state
     host.yum_install(['zfs'])
     host.ssh(['modprobe', 'zfs'])
@@ -30,9 +45,12 @@ def zpool_vol0(sr_disk_wiped, host_with_zfs):
     host_with_zfs.ssh(['zpool', 'destroy', POOL_NAME])
 
 @pytest.fixture(scope='package')
-def zfs_sr(host, zpool_vol0):
+def zfs_sr(host: Host, image_format: str, zpool_vol0: None) -> Generator[SR]:
     """ A ZFS SR on first host. """
-    sr = host.sr_create('zfs', "ZFS-local-SR-test", {'location': POOL_PATH})
+    sr = host.sr_create('zfs', "ZFS-local-SR-test", {
+        'location': POOL_PATH,
+        'preferred-image-formats': image_format
+    }, verify=True)
     yield sr
     # teardown
     sr.destroy()
