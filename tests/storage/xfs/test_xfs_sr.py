@@ -8,9 +8,18 @@ import time
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.host import Host
+from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import CoalesceOperation, XVACompression, coalesce_integrity, vdi_is_open, xva_export_import
+from tests.storage import (
+    CoalesceOperation,
+    ImageFormat,
+    XVACompression,
+    coalesce_integrity,
+    vdi_export_import,
+    vdi_is_open,
+    xva_export_import,
+)
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -91,6 +100,10 @@ class TestXFSSR:
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_xfs_sr: VM, compression: XVACompression):
         xva_export_import(vm_on_xfs_sr, compression)
+
+    @pytest.mark.small_vm
+    def test_vdi_export_import(self, storage_test_vm: VM, xfs_sr: SR, image_format: ImageFormat):
+        vdi_export_import(storage_test_vm, xfs_sr, image_format)
 
     # *** tests with reboots (longer tests).
 
