@@ -6,7 +6,13 @@ from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import CoalesceOperation, coalesce_integrity, vdi_is_open
+from tests.storage import (
+    CoalesceOperation,
+    XVACompression,
+    coalesce_integrity,
+    vdi_is_open,
+    xva_export_import,
+)
 
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
@@ -23,6 +29,7 @@ class TestNFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
+@pytest.mark.usefixtures('image_format')
 class TestNFSSR:
     @pytest.mark.quicktest
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
@@ -68,6 +75,14 @@ class TestNFSSR:
 
         vm.shutdown(verify=True)
 
+    @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
+    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: str):
+        fmt = dispatch_nfs.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
+
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
     # Make sure this fixture is called before the parametrized one
@@ -98,6 +113,14 @@ class TestNFSSR:
     @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
     def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation):
         coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op)
+
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
+    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression):
+        xva_export_import(dispatch_nfs, compression)
 
     # *** tests with reboots (longer tests).
 
