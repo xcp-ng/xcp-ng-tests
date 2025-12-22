@@ -48,6 +48,7 @@ def test_vm_start_stop(imported_vm: VM):
 @pytest.mark.usefixtures("started_vm")
 class TestBasicNoSSH:
     def test_pause(self, imported_vm: VM):
+        breakpoint()
         vm = imported_vm
         vm.pause(verify=True)
         vm.unpause()
