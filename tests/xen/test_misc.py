@@ -10,6 +10,7 @@ import re
 
 # Check for a valid "Latest ChangeSet" trace in 'xl dmesg'
 def test_xen_changeset(host):
+    breakpoint()
     changeset = host.ssh(['xl', 'dmesg', '|', 'grep', '"Latest ChangeSet"'])
     regexp = r'.*Latest ChangeSet:\s*(([^,]+),.*)'
 
