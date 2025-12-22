@@ -3,12 +3,15 @@ from __future__ import annotations
 import logging
 
 from lib.commands import SSHCommandFailed
-from lib.common import strtobool, wait_for, wait_for_not
+from lib.common import GiB, strtobool, wait_for, wait_for_not
 from lib.host import Host
+from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 
 from typing import Literal
+
+RANDSTREAM_1GIB_CHECKSUM = '65280014'
 
 def try_to_create_sr_with_missing_device(sr_type, label, host):
     try:
@@ -21,39 +24,104 @@ def try_to_create_sr_with_missing_device(sr_type, label, host):
         return
     assert False, 'SR creation should not have succeeded!'
 
-def cold_migration_then_come_back(vm, prov_host, dest_host, dest_sr):
+def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR):
     """ Storage migration of a shutdown VM, then migrate it back. """
     prov_sr = vm.get_sr()
+    vdi_name = None
+    integrity_check = not vm.is_windows
+    dev = ""
+
+    if integrity_check:
+        # the vdi will be destroyed with the vm
+        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi_name = vdi.name()
+        vbd = vm.connect_vdi(vdi)
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+        install_randstream(vm)
+        dev = f'/dev/{vbd.param_get("device")}'
+        logging.info(f"Generate {dev} content")
+        vm.ssh(f"randstream generate -v {dev}")
+        logging.info(f"Validate {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        vm.shutdown(verify=True)
+
     assert vm.is_halted()
+
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
     wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
+
     # Start VM to make sure it works
     vm.start(on=dest_host.uuid)
     vm.wait_for_os_booted()
+    if integrity_check:
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info(f"Validate {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
     vm.shutdown(verify=True)
+
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
     wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
+
     # Start VM to make sure it works
     vm.start(on=prov_host.uuid)
     vm.wait_for_os_booted()
+    if integrity_check:
+        vm.wait_for_vm_running_and_ssh_up()
+        logging.info(f"Validate {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
     vm.shutdown(verify=True)
 
-def live_storage_migration_then_come_back(vm, prov_host, dest_host, dest_sr):
+    if vdi_name is not None:
+        vm.destroy_vdi_by_name(vdi_name)
+
+def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR):
     prov_sr = vm.get_sr()
+    vdi_name = None
+    integrity_check = not vm.is_windows
+    dev = ""
+    vbd = None
+
+    if integrity_check:
+        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi_name = vdi.name()
+        vbd = vm.connect_vdi(vdi)
+
     # start VM
     vm.start(on=prov_host.uuid)
     vm.wait_for_os_booted()
+    if integrity_check:
+        vm.wait_for_vm_running_and_ssh_up()
+        install_randstream(vm)
+        assert vbd is not None
+        dev = f'/dev/{vbd.param_get("device")}'
+        logging.info(f"Generate {dev} content")
+        vm.ssh(f"randstream generate -v {dev}")
+        logging.info(f"Validate {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
     wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
     wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
+    if integrity_check:
+        logging.info(f"Validate {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
     wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
     wait_for(lambda: vm.is_running_on_host(prov_host), "Wait for VM to be running on provenance host")
+    if integrity_check:
+        logging.info(f"Validate {dev}")
+        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+
     vm.shutdown(verify=True)
+
+    if vdi_name is not None:
+        vm.destroy_vdi_by_name(vdi_name)
 
 def vdi_is_open(vdi):
     sr = vdi.sr

@@ -75,9 +75,6 @@ class BaseVM:
                 vdis_on_sr.append(vdi)
         return vdis_on_sr
 
-    def destroy_vdi(self, vdi_uuid: str) -> None:
-        self.host.xe('vdi-destroy', {'uuid': vdi_uuid})
-
     def all_vdis_on_host(self, host):
         for vdi_uuid in self.vdi_uuids():
             sr = SR(self.host.pool.get_vdi_sr_uuid(vdi_uuid), self.host.pool)

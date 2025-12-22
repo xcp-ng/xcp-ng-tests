@@ -5,6 +5,7 @@ import lib.commands as commands
 from lib.common import (
     GiB,
     prefix_object_name,
+    randid,
     safe_split,
     strtobool,
     wait_for,
@@ -167,7 +168,10 @@ class SR:
             self._type = self.pool.master.xe("sr-param-get", {"uuid": self.uuid, "param-name": "type"})
         return self._type
 
-    def create_vdi(self, name_label: str, virtual_size: int = 1 * GiB, image_format: Optional[str] = None) -> VDI:
+    def create_vdi(
+        self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: Optional[str] = None
+    ) -> VDI:
+        name_label = name_label or f'test-vdi-{randid()}'
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
         args = {
             'name-label': prefix_object_name(name_label),

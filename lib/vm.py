@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import logging
 import os
 import tempfile
@@ -310,11 +312,12 @@ class VM(BaseVM):
             "vm-uuid": self.uuid,
             "device": device,
         })
-        try:
-            self.host.xe("vbd-plug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed:
-            self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
-            raise
+        if self.is_running():
+            try:
+                self.host.xe("vbd-plug", {"uuid": vbd_uuid})
+            except commands.SSHCommandFailed:
+                self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
+                raise
 
         self.vdis.append(vdi)
 
@@ -327,13 +330,14 @@ class VM(BaseVM):
             "vdi-uuid": vdi.uuid,
             "vm-uuid": self.uuid
         }, minimal=True)
-        try:
-            self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
-        except commands.SSHCommandFailed as e:
-            if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
-                logging.info(f"VBD {vbd_uuid} already unplugged")
-            else:
-                raise
+        if self.is_running():
+            try:
+                self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
+            except commands.SSHCommandFailed as e:
+                if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
+                    logging.info(f"VBD {vbd_uuid} already unplugged")
+                else:
+                    raise
         self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
         self.vdis.remove(vdi)
 
@@ -341,8 +345,16 @@ class VM(BaseVM):
         for vdi in self.vdis:
             if vdi.uuid == vdi_uuid:
                 self.vdis.remove(vdi)
-                super().destroy_vdi(vdi_uuid)
+                vdi.destroy()
                 break
+
+    def destroy_vdi_by_name(self, name: str) -> None:
+        for vdi in self.vdis:
+            if vdi.name() == name:
+                self.vdis.remove(vdi)
+                vdi.destroy()
+                return
+        raise pytest.fail(f"No VDI named '{name}' in vm {self.uuid}")
 
     def create_vdis_list(self) -> None:
         """ Used to redo the VDIs list of the VM when reverting a snapshot. """
