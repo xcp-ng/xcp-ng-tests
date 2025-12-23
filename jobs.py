@@ -446,6 +446,19 @@ JOBS = {
         "nb_pools": 2,
         "params": {},
         "paths": ["tests/misc/test_pool.py"],
+    },
+    "limit-tests": {
+        "description": "Tests verifying we can hit our supported limits",
+        "requirements": [
+            "1 XCP-ng host >= 8.2"
+        ],
+        "nb_pools": 1,
+        "params": {
+            # The test does not work on Alpine because of how it handles
+            # multiple interfaces on the same network, so use Debian instead
+            "--vm": "single/debian_uefi_vm",
+        },
+        "paths": ["tests/limits"],
     }
 }
 
@@ -637,7 +650,7 @@ STDOUT: ---
 
     print("*** Checking that all tests that use VMs have VM target markers (small_vm, etc.)... ", end="")
     tests_missing_vm_markers = extract_tests(
-        ["pytest", "--collect-only", "-q", "-m", "not no_vm and not (small_vm or multi_vm or big_vm)"]
+        ["pytest", "--collect-only", "-q", "-m", "not no_vm and not (small_vm or multi_vm or big_vm or debian_uefi_vm)"]
     )
     if tests_missing_vm_markers:
         error = True
