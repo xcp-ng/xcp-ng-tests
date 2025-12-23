@@ -161,6 +161,10 @@ def install_randstream(vm: 'VM'):
         'Linux': 'x86_64-unknown-linux-musl',
         'FreeBSD': 'x86_64-unknown-freebsd',
     }
+    version = vm.ssh('randstream --version', check=False)
+    if f'randstream {VERSION}' == version:
+        logging.debug("randstream is already installed")
+        return
     logging.debug("Installing randstream")
     if vm.is_windows:
         raise ValueError("Windows is not currently supported")
