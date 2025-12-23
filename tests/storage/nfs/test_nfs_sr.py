@@ -32,6 +32,7 @@ class TestNFSSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
+# Make sure this fixture is called before the parametrized one
 @pytest.mark.usefixtures('image_format')
 class TestNFSSR:
     @pytest.mark.quicktest
@@ -126,8 +127,6 @@ class TestNFSSR:
         xva_export_import(dispatch_nfs, compression)
 
     @pytest.mark.small_vm
-    # Make sure this fixture is called before the parametrized one
-    @pytest.mark.usefixtures('image_format')
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
     def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat):
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format)
