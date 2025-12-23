@@ -152,12 +152,14 @@ print(sr_ref)
 
 def install_randstream(vm: 'VM'):
     BASE_URL = 'https://github.com/xcp-ng/randstream/releases/download'
-    VERSION = '0.3.1'
+    VERSION = '0.4.1'
     CHECKSUM = {
-        'Linux': '71fb54390c590e08d40330aed2818afc49f63fac69314148c7fa5eb35ff1babb',
+        'Linux': '2a49ec6492a826cc9d4a69556041dad6dbea0051039f41f8de765bd4fb560e54',
+        'FreeBSD': '07362e6ced58f3dcf0676500775df401ed475b2e594a75a7949e4b2c1ca4775c',
     }
     TARGET_TRIPLE = {
         'Linux': 'x86_64-unknown-linux-musl',
+        'FreeBSD': 'x86_64-unknown-freebsd',
     }
     logging.debug("Installing randstream")
     if vm.is_windows:
