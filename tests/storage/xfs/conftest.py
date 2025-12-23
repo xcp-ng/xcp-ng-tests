@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from lib.host import Host
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 from typing import Generator
@@ -25,7 +25,7 @@ def _xfs_config() -> XfsConfig:
 # image_format in the fixture arguments.
 # ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
 @pytest.fixture(scope='package')
-def host_with_xfsprogs(host: Host, image_format: str, _xfs_config: XfsConfig) -> Generator[Host]:
+def host_with_xfsprogs(host: Host, image_format: ImageFormat, _xfs_config: XfsConfig) -> Generator[Host]:
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
         "xfsprogs must not be installed on the host at the beginning of the tests"
     host.yum_save_state()
@@ -39,7 +39,7 @@ def host_with_xfsprogs(host: Host, image_format: str, _xfs_config: XfsConfig) ->
 def xfs_sr(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     host_with_xfsprogs: Host,
-    image_format: str,
+    image_format: ImageFormat,
     _xfs_config: XfsConfig,
 ) -> Generator[SR]:
     """ A XFS SR on first host. """

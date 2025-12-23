@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from lib.common import vm_image, wait_for
+from lib.vdi import ImageFormat
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 from typing import TYPE_CHECKING
@@ -26,7 +27,7 @@ class TestLARGEBLOCKSRCreateDestroy:
 
     def test_create_and_destroy_sr(self, host: Host,
                                    unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                                   image_format: str) -> None:
+                                   image_format: ImageFormat) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr_disk = unused_4k_disks[host][0]["name"]
         sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
@@ -47,7 +48,7 @@ class TestLARGEBLOCKSR:
     def test_vdi_is_not_open(self, vdi_on_largeblock_sr):
         assert not vdi_is_open(vdi_on_largeblock_sr)
 
-    def test_vdi_image_format(self, vdi_on_largeblock_sr: VDI, image_format: str):
+    def test_vdi_image_format(self, vdi_on_largeblock_sr: VDI, image_format: ImageFormat):
         fmt = vdi_on_largeblock_sr.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:

@@ -7,6 +7,7 @@ import logging
 from lib.sr import SR
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
+from lib.vdi import ImageFormat
 from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
 
 from typing import TYPE_CHECKING, Generator
@@ -30,7 +31,7 @@ def host_without_zfs(host):
 @pytest.fixture(scope='package')
 def host_with_zfs(host_without_zfs: Host,
                   host_with_saved_yum_state: Host,
-                  image_format: str
+                  image_format: ImageFormat
                   ) -> Generator[Host]:
     host = host_with_saved_yum_state
     host.yum_install(['zfs'])
@@ -45,7 +46,7 @@ def zpool_vol0(sr_disk_wiped, host_with_zfs):
     host_with_zfs.ssh(['zpool', 'destroy', POOL_NAME])
 
 @pytest.fixture(scope='package')
-def zfs_sr(host: Host, image_format: str, zpool_vol0: None) -> Generator[SR]:
+def zfs_sr(host: Host, image_format: ImageFormat, zpool_vol0: None) -> Generator[SR]:
     """ A ZFS SR on first host. """
     sr = host.sr_create('zfs', "ZFS-local-SR-test", {
         'location': POOL_PATH,
