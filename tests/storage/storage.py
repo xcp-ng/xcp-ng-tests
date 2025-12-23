@@ -33,7 +33,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
 
     if integrity_check:
         # the vdi will be destroyed with the vm
-        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi = prov_sr.create_vdi(None, virtual_size=1 * GiB)
         vdi_name = vdi.name()
         vbd = vm.connect_vdi(vdi)
         vm.start()
@@ -85,7 +85,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     vbd = None
 
     if integrity_check:
-        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi = prov_sr.create_vdi(None, virtual_size=1 * GiB)
         vdi_name = vdi.name()
         vbd = vm.connect_vdi(vdi)
 
@@ -221,7 +221,7 @@ def xva_export_import(vm: VM, compression: XVACompression):
         vm.host.ssh(f'rm -f {xva_path}')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
-    vdi = sr.create_vdi(image_format=image_format)
+    vdi = sr.create_vdi(None, image_format=image_format)
     image_path = f'/tmp/{vdi.uuid}.{image_format}'
     try:
         vbd = vm.connect_vdi(vdi)
@@ -238,7 +238,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
         # check that the zero blocks are not part of the result
         size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
         assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
-        vdi = sr.create_vdi(image_format=image_format)
+        vdi = sr.create_vdi(None, image_format=image_format)
         vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
         vm.connect_vdi(vdi, 'xvdb')
         vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
