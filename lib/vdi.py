@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 R = TypeVar("R")
 
-ImageFormat = Literal['vhd', 'qcow2']
+ImageFormat = Literal['qcow2', 'raw', 'vhd']
 
 class VDI:
     xe_prefix = "vdi"
