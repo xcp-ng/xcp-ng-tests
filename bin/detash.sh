@@ -7,7 +7,7 @@
 # SPDX-License-Identifier: MIT
 #
 
-set -x  # Trace for debugging, TODO: Comment when stable
+# set -x  # Trace for debugging, TODO: Comment when stable
 set -e  # Fail on error
 set -o pipefail
 set -m  # Job control
@@ -120,13 +120,23 @@ on_quit_()
 
 run_()
 {
+    local defcol="\e[0m"
+    local purplecol="\e[1;35m"
+
+    echo -e "${purplecol}================================================================================${defcol}"
+   
     cat<<EOF
+
 info: Start cmdline: $@
 info: Attempt to run in detached GNU screen named "${DETASH_NAME}" and trace
 info: On hanging please cancel job $pid or troubleshoot it using:
 info: sudo -u $USER screen -r ${DETASH_NAME} # If logged on $HOSTNAME
 info: ssh -t $USER@$HOSTNAME $0 --attach ${DETASH_NAME} # Or remotely
+
 EOF
+
+    echo -e "${purplecol}================================================================================${defcol}\n"
+    
     trap "on_quit_ TERM" TERM  # Default handler for liberating resources
     touch "$logfile"
 
