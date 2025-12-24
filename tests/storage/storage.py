@@ -196,6 +196,8 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation):
 XVACompression = Literal['none', 'gzip', 'zstd']
 
 def xva_export_import(vm: VM, compression: XVACompression):
+    # The tests using this function are using specific fixtures to create the VM on the expected SR
+    # In consequence, we can't use the storage_test_vm, so we have to start the VM explicitly and install randstream
     vm.start()
     vm.wait_for_vm_running_and_ssh_up()
     install_randstream(vm)
