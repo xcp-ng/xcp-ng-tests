@@ -4,6 +4,8 @@ import pytest
 
 import logging
 
+from lib.vdi import ImageFormat
+
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 @pytest.fixture(scope='package')
 def largeblock_sr(host: Host,
                   unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                  image_format: str) -> Generator[SR]:
+                  image_format: ImageFormat) -> Generator[SR]:
     """ A LARGEBLOCK SR on first host. """
     sr_disk = unused_4k_disks[host][0]["name"]
     sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",

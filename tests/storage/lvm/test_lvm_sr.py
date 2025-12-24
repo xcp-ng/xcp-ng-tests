@@ -37,7 +37,7 @@ class TestLVMSRCreateDestroy:
 
     def test_create_and_destroy_sr(self, host: Host,
                                    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                                   image_format: str
+                                   image_format: ImageFormat
                                    ) -> None:
         sr_disk = unused_512B_disks[host][0]["name"]
         # Create and destroy tested in the same test to leave the host as unchanged as possible
@@ -60,7 +60,7 @@ class TestLVMSR:
     def test_vdi_is_not_open(self, vdi_on_lvm_sr):
         assert not vdi_is_open(vdi_on_lvm_sr)
 
-    def test_vdi_image_format(self, vdi_on_lvm_sr: VDI, image_format: str):
+    def test_vdi_image_format(self, vdi_on_lvm_sr: VDI, image_format: ImageFormat):
         fmt = vdi_on_lvm_sr.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:

@@ -35,7 +35,7 @@ class TestXFSSRCreateDestroy:
     def test_create_xfs_sr_without_xfsprogs(self,
                                             host: Host,
                                             unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                                            image_format: str
+                                            image_format: ImageFormat
                                             ) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
@@ -76,7 +76,7 @@ class TestXFSSR:
     def test_vdi_is_not_open(self, vdi_on_xfs_sr):
         assert not vdi_is_open(vdi_on_xfs_sr)
 
-    def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: str):
+    def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: ImageFormat):
         fmt = vdi_on_xfs_sr.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:

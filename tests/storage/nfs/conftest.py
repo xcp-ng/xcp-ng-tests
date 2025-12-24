@@ -6,6 +6,7 @@ import logging
 
 from lib import config
 from lib.sr import SR
+from lib.vdi import ImageFormat
 
 # --- Dispatch fixture for NFS versions ----------------------------------------
 
@@ -20,7 +21,7 @@ def nfs_device_config():
     return config.sr_device_config("NFS_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
-def nfs_sr(host, image_format: str, nfs_device_config):
+def nfs_sr(host, image_format: ImageFormat, nfs_device_config):
     """ A NFS SR on first host. """
     sr = host.sr_create(
         'nfs', "NFS-SR-test", nfs_device_config | {'preferred-image-formats': image_format}, shared=True
@@ -50,7 +51,7 @@ def nfs4_device_config():
     return config.sr_device_config("NFS4_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
-def nfs4_sr(host, image_format: str, nfs4_device_config):
+def nfs4_sr(host, image_format: ImageFormat, nfs4_device_config):
     """ A NFS4+ SR on first host. """
     sr = host.sr_create(
         'nfs', "NFS4-SR-test", nfs4_device_config | {'preferred-image-formats': image_format}, shared=True
