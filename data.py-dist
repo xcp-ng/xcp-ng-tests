@@ -17,7 +17,7 @@ HOST_DEFAULT_PASSWORD = ""
 
 def hash_password(password):
     """Hash password for /etc/password."""
-    salt = crypt.mksalt(crypt.METHOD_SHA512)
+    salt = crypt.mksalt(crypt.METHOD_SHA512)  # type: ignore
     return crypt.crypt(password, salt)
 
 HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
