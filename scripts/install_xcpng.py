@@ -17,7 +17,7 @@ from packaging import version
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
-from lib.commands import SSHCommandFailed, scp, ssh
+from lib.commands import SSHCommandFailed, ssh
 from lib.common import is_uuid, wait_for
 from lib.host import host_data
 from lib.pool import Pool
@@ -62,7 +62,7 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
 </installation>
         """)
         elif action == 'restore':
-            answerfile.write(f"""<?xml version="1.0"?>
+            answerfile.write("""<?xml version="1.0"?>
 <restore>
 </restore>
         """)
@@ -159,7 +159,7 @@ def main():
 
     try:
         pool = Pool(args.host) # will fail if host is not XCP-ng or XAPI doesn't respond yet
-    except Exception as e:
+    except Exception:
         raise Exception(f"Host `{args.host}` isn't ready or isn't an XCP-ng host")
 
     host = pool.master
@@ -201,11 +201,12 @@ def main():
             "Waiting for the installation process to complete and the VM to reboot and be up", 3600, 10
         )
         vm_ip_address = get_new_host_ip(mac_address)
+        assert vm_ip_address is not None
         logging.info('The IP address of the installed XCP-ng is: ' + vm_ip_address)
         wait_for(lambda: is_new_host_ready(vm_ip_address), "Waiting for XAPI to be ready", 600, 10)
         pool2 = Pool(vm_ip_address)
         host2 = pool2.master
-        host2.inventory = host2._get_xensource_inventory()
+        host2.inventory = host2._get_xensource_inventory()  # noqa: SLF001
         check_mac_address(host2, mac_address)
         logging.info(f'Target host is started and enabled in version: {host2.xcp_version}')
         if args.action == 'restore' and host2.xcp_version >= version.parse(xcp_version):
