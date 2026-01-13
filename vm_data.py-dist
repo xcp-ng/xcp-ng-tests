@@ -26,7 +26,7 @@
 #         ("alpine-uefi-minimal-efitools-3.12.0.xva", r"8\.2\."),
 #         ...],
 
-VMS = {
+VMS: dict[str, dict[str, str | list]] = {
     "single": {
         # basic small VM
         "small_vm": "",

@@ -86,6 +86,10 @@ pydocstyle.convention = "pep257"
   "F401",  # F401 unused-import
   "F811",  # F811 redefined-while-unused
 ]
+"conftest.py" = [
+  "F401",  # F401 unused-import
+  "F811",  # F811 redefined-while-unused
+]
 
 [tool.ruff.lint.isort.sections]
 testing = ["pytest*"]
