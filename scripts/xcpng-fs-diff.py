@@ -56,11 +56,7 @@ class DataType(StrEnum):
     PACKAGE = auto()
 
 def ignore_file(filename, ignored_files):
-    for i in ignored_files:
-        if fnmatch(filename, i):
-            return True
-
-    return False
+    return any(fnmatch(filename, i) for i in ignored_files)
 
 def ssh_cmd(host, cmd):
     args = ["ssh", f"root@{host}", cmd]
@@ -155,9 +151,9 @@ def sftp_get(host, remote_file, local_file):
     return res
 
 def remote_diff(host_ref, host_test, filename):
+    file_ref = None
+    file_test = None
     try:
-        file_ref = None
-        file_test = None
 
         # check remote files are text files
         cmd = f"file -b {shlex.quote(filename)}"
