@@ -1,6 +1,9 @@
 name: GitHub Actions Security Analysis with zizmor 🌈
 
-on: [push]
+on:
+  push:
+  schedule:
+    - cron: '20 7 * * *'
 
 permissions: {}
 
