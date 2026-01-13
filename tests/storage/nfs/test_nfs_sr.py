@@ -80,7 +80,7 @@ class TestNFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
-    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: str):
+    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: ImageFormat):
         fmt = dispatch_nfs.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:

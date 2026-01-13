@@ -6,13 +6,14 @@ import logging
 
 from lib.host import Host
 from lib.sr import SR
+from lib.vdi import ImageFormat
 
 from typing import Generator
 
 @pytest.fixture(scope='package')
 def lvm_sr(host: Host,
            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
-           image_format: str
+           image_format: ImageFormat
            ) -> Generator[SR]:
     """ An LVM SR on first host. """
     sr_disk = unused_512B_disks[host][0]["name"]
