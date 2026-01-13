@@ -2,7 +2,6 @@ import base64
 import logging
 import os
 import platform
-import shlex
 import subprocess
 
 import lib.config as config
@@ -67,51 +66,47 @@ def _ellide_log_lines(log):
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
          background, decode, options, multiplexing) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
     opts = list(options)
-    opts.append('-o "BatchMode yes"')
-    opts.append('-o "PubkeyAcceptedAlgorithms +ssh-rsa"')
+    opts += ['-o', 'BatchMode yes']
+    opts += ['-o', 'PubkeyAcceptedAlgorithms +ssh-rsa']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        opts.append('-o "StrictHostKeyChecking no"')
-        opts.append('-o "LogLevel ERROR"')
-        opts.append('-o "UserKnownHostsFile /dev/null"')
-    # ssh multiplexing is not always well supported on windows, so we disable it on that platform.
+        opts += ['-o', 'StrictHostKeyChecking no']
+        opts += ['-o', 'LogLevel ERROR']
+        opts += ['-o', 'UserKnownHostsFile /dev/null']
     # It could work with git bash—we might want to check that instead.
     # We use the pid in the control path to avoid a race condition on the master socket creation
     # when running the tests in parallel. The socket is removed by the ssh client olding the master
     # connection when it reaches the timeout.
     if multiplexing and platform.system() != "Windows":
-        opts.append('-o "ControlMaster auto"')
-        opts.append(f'-o "ControlPath ~/.ssh/control-{os.getpid()}:%h:%p:%r"')
-        opts.append('-o "ControlPersist 10m"')
-        opts.append('-o "ServerAliveInterval 10s"')
-        opts.append('-o "LogLevel ERROR"')
+        opts += ['-o', 'ControlMaster auto']
+        opts += ['-o', f'ControlPath ~/.ssh/control-{os.getpid()}:%h:%p:%r']
+        opts += ['-o', 'ControlPersist 10m']
+        opts += ['-o', 'ServerAliveInterval 10s']
     else:
-        opts.append('-o "ControlMaster no"')
+        opts += ['-o', 'ControlMaster no']
 
     if isinstance(cmd, str):
-        command = cmd
+        command = [cmd]
     else:
-        command = " ".join(cmd)
+        command = cmd
 
-    ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(opts)} {shlex.quote(command)}"
+    ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + command
 
     # Fetch banner and remove it to avoid stdout/stderr pollution.
     banner_res = None
     if config.ignore_ssh_banner:
         banner_res = subprocess.run(
-            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(opts), '\n'),
-            shell=True,
+            ['ssh', f'root@{hostname_or_ip}'] + opts + ['\n'],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False
         )
 
-    logging.debug(f"[{hostname_or_ip}] {command}")
+    logging.debug(f"[{hostname_or_ip}] {' '.join(command)}")
     process = subprocess.Popen(
         ssh_cmd,
-        shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
     )

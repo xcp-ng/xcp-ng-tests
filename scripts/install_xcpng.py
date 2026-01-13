@@ -74,7 +74,7 @@ def is_ip_active(ip):
 
 def is_ssh_up(ip):
     try:
-        ssh(ip, ['true'], options=['-o "ConnectTimeout 10"'])
+        ssh(ip, ['true'], options=['-o', 'ConnectTimeout 10'])
         return True
     except SSHCommandFailed:
         # probably not up yet
