@@ -31,6 +31,7 @@ def existing_shared_sr(host: Host) -> SR:
 @pytest.mark.multi_vms # run them on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
 def test_vm_start_stop(imported_vm: VM):
+    assert [1, 2] == [3]
     vm = imported_vm
     # if VM already running, stop it
     if (vm.is_running()):
