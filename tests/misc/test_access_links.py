@@ -38,7 +38,7 @@ def test_access_links(host, command_id, url_id):
     local_result = commands.local_cmd(COMMAND)
 
     assert local_result.returncode == 0, (
-        f"Failed to fetch URL locally: {local_result.stderr}"
+        f"Failed to fetch URL locally: {local_result.stdout}"
     )
 
     # Extract checksums
