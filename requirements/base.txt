@@ -8,3 +8,4 @@ pydantic
 pytest>=8.0.0
 pytest-dependency
 requests
+types-pyyaml
