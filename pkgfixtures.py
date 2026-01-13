@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from typing import TYPE_CHECKING, Generator
 
 import logging
 
 from lib.common import setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+
+from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
     from lib.common import DiskDevName
