@@ -200,7 +200,6 @@ if __name__ == "__main__":
     host_ip_or_name = args.host if args.host else list(data.HOSTS.keys())[0]
     pool = Pool(host)
     host = pool.master
-    host.initialize()
 
     # Create an inventory (i.e., hosts file) for Ansible. The host name is the image name.
     lines = []
