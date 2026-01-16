@@ -25,10 +25,13 @@ def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm):
 def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm):
     vm = snapshotted_halted_uefi_unix_vm
 
-    vm.create_vtpm()
+    has_vtpm = vm.get_vtpm_uuid()
+    if not has_vtpm:
+        vm.create_vtpm()
     yield vm
     # Tear down
-    vm.destroy_vtpm()
+    if not has_vtpm:
+        vm.destroy_vtpm()
 
 @pytest.fixture(scope='module')
 def started_unix_vm_with_vtpm(unix_vm_with_vtpm):
