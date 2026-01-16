@@ -3,6 +3,8 @@ import pytest
 import ipaddress
 import os
 
+from lib.vm import VM
+
 # Requirements:
 # - one XCP-ng host (--hosts) >= 8.2 (>= 8.3 for the CIDR tests) with no SDN controller configured
 # - a VM (--vm)
@@ -13,10 +15,11 @@ def ip_responsive(ip):
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_no_sdn_controller")
 class TestAllowedIP:
-    def test_unallowed_ip(self, running_vm):
+    def test_unallowed_ip(self, running_vm: VM):
         vm = running_vm
         vif = vm.vifs()[0]
         ip = vm.ip
+        assert ip # apease typage about uninitialized ip value: the VM is running
         ip_address = ipaddress.ip_address(ip)
         ip_family = ip_address.version
         dummy_ip = str(ip_address + 1)
@@ -33,6 +36,7 @@ class TestAllowedIP:
         vm = running_vm
         vif = vm.vifs()[0]
         ip = vm.ip
+        assert ip # apease typage about uninitialized ip value: the VM is running
         ip_address = ipaddress.ip_address(ip)
         ip_family = ip_address.version
 
@@ -51,10 +55,11 @@ class TestAllowedIP:
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3", "host_no_sdn_controller")
 class TestAllowedCIDR:
-    def test_unallowed_cidr(self, running_vm):
+    def test_unallowed_cidr(self, running_vm: VM):
         vm = running_vm
         vif = vm.vifs()[0]
         ip = vm.ip
+        assert ip # apease typage about uninitialized ip value: the VM is running
         ip_address = ipaddress.ip_address(ip)
         ip_family = ip_address.version
         lo = "127.0.0.1" if ip_family == 4 else "::1"
@@ -68,10 +73,11 @@ class TestAllowedCIDR:
         vif.param_clear(f"ipv{ip_family}-allowed")
         vif.param_set("locking-mode", "unlocked")
 
-    def test_allowed_cidr(self, running_vm):
+    def test_allowed_cidr(self, running_vm: VM):
         vm = running_vm
         vif = vm.vifs()[0]
         ip = vm.ip
+        assert ip # apease typage about uninitialized ip value: the VM is running
         ip_address = ipaddress.ip_address(ip)
         ip_family = ip_address.version
         cidr = f'{ip}/24'
