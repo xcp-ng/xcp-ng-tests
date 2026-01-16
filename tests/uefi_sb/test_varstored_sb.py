@@ -216,6 +216,8 @@ class TestGuestWindowsUEFIKeyUpgrade:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot):
         vm, snapshot = uefi_vm_and_snapshot
+        if not vm.get_vtpm_uuid():
+            vm.create_vtpm()
         yield
         revert_vm_state(vm, snapshot)
 
@@ -264,8 +266,6 @@ class TestGuestWindowsUEFIKeyUpgrade:
     def test_key_upgrade(self, uefi_vm: VM):
         vm = uefi_vm
         vm.param_set("platform", True, key="secureboot")
-        assert not vm.get_vtpm_uuid()
-        vm.create_vtpm()
 
         PK, _, _, _ = self.install_old_certs(vm)
         boot_and_check_sb_succeeded(vm)
@@ -278,8 +278,6 @@ class TestGuestWindowsUEFIKeyUpgrade:
     def test_key_upgrade_bitlocker(self, uefi_vm: VM):
         vm = uefi_vm
         vm.param_set("platform", True, key="secureboot")
-        assert not vm.get_vtpm_uuid()
-        vm.create_vtpm()
 
         PK, _, _, _ = self.install_old_certs(vm)
         boot_and_check_sb_succeeded(vm)
