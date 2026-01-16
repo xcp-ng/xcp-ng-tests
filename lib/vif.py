@@ -1,3 +1,5 @@
+import logging
+
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 
 class VIF:
@@ -6,12 +8,6 @@ class VIF:
     def __init__(self, uuid, vm):
         self.uuid = uuid
         self.vm = vm
-
-    def plug(self):
-        self.vm.host.xe("vif-plug", {'uuid': self.uuid})
-
-    def unplug(self):
-        self.vm.host.xe("vif-unplug", {'uuid': self.uuid})
 
     def param_get(self, param_name, key=None, accept_unknown_key=False):
         return _param_get(self.vm.host, VIF.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
@@ -38,9 +34,18 @@ class VIF:
         self.vm.host.xe('vif-move', {'uuid': self.uuid, 'network-uuid': network_uuid})
 
     def destroy(self):
+        logging.info("Destroying VIF %s on VM %s", self.param_get('device'), self.vm.uuid)
         self.vm.host.xe('vif-destroy', {'uuid': self.uuid})
 
     def mac_address(self) -> str:
         mac_address = self.param_get('MAC')
         assert mac_address is not None, "VIF must have a MAC address"
         return mac_address
+
+    def plug(self):
+        logging.info("Plugging VIF %s on VM %s", self.param_get('device'), self.vm.uuid)
+        self.vm.host.xe('vif-plug', {'uuid': self.uuid})
+
+    def unplug(self):
+        logging.info("Unplugging VIF %s on VM %s", self.param_get('device'), self.vm.uuid)
+        self.vm.host.xe('vif-unplug', {'uuid': self.uuid})

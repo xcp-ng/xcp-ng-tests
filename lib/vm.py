@@ -374,7 +374,7 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
-    def create_vif(self, vif_num, *, network_uuid=None, network_name=None) -> VIF:
+    def create_vif(self, vif_num: int, *, network_uuid=None, network_name=None) -> VIF:
         assert bool(network_uuid) != bool(network_name), \
             "create_vif needs network_uuid XOR network_name"
         if network_name:
