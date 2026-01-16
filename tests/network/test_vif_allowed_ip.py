@@ -4,7 +4,7 @@ import ipaddress
 import os
 
 # Requirements:
-# - one XCP-ng host (--host) >= 8.2 (>= 8.3 for the CIDR tests) with no SDN controller configured
+# - one XCP-ng host (--hosts) >= 8.2 (>= 8.3 for the CIDR tests) with no SDN controller configured
 # - a VM (--vm)
 
 def ip_responsive(ip):

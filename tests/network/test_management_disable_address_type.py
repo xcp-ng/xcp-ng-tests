@@ -1,5 +1,5 @@
 # Requirements:
-# - one XCP-ng host (--host) (>= 8.3 for IPv6 test)
+# - one XCP-ng host (--hosts) (>= 8.3 for IPv6 test)
 
 def test_management_disable_address_type(host):
     management_pif = host.management_pif()
