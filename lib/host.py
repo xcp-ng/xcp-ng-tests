@@ -10,7 +10,6 @@ import uuid
 from packaging import version
 
 import lib.commands as commands
-import lib.pif as pif
 
 from typing import TYPE_CHECKING, Dict, List, Literal, Mapping, Optional, TypedDict, Union, overload
 
@@ -33,6 +32,7 @@ from lib.common import (
     wait_for_not,
 )
 from lib.netutil import wrap_ip
+from lib.pif import PIF
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
@@ -313,7 +313,7 @@ class Host:
     def vm_cache_key(uri):
         return f"[Cache for {strip_suffix(uri, '.xva')}]"
 
-    def cached_vm(self, uri, sr_uuid):
+    def cached_vm(self, uri, sr_uuid) -> Optional[VM]:
         assert sr_uuid, "A SR UUID is necessary to use import cache"
         cache_key = self.vm_cache_key(uri)
         # Look for an existing cache VM
@@ -328,8 +328,9 @@ class Host:
                 logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
                 return vm
         logging.info("Could not find a VM in cache for %r", uri)
+        return None
 
-    def import_vm(self, uri, sr_uuid=None, use_cache=False):
+    def import_vm(self, uri, sr_uuid=None, use_cache=False) -> VM:
         vm = None
         if use_cache:
             if '://' in uri and uri.startswith("clone"):
@@ -373,7 +374,7 @@ class Host:
             vm.param_set('name-description', cache_key)
         return vm
 
-    def import_iso(self, uri, sr: SR):
+    def import_iso(self, uri, sr: SR) -> VDI:
         random_name = str(uuid.uuid4())
 
         vdi_uuid = self.xe(
@@ -404,7 +405,7 @@ class Host:
 
         return VDI(vdi_uuid, sr=sr)
 
-    def vm_from_template(self, name, template):
+    def vm_from_template(self, name, template) -> VM:
         params = {
             "new-name-label": prefix_object_name(name),
             "template": template,
@@ -413,7 +414,7 @@ class Host:
         vm_uuid = self.xe('vm-install', params)
         return VM(vm_uuid, self)
 
-    def pool_has_vm(self, vm_uuid, vm_type='vm'):
+    def pool_has_vm(self, vm_uuid, vm_type='vm') -> bool:
         if vm_type == 'snapshot':
             return self.xe('snapshot-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
         else:
@@ -436,7 +437,7 @@ class Host:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
-    def has_updates(self):
+    def has_updates(self) -> bool:
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
             self.ssh(['yum', 'check-update'])
@@ -504,14 +505,14 @@ class Host:
             self.ssh(['rpm', '-qa', '--qf', '%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\\\\n']).splitlines()
         )
 
-    def check_packages_available(self, packages):
+    def check_packages_available(self, packages) -> bool:
         """ Check if a given package list is available in the YUM repositories. """
         return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
 
     def get_available_package_versions(self, package):
         return self.ssh(['repoquery', '--show-duplicates', package]).splitlines()
 
-    def is_package_installed(self, package):
+    def is_package_installed(self, package) -> bool:
         return self.ssh_with_result(['rpm', '-q', package]).returncode == 0
 
     def yum_save_state(self):
@@ -563,12 +564,12 @@ class Host:
                      "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
             wait_for(self.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 
-    def management_network(self):
+    def management_network(self) -> str:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
 
-    def management_pif(self):
+    def management_pif(self) -> PIF:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
-        return pif.PIF(uuid, self)
+        return PIF(uuid, self)
 
     def rescan_block_devices_info(self) -> None:
         """
@@ -607,17 +608,17 @@ class Host:
         """
         return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
 
-    def file_exists(self, filepath, regular_file=True):
+    def file_exists(self, filepath, regular_file=True) -> bool:
         option = '-f' if regular_file else '-e'
         return self.ssh_with_result(['test', option, filepath]).returncode == 0
 
-    def binary_exists(self, binary):
+    def binary_exists(self, binary) -> bool:
         return self.ssh_with_result(['which', binary]).returncode == 0
 
-    def is_symlink(self, filepath):
+    def is_symlink(self, filepath) -> bool:
         return self.ssh_with_result(['test', '-L', filepath]).returncode == 0
 
-    def sr_create(self, sr_type, label, device_config, shared=False, verify=False):
+    def sr_create(self, sr_type, label, device_config, shared=False, verify=False) -> SR:
         params = {
             'host-uuid': self.uuid,
             'type': sr_type,
@@ -637,10 +638,10 @@ class Host:
             wait_for(sr.exists, "Wait for SR to exist")
         return sr
 
-    def is_master(self):
+    def is_master(self) -> bool:
         return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
 
-    def local_vm_srs(self):
+    def local_vm_srs(self) -> list[SR]:
         srs = []
         sr_uuids = safe_split(self.xe('pbd-list', {'host-uuid': self.uuid, 'params': 'sr-uuid'}, minimal=True))
         for sr_uuid in sr_uuids:
@@ -649,7 +650,7 @@ class Host:
                 srs.append(sr)
         return srs
 
-    def main_sr_uuid(self):
+    def main_sr_uuid(self) -> str:
         """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
@@ -695,7 +696,7 @@ class Host:
                 params['args:%s' % k] = v
         return self.xe('host-call-plugin', params)
 
-    def join_pool(self, pool):
+    def join_pool(self, pool: Pool):
         master = pool.master
         self.xe('pool-join', {
             'master-address': master.hostname_or_ip,

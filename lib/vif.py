@@ -39,3 +39,8 @@ class VIF:
 
     def destroy(self):
         self.vm.host.xe('vif-destroy', {'uuid': self.uuid})
+
+    def mac_address(self) -> str:
+        mac_address = self.param_get('MAC')
+        assert mac_address is not None, "VIF must have a MAC address"
+        return mac_address
