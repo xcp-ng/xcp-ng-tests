@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import traceback
@@ -95,19 +97,19 @@ class Pool:
         if errors:
             raise Exception(f"One or more exceptions were raised in `exec_on_hosts_on_error_continue`: {errors}")
 
-    def hosts_uuids(self):
+    def hosts_uuids(self) -> list[str]:
         return safe_split(self.master.xe('host-list', {}, minimal=True))
 
-    def host_ip(self, host_uuid):
+    def host_ip(self, host_uuid) -> str:
         return self.master.xe('host-param-get', {'uuid': host_uuid, 'param-name': 'address'})
 
-    def get_host_by_uuid(self, host_uuid):
+    def get_host_by_uuid(self, host_uuid) -> Host:
         for host in self.hosts:
             if host.uuid == host_uuid:
                 return host
         raise Exception(f"Host with uuid {host_uuid} not found in pool.")
 
-    def first_host_that_isnt(self, host):
+    def first_host_that_isnt(self, host: Host) -> Optional[Host]:
         for h in self.hosts:
             if h != host:
                 return h
@@ -122,7 +124,7 @@ class Pool:
     def get_vdi_sr_uuid(self, vdi_uuid: str) -> str:
         return self.master.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
 
-    def get_iso_sr(self):
+    def get_iso_sr(self) -> SR:
         uuids = safe_split(self.master.xe('sr-list', {'type': 'iso',
                                                       'content-type': 'iso',
                                                       'is-tools-sr': False},
@@ -130,7 +132,7 @@ class Pool:
         assert len(uuids) == 1  # we may need to allow finer selection if this triggers
         return SR(uuids[0], self)
 
-    def push_iso(self, local_file, remote_filename=None):
+    def push_iso(self, local_file, remote_filename=None) -> str:
         iso_sr = self.get_iso_sr()
         mountpoint = f"/run/sr-mount/{iso_sr.uuid}"
         if remote_filename is None:
@@ -280,7 +282,7 @@ class Pool:
         finally:
             host.ssh(['rm', '-f'] + list(auths_dict.values()))
 
-    def eject_host(self, host):
+    def eject_host(self, host: Host):
         master = self.master
         master.xe('pool-eject', {'host-uuid': host.uuid, 'force': True})
         wait_for_not(lambda: host.uuid in self.hosts_uuids(), f"Wait for host {host} to be ejected of pool {master}.")

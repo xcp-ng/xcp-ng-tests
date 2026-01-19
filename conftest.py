@@ -188,6 +188,7 @@ def hosts(pytestconfig) -> Generator[list[Host]]:
 
             vif = host_vm.vifs()[0]
             mac_address = vif.param_get('MAC')
+            assert mac_address is not None, "unexpected mac_address=None"
             logging.info("Nested host has MAC %s", mac_address)
 
             host_vm.start()
