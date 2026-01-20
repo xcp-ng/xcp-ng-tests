@@ -56,6 +56,11 @@ class PIF:
     def is_management(self) -> bool:
         return strtobool(self.param_get("management"))
 
+    def device(self) -> str:
+        device = self.param_get("device")
+        assert device is not None
+        return device
+
     def network_uuid(self) -> str:
         uuid = self.param_get("network-uuid")
         assert uuid is not None, "unexpected PIF without network-uuid"
