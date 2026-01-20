@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Dict, List, Literal, Mapping, Optional, TypedD
 if TYPE_CHECKING:
     from lib.pool import Pool
 
+from lib.bond import Bond
 from lib.common import (
     DiskDevName,
     _param_add,
@@ -32,6 +33,7 @@ from lib.common import (
     wait_for_not,
 )
 from lib.netutil import wrap_ip
+from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
 from lib.vdi import VDI
@@ -768,3 +770,41 @@ class Host:
                 continue
             ret.append(line.strip())
         return ret
+
+    def pifs(self, device: Optional[str] = None) -> list[PIF]:
+        args: Dict[str, str | bool] = {
+            "host-uuid": self.uuid,
+        }
+
+        if device is not None:
+            args["device"] = device
+
+        return [PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
+
+    def create_bond(self, network: Network, pifs: list[PIF], mode: Optional[str] = None) -> Bond:
+        args: dict[str, str | bool] = {
+            'network-uuid': network.uuid,
+            'pif-uuids': ','.join([pif.uuid for pif in pifs]),
+        }
+
+        if mode is not None:
+            args['mode'] = mode
+
+        uuid = self.xe("bond-create", args, minimal=True)
+        logging.info(f"New Bond: {uuid}")
+
+        return Bond(self, uuid)
+
+    def create_network(self, label: str, description: Optional[str] = None) -> Network:
+        args: dict[str, str | bool] = {
+            'name-label': label,
+        }
+
+        if description is not None:
+            args['name-description'] = description
+
+        logging.info(f"Creating network '{label}'")
+        uuid = self.xe("network-create", args, minimal=True)
+        logging.info(f"New Network: {uuid}")
+
+        return Network(self, uuid)
