@@ -11,6 +11,7 @@ import uuid
 from packaging import version
 
 import lib.commands as commands
+from lib.bond import Bond
 from lib.common import (
     DiskDevName,
     _param_add,
@@ -26,6 +27,7 @@ from lib.common import (
     wait_for,
 )
 from lib.netutil import wrap_ip
+from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
 from lib.vm import VM
@@ -838,3 +840,41 @@ class Host:
                 continue
             ret.append(line.strip())
         return ret
+
+    def pifs(self, device: str | None = None) -> list[PIF]:
+        args: dict[str, str | bool | dict[str, str]] = {
+            "host-uuid": self.uuid,
+        }
+
+        if device is not None:
+            args["device"] = device
+
+        return [PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
+
+    def create_bond(self, network: Network, pifs: list[PIF], mode: str | None = None) -> Bond:
+        args: dict[str, str | bool | dict[str, str]] = {
+            'network-uuid': network.uuid,
+            'pif-uuids': ','.join([pif.uuid for pif in pifs]),
+        }
+
+        if mode is not None:
+            args['mode'] = mode
+
+        uuid = self.xe("bond-create", args, minimal=True)
+        logging.info(f"New Bond: {uuid}")
+
+        return Bond(self, uuid)
+
+    def create_network(self, label: str, description: str | None = None) -> Network:
+        args: dict[str, str | bool | dict[str, str]] = {
+            'name-label': label,
+        }
+
+        if description is not None:
+            args['name-description'] = description
+
+        logging.info(f"Creating network '{label}'")
+        uuid = self.xe("network-create", args, minimal=True)
+        logging.info(f"New Network: {uuid}")
+
+        return Network(self, uuid)
