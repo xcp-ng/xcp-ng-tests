@@ -262,3 +262,7 @@ IMAGE_EQUIVS: dict[str, str] = {
 
 # This should be a working DNS server that's not used by any VM images.
 TEST_DNS_SERVER = "1.1.1.1"
+
+# List of NICs available on host for network tests.
+# example: HOST_FREE_NICS: list[str] = ['eth1', 'eth2']
+HOST_FREE_NICS: list[str] = []
