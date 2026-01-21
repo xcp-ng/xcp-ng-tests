@@ -30,3 +30,6 @@ class VIF:
 
     def move(self, network_uuid):
         self.vm.host.xe('vif-move', {'uuid': self.uuid, 'network-uuid': network_uuid})
+
+    def destroy(self):
+        self.vm.host.xe('vif-destroy', {'uuid': self.uuid})
