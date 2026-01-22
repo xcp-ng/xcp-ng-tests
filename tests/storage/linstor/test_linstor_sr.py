@@ -161,7 +161,7 @@ def _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid):
             diskfuls = []
             for line in lines:
                 hostname = line.split('|')[2].strip()
-                diskfuls += hostname
+                diskfuls += [hostname]
             return diskfuls
         except SSHCommandFailed as e:
             logging.error("SSH Command Failed (attempt %d/%d): %s", attempt + 1, retries, e)
