@@ -2,18 +2,21 @@ import pytest
 
 import logging
 
+from lib.host import Host
+from lib.vm import VM
+
 # Requirements:
 # From --hosts parameter:
 # - host: a XCP-ng host with an unused disk to store the exported VM
 # From --vm parameter:
 # - A VM to import and export
 
-def export_test(host, vm, filepath, compress='none'):
+def export_test(host: Host, vm: VM, filepath, compress='none'):
     vm.export(filepath, compress)
     assert host.file_exists(filepath)
 
     def check_file_type(expected):
-        assert host.ssh(['file', '--mime-type', '-b', filepath]) == expected
+        assert host.ssh(f'file --mime-type -b {filepath}') == expected
 
     if compress == 'none':
         check_file_type('application/x-tar')
@@ -32,7 +35,7 @@ def export_test(host, vm, filepath, compress='none'):
         vm2.shutdown(verify=True)
     finally:
         logging.info("Delete %s" % filepath)
-        host.ssh(['rm', '-f', filepath], check=False)
+        host.ssh(f'rm -f {filepath}', check=False)
         if vm2 is not None:
             vm2.destroy()
 

@@ -29,7 +29,7 @@ class TestsNetdata:
 
     # Verify the ActiveState for the netdata service
     def test_netdata_service(self, host):
-        host.ssh(['systemctl', 'is-active', 'netdata.service'])
+        host.ssh('systemctl is-active netdata.service')
 
     # Netdata configuration should be accessible only from the host
     def test_netdata_conf(self, host):
@@ -38,7 +38,7 @@ class TestsNetdata:
         assert response == "HTTP/1.1 403 Forbidden" or \
                response == "HTTP/1.1 451 Unavailable For Legal Reasons"
 
-        stdout = host.ssh(['curl', "-XGET", "-k", "-I", '-s', 'localhost:19999/netdata.conf'])
+        stdout = host.ssh('curl -XGET -k -I -s localhost:19999/netdata.conf')
         lines = stdout.splitlines()
         assert lines[0].strip() == "HTTP/1.1 200 OK"
 

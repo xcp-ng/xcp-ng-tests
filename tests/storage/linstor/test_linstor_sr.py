@@ -5,6 +5,7 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
 from tests.storage import vdi_is_open
 
 from .conftest import LINSTOR_PACKAGE
@@ -137,7 +138,7 @@ class TestLinstorSR:
 
 # --- Test diskless resources --------------------------------------------------
 
-def _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid):
+def _get_diskful_hosts(host: Host, controller_option, sr_group_name, vdi_uuid):
     # TODO: If any resource is in a temporary creation state or unknown, then need to wait intelligently.
     attempt = 0
     retries = 3
@@ -147,17 +148,15 @@ def _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid):
         try:
             # Get volume name from VDI UUID
             # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
-            volume_name = host.ssh([
-                "linstor-kv-tool", "--dump-volumes", "-g", sr_group_name,
-                "|", "grep", "volume-name", "|", "grep", f"/{vdi_uuid}/"
-            ]).split(': ')[1].split('"')[1]
+            volume_name = host.ssh(
+                f'linstor-kv-tool --dump-volumes -g {sr_group_name} | grep volume-name | grep /{vdi_uuid}/'
+            ).split(': ')[1].split('"')[1]
 
             # Find host where volume is UpToDate
             # | {volume_name} | {host} | 7017 | Unused | Ok    |   UpToDate | 2023-10-24 18:52:05 |
-            lines = host.ssh([
-                "linstor", controller_option, "resource", "list",
-                "|", "grep", volume_name, "|", "grep", "UpToDate"
-            ]).splitlines()
+            lines = host.ssh(
+                f'linstor {controller_option} resource list | grep {volume_name} | grep UpToDate'
+            ).splitlines()
             diskfuls = []
             for line in lines:
                 hostname = line.split('|')[2].strip()

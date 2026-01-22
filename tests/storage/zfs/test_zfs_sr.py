@@ -133,7 +133,7 @@ class TestZFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.reboot
-    def test_zfs_missing(self, host, zfs_sr):
+    def test_zfs_missing(self, host: Host, zfs_sr):
         sr = zfs_sr
         zfs_installed = True
         try:
@@ -150,23 +150,23 @@ class TestZFSSR:
             logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['zfs'])
-            host.ssh(['modprobe', 'zfs'])
+            host.ssh('modprobe zfs')
             zfs_installed = True
-            host.ssh(['zpool', 'import', POOL_NAME])
+            host.ssh(f'zpool import {POOL_NAME}')
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not zfs_installed:
                 host.yum_install(['zfs'])
-                host.ssh(['modprobe', 'zfs'])
+                host.ssh('modprobe zfs')
 
     @pytest.mark.reboot
-    def test_zfs_unmounted(self, host, zfs_sr):
+    def test_zfs_unmounted(self, host: Host, zfs_sr):
         sr = zfs_sr
         zpool_imported = True
         try:
             # Simulate broken mountpoint
-            host.ssh(['zpool', 'export', POOL_NAME])
+            host.ssh(f'zpool export {POOL_NAME}')
             zpool_imported = False
             try:
                 sr.scan()
@@ -178,12 +178,12 @@ class TestZFSSR:
             time.sleep(10)
             logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
-            host.ssh(['zpool', 'import', POOL_NAME])
+            host.ssh(f'zpool import {POOL_NAME}')
             zpool_imported = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not zpool_imported:
-                host.ssh(['zpool', 'import', POOL_NAME])
+                host.ssh(f'zpool import {POOL_NAME}')
 
     # *** End of tests with reboots
