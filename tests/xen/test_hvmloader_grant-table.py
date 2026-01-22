@@ -4,6 +4,8 @@ import logging
 import os
 import re
 
+from lib.vm import VM
+
 # AMD grant-tables cachability parameter tests.
 # This file contains 2 tests to check if the hvmloader PCI bar fix is applied or not
 # by xenopsd. Tests check the xenopsd configuration and then compare with what is
@@ -13,16 +15,15 @@ import re
 # - At least one XCP-ng host (>=8.3)
 # - A Linux VM
 
-def xen_platform_pci_id(vm):
-    pci_path = vm.ssh(['ls', '-d', '/sys/bus/pci/drivers/xen-platform-pci/0000:*'])
+def xen_platform_pci_id(vm: VM):
+    pci_path = vm.ssh('ls -d /sys/bus/pci/drivers/xen-platform-pci/0000:*')
     if pci_path is not None:
         return os.path.basename(pci_path)
     pytest.fail("'xen-platform-pci' PCI not found")
 
-def xen_platform_pci_io_address(vm, xen_platform_pci_id):
+def xen_platform_pci_io_address(vm: VM, xen_platform_pci_id):
     # Find 'xen-platform-pci' IO mem resource address.
-    pci_resource_output = vm.ssh(
-        ['cat', '/sys/devices/pci0000:00/{}/resource'.format(xen_platform_pci_id)])
+    pci_resource_output = vm.ssh(f'cat /sys/devices/pci0000:00/{xen_platform_pci_id}/resource')
 
     # First line is taken by PCI IO port, select 2nd line for IO mem.
     address_line = pci_resource_output.splitlines()[1].split()
@@ -31,7 +32,7 @@ def xen_platform_pci_io_address(vm, xen_platform_pci_id):
 
 def mtrr_ranges(vm):
     # List and check MTRR ranges.
-    return vm.ssh(['cat', '/proc/mtrr']).splitlines()
+    return vm.ssh('cat /proc/mtrr').splitlines()
 
 def are_grant_tables_inside_uncachable_mapping(mtrr_ranges_list, pci_io_address):
     regexp = r'reg(.*): base=(0x[0-9a-f]*) \(.*\), size=(.*)MB, count=(.*): (.*)'
@@ -55,10 +56,10 @@ def are_grant_tables_inside_uncachable_mapping(mtrr_ranges_list, pci_io_address)
 class TestXenPlatformPciBarUc:
     @pytest.fixture
     def host_with_xen_platform_pci_bar_uc_set_to_true(self, host):
-        host.ssh(['echo', 'xen-platform-pci-bar-uc=true', '>', '/etc/xenopsd.conf.d/hvmloader.conf'])
+        host.ssh('echo xen-platform-pci-bar-uc=true > /etc/xenopsd.conf.d/hvmloader.conf')
         host.restart_toolstack(verify=True)
         yield host
-        host.ssh(['rm', '/etc/xenopsd.conf.d/hvmloader.conf'])
+        host.ssh('rm /etc/xenopsd.conf.d/hvmloader.conf')
         host.restart_toolstack(verify=True)
 
     @pytest.fixture
@@ -71,10 +72,10 @@ class TestXenPlatformPciBarUc:
 
     @pytest.fixture
     def host_with_xen_platform_pci_bar_uc_set_to_false(self, host):
-        host.ssh(['echo', 'xen-platform-pci-bar-uc=false', '>', '/etc/xenopsd.conf.d/hvmloader.conf'])
+        host.ssh('echo xen-platform-pci-bar-uc=false > /etc/xenopsd.conf.d/hvmloader.conf')
         host.restart_toolstack(verify=True)
         yield host
-        host.ssh(['rm', '/etc/xenopsd.conf.d/hvmloader.conf'])
+        host.ssh('rm /etc/xenopsd.conf.d/hvmloader.conf')
         host.restart_toolstack(verify=True)
 
     @pytest.fixture

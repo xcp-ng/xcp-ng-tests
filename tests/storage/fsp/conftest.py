@@ -31,22 +31,22 @@ def host_with_fsp(host_with_runx_repo: Host):
     # teardown: nothing to do, done by host_with_saved_yum_state.
 
 @pytest.fixture(scope='package')
-def fsp_config(host_with_fsp):
-    db_path = host_with_fsp.ssh(['mktemp', '-d'])
-    shared_dir_path = host_with_fsp.ssh(['mktemp', '-d'])
+def fsp_config(host_with_fsp: Host):
+    db_path = host_with_fsp.ssh('mktemp -d')
+    shared_dir_path = host_with_fsp.ssh('mktemp -d')
     return {
         'db_path': db_path,
         'shared_dir_path': shared_dir_path
     }
 
 @pytest.fixture(scope='package')
-def fsp_sr(host_with_fsp, fsp_config):
+def fsp_sr(host_with_fsp: Host, fsp_config):
     """ An FSP SR on first host. """
     db_path = fsp_config['db_path']
-    host_with_fsp.ssh(['mkdir', db_path + '/' + DIRECTORIES_PATH])
+    host_with_fsp.ssh(f'mkdir {db_path}/{DIRECTORIES_PATH}')
     sr = host_with_fsp.sr_create('fsp', "fsp-local-SR-test", {'file-uri': db_path})
     yield sr
     # teardown
     sr.destroy()
-    host_with_fsp.ssh(['rm', '-rf', fsp_config['db_path']])
-    host_with_fsp.ssh(['rm', '-rf', fsp_config['shared_dir_path']])
+    host_with_fsp.ssh(f'rm -rf {fsp_config["db_path"]}')
+    host_with_fsp.ssh(f'rm -rf {fsp_config["shared_dir_path"]}')

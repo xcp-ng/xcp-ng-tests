@@ -5,6 +5,8 @@ import os
 import tempfile
 
 from lib.common import exec_nofail, raise_errors
+from lib.host import Host
+from lib.vm import VM
 
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.2
@@ -37,7 +39,7 @@ class TestIrqBalance:
     We want to avoid this to happen again, so this testcase runs several VMs
     and verifies that the IRQs are balanced on more than one CPU.
     """
-    def test_start_four_vms(self, host, four_vms):
+    def test_start_four_vms(self, host: Host, four_vms: tuple[VM, VM, VM, VM]):
         for vm in four_vms:
             vm.start(on=host.uuid)
 
@@ -49,7 +51,7 @@ class TestIrqBalance:
             f.write(os.urandom(2000000))
             for vm in four_vms:
                 vm.scp(f.name, f.name)
-                vm.ssh(['rm', '-f', f.name])
+                vm.ssh(f'rm -f {f.name}')
 
         logging.info("Check that the IRQs of the VMs VIFs are not all on the same CPU on dom0")
         cpus = set()
@@ -58,7 +60,7 @@ class TestIrqBalance:
             for vif in vm.vifs():
                 device_id = vif.device_id()
                 # depending on kernel patches, we're looking either for xen-dyn or xen-dyn-lateeoi
-                output = vm.host.ssh([rf'grep /proc/interrupts -e "xen-dyn\(-lateeoi\)\?\\s\+-event\\s\+{device_id}-"'])
+                output = vm.host.ssh(rf'grep /proc/interrupts -e "xen-dyn\(-lateeoi\)\?\\s\+-event\\s\+{device_id}-"')
                 assert len(output) > 0
                 for line in output.splitlines():
                     fields = line.split()

@@ -3,13 +3,15 @@
 # - host(A1): any xcp-ng host
 import re
 
-def perf_probe(host, probe):
-    host.ssh(['perf', 'probe', '--add', probe])
-    host.ssh(['perf', 'record', '-e', 'probe:' + probe, '-o', '~/perf.data', '-aR', '--', 'sleep', '10'])
-    host.ssh(['perf', 'probe', '--del', probe])
+from lib.host import Host
 
-    samples = host.ssh(['perf', 'report', '-i', '~/perf.data', '-D', '--stdio-color', 'never'])
-    host.ssh(['rm', '~/perf.data'])
+def perf_probe(host: Host, probe):
+    host.ssh(f'perf probe --add {probe}')
+    host.ssh(f'perf record -e probe:{probe} -o ~/perf.data -aR -- sleep 10')
+    host.ssh(f'perf probe --del {probe}')
+
+    samples = host.ssh('perf report -i ~/perf.data -D --stdio-color never')
+    host.ssh('rm ~/perf.data')
 
     return re.findall(r'RECORD_SAMPLE', samples)
 
