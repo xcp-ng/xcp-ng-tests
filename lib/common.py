@@ -35,7 +35,8 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    import lib.host
+    from lib.host import Host
+
 
 KiB = 2**10
 MiB = KiB**2
@@ -217,7 +218,7 @@ def strip_suffix(string, suffix):
         return string[:-len(suffix)]
     return string
 
-def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
+def setup_formatted_and_mounted_disk(host: Host, sr_disk, fs_type, mountpoint):
     if fs_type == 'ext4':
         option_force = '-F'
     elif fs_type == 'xfs':
@@ -226,29 +227,25 @@ def setup_formatted_and_mounted_disk(host, sr_disk, fs_type, mountpoint):
         raise Exception(f"Unsupported fs_type '{fs_type}' in this function")
     device = '/dev/' + sr_disk
     logging.info(f">> Format sr_disk {sr_disk} and mount it on host {host}")
-    host.ssh(['mkfs.' + fs_type, option_force, device])
-    host.ssh(['rm', '-rf', mountpoint]) # Remove any existing leftover to ensure rmdir will not fail in teardown
-    host.ssh(['mkdir', '-p', mountpoint])
-    host.ssh(['cp', '-f', '/etc/fstab', '/etc/fstab.orig'])
-    ssh_client = host.ssh(['echo', '$SSH_CLIENT']).split()[0]
+    host.ssh(f'mkfs.{fs_type} {option_force} {device}')
+    host.ssh(f'rm -rf {mountpoint}') # Remove any existing leftover to ensure rmdir will not fail in teardown
+    host.ssh(f'mkdir -p {mountpoint}')
+    host.ssh('cp -f /etc/fstab /etc/fstab.orig')
+    ssh_client = host.ssh('echo $SSH_CLIENT').split()[0]
     now = datetime.now().isoformat()
-    host.ssh([
-        'echo',
-        f'"# added by {ssh_client} on {now}\n{device} {mountpoint} {fs_type} defaults 0 0"',
-        '>>/etc/fstab',
-    ])
+    host.ssh(f'echo "# added by {ssh_client} on {now}\n{device} {mountpoint} {fs_type} defaults 0 0" >>/etc/fstab')
     try:
-        host.ssh(['mount', mountpoint])
+        host.ssh(f'mount {mountpoint}')
     except Exception:
         # restore fstab then re-raise
-        host.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
+        host.ssh('cp -f /etc/fstab.orig /etc/fstab')
         raise
 
-def teardown_formatted_and_mounted_disk(host, mountpoint):
+def teardown_formatted_and_mounted_disk(host: Host, mountpoint):
     logging.info(f"<< Restore fstab and unmount {mountpoint} on host {host}")
-    host.ssh(['cp', '-f', '/etc/fstab.orig', '/etc/fstab'])
-    host.ssh(['umount', mountpoint])
-    host.ssh(['rmdir', mountpoint])
+    host.ssh('cp -f /etc/fstab.orig /etc/fstab')
+    host.ssh(f'umount {mountpoint}')
+    host.ssh(f'rmdir {mountpoint}')
 
 def exec_nofail(func):
     """ Execute a function, log a warning if it fails, and return eiter [] or [e] where e is the exception. """
@@ -305,21 +302,21 @@ def randid(length=6):
     return ''.join(random.choices(characters, k=length))
 
 @overload
-def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
+def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
                accept_unknown_key: Literal[False] = ...) -> str:
     ...
 
 @overload
-def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
+def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
                accept_unknown_key: Literal[True] = ...) -> Optional[str]:
     ...
 
 @overload
-def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
+def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = ...,
                accept_unknown_key: bool = ...) -> Optional[str]:
     ...
 
-def _param_get(host: 'lib.host.Host', xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
+def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: Optional[str] = None,
                accept_unknown_key: bool = False) -> Optional[str]:
     """ Common implementation for param_get. """
     import lib.commands as commands

@@ -544,7 +544,7 @@ def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
     if hosts is not None:
         try:
             host = hosts.split(',')[0]
-            cmd = ["lsb_release", "-sr"]
+            cmd = "lsb_release -sr"
             host_version = ssh(host, cmd)
         except Exception as e:
             print(e, file=sys.stderr)

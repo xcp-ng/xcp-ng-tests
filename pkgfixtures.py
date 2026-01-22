@@ -27,7 +27,7 @@ def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDevic
     assert host_disks, f"No 512B disk available on host {host}"
     sr_disk = host_disks[0]["name"]
     logging.info(">> wipe disk %s" % sr_disk)
-    host.ssh(['wipefs', '-a', '/dev/' + sr_disk])
+    host.ssh(f'wipefs -a /dev/{sr_disk}')
     yield sr_disk
 
 # package scope so that the device is unmounted before tests from the next package is executed.

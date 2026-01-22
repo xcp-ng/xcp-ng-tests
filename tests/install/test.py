@@ -10,6 +10,7 @@ from lib.installer import AnswerFile
 from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
+from lib.vm import VM
 
 assert "MGMT" in NETWORKS
 
@@ -117,25 +118,23 @@ class TestNested:
             vm="vm1",
             image_test=f"TestNested::test_install[{firmware}-{version}-{package_source}-{local_sr}]")])
     @pytest.mark.small_vm
-    def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk,
+    def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk: VM,
                             firmware, version, machine, local_sr, package_source):
         helper_vm = helper_vm_with_plugged_disk
 
-        helper_vm.ssh(["mount /dev/xvdb1 /mnt"])
+        helper_vm.ssh("mount /dev/xvdb1 /mnt")
         try:
             # hostname
             logging.info("Setting hostname to %r", machine)
-            helper_vm.ssh(["echo > /mnt/etc/hostname", machine])
+            helper_vm.ssh(f'echo {machine} > /mnt/etc/hostname')
             # UUIDs
             logging.info("Randomizing UUIDs")
             helper_vm.ssh(
-                ['sed -i',
-                 f'''-e "/^INSTALLATION_UUID=/ s/.*/INSTALLATION_UUID='{uuid4()}'/"''',
-                 f'''-e "/^CONTROL_DOMAIN_UUID=/ s/.*/CONTROL_DOMAIN_UUID='{uuid4()}'/"''',
-                 '/mnt/etc/xensource-inventory'])
-            helper_vm.ssh(["grep UUID /mnt/etc/xensource-inventory"])
+                f'''sed -i -e "/^INSTALLATION_UUID=/ s/.*/INSTALLATION_UUID='{uuid4()}'/" -e "/^CONTROL_DOMAIN_UUID=/ s/.*/CONTROL_DOMAIN_UUID='{uuid4()}'/" /mnt/etc/xensource-inventory''' # noqa
+            )
+            helper_vm.ssh("grep UUID /mnt/etc/xensource-inventory")
         finally:
-            helper_vm.ssh(["umount /dev/xvdb1"])
+            helper_vm.ssh("umount /dev/xvdb1")
 
     def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
         host_vm = create_vms[0]
@@ -194,8 +193,8 @@ class TestNested:
 
             logging.info("Checking installed version (expecting %r %r)",
                          expected_dist, expected_rel)
-            lsb_dist = commands.ssh(host_vm.ip, ["lsb_release", "-si"])
-            lsb_rel = commands.ssh(host_vm.ip, ["lsb_release", "-sr"])
+            lsb_dist = commands.ssh(host_vm.ip, "lsb_release -si")
+            lsb_rel = commands.ssh(host_vm.ip, "lsb_release -sr")
             assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
             # pool master must be reachable here
@@ -249,16 +248,16 @@ class TestNested:
             stamp = ''
             try:
                 for stamp in sorted(STAMPS):
-                    wait_for(lambda: pool.master.ssh(["test", "-e", f"{STAMPS_DIR}/{stamp}"],
+                    wait_for(lambda: pool.master.ssh(f'test -e {STAMPS_DIR}/{stamp}',
                                                      check=False, simple_output=False,
                                                      ).returncode == 0,
                              f"Wait for {stamp} stamp")
             except TimeoutError:
                 logging.warning("investigating lack of %s service stamp", stamp)
                 for service in SERVICES:
-                    out = pool.master.ssh(["systemctl", "status", service], check=False)
+                    out = pool.master.ssh(f'systemctl status {service}', check=False)
                     logging.warning("service status: %s", out)
-                    out = pool.master.ssh(["grep", "-r", service, "/var/log"], check=False)
+                    out = pool.master.ssh(f'grep -r {service} /var/log', check=False)
                     logging.warning("in logs: %s", out)
                 raise
 
@@ -267,7 +266,7 @@ class TestNested:
                 # use "poweroff" because "reboot" would cause ARP and
                 # SSH to be checked before host is down, and require
                 # ssh retries
-                pool.master.ssh(["poweroff"])
+                pool.master.ssh("poweroff")
             except commands.SSHCommandFailed as e:
                 # ignore connection closed by reboot
                 if e.returncode == 255 and "closed by remote host" in e.stdout:

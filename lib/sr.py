@@ -196,7 +196,7 @@ class SR:
         # even when quicktest leaves SRs in a state which makes teardown fail (in this case, pytest often doesn't
         # manage to display the details of the failed command, for a reason unknown - no usable reproducer found)
         try:
-            output = self.pool.master.ssh(['/opt/xensource/debug/quicktest', '-sr', self.uuid])
+            output = self.pool.master.ssh(f'/opt/xensource/debug/quicktest -sr {self.uuid}')
             logging.info(f"Quicktest output: {output}")
         except commands.SSHCommandFailed as e:
             logging.error(f"Quicktest output: {e.stdout}")

@@ -19,7 +19,7 @@ sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
 from lib.commands import SSHCommandFailed, ssh
 from lib.common import is_uuid, wait_for
-from lib.host import host_data
+from lib.host import Host, host_data
 from lib.pool import Pool
 from lib.vm import VM
 
@@ -74,7 +74,7 @@ def is_ip_active(ip):
 
 def is_ssh_up(ip):
     try:
-        ssh(ip, ['true'], options=['-o', 'ConnectTimeout 10'])
+        ssh(ip, 'true', options=['-o', 'ConnectTimeout 10'])
         return True
     except SSHCommandFailed:
         # probably not up yet
@@ -90,14 +90,14 @@ def get_new_host_ip(mac_address):
 
 def is_new_host_ready(ip_address):
     try:
-        output = ssh(ip_address, ['xe', 'host-list', 'enabled=true', '--minimal'])
+        output = ssh(ip_address, 'xe host-list enabled=true --minimal')
         return is_uuid(output)
     except Exception:
         return False
 
-def check_mac_address(host, mac_address):
+def check_mac_address(host: Host, mac_address):
     bridge = host.inventory['MANAGEMENT_INTERFACE']
-    host_mac_address = host.ssh(['cat', f'/sys/class/net/{bridge}/address'])
+    host_mac_address = host.ssh(f'cat /sys/class/net/{bridge}/address')
     if mac_address != host_mac_address:
         raise Exception(
             f"Unexpected MAC address `{host_mac_address}` for host `{host.hostname_or_ip}`. "

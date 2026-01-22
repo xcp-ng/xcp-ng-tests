@@ -34,7 +34,7 @@ class VM(BaseVM):
     def __init__(self, uuid: str, host: 'Host'):
         super().__init__(uuid, host)
         self.ip: Optional[str] = None
-        self.previous_host = None # previous host when migrated or being migrated
+        self.previous_host: Host | None = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
         self.create_vdis_list()
@@ -55,10 +55,10 @@ class VM(BaseVM):
         return self.power_state() == 'paused'
 
     # `on` can be an host name-label or UUID
-    def start(self, on=None):
+    def start(self, on: str | None = None) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
-        args = {'uuid': self.uuid}
+        args: dict[str, str | bool] = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
         return self.host.xe('vm-start', args)
@@ -103,31 +103,31 @@ class VM(BaseVM):
             return True
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             background: Literal[False] = False, decode: Literal[True] = True) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             background: Literal[False] = False, decode: Literal[False]) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
             background: Literal[False] = False, decode: bool = True) -> commands.SSHResult:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             background: Literal[True], decode: bool = True) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check=True, simple_output=True, background=False, decode=True) \
+    def ssh(self, cmd: str, *, check=True, simple_output=True, background=False, decode=True) \
             -> Union[str, bytes, commands.SSHResult, None]:
         ...
 
-    def ssh(self, cmd, *, check=True, simple_output=True, background=False, decode=True):
+    def ssh(self, cmd: str, *, check=True, simple_output=True, background=False, decode=True):
         # raises by default for any nonzero return code
         assert self.ip is not None
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
@@ -135,6 +135,7 @@ class VM(BaseVM):
 
     def ssh_with_result(self, cmd) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
+        assert self.ip is not None
         return commands.ssh_with_result(self.ip, cmd)
 
     def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
@@ -154,7 +155,7 @@ class VM(BaseVM):
 
     def is_ssh_up(self) -> bool:
         try:
-            return self.ssh_with_result(['true']).returncode == 0
+            return self.ssh_with_result('true').returncode == 0
         except commands.SSHCommandFailed:
             # probably not up yet
             return False
@@ -192,11 +193,11 @@ class VM(BaseVM):
 
     def ssh_touch_file(self, filepath):
         logging.info("Create file on VM (%s)" % filepath)
-        self.ssh(['touch', filepath])
+        self.ssh(f'touch {filepath}')
         if not self.is_windows:
-            self.ssh(['sync', filepath])
+            self.ssh(f'sync {filepath}')
         logging.info("Check file created")
-        self.ssh(['test -f ' + filepath])
+        self.ssh(f'test -f {filepath}')
 
     def suspend(self, verify=False):
         logging.info("Suspend VM")
@@ -241,7 +242,7 @@ class VM(BaseVM):
         assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host, sr=None, network=None):
+    def migrate(self, target_host: Host, sr=None, network=None):
         msg = "Migrate VM to host %s" % target_host
         params = {
             'uuid': self.uuid,
@@ -420,15 +421,15 @@ class VM(BaseVM):
                 remote_cmd = f'nohup bash -c "{remote_cmd} &>/dev/null &"'
             self.ssh(remote_cmd, background=True)
 
-            wait_for(lambda: self.ssh_with_result(['test', '-f', pidfile]).returncode == 0,
+            wait_for(lambda: self.ssh_with_result(f'test -f {pidfile}').returncode == 0,
                      "wait for pid file %s to exist" % pidfile)
-            pid = self.ssh(['cat', pidfile])
-            self.ssh(['rm', '-f', script])
-            self.ssh(['rm', '-f', pidfile])
+            pid = self.ssh(f'cat {pidfile}')
+            self.ssh(f'rm -f {script}')
+            self.ssh(f'rm -f {pidfile}')
             return pid
 
     def pid_exists(self, pid) -> bool:
-        return self.ssh_with_result(['kill', '-s', '0', pid]).returncode == 0
+        return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
 
     def execute_script(self, script_contents, simple_output=True):
         with tempfile.NamedTemporaryFile('w') as f:
@@ -439,10 +440,10 @@ class VM(BaseVM):
                 logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
                 # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
                 # It is a documented requirement that bash is present on all test VMs.
-                res = self.ssh(['bash', f.name], simple_output=simple_output)
+                res = self.ssh(f'bash {f.name}', simple_output=simple_output)
                 return res
             finally:
-                self.ssh(['rm', '-f', f.name])
+                self.ssh(f'rm -f {f.name}')
 
     def distro(self):
         """
@@ -503,7 +504,7 @@ class VM(BaseVM):
             self.start()
             self.wait_for_vm_running_and_ssh_up()
             logging.info("Check file does not exist anymore")
-            self.ssh(['test ! -f ' + filepath])
+            self.ssh(f'test ! -f {filepath}')
         finally:
             snapshot.destroy(verify=True)
 
@@ -541,7 +542,7 @@ class VM(BaseVM):
         tmp_efivarfs = '/tmp/%s-%s' % (var, guid.as_str())
 
         if self.file_exists(efivarfs):
-            self.ssh(['chattr', '-i', efivarfs])
+            self.ssh(f'chattr -i {efivarfs}')
 
         try:
             with tempfile.NamedTemporaryFile('wb') as f:
@@ -554,9 +555,9 @@ class VM(BaseVM):
                 # instead of 'cp' since it doesn't work in Alpine image (because
                 # cp is busybox in Alpine)
                 self.scp(f.name, tmp_efivarfs)
-                self.ssh(["cat", tmp_efivarfs, ">", efivarfs])
+                self.ssh(f'cat {tmp_efivarfs} > {efivarfs}')
         finally:
-            self.ssh(["rm", "-f", tmp_efivarfs], check=False)
+            self.ssh(f'rm -f {tmp_efivarfs}', check=False)
 
     def get_efi_var(self, var, guid):
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""
@@ -565,7 +566,7 @@ class VM(BaseVM):
         if not self.file_exists(efivarfs):
             return b''
 
-        data = self.ssh(['cat', efivarfs], decode=False)
+        data = self.ssh(f'cat {efivarfs}', decode=False)
 
         # The efivarfs file starts with the attributes, which are 4 bytes long
         return data[4:]
@@ -584,12 +585,8 @@ class VM(BaseVM):
     def get_all_efi_bins(self) -> List[str]:
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
-            [
-                'for', 'file', 'in', '$(find', '/boot', '-type', 'f);',
-                'do', 'echo', '$file', '$(head', '-c', magicsz, '$file);',
-                'done'
-            ],
-            decode=False).split(b'\n')
+            f'for file in $(find /boot -type f); do echo $file $(head -c {magicsz} $file); done', decode=False
+        ).split(b'\n')
 
         magic = efi.EFI_HEADER_MAGIC.encode('ascii')
         binaries: List[str] = []
@@ -646,12 +643,12 @@ class VM(BaseVM):
     def set_variable_from_file(
         self, filepath: str, variable_guid: str | uuid.UUID, variable_name: str, attr: int | str
     ):
-        dest = self.host.ssh(['mktemp'])
+        dest = self.host.ssh('mktemp')
         try:
             self.host.scp(filepath, dest)
-            self.host.ssh(['varstore-set', self.uuid, str(variable_guid), variable_name, str(attr), dest])
+            self.host.ssh(f'varstore-set {self.uuid} {variable_guid} {variable_name} {attr} {dest}')
         finally:
-            self.host.ssh(['rm', '-f', dest])
+            self.host.ssh(f'rm -f {dest}')
 
     def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
         """
@@ -687,7 +684,7 @@ class VM(BaseVM):
             # but it turns out CentOS 7 can't handle tail -c1 on that special file (can't "seek").
             # So we need to cat then pipe into tail.
             last_byte = self.ssh(
-                ["cat /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c | tail -c1"],
+                "cat /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c | tail -c1",
                 decode=False
             )
             if last_byte == b'\x01':
@@ -710,23 +707,23 @@ class VM(BaseVM):
         """
         dom_id = self.param_get('dom-id')
         res_host = self.get_residence_host()
-        pty = res_host.ssh(['xenstore-read', f'/local/domain/{dom_id}/serial/0/tty'])
-        tmp_file = res_host.ssh(['mktemp'])
+        pty = res_host.ssh(f'xenstore-read /local/domain/{dom_id}/serial/0/tty')
+        tmp_file = res_host.ssh('mktemp')
         session = f"detached-cat-{self.uuid}"
         ret = False
         try:
-            res_host.ssh(['screen', '-dmS', session])
+            res_host.ssh(f'screen -dmS {session}')
             # run `cat` on the pty in a background screen session and redirect to a tmp file.
             # `cat` will run until we kill the session.
-            res_host.ssh(['screen', '-S', session, '-X', 'stuff', f'"cat {pty} > {tmp_file}^M"'])
+            res_host.ssh(f'screen -S {session} -X stuff "cat {pty} > {tmp_file}^M"')
             # Send the `ver` command to the pty.
             # The first \r is meant to give us access to the shell prompt in case we arrived
             # before the end of the 5s countdown during the UEFI shell startup.
             # The second \r submits the command to the UEFI shell.
-            res_host.ssh(['echo', '-e', r'"\rver\r"', '>', pty])
+            res_host.ssh(f'echo -e "\\rver\\r" > {pty}')
             try:
                 wait_for(
-                    lambda: "UEFI Interactive Shell" in res_host.ssh(['cat', '-v', tmp_file]),
+                    lambda: "UEFI Interactive Shell" in res_host.ssh(f'cat -v {tmp_file}'),
                     "Wait for UEFI shell response in pty output",
                     10
                 )
@@ -735,23 +732,23 @@ class VM(BaseVM):
                 logging.debug(e)
                 pass
         finally:
-            res_host.ssh(['screen', '-S', session, '-X', 'quit'], check=False)
-            res_host.ssh(['rm', '-f', tmp_file], check=False)
+            res_host.ssh(f'screen -S {session} -X quit', check=False)
+            res_host.ssh(f'rm -f {tmp_file}', check=False)
         return ret
 
     def set_uefi_setup_mode(self):
         # Note that in XCP-ng 8.2, the VM won't stay in setup mode, because uefistored
         # will add PK and other certs if available when the guest boots.
         logging.info(f"Set VM {self.uuid} to UEFI setup mode")
-        self.host.ssh(["varstore-sb-state", self.uuid, "setup"])
+        self.host.ssh(f'varstore-sb-state {self.uuid} setup')
 
     def set_uefi_user_mode(self):
         # Setting user mode propagates the host's certificates to the VM
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
-        self.host.ssh(["varstore-sb-state", self.uuid, "user"])
+        self.host.ssh(f'varstore-sb-state {self.uuid} user')
 
     def is_uefi_var_present(self, varname):
-        res = self.host.ssh(['varstore-get', self.uuid, efi.get_secure_boot_guid(varname).as_str(), varname],
+        res = self.host.ssh(f'varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname}',
                             check=False, simple_output=False, decode=False)
         return res.returncode == 0
 

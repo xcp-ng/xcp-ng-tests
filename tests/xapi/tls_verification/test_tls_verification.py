@@ -4,6 +4,7 @@ import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool
+from lib.host import Host
 
 # Requirements:
 # From --hosts parameter:
@@ -31,7 +32,7 @@ def host_with_tls_verification_enabled(hostA1):
 
 @pytest.mark.usefixtures("host_at_least_8_3", "host_with_tls_verification_enabled")
 class TestTLSVerification:
-    def _test_tls_verification(self, hostA1, with_toolstack_restart=False):
+    def _test_tls_verification(self, hostA1: Host, with_toolstack_restart=False):
         for h in hostA1.pool.hosts[1:]:
             logging.info(f"Establish a connexion from host {hostA1} to host {h} by running 'xe host-dmesg'")
             hostA1.xe('host-dmesg', {'host': h.uuid})
@@ -49,30 +50,30 @@ class TestTLSVerification:
     def test_refresh_certificate(self, hostA1):
         logging.info("Refresh the xapi:pool certificate on every pool member")
         for h in hostA1.pool.hosts:
-            old_checksum = h.ssh(['md5sum', XAPI_POOL_PEM_FILEPATH]).split()[0]
+            old_checksum = h.ssh(f'md5sum {XAPI_POOL_PEM_FILEPATH}').split()[0]
             hostA1.xe('host-refresh-server-certificate', {'host': h.uuid})
-            new_checksum = h.ssh(['md5sum', XAPI_POOL_PEM_FILEPATH]).split()[0]
+            new_checksum = h.ssh(f'md5sum {XAPI_POOL_PEM_FILEPATH}').split()[0]
             assert old_checksum != new_checksum, "The new certificate must differ from the previous one"
         # Now that we refreshed the certs, check that the connexions still work
         self._test_tls_verification(hostA1, with_toolstack_restart=True)
 
     @pytest.fixture(scope="function")
-    def hostA2_with_saved_cert(self, hostA2):
-        tmp_dir = hostA2.ssh(['mktemp', '-d'])
+    def hostA2_with_saved_cert(self, hostA2: Host):
+        tmp_dir = hostA2.ssh('mktemp -d')
         logging.info(f"Save {XAPI_POOL_PEM_FILEPATH} on {hostA2}")
-        hostA2.ssh(['cp', XAPI_POOL_PEM_FILEPATH, tmp_dir])
+        hostA2.ssh(f'cp {XAPI_POOL_PEM_FILEPATH} {tmp_dir}')
         yield hostA2
         logging.info(f"Restore {XAPI_POOL_PEM_FILEPATH} on {hostA2}")
-        hostA2.ssh(['cp', '-f', f'{tmp_dir}/{XAPI_POOL_PEM_FILENAME}', XAPI_POOL_PEM_FILEPATH])
-        hostA2.ssh(['rm', '-r', tmp_dir])
-        hostA2.ssh(['systemctl', 'reload-or-restart stunnel@xapi'])
+        hostA2.ssh(f'cp -f {tmp_dir}/{XAPI_POOL_PEM_FILENAME} {XAPI_POOL_PEM_FILEPATH}')
+        hostA2.ssh(f'rm -r {tmp_dir}')
+        hostA2.ssh('systemctl reload-or-restart stunnel@xapi')
 
-    def test_break_cert(self, hostA1, hostA2_with_saved_cert):
+    def test_break_cert(self, hostA1: Host, hostA2_with_saved_cert: Host):
         hostA2 = hostA2_with_saved_cert
         logging.info(f"Replace the certificate on host {hostA2}")
-        hostA2.ssh(['rm', XAPI_POOL_PEM_FILEPATH])
-        hostA2.ssh(['/opt/xensource/libexec/gencert', XAPI_POOL_PEM_FILEPATH, '-1', 'xapi:pool'])
-        hostA2.ssh(['systemctl', 'reload-or-restart stunnel@xapi'])
+        hostA2.ssh(f'rm {XAPI_POOL_PEM_FILEPATH}')
+        hostA2.ssh(f'/opt/xensource/libexec/gencert {XAPI_POOL_PEM_FILEPATH} -1 xapi:pool')
+        hostA2.ssh('systemctl reload-or-restart stunnel@xapi')
         # Restart toolstack on client host to clear any existing TLS connection
         hostA1.restart_toolstack(True)
         # now the master host should not be able to connect to the pool member anymore
@@ -87,7 +88,7 @@ class TestTLSVerification:
 The server may be switched off or there may be network connectivity problems." in excinfo.value.stdout
         )
 
-    def test_toolstack_restart(self, hostA1, hostA2):
+    def test_toolstack_restart(self, hostA1: Host, hostA2: Host):
         """
         Same test as the previous one, but we don't break the cert.
 

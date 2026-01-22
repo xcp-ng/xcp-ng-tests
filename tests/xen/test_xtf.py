@@ -33,12 +33,12 @@ class TestXtf:
 
     def test_self(self, host, xtf_runner):
         logging.info("Running selftest...")
-        host.ssh([xtf_runner, 'selftest', '-q', '--host'])
+        host.ssh(f'{xtf_runner} selftest -q --host')
 
     def test_all(self, host, xtf_runner):
         logging.info("Running tests...")
         try:
-            host.ssh([xtf_runner, '-aqq', '--host'])
+            host.ssh(f'{xtf_runner} -aqq --host')
         except SSHCommandFailed as e:
             if e.returncode == 3: # 3 means there were skipped tests
                 # Check that the skipped tests belong to the list of common expected skips

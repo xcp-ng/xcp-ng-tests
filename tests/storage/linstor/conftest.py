@@ -59,28 +59,28 @@ def lvm_disks(
         devices = host_devices(host)
         for device in devices:
             try:
-                host.ssh(['pvcreate', '-ff', '-y', device])
+                host.ssh(f'pvcreate -ff -y {device}')
             except commands.SSHCommandFailed as e:
                 if e.stdout.endswith('Mounted filesystem?'):
-                    host.ssh(['vgremove', '-f', GROUP_NAME, '-y'])
-                    host.ssh(['pvcreate', '-ff', '-y', device])
+                    host.ssh(f'vgremove -f {GROUP_NAME} -y')
+                    host.ssh(f'pvcreate -ff -y {device}')
                 elif e.stdout.endswith('excluded by a filter.'):
-                    host.ssh(['wipefs', '-a', device])
-                    host.ssh(['pvcreate', '-ff', '-y', device])
+                    host.ssh(f'wipefs -a {device}')
+                    host.ssh(f'pvcreate -ff -y {device}')
                 else:
                     raise e
 
-        host.ssh(['vgcreate', GROUP_NAME] + devices)
+        host.ssh(f'vgcreate {GROUP_NAME}' + ' '.join(devices))
         if provisioning_type == 'thin':
-            host.ssh(['lvcreate', '-l', '100%FREE', '-T', STORAGE_POOL_NAME])
+            host.ssh(f'lvcreate -l 100%FREE -T {STORAGE_POOL_NAME}')
 
     # FIXME ought to provide storage_pool_name and get rid of that other fixture
     yield None
 
     for host in hosts:
-        host.ssh(['vgremove', '-f', GROUP_NAME])
+        host.ssh(f'vgremove -f {GROUP_NAME}')
         for device in host_devices(host):
-            host.ssh(['pvremove', device])
+            host.ssh(f'pvremove {device}')
 
 @pytest.fixture(scope="package")
 def storage_pool_name(provisioning_type: str) -> str:
@@ -115,7 +115,7 @@ def pool_with_linstor(
         host.yum_install([LINSTOR_PACKAGE], enablerepo="xcp-ng-linstor-testing")
         # Needed because the linstor driver is not in the xapi sm-plugins list
         # before installing the LINSTOR packages.
-        host.ssh(["systemctl", "restart", "multipathd"])
+        host.ssh('systemctl restart multipathd')
         host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:

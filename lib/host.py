@@ -10,12 +10,6 @@ import uuid
 from packaging import version
 
 import lib.commands as commands
-
-from typing import TYPE_CHECKING, Dict, List, Literal, Mapping, Optional, TypedDict, Union, overload
-
-if TYPE_CHECKING:
-    from lib.pool import Pool
-
 from lib.common import (
     DiskDevName,
     _param_add,
@@ -33,9 +27,14 @@ from lib.common import (
 from lib.netutil import wrap_ip
 from lib.pif import PIF
 from lib.sr import SR
-from lib.vdi import VDI
-from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
+
+from typing import TYPE_CHECKING, Dict, List, Literal, Mapping, Optional, TypedDict, Union, overload
+
+if TYPE_CHECKING:
+    from lib.pool import Pool
+    from lib.vdi import VDI
+    from lib.vm import VM
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
@@ -89,43 +88,43 @@ class Host:
         return self.hostname_or_ip
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
             decode: Literal[True] = True, multiplexing=True) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
             decode: Literal[False], multiplexing=True) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
             decode: bool = True, multiplexing=True) -> commands.SSHResult:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[True],
             decode: bool = True, multiplexing=True) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
             multiplexing=True) \
             -> Union[str, bytes, commands.SSHResult, None]:
         ...
 
-    def ssh(self, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
+    def ssh(self, cmd: str, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
             background=False, decode=True, multiplexing=True):
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
                             background=background, decode=decode, multiplexing=multiplexing)
 
-    def ssh_with_result(self, cmd) -> commands.SSHResult:
+    def ssh_with_result(self, cmd: str) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return commands.ssh_with_result(self.hostname_or_ip, cmd)
 
@@ -147,8 +146,8 @@ class Host:
 
     def xe(self, action, args={}, *, check=True, simple_output=True, minimal=False, force=False) \
             -> Union[str, commands.SSHResult]:
-        maybe_param_minimal = ['--minimal'] if minimal else []
-        maybe_param_force = ['--force'] if force else []
+        maybe_param_minimal = '--minimal' if minimal else ''
+        maybe_param_force = '--force' if force else ''
 
         def stringify(key, value):
             if isinstance(value, bool):
@@ -156,12 +155,12 @@ class Host:
             if isinstance(value, dict):
                 ret = ""
                 for key2, value2 in value.items():
-                    ret += f"{key}:{key2}={value2} "
+                    ret += f'{key}:{key2}={shlex.quote(value2)} '
                 return ret.rstrip()
-            return "{}={}".format(key, shlex.quote(value))
+            return f'{key}={shlex.quote(value)}'
 
-        command: List[str] = ['xe', action] + maybe_param_minimal + maybe_param_force + \
-                             [stringify(key, value) for key, value in args.items()]
+        command: str = f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
+                       ' '.join(stringify(key, value) for key, value in args.items())
         result = self.ssh(
             command,
             check=check,
@@ -223,7 +222,7 @@ class Host:
         ))
 
     def remove_xcpng_repo(self, name):
-        self.ssh(['rm -f /etc/yum.repos.d/xcp-ng-{}.repo'.format(name)])
+        self.ssh(f'rm -f /etc/yum.repos.d/xcp-ng-{name}.repo')
 
     def execute_script(self, script_contents, shebang='sh', simple_output=True):
         with tempfile.NamedTemporaryFile('w') as script:
@@ -234,19 +233,19 @@ class Host:
             try:
                 remote_path = self.ssh("mktemp").strip()
                 self.scp(script.name, remote_path)
-                self.ssh(['chmod', '0755', remote_path])
+                self.ssh(f'chmod 0755 {remote_path}')
             except Exception as e:
                 logging.error("Failed to create temporary file. %s", e)
                 raise
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh([remote_path], simple_output=simple_output)
+                return self.ssh(remote_path, simple_output=simple_output)
             finally:
-                self.ssh(['rm', '-f', remote_path])
+                self.ssh(f'rm -f {remote_path}')
 
     def _get_xensource_inventory(self) -> Dict[str, str]:
-        output = self.ssh(['cat', '/etc/xensource-inventory'])
+        output = self.ssh('cat /etc/xensource-inventory')
         inventory: Dict[str, str] = {}
         for line in output.splitlines():
             key, raw_value = line.split('=')
@@ -422,11 +421,11 @@ class Host:
 
     def install_updates(self):
         logging.info("Install updates on host %s" % self)
-        return self.ssh(['yum', 'update', '-y'])
+        return self.ssh('yum update -y')
 
     def restart_toolstack(self, verify=False):
         logging.info("Restart toolstack on host %s" % self)
-        self.ssh(['xe-toolstack-restart'])
+        self.ssh('xe-toolstack-restart')
         if verify:
             wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=30 * 60)
 
@@ -440,7 +439,7 @@ class Host:
     def has_updates(self) -> bool:
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
-            self.ssh(['yum', 'check-update'])
+            self.ssh('yum check-update')
             # returned 0, else there would have been a SSHCommandFailed
             return False
         except commands.SSHCommandFailed as e:
@@ -464,7 +463,7 @@ class Host:
         [...]
         """
         try:
-            history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
+            history_str = self.ssh('yum history list --noplugins')
         except commands.SSHCommandFailed:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
@@ -472,7 +471,7 @@ class Host:
             logging.info('Install and remove a small package to workaround empty yum history.')
             self.yum_install(['gpm-libs'])
             self.yum_remove(['gpm-libs'])
-            history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
+            history_str = self.ssh('yum history list --noplugins')
 
         history = history_str.splitlines()
         line_index = None
@@ -491,29 +490,28 @@ class Host:
 
     def yum_install(self, packages, enablerepo=None):
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
-        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
-        return self.ssh(['yum', 'install', '--setopt=skip_missing_names_on_install=False', '-y']
-                        + enablerepo_cmd + packages)
+        cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
+        if enablerepo is not None:
+            cmd = f'{cmd} --enablerepo={enablerepo}'
+        return self.ssh(f'{cmd} {" ".join(packages)}')
 
     def yum_remove(self, packages):
         logging.info('Remove packages: %s from host %s' % (' '.join(packages), self))
-        return self.ssh(['yum', 'remove', '-y'] + packages)
+        return self.ssh(f'yum remove -y {" ".join(packages)}')
 
     def packages(self):
         """ Returns the list of installed RPMs - with version, release, arch and epoch. """
-        return sorted(
-            self.ssh(['rpm', '-qa', '--qf', '%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\\\\n']).splitlines()
-        )
+        return sorted(self.ssh('rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\n"').splitlines())
 
     def check_packages_available(self, packages) -> bool:
         """ Check if a given package list is available in the YUM repositories. """
-        return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
+        return len(self.ssh(f'repoquery {" ".join(packages)}').splitlines()) == len(packages)
 
     def get_available_package_versions(self, package):
-        return self.ssh(['repoquery', '--show-duplicates', package]).splitlines()
+        return self.ssh(f'repoquery --show-duplicates {package}').splitlines()
 
     def is_package_installed(self, package) -> bool:
-        return self.ssh_with_result(['rpm', '-q', package]).returncode == 0
+        return self.ssh_with_result(f'rpm -q {package}').returncode == 0
 
     def yum_save_state(self):
         logging.info(f"Save yum state for host {self}")
@@ -532,10 +530,9 @@ class Host:
 
         assert isinstance(self.saved_rollback_id, int)
 
-        self.ssh([
-            'yum', 'history', 'rollback', '--enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates',
-            str(self.saved_rollback_id), '-y'
-        ])
+        self.ssh(
+            f'yum history rollback --enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates {self.saved_rollback_id} -y'
+        )
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
             missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
@@ -552,7 +549,7 @@ class Host:
         logging.info("Reboot host %s" % self)
         # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
         # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
-        self.ssh(['systemd-run --on-active=2s reboot'])
+        self.ssh('systemd-run --on-active=2s reboot')
         if verify:
             wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
             wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
@@ -576,9 +573,9 @@ class Host:
         when we test how XCP-ng reacts to changes of hardware (or
         reconfiguration of device blocksize), or after a reboot.
         """
-        output_string = self.ssh(["lsblk", "--pairs", "--bytes",
-                                  '-I', '8,259', # limit to: sd, blkext
-                                  "--output", Host.BLOCK_DEVICES_FIELDS])
+        output_string = self.ssh(
+            f'lsblk --pairs --bytes -I 8,259 --output {Host.BLOCK_DEVICES_FIELDS}'
+        )  # limit to: sd, blkext
 
         self.block_devices_info = [
             Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore[misc]
@@ -603,17 +600,17 @@ class Host:
         Warn: This function may misclassify LVM_member disks (e.g. in XOSTOR, RAID, ZFS) as "available".
         Such disks may not have mountpoints but still be in use.
         """
-        return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
+        return len(self.ssh(f'lsblk --noheadings -o MOUNTPOINT /dev/{disk}').strip()) == 0
 
     def file_exists(self, filepath, regular_file=True) -> bool:
         option = '-f' if regular_file else '-e'
-        return self.ssh_with_result(['test', option, filepath]).returncode == 0
+        return self.ssh_with_result(f'test {option} {filepath}').returncode == 0
 
     def binary_exists(self, binary) -> bool:
-        return self.ssh_with_result(['which', binary]).returncode == 0
+        return self.ssh_with_result(f'which {binary}').returncode == 0
 
     def is_symlink(self, filepath) -> bool:
-        return self.ssh_with_result(['test', '-L', filepath]).returncode == 0
+        return self.ssh_with_result(f'test -L {filepath}').returncode == 0
 
     def sr_create(self, sr_type, label, device_config, shared=False, verify=False) -> SR:
         params = {
@@ -636,7 +633,7 @@ class Host:
         return sr
 
     def is_master(self) -> bool:
-        return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
+        return self.ssh('cat /etc/xensource/pool.conf') == 'master'
 
     def local_vm_srs(self) -> list[SR]:
         srs = []
@@ -679,7 +676,7 @@ class Host:
         return sr_uuid
 
     def hostname(self):
-        return self.ssh(['hostname'])
+        return self.ssh('hostname')
 
     def call_plugin(self, plugin_name: str, function: str,
                     args: Optional[Dict[str, str]] = None) -> str:
@@ -713,13 +710,13 @@ class Host:
         self.pool = pool
 
     def activate_smapi_driver(self, driver):
-        sm_plugins = self.ssh(['grep', '[[:space:]]*sm-plugins[[:space:]]*=[[:space:]]*', XAPI_CONF_FILE]).splitlines()
+        sm_plugins = self.ssh(f'grep [[:space:]]*sm-plugins[[:space:]]*=[[:space:]]* {XAPI_CONF_FILE}').splitlines()
         sm_plugins = sm_plugins[-1] + ' ' + driver
-        self.ssh([f'echo "{sm_plugins}" > {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
+        self.ssh(f'echo "{sm_plugins}" > {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf')
         self.restart_toolstack(verify=True)
 
     def deactivate_smapi_driver(self, driver):
-        self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
+        self.ssh(f'rm -f {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf')
         self.restart_toolstack(verify=True)
 
     def varstore_dir(self):
@@ -729,12 +726,11 @@ class Host:
             return "/var/lib/varstored"
 
     def enable_hsts_header(self):
-        self.ssh(['echo', '"hsts_max_age = 63072000"', '>',
-                  f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
+        self.ssh(f'echo "hsts_max_age = 63072000" > {XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf')
         self.restart_toolstack(verify=True)
 
     def disable_hsts_header(self):
-        self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
+        self.ssh(f'rm -f {XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf')
         self.restart_toolstack(verify=True)
 
     def get_dom0_uuid(self):
@@ -756,9 +752,9 @@ class Host:
 
     def lvs(self, vgName: Optional[str] = None, ignore_MGT: bool = True) -> List[str]:
         ret: List[str] = []
-        cmd = ["lvs", "--noheadings", "-o", "LV_NAME"]
+        cmd = 'lvs --noheadings -o LV_NAME'
         if vgName:
-            cmd.append(vgName)
+            cmd = f'{cmd} {vgName}'
         output = self.ssh(cmd)
         for line in output.splitlines():
             if ignore_MGT and "MGT" in line:
