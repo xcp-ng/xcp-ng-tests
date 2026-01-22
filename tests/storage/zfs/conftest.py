@@ -4,6 +4,7 @@ import pytest
 
 import logging
 
+from lib import config
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -57,7 +58,7 @@ def zfs_sr(host: Host, image_format: ImageFormat, zpool_vol0: None) -> Generator
 
 @pytest.fixture(scope='module')
 def vdi_on_zfs_sr(zfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = zfs_sr.create_vdi('ZFS-local-VDI-test')
+    vdi = zfs_sr.create_vdi('ZFS-local-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
