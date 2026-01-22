@@ -4,6 +4,7 @@ import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
+from lib.vm import VM
 
 from .utils import (
     VM_SECURE_BOOT_FAILED,
@@ -144,12 +145,12 @@ class TestGuestWindowsUEFISecureBoot:
         boot_and_check_sb_failed(vm)
 
     @pytest.mark.multi_vms # test that SB works on every Windows VM we have
-    def test_windows_succeeds(self, uefi_vm):
+    def test_windows_succeeds(self, uefi_vm: VM):
         vm = uefi_vm
         vm.param_set('platform', True, key='secureboot')
         # Install default certs. This requires internet access from the host.
         logging.info("Install default certs on pool with secureboot-certs install")
-        vm.host.ssh(['secureboot-certs', 'install'])
+        vm.host.ssh('secureboot-certs install')
         boot_and_check_sb_succeeded(vm)
 
 

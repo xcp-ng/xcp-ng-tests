@@ -4,6 +4,7 @@ import logging
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.efi import EFI_AT_ATTRS_BYTES, EFIAuth, get_md5sum_from_auth, get_secure_boot_guid
+from lib.host import Host
 
 from typing import Literal, overload
 
@@ -167,12 +168,12 @@ def _test_key_exchanges(vm):
             raise AssertionError('Failed to set {} {}'.format(i, auth.name))
 
 
-def check_disk_cert_md5sum(host, key, reference_file, do_assert=True):
+def check_disk_cert_md5sum(host: Host, key, reference_file, do_assert=True):
     auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
     assert host.file_exists(auth_filepath_on_host)
     with open(reference_file, 'rb') as rf:
         reference_md5 = hashlib.md5(rf.read()).hexdigest()
-    host_disk_md5 = host.ssh([f'md5sum {auth_filepath_on_host} | cut -d " " -f 1'])
+    host_disk_md5 = host.ssh(f'md5sum {auth_filepath_on_host} | cut -d " " -f 1')
     logging.debug('Reference MD5: %s' % reference_md5)
     logging.debug('Host disk MD5: %s' % host_disk_md5)
     if do_assert:
@@ -183,7 +184,7 @@ def check_disk_cert_md5sum(host, key, reference_file, do_assert=True):
 
 def check_vm_cert_md5sum(vm, key, reference_file):
     res = vm.host.ssh(
-        ['varstore-get', vm.uuid, get_secure_boot_guid(key).as_str(), key],
+        f'varstore-get {vm.uuid} {get_secure_boot_guid(key)} {key}',
         check=False,
         simple_output=False,
         decode=False,
