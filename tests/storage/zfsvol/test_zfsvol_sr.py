@@ -4,12 +4,20 @@ import pytest
 
 import logging
 
-from lib.common import Defer, vm_image, wait_for
+from lib import config
+from lib.common import Defer, KiB, MiB, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import CoalesceOperation, ImageFormat, XVACompression, coalesce_integrity, xva_export_import
+from tests.storage import (
+    CoalesceOperation,
+    ImageFormat,
+    XVACompression,
+    coalesce_integrity,
+    randstream,
+    xva_export_import,
+)
 
 # Requirements:
 # - one XCP-ng host >= 8.3 with an additional unused disk for the SR
@@ -80,20 +88,26 @@ class TestZfsvolVm:
             -> None:
         vm = storage_test_vm
         sr = zfsvol_sr
-        vdi_src: VDI | None = sr.create_vdi(image_format=image_format)
+        vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
         defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
         assert vdi_src is not None
 
         vbd = vm.connect_vdi(vdi_src)
-        defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None else None)
+        defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
         dev = f'/dev/{vbd.param_get("device")}'
 
-        # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
-        vm.ssh(f"randstream generate -v --size 200MiB {dev}")
+        # the stream is 1/5 of the full one, truncated to a multiple of 32KiB, in order to
+        # be validable in a single command
+        stream_size = (config.volume_size // 5 // (32 * KiB)) * (32 * KiB)
+        stream_position = (config.volume_size // 2)
+
+        checksum1 = randstream(vm, f'generate --size {stream_size} {dev}')
         # use a different seed to not write the same data (default seed is 0)
-        vm.ssh(f"randstream generate -v --seed 1 --position 500MiB --size 200MiB {dev}")
-        vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
-        vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+        checksum2 = randstream(vm, f'generate --seed 1 --position {stream_position} --size {stream_size} {dev}')
+        randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
+        randstream(
+            vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}'
+        )
         vm.disconnect_vdi(vdi_src)
 
         image_path = f'/tmp/{vdi_src.uuid}.{image_format}'
@@ -108,16 +122,18 @@ class TestZfsvolVm:
         if image_format == 'vhd':
             logging.warning(f"FIXME: this is broken with vhd, skip for now (XCPNG-2631). File size is {size_mb}MB")
         else:
-            assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
-        vdi_dest = sr.create_vdi(image_format=image_format)
+            assert stream_size // MiB * 2 < size_mb < stream_size // MiB * 2.1, f"unexpected image size: {size_mb}"
+        vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
         defer(lambda: vdi_dest.destroy())
 
         vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
         vm.connect_vdi(vdi_dest, 'xvdb')
         defer(lambda: vm.disconnect_vdi(vdi_dest))
 
-        vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
-        vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+        randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
+        randstream(
+            vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}'
+        )
 
     # *** tests with reboots (longer tests).
 
