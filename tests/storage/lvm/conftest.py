@@ -4,6 +4,7 @@ import pytest
 
 import logging
 
+from lib import config
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -27,7 +28,7 @@ def lvm_sr(host: Host,
 
 @pytest.fixture(scope='module')
 def vdi_on_lvm_sr(lvm_sr: SR) -> Generator[VDI, None, None]:
-    vdi = lvm_sr.create_vdi('LVM-local-VDI-test')
+    vdi = lvm_sr.create_vdi('LVM-local-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 

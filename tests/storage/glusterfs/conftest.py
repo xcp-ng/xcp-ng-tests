@@ -5,6 +5,7 @@ import pytest
 import logging
 from dataclasses import dataclass
 
+from lib import config
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
 from lib.netutil import is_ipv6
 
@@ -263,7 +264,7 @@ def glusterfs_sr(
 
 @pytest.fixture(scope='module')
 def vdi_on_glusterfs_sr(glusterfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test')
+    vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 

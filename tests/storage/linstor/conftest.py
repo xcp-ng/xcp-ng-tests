@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass
 
 import lib.commands as commands
+from lib import config
 
 try:
     from data import LINSTOR_REDUNDANCY  # type: ignore
@@ -173,7 +174,7 @@ def linstor_sr(
 
 @pytest.fixture(scope='module')
 def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI, None, None]:
-    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test')
+    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
