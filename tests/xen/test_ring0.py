@@ -58,6 +58,7 @@ class TestRing0Tests:
     def test_xst_big_module(self, host: Host):
         do_execute_xst(host, "big_module")
 
+    @pytest.mark.skip("may hang system with fifo evtchn")
     def test_xst_evtchn_latency(self, host: Host):
         do_execute_xst(host, "evtchn_latency", "evtchn_lat")
 
