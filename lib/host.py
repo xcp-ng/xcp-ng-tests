@@ -12,7 +12,7 @@ from packaging import version
 import lib.commands as commands
 import lib.pif as pif
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, TypedDict, Union, overload
+from typing import TYPE_CHECKING, Dict, List, Literal, Mapping, Optional, TypedDict, Union, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -136,12 +136,12 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: Mapping[str, Union[str, bool]] = {}, *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: Mapping[str, Union[str, bool]] = {}, *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult:
         ...
 

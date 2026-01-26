@@ -8,16 +8,15 @@ from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vm import VM
-
-from . import (
+from lib.windows import (
     WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
     iso_create,
     try_get_and_store_vm_ip_serial,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
-from .guest_tools import install_guest_tools
-from .other_tools import install_other_drivers
+from lib.windows.guest_tools import install_guest_tools
+from lib.windows.other_tools import install_other_drivers
 
 from typing import Any, Dict, Tuple
 
@@ -63,6 +62,7 @@ def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
     install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
+    assert vm.are_windows_tools_working()
     yield vm
     snapshot.revert()
 

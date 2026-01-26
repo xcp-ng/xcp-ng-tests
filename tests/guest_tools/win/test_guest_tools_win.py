@@ -1,13 +1,26 @@
 import pytest
 
 import logging
+import time
 
-from . import PowerAction, wait_for_vm_running_and_ssh_up_without_tools
-from .guest_tools import (
+from lib.commands import SSHCommandFailed
+from lib.common import strtobool, wait_for
+from lib.vm import VM
+from lib.windows import (
+    WINDOWS_SHUTDOWN_COMMAND,
+    PowerAction,
+    check_vm_dns,
+    set_vm_dns,
+    vif_has_rss,
+    wait_for_vm_running_and_ssh_up_without_tools,
+)
+from lib.windows.guest_tools import (
     ERROR_INSTALL_FAILURE,
     install_guest_tools,
     uninstall_guest_tools,
 )
+
+from typing import Any, Tuple
 
 # Requirements:
 # - XCP-ng >= 8.2.
@@ -55,38 +68,81 @@ from .guest_tools import (
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindows:
-    def test_tools_after_reboot(self, vm_install_test_tools_per_test_class):
-        vm = vm_install_test_tools_per_test_class
-        assert vm.are_windows_tools_working()
+    def test_drivers_detected(self, vm_install_test_tools_per_test_class: VM):
+        pass
 
-    def test_drivers_detected(self, vm_install_test_tools_per_test_class):
+    def test_vif_replug(self, vm_install_test_tools_per_test_class: VM):
         vm = vm_install_test_tools_per_test_class
-        assert vm.are_windows_tools_working()
+        vifs = vm.vifs()
+        for vif in vifs:
+            assert strtobool(vif.param_get("currently-attached"))
+            vif.unplug()
+            # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
+            assert not strtobool(vif.param_get("currently-attached"))
+            time.sleep(5)
+            vif.plug()
+        wait_for(vm.is_ssh_up, "Wait for SSH up")
+
+    def test_rss(self, vm_install_test_tools_per_test_class: VM):
+        """
+        Receive-side scaling is known to be broken on some driver versions.
+
+        Test that RSS is functional for each NIC.
+        """
+        vm = vm_install_test_tools_per_test_class
+        vifs = vm.vifs()
+        for vif in vifs:
+            assert vif_has_rss(vif)
 
 
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindowsDestructive:
-    def test_uninstall_tools(self, vm_install_test_tools_no_reboot):
+    def test_uninstall_tools(self, vm_install_test_tools_no_reboot: VM):
         vm = vm_install_test_tools_no_reboot
-        vm.reboot()
+        vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
+        wait_for(vm.is_halted, "Shutdown VM")
+
+        vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+
+        set_vm_dns(vm)
         logging.info("Uninstall Windows PV drivers")
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
+        logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
+        check_vm_dns(vm)
 
-    def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot):
+    def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot: VM):
         vm = vm_install_test_tools_no_reboot
         logging.info("Uninstall Windows PV drivers before rebooting")
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_install_with_other_tools(self, vm_install_other_drivers, guest_tools_iso):
+    def test_install_with_other_tools(
+        self, vm_install_other_drivers: Tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
+    ):
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
-            pytest.xfail("Upgrades may require multiple reboots and are not testable yet")
             install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
             assert vm.are_windows_tools_working()
         else:
             exitcode = install_guest_tools(vm, guest_tools_iso, PowerAction.Nothing, check=False)
             assert exitcode == ERROR_INSTALL_FAILURE
+
+    @pytest.mark.usefixtures("uefi_vm")
+    def test_uefi_vm_suspend_refused_without_tools(self, running_unsealed_windows_vm: VM):
+        vm = running_unsealed_windows_vm
+        with pytest.raises(SSHCommandFailed, match="lacks the feature"):
+            vm.suspend()
+        wait_for_vm_running_and_ssh_up_without_tools(vm)
+
+    # Test of the unplug rework, where the driver must remain activated even if the device ID changes.
+    # Also serves as a "close-enough" test of vendor device toggling.
+    def test_toggle_device_id(self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]):
+        vm = running_unsealed_windows_vm
+        assert vm.param_get("platform", "device_id") == "0002"
+        install_guest_tools(vm, guest_tools_iso, PowerAction.Shutdown, check=False)
+        vm.param_set("platform", "0001", "device_id")
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
