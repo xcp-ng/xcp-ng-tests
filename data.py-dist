@@ -100,6 +100,8 @@ OTHER_GUEST_TOOLS = {
 
         # Can we upgrade automatically from this guest tool to our tools?
         "upgradable": True,
+        # Once this guest tool is installed, what onboarding phase (with the XCP-ng vendor) do we expect?
+        "onboarding_phase": "CleaningSucceeded/ReadyForOnboard/AlreadyOnboarded/OnboardDenied",
     },
     "vendor": {
         "vendor_device": True,

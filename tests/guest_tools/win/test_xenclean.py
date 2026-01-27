@@ -18,13 +18,23 @@ from typing import Any, Dict, Tuple
 
 # Test uninstallation of other drivers using the XenClean program.
 
+# To keep in sync with win-pvdrivers/XenClean/ExitCode.cs
+XENCLEAN_EXIT_CODES = {
+    0: "CleaningSucceeded",
+    1: "Error",
+    2: "UserCanceled",
+    64: "ReadyForOnboard",
+    65: "AlreadyOnboarded",
+    66: "OnboardDenied",
+}
+
 
 def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     logging.info("Run XenClean")
     xenclean_path = PureWindowsPath("D:\\") / guest_tools_iso["xenclean_path"]
-    xenclean_cmd = f"Set-Location C:\\; {xenclean_path} -NoReboot -Confirm:$false; {WINDOWS_SHUTDOWN_COMMAND}"
+    xenclean_cmd = f"Set-Location C:\\; {xenclean_path} -NoReboot -NoConfirm; {WINDOWS_SHUTDOWN_COMMAND}"
     vm.start_background_powershell(xenclean_cmd)
 
     # XenClean sometimes takes a bit long due to all the calls to the uninstallers. We need an extended timeout.
@@ -34,6 +44,30 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
     wait_for_vm_xenvif_offboard(vm)
+
+
+def run_xenclean_onboard_dryrun(vm: VM, guest_tools_iso: Dict[str, Any]):
+    """
+    The "onboard" mode of XenClean removes any existing tools that don't match a given vendor name.
+    Its goal is to help users transition from one Xen driver vendor to another.
+
+    Note: Running XenClean for real requires a reboot and causes the virtual network to disconnect, which makes
+    harvesting the XenClean exit code for the onboard status more complicated. Since all we want is the exit code, we
+    just run it in dry-run mode here.
+    """
+    insert_cd_safe(vm, guest_tools_iso["name"])
+
+    logging.info("Run XenClean (onboarding dry-run)")
+    xenclean_path = PureWindowsPath("D:\\") / guest_tools_iso["xenclean_path"]
+    xenclean_cmd = (
+        "Set-Location C:\\; "
+        f"{xenclean_path} -NoReboot -NoConfirm -Onboard XCP-ng -DryRun > $null; "
+        "Write-Output $LASTEXITCODE"
+    )
+    exitcode = vm.execute_powershell_script(xenclean_cmd)
+
+    vm.eject_cd()
+    return int(exitcode)
 
 
 @pytest.mark.multi_vms
@@ -76,3 +110,19 @@ class TestXenClean:
         logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
         check_vm_dns(vm)
+
+    def test_onboarding_without_tools(self, running_unsealed_windows_vm: VM, guest_tools_iso):
+        vm = running_unsealed_windows_vm
+        logging.info("XenClean onboarding with empty VM")
+        exitcode = run_xenclean_onboard_dryrun(vm, guest_tools_iso)
+        assert XENCLEAN_EXIT_CODES.get(exitcode) == "ReadyForOnboard"
+
+    def test_onboarding_with_other_tools(self, vm_install_other_drivers: Tuple[VM, Dict], guest_tools_iso):
+        vm, param = vm_install_other_drivers
+        expected_phase = param.get("onboarding_phase")
+        if not expected_phase:
+            pytest.skip("Skipping this guest tool since onboarding phase is not specified")
+
+        logging.info("XenClean onboarding with other tools")
+        exitcode = run_xenclean_onboard_dryrun(vm, guest_tools_iso)
+        assert XENCLEAN_EXIT_CODES.get(exitcode) == expected_phase
