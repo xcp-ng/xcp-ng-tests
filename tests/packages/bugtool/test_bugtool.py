@@ -18,6 +18,7 @@ def verify_contains(host: Host, archive: str, files: list[str]):
 class TestsBugtool:
     # Verify a minimal bugtool invocation that only queries certain capabilities
     def test_bugtool_entries(self, host):
+        filename = ''
         try:
             filename = host.ssh(['xen-bugtool', '-y', '-s',
                                  '--entries=xenserver-logs,xenserver-databases,system-logs'])
@@ -33,6 +34,7 @@ class TestsBugtool:
 
     # Verify that a full xen-bugtool invocation contains the most essential files
     def test_bugtool_all(self, host):
+        filename = ''
         try:
             filename = host.ssh(['xen-bugtool', '-y', '-s'])
             verify_contains(host, filename,

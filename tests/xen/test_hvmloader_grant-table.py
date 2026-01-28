@@ -38,6 +38,7 @@ def are_grant_tables_inside_uncachable_mapping(mtrr_ranges_list, pci_io_address)
 
     for mtrr_range in mtrr_ranges_list:
         m = re.match(regexp, mtrr_range)
+        assert m is not None
         base_address = int(m.group(2), 16)
         size = int(m.group(3)) * 1024 * 1024
         cache_mode = m.group(5)
