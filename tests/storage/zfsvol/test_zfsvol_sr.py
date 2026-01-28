@@ -75,7 +75,7 @@ class TestZfsvolVm:
     def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat):
         vm = storage_test_vm
         sr = zfsvol_sr
-        vdi = sr.create_vdi(image_format=image_format)
+        vdi = sr.create_vdi(None, image_format=image_format)
         image_path = f'/tmp/{vdi.uuid}.{image_format}'
         try:
             vbd = vm.connect_vdi(vdi)
@@ -94,7 +94,7 @@ class TestZfsvolVm:
                 logging.warning(f"FIXME: this is broken with vhd, skip for now (XCPNG-2631). File size is {size_mb}MB")
             else:
                 assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
-            vdi = sr.create_vdi(image_format=image_format)
+            vdi = sr.create_vdi(None, image_format=image_format)
             vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
             vm.connect_vdi(vdi, 'xvdb')
             vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")

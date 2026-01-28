@@ -167,7 +167,7 @@ class SR:
         return self._type
 
     def create_vdi(
-        self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
+        self, name_label: str | None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
         name_label = name_label or f'test-vdi-{randid()}'
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
