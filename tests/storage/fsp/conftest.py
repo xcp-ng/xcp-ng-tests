@@ -1,6 +1,9 @@
 import pytest
 
+import time
+
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
+from lib.host import Host
 from pkgfixtures import host_with_saved_yum_state_toolstack_restart
 
 FSP_REPO_NAME = 'runx'
@@ -18,9 +21,12 @@ def host_with_runx_repo(host_with_saved_yum_state_toolstack_restart):
     host.remove_xcpng_repo(FSP_REPO_NAME)
 
 @pytest.fixture(scope='package')
-def host_with_fsp(host_with_runx_repo):
+def host_with_fsp(host_with_runx_repo: Host):
     host = host_with_runx_repo
     host.yum_install(FSP_PACKAGES)
+    # fsp is not listed by xe sm-list until it's actually used, so just wait a few seconds instead
+    # wait_for(lambda: host.xe('sm-list', {'type': 'fsp'}).strip() != '', "Wait for fsp to be available")
+    time.sleep(3)
     yield host
     # teardown: nothing to do, done by host_with_saved_yum_state.
 
