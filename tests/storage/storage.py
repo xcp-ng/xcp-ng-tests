@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 
 from lib import config
@@ -11,7 +12,7 @@ from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
-from typing import Literal
+from typing import Generator, Literal
 
 MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
@@ -25,6 +26,7 @@ def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
         ), 'Bad error, current: {}'.format(e.stdout)
         return
     assert False, 'SR creation should not have succeeded!'
+
 
 def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     """ Storage migration of a shutdown VM, then migrate it back. """
@@ -489,3 +491,325 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
     for span in spans:
         if span.checksum is not None:
             span.validate(vm, dev)
+
+# ---- CBT helpers -------------------------------------------------------------
+
+def wait_for_cbt_enabled(vdi: VDI, timeout: int = 60) -> None:
+    wait_for(
+        lambda: vdi.is_cbt_enabled(),
+        msg=f"Waiting for CBT to be enabled on VDI {vdi.uuid}",
+        timeout_secs=timeout
+    )
+
+
+def wait_for_cbt_disabled(vdi: VDI, timeout: int = 60) -> None:
+    wait_for(
+        lambda: not vdi.is_cbt_enabled(),
+        msg=f"Waiting for CBT to be disabled on VDI {vdi.uuid}",
+        timeout_secs=timeout
+    )
+
+
+def assert_cbt_enabled(vdi: VDI) -> None:
+    assert vdi.is_cbt_enabled(), f"CBT should be enabled on VDI {vdi.uuid}"
+
+
+def assert_cbt_disabled(vdi: VDI) -> None:
+    assert not vdi.is_cbt_enabled(), f"CBT should be disabled on VDI {vdi.uuid}"
+
+
+def list_changed_blocks(vdi_from: VDI, vdi_to: VDI) -> str:
+    """List changed blocks between two VDIs using the correct XAPI parameter name."""
+    logging.info(f"Listing changed blocks from VDI {vdi_from.uuid} to {vdi_to.uuid}")
+    return vdi_from.sr.pool.master.xe('vdi-list-changed-blocks', {
+        'vdi-from-uuid': vdi_from.uuid,
+        'vdi-to-uuid': vdi_to.uuid
+    })
+
+
+def verify_changed_blocks_detected(vdi_from: VDI, vdi_to: VDI) -> bool:
+    changed = list_changed_blocks(vdi_from, vdi_to)
+    return bool(changed and changed.strip())
+
+
+def assert_changed_blocks_exist(vdi_from: VDI, vdi_to: VDI) -> None:
+    changed = list_changed_blocks(vdi_from, vdi_to)
+    assert changed and changed.strip(), \
+        f"Expected changed blocks between {vdi_from.uuid} and {vdi_to.uuid}"
+
+
+def assert_no_changed_blocks(vdi_from: VDI, vdi_to: VDI) -> None:
+    changed = list_changed_blocks(vdi_from, vdi_to)
+    assert not changed or not changed.strip(), \
+        f"Expected no changed blocks between {vdi_from.uuid} and {vdi_to.uuid}"
+
+
+def get_vdi_from_vm(vm: VM, sr: SR) -> VDI:
+    """Return the first VDI of a VM, bound to the given SR."""
+    vdi_uuids = vm.vdi_uuids()
+    assert vdi_uuids, f"VM {vm.uuid} has no VDIs"
+    return VDI(vdi_uuids[0], sr=sr)
+
+
+def enable_cbt_with_wait(vdi: VDI, timeout: int = 60) -> None:
+    vdi.enable_cbt()
+    wait_for_cbt_enabled(vdi, timeout)
+
+
+def disable_cbt_with_wait(vdi: VDI, timeout: int = 60) -> None:
+    vdi.disable_cbt()
+    wait_for_cbt_disabled(vdi, timeout)
+
+
+def assert_cbt_log_exists_file_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    log_path = f"/var/run/sr-mount/{sr.uuid}/{vdi.uuid}.cbtlog"
+    result = host.ssh(f'test -f {log_path}', check=False, simple_output=False)
+    assert result.returncode == 0, f"CBT log not found at {log_path}"
+    result = host.ssh(f'stat -c %s {log_path}', simple_output=False)
+    log_size = int(result.stdout.strip())
+    assert log_size > 0, f"CBT log at {log_path} is empty"
+    logging.info(f"CBT log exists: {log_path} ({log_size} bytes)")
+
+
+def assert_cbt_log_exists_lvm_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    vg_name = f"VG_XenStorage-{sr.uuid}"
+    cbt_log_name = f"{vdi.uuid}.cbtlog"
+    result = host.ssh(f'lvs --noheadings -o lv_name {vg_name}', simple_output=False)
+    assert cbt_log_name in result.stdout, \
+        f"CBT log LV {cbt_log_name} not found in VG {vg_name}"
+    logging.info(f"CBT log LV exists: {vg_name}/{cbt_log_name}")
+
+
+def assert_cbt_log_does_not_exist_file_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    log_path = f"/var/run/sr-mount/{sr.uuid}/{vdi.uuid}.cbtlog"
+    result = host.ssh(f'test -f {log_path}', check=False, simple_output=False)
+    assert result.returncode != 0, f"CBT log should not exist at {log_path}"
+    logging.info(f"CBT log correctly absent: {log_path}")
+
+
+def assert_cbt_log_does_not_exist_lvm_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    vg_name = f"VG_XenStorage-{sr.uuid}"
+    cbt_log_name = f"{vdi.uuid}.cbtlog"
+    result = host.ssh(f'lvs --noheadings -o lv_name {vg_name}', simple_output=False)
+    assert cbt_log_name not in result.stdout, \
+        f"CBT log LV {cbt_log_name} should not exist in VG {vg_name}"
+    logging.info(f"CBT log LV correctly absent: {vg_name}/{cbt_log_name}")
+
+
+@contextmanager
+def cbt_enabled(vdi: VDI) -> Generator[VDI, None, None]:
+    enable_cbt_with_wait(vdi)
+    try:
+        yield vdi
+    finally:
+        disable_cbt_with_wait(vdi)
+
+
+@contextmanager
+def vm_halted(vm: VM) -> Generator[VM, None, None]:
+    """Ensure the VM is halted on entry, yield, then ensure it is halted again on exit."""
+    if vm.is_paused() or vm.is_suspended():
+        vm.shutdown(force=True, verify=True)
+    elif vm.is_running():
+        vm.shutdown(verify=True)
+        wait_for(vm.is_halted, "Wait for VM halted")
+    try:
+        yield vm
+    finally:
+        if vm.is_paused() or vm.is_suspended():
+            vm.shutdown(force=True, verify=True)
+        elif vm.is_running():
+            vm.shutdown(verify=True)
+        wait_for(vm.is_halted, "Wait for VM halted")
+
+
+@contextmanager
+def vm_started(vm: VM) -> Generator[VM, None, None]:
+    """Ensure the VM is started, booted, and SSH-reachable on entry, yield, then shut it down on exit."""
+    if vm.is_paused() or vm.is_suspended():
+        vm.shutdown(force=True, verify=True)
+    wait_for(vm.is_halted, "Wait for VM halted before start")
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    try:
+        yield vm
+    finally:
+        if vm.is_running():
+            vm.shutdown(verify=True, force_if_fails=True)
+
+
+class CBTTest:
+    """
+    Base class for CBT tests on a given SR.
+
+    Subclasses should expose one `test_*` wrapper per `_test_*` method below,
+    declaring the SR and VM fixtures explicitly so that fixture-dependent
+    parametrization (e.g. `image_format`) is correctly resolved by pytest.
+    """
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        raise NotImplementedError
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        raise NotImplementedError
+
+    def _test_enable_disable_cbt(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi):
+            assert_cbt_enabled(vdi)
+        assert_cbt_disabled(vdi)
+
+    def _test_cbt_log_creation(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi):
+            self.assert_cbt_log_exists(host, sr, vdi)
+
+    def _test_snapshot_with_cbt(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi), ExitStack() as stack:
+            snapshot_vdi = vdi.snapshot()
+            stack.callback(lambda: vdi.wait_for_coalesce(snapshot_vdi.destroy))
+            assert_cbt_enabled(snapshot_vdi)
+            self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+            logging.info(f"Snapshot with CBT: {snapshot_vdi.uuid}")
+
+    def _test_changed_blocks_tracking(self, host: Host, sr: SR, vdi: VDI, vm: VM) -> None:
+        with cbt_enabled(vdi), ExitStack() as stack:
+            baseline = vdi.snapshot()
+            stack.callback(baseline.destroy)
+            vm.start()
+            vm.wait_for_os_booted()
+            vbd = vm.connect_vdi(vdi)
+            dev = f'/dev/{vbd.param_get("device")}'
+            install_randstream(vm)
+            vm.ssh(f'randstream generate --size 10485760 {dev}')
+            vm.ssh('sync')
+            vm.disconnect_vdi(vdi)
+            vm.shutdown(verify=True)
+            second = vdi.snapshot()
+            stack.callback(second.destroy)
+            assert_changed_blocks_exist(baseline, second)
+            logging.info("Changed blocks detected successfully")
+
+    def _test_cbt_after_coalesce(self, host: Host, sr: SR, vdi: VDI, vm: VM) -> None:
+        enable_cbt_with_wait(vdi)
+        try:
+            vm.start()
+            vm.wait_for_os_booted()
+            vbd = vm.connect_vdi(vdi)
+            dev = f'/dev/{vbd.param_get("device")}'
+            install_randstream(vm)
+            vm.ssh(f'randstream generate --size 5242880 {dev}')
+            vm.ssh('sync')
+            vm.disconnect_vdi(vdi)
+            vm.shutdown(verify=True)
+            snap1 = vdi.snapshot()
+            vdi.wait_for_coalesce(snap1.destroy)
+            assert_cbt_enabled(vdi)
+            logging.info("CBT survived coalesce")
+        finally:
+            disable_cbt_with_wait(vdi)
+
+    def _test_incremental_snap_scenario(self, host: Host, sr: SR, vdi: VDI, vm: VM) -> None:
+        enable_cbt_with_wait(vdi)
+        snapshots = []
+        try:
+            vm.start()
+            vm.wait_for_os_booted()
+            vbd = vm.connect_vdi(vdi)
+            dev = f'/dev/{vbd.param_get("device")}'
+            install_randstream(vm)
+            for i in range(3):
+                snap = vdi.snapshot()
+                snapshots.append(snap)
+                assert_cbt_enabled(snap)
+                if i < 2:
+                    vm.ssh(f'randstream generate --size 5242880 {dev}')
+                    vm.ssh('sync')
+            vm.disconnect_vdi(vdi)
+            vm.shutdown(verify=True)
+            for i in range(len(snapshots) - 1):
+                assert verify_changed_blocks_detected(snapshots[i], snapshots[i + 1])
+                logging.info(f"Changes detected: snap{i} -> snap{i + 1}")
+        finally:
+            for snap in snapshots:
+                snap.destroy()
+            disable_cbt_with_wait(vdi)
+
+    def _test_disable_cbt_removes_log(self, host: Host, sr: SR, vdi: VDI) -> None:
+        enable_cbt_with_wait(vdi)
+        self.assert_cbt_log_exists(host, sr, vdi)
+        disable_cbt_with_wait(vdi)
+        self.assert_cbt_log_does_not_exist(host, sr, vdi)
+
+    def _test_destroy_vdi_removes_cbt_log(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi):
+            snapshot_vdi = vdi.snapshot()
+            with ExitStack() as stack:
+                stack.callback(lambda: vdi.wait_for_coalesce(snapshot_vdi.destroy))
+                self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+            self.assert_cbt_log_does_not_exist(host, sr, snapshot_vdi)
+
+    def _test_cbt_persist_after_sr_reboot(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi):
+            assert_cbt_enabled(vdi)
+            sr.unplug_pbds()
+            sr.plug_pbds(verify=True)
+            assert_cbt_enabled(vdi)
+            logging.info("CBT persisted after SR unplug/replug")
+
+    def _test_cbt_on_snapshot_chain(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi), ExitStack() as stack:
+            snap1 = vdi.snapshot()
+            stack.callback(snap1.destroy)
+            assert_cbt_enabled(snap1)
+            snap2 = snap1.snapshot()
+            stack.callback(snap2.destroy)
+            assert_cbt_enabled(snap2)
+            snap3 = snap2.snapshot()
+            stack.callback(snap3.destroy)
+            assert_cbt_enabled(snap3)
+            logging.info("CBT enabled on full snapshot chain")
+
+    def _test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi):
+            snapshot_vdi = vdi.snapshot()
+            try:
+                assert_cbt_enabled(snapshot_vdi)
+                disable_cbt_with_wait(vdi)
+                assert_cbt_disabled(vdi)
+                assert_cbt_enabled(snapshot_vdi)
+                logging.info("Disabling CBT on parent did not affect snapshot")
+                enable_cbt_with_wait(vdi)
+            finally:
+                vdi.wait_for_coalesce(snapshot_vdi.destroy)
+
+    def _test_cbt_data_destroy(self, host: Host, sr: SR, vdi: VDI) -> None:
+        with cbt_enabled(vdi), ExitStack() as stack:
+            snapshot_vdi = vdi.snapshot()
+            stack.callback(snapshot_vdi.destroy)
+            assert_cbt_enabled(snapshot_vdi)
+            self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+            snapshot_vdi.data_destroy()
+            assert_cbt_enabled(snapshot_vdi)
+            self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+            logging.info("CBT log persists after data_destroy")
+
+    def _test_cbt_bitmap_non_zero_after_write(self, host: Host, sr: SR, vdi: VDI, vm: VM) -> None:
+        with cbt_enabled(vdi), ExitStack() as stack:
+            baseline = vdi.snapshot()
+            stack.callback(baseline.destroy)
+            vm.start()
+            vm.wait_for_os_booted()
+            vbd = vm.connect_vdi(vdi)
+            dev = f'/dev/{vbd.param_get("device")}'
+            install_randstream(vm)
+            vm.ssh(f'randstream generate --size 10485760 {dev}')
+            vm.ssh('sync')
+            vm.disconnect_vdi(vdi)
+            vm.shutdown(verify=True)
+            after = vdi.snapshot()
+            stack.callback(after.destroy)
+            changed = list_changed_blocks(baseline, after)
+            assert changed.strip('0'), \
+                "CBT bitmap should contain non-zero blocks after write"
+            logging.info("CBT bitmap has non-zero blocks after write")
