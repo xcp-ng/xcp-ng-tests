@@ -1,5 +1,13 @@
+from __future__ import annotations
+
 import logging
 import time
+
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.pool import Pool
 
 import lib.commands as commands
 from lib.common import (
@@ -14,12 +22,12 @@ from lib.common import (
 from lib.vdi import VDI, ImageFormat
 
 class SR:
-    def __init__(self, uuid, pool):
+    def __init__(self, uuid, pool: Pool):
         self.uuid = uuid
         self.pool = pool
-        self._is_shared = None # cached value for is_shared()
-        self._main_host = None # cached value for main_host()
-        self._type = None # cache value for get_type()
+        self._is_shared: Optional[bool] = None # cached value for is_shared()
+        self._main_host: Optional[Host] = None # cached value for main_host()
+        self._type: Optional[str] = None # cache value for get_type()
 
     def pbd_uuids(self):
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
@@ -143,7 +151,7 @@ class SR:
     def attached_to_host(self, host):
         return host.uuid in self.hosts_uuids()
 
-    def main_host(self):
+    def main_host(self) -> Host:
         """ Returns the host in case of a local SR, the master host in case of a shared SR. """
         if self._main_host is None:
             if self.is_shared():
@@ -155,7 +163,7 @@ class SR:
     def content_type(self):
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
 
-    def is_shared(self):
+    def is_shared(self) -> bool:
         if self._is_shared is None:
             self._is_shared = strtobool(self.pool.master.xe('sr-param-get',
                                                             {'uuid': self.uuid, 'param-name': 'shared'}))

@@ -152,14 +152,14 @@ class VM(BaseVM):
         cmd = f"put {src} {dest}"
         return commands.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
 
-    def is_ssh_up(self):
+    def is_ssh_up(self) -> bool:
         try:
             return self.ssh_with_result(['true']).returncode == 0
         except commands.SSHCommandFailed:
             # probably not up yet
             return False
 
-    def is_management_agent_up(self):
+    def is_management_agent_up(self) -> bool:
         """Check for management agent features required by the tests."""
         return (
             self.param_get("PV-drivers-version", "major", accept_unknown_key=True) is not None
@@ -234,10 +234,10 @@ class VM(BaseVM):
         if verify:
             wait_for_not(self.exists, "Wait for VM destroyed")
 
-    def exists(self):
+    def exists(self) -> bool:
         return self.host.pool_has_vm(self.uuid)
 
-    def exists_on_previous_pool(self):
+    def exists_on_previous_pool(self) -> bool:
         assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
@@ -291,9 +291,9 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis=None):
+    def snapshot(self, ignore_vdis=None) -> Snapshot:
         logging.info("Snapshot VM")
-        args = {'uuid': self.uuid, 'new-name-label': 'Snapshot of %s' % self.uuid}
+        args: dict[str, str | bool] = {'uuid': self.uuid, 'new-name-label': 'Snapshot of %s' % self.uuid}
         if ignore_vdis:
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         snap_uuid = self.host.xe('vm-snapshot', args)
@@ -368,7 +368,7 @@ class VM(BaseVM):
             else:
                 raise
 
-    def vifs(self):
+    def vifs(self) -> list[VIF]:
         _vifs = []
         for vif_uuid in safe_split(self.host.xe('vif-list', {'vm-uuid': self.uuid}, minimal=True)):
             _vifs.append(VIF(vif_uuid, self))
@@ -427,7 +427,7 @@ class VM(BaseVM):
             self.ssh(['rm', '-f', pidfile])
             return pid
 
-    def pid_exists(self, pid):
+    def pid_exists(self, pid) -> bool:
         return self.ssh_with_result(['kill', '-s', '0', pid]).returncode == 0
 
     def execute_script(self, script_contents, simple_output=True):
@@ -467,7 +467,7 @@ class VM(BaseVM):
         version_dict = self.tools_version_dict()
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
-    def file_exists(self, filepath, regular_file=True):
+    def file_exists(self, filepath, regular_file=True) -> bool:
         """Returns True if the file exists, otherwise returns False."""
         option = '-f' if regular_file else '-e'
         return self.ssh_with_result(['test', option, filepath]).returncode == 0
@@ -615,7 +615,7 @@ class VM(BaseVM):
         logging.info("Destroying vTPM %s" % vtpm_uuid)
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
-    def create_vbd(self, device, vdi_uuid):
+    def create_vbd(self, device, vdi_uuid) -> VBD:
         logging.info("Create VBD %r for VDI %r on VM %s", device, vdi_uuid, self.uuid)
         vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
                                                'device': device,
@@ -624,7 +624,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return VBD(vbd_uuid, self, device)
 
-    def create_cd_vbd(self, device, userdevice):
+    def create_cd_vbd(self, device, userdevice) -> VBD:
         logging.info("Create CD VBD %r on VM %s", device, self.uuid)
         vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
                                                'device': device,
@@ -636,7 +636,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name=None):
+    def clone(self, *, name=None) -> VM:
         if name is None:
             name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
@@ -699,7 +699,7 @@ class VM(BaseVM):
                 "Got: %r" % last_byte
             )
 
-    def is_in_uefi_shell(self):
+    def is_in_uefi_shell(self) -> bool:
         """
         Returns True if it can be established that the UEFI shell is currently running.
 
