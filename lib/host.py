@@ -767,3 +767,13 @@ class Host:
                 continue
             ret.append(line.strip())
         return ret
+
+    def PIFs(self, device: Optional[str] = None) -> list[pif.PIF]:
+        args: Dict[str, str | bool] = {
+            "host-uuid": self.uuid,
+        }
+
+        if device is not None:
+            args["device"] = device
+
+        return [pif.PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
