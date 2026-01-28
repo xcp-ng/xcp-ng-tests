@@ -67,6 +67,14 @@ class VDI:
         logging.info(f"Resizing VDI {self.uuid} to {new_size}")
         self.sr.pool.master.xe("vdi-resize", {"uuid": self.uuid, "disk-size": str(new_size)})
 
+    def enable_cbt(self):
+        logging.info(f"enable cbt on VDI {self.uuid}")
+        self.sr.pool.master.xe('vdi-enable-cbt', {'uuid': self.uuid})
+
+    def disable_cbt(self):
+        logging.info(f"disable cbt on VDI {self.uuid}")
+        self.sr.pool.master.xe('vdi-disable-cbt', {'uuid': self.uuid})
+
     def __str__(self):
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 
