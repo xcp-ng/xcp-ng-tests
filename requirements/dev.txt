@@ -10,5 +10,6 @@ ruff
 types-requests
 typing-extensions
 libarchive-c==5.3
+XenAPI
 zizmor
 -r base.txt
