@@ -7,4 +7,5 @@ pluggy>=1.1.0
 pydantic
 pytest>=8.0.0
 pytest-dependency
+pytest-repeat>=0.9.4
 requests

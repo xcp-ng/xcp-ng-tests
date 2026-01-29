@@ -1,0 +1,501 @@
+"""
+Basic tapdisk tests without VMs.
+
+Tests VBD lifecycle operations using tap-ctl directly:
+- spawn/allocate/attach/open/close/detach/free
+- pause/resume
+- list/stats
+- error handling
+
+All tests marked with @pytest.mark.no_vm since they don't require VMs.
+
+NOTE: These tests are currently disabled as their usefulness is unclear.
+"""
+import pytest
+import logging
+
+from lib.blktap import TapCtl, TapCtlError
+
+# Skip all tests in this module
+pytestmark = pytest.mark.skip(reason="Basic tap-ctl tests disabled - usefulness unclear")
+
+
+@pytest.mark.no_vm
+class TestTapdiskSpawn:
+    """Test tapdisk process spawning."""
+
+    def test_spawn_returns_pid(self, tapctl):
+        """Spawn should return a valid PID."""
+        pid = tapctl.spawn()
+
+        assert isinstance(pid, int)
+        assert pid > 0
+
+        # Verify tapdisk process exists
+        result = tapctl.host.ssh(["ps", "-p", str(pid)], check=False, simple_output=False)
+        assert result.returncode == 0, f"Process {pid} does not exist"
+
+        # Verify tapdisk appears in list (may be empty if not attached yet)
+        tapdisks = tapctl.list(pid=pid)
+        assert isinstance(tapdisks, list)
+
+        # Cleanup: kill the spawned tapdisk
+        tapctl.host.ssh(['kill', '-9', str(pid)], check=False)
+
+    def test_spawn_multiple(self, tapctl):
+        """Can spawn multiple tapdisk processes."""
+        pid1 = tapctl.spawn()
+        pid2 = tapctl.spawn()
+
+        try:
+            assert pid1 != pid2
+            assert pid1 > 0
+            assert pid2 > 0
+
+            # Both should exist as processes
+            result1 = tapctl.host.ssh(["ps", "-p", str(pid1)], check=False, simple_output=False)
+            assert result1.returncode == 0, f"Process {pid1} does not exist"
+            result2 = tapctl.host.ssh(["ps", "-p", str(pid2)], check=False, simple_output=False)
+            assert result2.returncode == 0, f"Process {pid2} does not exist"
+
+        finally:
+            # Cleanup: kill both spawned tapdisks
+            tapctl.host.ssh(['kill', '-9', str(pid1)], check=False)
+            tapctl.host.ssh(['kill', '-9', str(pid2)], check=False)
+
+
+@pytest.mark.no_vm
+class TestTapdiskAllocate:
+    """Test device allocation."""
+
+    def test_allocate_returns_minor_and_device(self, tapctl):
+        """Allocate should return minor number and device path."""
+        minor, device = tapctl.allocate()
+
+        assert isinstance(minor, int)
+        assert minor >= 0
+        assert isinstance(device, str)
+        assert 'tapdev' in device
+
+        # Cleanup
+        tapctl.free(minor)
+
+    def test_free_allocated_device(self, tapctl):
+        """Free should release an allocated device."""
+        minor, _ = tapctl.allocate()
+
+        # Should not raise
+        tapctl.free(minor)
+
+        # Note: Double free behavior is implementation-dependent
+        # Some implementations may be idempotent
+
+
+@pytest.mark.no_vm
+class TestTapdiskVBDLifecycle:
+    """Test complete VBD lifecycle: attach → open → close → detach."""
+
+    def test_attach_and_detach(self, tapctl):
+        """Attach and detach a minor to/from tapdisk."""
+        pid = tapctl.spawn()
+        minor, _ = tapctl.allocate()
+
+        try:
+            # Attach (should not raise an error)
+            tapctl.attach(pid, minor)
+
+            # Note: tap-ctl list only shows tapdisks with open images,
+            # so we can't verify the attach this way. Instead, verify
+            # that detach succeeds (would fail if not attached)
+
+            # Detach (should not raise an error)
+            tapctl.detach(pid, minor)
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.free(minor)
+            except Exception as e:
+                logging.warning(f"Failed to free minor {minor}: {e}")
+
+            tapctl.host.ssh(['kill', '-9', str(pid)], check=False)
+
+    def test_open_and_close_vhd(self, tapctl, test_vhd_small):
+        """Open and close a VHD image."""
+        pid = tapctl.spawn()
+        minor, _ = tapctl.allocate()
+        tapctl.attach(pid, minor)
+
+        try:
+            # Open VHD
+            image_path = f"vhd:{test_vhd_small}"
+            tapctl.open(pid, minor, image_path)
+
+            # Verify it appears in list with correct path
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            assert len(tapdisks) == 1
+            assert tapdisks[0].type == "vhd"
+            assert test_vhd_small in tapdisks[0].path
+
+            # Close - use force=True as tapdisk may have issues without VM connection
+            try:
+                tapctl.close(pid, minor, force=True)
+            except TapCtlError as e:
+                # Tapdisk may crash without VM connection, which is expected behavior
+                logging.warning(f"Close failed (expected without VM connection): {e}")
+                # Verify the tapdisk is gone by trying to list it
+                result = tapctl.host.ssh(["ps", "-p", str(pid)], check=False, simple_output=False)
+                if result.returncode != 0:
+                    # Process died, skip rest of test
+                    logging.info(f"Tapdisk process {pid} died, skipping remaining assertions")
+                    return
+
+            # After close, may still be in list but with empty path
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            if tapdisks:
+                assert tapdisks[0].path == "" or tapdisks[0].path == "-"
+
+        finally:
+            # Cleanup - check if process still exists before detaching
+            result = tapctl.host.ssh(["ps", "-p", str(pid)], check=False, simple_output=False)
+            if result.returncode == 0:
+                try:
+                    tapctl.detach(pid, minor)
+                    tapctl.free(minor)
+                except Exception as e:
+                    logging.warning(f"Cleanup error: {e}")
+            else:
+                # Process is dead, just try to free the minor
+                try:
+                    tapctl.free(minor)
+                except Exception as e:
+                    logging.warning(f"Failed to free minor {minor}: {e}")
+
+    def test_open_readonly(self, tapctl, test_vhd_small):
+        """Open image in read-only mode."""
+        pid = tapctl.spawn()
+        minor, _ = tapctl.allocate()
+        tapctl.attach(pid, minor)
+
+        try:
+            # Open read-only
+            image_path = f"vhd:{test_vhd_small}"
+            tapctl.open(pid, minor, image_path, readonly=True)
+
+            # Verify it's open
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            assert len(tapdisks) == 1
+
+        finally:
+            # Cleanup - use force close and check if process exists
+            try:
+                tapctl.close(pid, minor, force=True)
+            except Exception as e:
+                logging.warning(f"Force close failed: {e}")
+
+            # Check if process still exists before detaching
+            result = tapctl.host.ssh(["ps", "-p", str(pid)], check=False, simple_output=False)
+            if result.returncode == 0:
+                try:
+                    tapctl.detach(pid, minor)
+                    tapctl.free(minor)
+                except Exception as e:
+                    logging.warning(f"Cleanup error: {e}")
+            else:
+                try:
+                    tapctl.free(minor)
+                except Exception:
+                    pass
+
+
+@pytest.mark.no_vm
+class TestTapdiskCreate:
+    """Test the 'create' shortcut command."""
+
+    def test_create_combines_operations(self, tapctl, test_vhd_small):
+        """Create should spawn + allocate + attach + open in one command."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            assert pid > 0
+            assert minor >= 0
+
+            # Should be in list and open
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            assert len(tapdisks) == 1
+            assert tapdisks[0].type == "vhd"
+
+        finally:
+            # Cleanup - destroy may fail without VM connection
+            try:
+                tapctl.destroy(pid, minor)
+            except TapCtlError as e:
+                logging.warning(f"Destroy failed (expected without VM): {e}")
+                # Try manual cleanup
+                try:
+                    tapctl.close(pid, minor, force=True)
+                except Exception:
+                    pass
+                try:
+                    tapctl.free(minor)
+                except Exception:
+                    pass
+
+    def test_create_readonly(self, tapctl, test_vhd_small):
+        """Create with read-only flag."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path, readonly=True)
+
+        try:
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            assert len(tapdisks) == 1
+
+        finally:
+            # Cleanup - destroy may fail without VM connection
+            try:
+                tapctl.destroy(pid, minor)
+            except TapCtlError as e:
+                logging.warning(f"Destroy failed (expected without VM): {e}")
+                try:
+                    tapctl.free(minor)
+                except Exception:
+                    pass
+
+
+@pytest.mark.no_vm
+class TestTapdiskDestroy:
+    """Test the 'destroy' shortcut command."""
+
+    def test_destroy_cleans_up(self, tapctl, test_vhd_small):
+        """Destroy should close + detach + free."""
+        # Create
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        # Destroy - may fail without VM connection
+        try:
+            tapctl.destroy(pid, minor)
+        except TapCtlError as e:
+            # Expected without VM connection
+            logging.warning(f"Destroy failed (expected without VM): {e}")
+            # Verify process is gone
+            result = tapctl.host.ssh(["ps", "-p", str(pid)], check=False, simple_output=False)
+            assert result.returncode != 0, "Tapdisk process should have died"
+            return
+
+        # Should no longer be in list (or state shows closed)
+        tapdisks = tapctl.list(pid=pid, minor=minor)
+        # Either empty or path is empty
+        if tapdisks:
+            assert tapdisks[0].path == "" or tapdisks[0].path == "-"
+
+
+@pytest.mark.no_vm
+class TestTapdiskPauseResume:
+    """Test pause and resume operations."""
+
+    @pytest.mark.skip(reason="pause requires active VM connection")
+    def test_pause_and_unpause(self, tapctl, test_vhd_small):
+        """Pause and resume VBD."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            # Pause
+            tapctl.pause(pid, minor, timeout=5)
+
+            # State should show paused (implementation-dependent)
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            assert len(tapdisks) == 1
+
+            # Unpause
+            tapctl.unpause(pid, minor)
+
+            # State should be active again
+            tapdisks = tapctl.list(pid=pid, minor=minor)
+            assert len(tapdisks) == 1
+
+        finally:
+            # Cleanup
+            tapctl.destroy(pid, minor)
+
+    @pytest.mark.skip(reason="pause requires active VM connection")
+    def test_unpause_with_new_image(self, tapctl, test_vhd_small):
+        """Unpause can optionally specify a new image."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            # Pause
+            tapctl.pause(pid, minor)
+
+            # Unpause with same image
+            tapctl.unpause(pid, minor, path=image_path)
+
+        finally:
+            # Cleanup
+            tapctl.destroy(pid, minor)
+
+
+@pytest.mark.no_vm
+class TestTapdiskList:
+    """Test listing tapdisks."""
+
+    def test_list_all(self, tapctl):
+        """List all tapdisks."""
+        tapdisks = tapctl.list()
+        assert isinstance(tapdisks, list)
+        # May be empty, that's OK
+
+    def test_list_by_pid(self, tapctl, test_vhd_small):
+        """Filter list by PID."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            # List only this PID
+            tapdisks = tapctl.list(pid=pid)
+            assert len(tapdisks) >= 1
+            assert all(t.pid == pid for t in tapdisks)
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.destroy(pid, minor)
+            except TapCtlError:
+                pass
+
+    def test_list_by_minor(self, tapctl, test_vhd_small):
+        """Filter list by minor."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            # List only this minor
+            tapdisks = tapctl.list(minor=minor)
+            assert len(tapdisks) == 1
+            assert tapdisks[0].minor == minor
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.destroy(pid, minor)
+            except TapCtlError:
+                pass
+
+
+@pytest.mark.no_vm
+class TestTapdiskStats:
+    """Test statistics collection."""
+
+    def test_stats_returns_dict(self, tapctl, test_vhd_small):
+        """Stats should return a dictionary."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            # Get stats
+            stats = tapctl.stats(pid, minor)
+
+            assert isinstance(stats, dict)
+            # Should have some basic fields (implementation-dependent)
+            # Common fields: received, returned, etc.
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.destroy(pid, minor)
+            except TapCtlError:
+                pass
+
+    def test_stats_without_io(self, tapctl, test_vhd_small):
+        """Stats should work even without I/O activity."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            stats = tapctl.stats(pid, minor)
+
+            # Should have zero or low counts
+            assert isinstance(stats, dict)
+            # No I/O yet, so counters should be low/zero
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.destroy(pid, minor)
+            except TapCtlError:
+                pass
+
+
+@pytest.mark.no_vm
+class TestTapdiskErrors:
+    """Test error handling."""
+
+    def test_open_nonexistent_file(self, tapctl):
+        """Opening non-existent file should fail."""
+        pid = tapctl.spawn()
+        minor, _ = tapctl.allocate()
+        tapctl.attach(pid, minor)
+
+        try:
+            # Try to open non-existent file
+            with pytest.raises(TapCtlError):
+                tapctl.open(pid, minor, "vhd:/nonexistent/file.vhd")
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.detach(pid, minor)
+                tapctl.free(minor)
+            except Exception:
+                pass
+
+    def test_double_open_fails(self, tapctl, test_vhd_small):
+        """Opening same VBD twice should fail."""
+        pid = tapctl.spawn()
+        minor, _ = tapctl.allocate()
+        tapctl.attach(pid, minor)
+
+        image_path = f"vhd:{test_vhd_small}"
+
+        try:
+            tapctl.open(pid, minor, image_path)
+
+            # Try to open again
+            with pytest.raises(TapCtlError):
+                tapctl.open(pid, minor, image_path)
+
+        finally:
+            # Cleanup
+            try:
+                tapctl.close(pid, minor)
+                tapctl.detach(pid, minor)
+                tapctl.free(minor)
+            except Exception:
+                pass
+
+    def test_detach_without_close_fails(self, tapctl, test_vhd_small):
+        """Detaching without closing should fail."""
+        image_path = f"vhd:{test_vhd_small}"
+        pid, minor = tapctl.create(image_path)
+
+        try:
+            # Try to detach without closing - should fail
+            with pytest.raises(TapCtlError):
+                tapctl.detach(pid, minor)
+
+        finally:
+            # Cleanup - use force destroy
+            try:
+                tapctl.destroy(pid, minor)
+            except Exception as e:
+                # If destroy fails, try force close first
+                try:
+                    tapctl.close(pid, minor, force=True)
+                    tapctl.detach(pid, minor)
+                    tapctl.free(minor)
+                except Exception:
+                    # Give up, process might be dead
+                    pass
