@@ -31,6 +31,7 @@ dev = [
     "types-pygments",
     "types-colorama",
     "types-pexpect",
+    "XenAPI",
     "zizmor",
     "prek>=0.4.4",
     "autopep8",
@@ -83,7 +84,7 @@ ignore = [
 pydocstyle.convention = "pep257"
 
 [tool.ruff.lint.extend-per-file-ignores]
-# Pytest fixtures are often flagged as unused imports (F401) or 
+# Pytest fixtures are often flagged as unused imports (F401) or
 # redefined variables (F811) because they are injected by name.
 "tests/**/*.py" = [
   "F401",  # F401 unused-import
