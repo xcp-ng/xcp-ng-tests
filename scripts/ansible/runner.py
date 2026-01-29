@@ -18,32 +18,28 @@ import __main__
 from typing import List
 
 try:
-    from yaml import CDumper as Dumper
     from yaml import CLoader as Loader
 except ImportError:
-    from yaml import Dumper, Loader
+    from yaml import Loader  # type: ignore
 
 cur = os.path.split(__main__.__file__)[0]
 root = os.path.abspath(os.path.join(cur, "..", ".."))
 sys.path.append(root)
 
 import data  # noqa
-from lib.commands import ssh  # noqa
 from lib.pool import Pool # noqa
 from lib.vm import VM # noqa
+from lib.host import Host # noqa
 
 user = getattr(data, "HOST_DEFAULT_USER", "root")
 
 
-def get_url_paths(url, ext="", params={}):
+def get_url_paths(url, ext="", params={}) -> list[str]:
     """Return all paths of files found at http server at url that match extension ext."""
     response = requests.get(url, params=params)
-    if response.ok:
-        response_text = response.text
-    else:
-        return response.raise_for_status()
-    soup = BeautifulSoup(response_text, "html.parser")
-    return [url + node.get("href") for node in soup.find_all("a") if node.get("href").endswith(ext)]
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    return [url + node.get("href") for node in soup.find_all("a") if node.get("href").endswith(ext)]  # type: ignore
 
 
 class Image:
@@ -89,11 +85,11 @@ def print_images(images: List[Image]):
 vms: List[VM] = []
 
 
-def cleanup(*args, **kwargs):
+def cleanup(*_args, **_kwargs):
     if not vms:
         return
 
-    logger.debug(f"Running cleanup")
+    logger.debug("Running cleanup")
     while vms:
         vm = vms.pop()
         logger.debug(f"Destroying {vm}")
@@ -191,16 +187,15 @@ if __name__ == "__main__":
         signal(sig, cleanup)
 
     if args.print_images:
-        print_images(images)
+        print_images(Image.from_http_server(args.http))
         sys.exit(0)
 
     ansible_hosts = get_ansible_hosts(args.playbook)
 
     # Initialize the hosts and gather the urls for the VM images to update
     host_ip_or_name = args.host if args.host else list(data.HOSTS.keys())[0]
-    pool = Pool(host)
+    pool = Pool(host_ip_or_name)
     host = pool.master
-    host.initialize()
 
     # Create an inventory (i.e., hosts file) for Ansible. The host name is the image name.
     lines = []
