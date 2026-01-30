@@ -13,19 +13,17 @@ from packaging import version
 import lib.config as global_config
 from lib import pxe
 from lib.common import (
-    callable_marker,
     DiskDevName,
     HostAddress,
+    callable_marker,
     is_uuid,
     prefix_object_name,
-    setup_formatted_and_mounted_disk,
     shortened_nodeid,
-    teardown_formatted_and_mounted_disk,
     vm_image,
     wait_for,
 )
-from lib.netutil import is_ipv6
 from lib.host import Host
+from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM, vm_cache_key_from_def
@@ -34,8 +32,6 @@ from lib.xo import xo_cli
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
-from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
-
 from typing import Dict, Generator, Iterable
 
 # Do we cache VMs?
@@ -321,7 +317,7 @@ def xfail_on_xcpng_8_3(host, request):
 @pytest.fixture(scope='session')
 def host_no_ipv6(host):
     if is_ipv6(host.hostname_or_ip):
-        pytest.skip(f"This test requires an IPv4 XCP-ng")
+        pytest.skip("This test requires an IPv4 XCP-ng")
 
 @pytest.fixture(scope="session")
 def shared_sr(host):
@@ -442,9 +438,7 @@ def vm_ref(request):
             logging.info(">> No VM specified on CLI, and no default found in test definition. Using global default.")
             ref = 'mini-linux-x86_64-bios'
 
-    if is_uuid(ref):
-        return ref
-    elif ref.startswith('http'):
+    if is_uuid(ref) or ref.startswith('http'):
         return ref
     else:
         return vm_image(ref)
