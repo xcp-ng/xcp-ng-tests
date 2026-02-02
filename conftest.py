@@ -187,7 +187,7 @@ def hosts(pytestconfig) -> Generator[list[Host]]:
             nested_list.append(host_vm)
 
             vif = host_vm.vifs()[0]
-            mac_address = vif.param_get('MAC')
+            mac_address = vif.mac_address()
             logging.info("Nested host has MAC %s", mac_address)
 
             host_vm.start()
