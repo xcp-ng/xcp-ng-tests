@@ -3,11 +3,14 @@ from __future__ import annotations
 import pytest
 
 import functools
+import json
 import logging
 import os
 from dataclasses import dataclass
 
 import lib.commands as commands
+from lib.common import safe_split
+from lib.sr import SR
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
@@ -19,6 +22,7 @@ if TYPE_CHECKING:
     from lib.pool import Pool
     from lib.sr import SR
     from lib.vdi import VDI
+    from lib.vm import VM
 
 GROUP_NAME = 'linstor_group'
 STORAGE_POOL_NAME = f'{GROUP_NAME}/thin_device'
@@ -171,3 +175,56 @@ def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str):
     yield vm
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture(scope='function')
+def host_and_corrupted_vdi_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str):
+    vm: VM = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
+    pool: Pool = host.pool
+    master: Host = pool.master
+
+    def get_vdi_volume_name_from_linstor() -> str:
+        result = master.ssh([
+            "linstor-kv-tool",
+            "--dump-volumes",
+            "-g",
+            f"xcp-sr-{GROUP_NAME}_thin_device"
+        ])
+        volumes = json.loads(result)
+        for k, v in volumes.items():
+            path = safe_split(k, "/")
+            if len(path) < 4:
+                continue
+            uuid = path[2]
+            data_type = path[3]
+            if uuid == vdi_uuid and data_type == "volume-name":
+                return v
+        raise FileNotFoundError(f"Could not find matching linstor volume for `{vdi_uuid}`")
+
+    def get_vdi_host(path: str) -> Host:
+        for h in pool.hosts:
+            result = h.ssh(["test", "-e", path], simple_output=False, check=False)
+            if result.returncode == 0:
+                return h
+        raise FileNotFoundError(f"Could not find matching host for `{vdi_uuid}`")
+
+    try:
+        vdi_uuid: str = next((
+            vdi.uuid for vdi in vm.vdis if vdi.sr.uuid == linstor_sr.uuid
+        ))
+
+        volume_name = get_vdi_volume_name_from_linstor()
+        lv_path = f"/dev/{GROUP_NAME}/{volume_name}_00000"
+        vdi_host = get_vdi_host(lv_path)
+        logging.info("[%s]: corrupting `%s`", host, lv_path)
+        vdi_host.ssh([
+            "dd",
+            "if=/dev/urandom",
+            f"of={lv_path}",
+            "bs=4096",
+            # Lower values seems to go undetected sometimes
+            "count=10000" # ~40MB
+        ])
+        yield vm, vdi_host, volume_name
+    finally:
+        logging.info("<< Destroy corrupted VDI")
+        vm.destroy(verify=True)
