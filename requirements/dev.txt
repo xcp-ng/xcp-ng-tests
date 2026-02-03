@@ -11,4 +11,5 @@ ruff
 types-requests
 typing-extensions
 libarchive-c==5.3
+XenAPI
 -r base.txt
