@@ -2,6 +2,7 @@ import enum
 import logging
 import re
 import time
+from pathlib import PureWindowsPath
 
 from data import ISO_DOWNLOAD_URL, TEST_DNS_SERVER
 from lib.commands import SSHCommandFailed
@@ -11,7 +12,7 @@ from lib.sr import SR
 from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Generator
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -24,7 +25,7 @@ class PowerAction(enum.Enum):
     Reboot = "reboot"
 
 
-def iso_create(host: Host, sr: SR, param: Dict[str, Any]):
+def iso_create(host: Host, sr: SR, param: Dict[str, Any]) -> Generator[dict[str, Any], None, None]:
     if param["download"]:
         vdi = host.import_iso(ISO_DOWNLOAD_URL + param["name"], sr)
         new_param = param.copy()
@@ -35,7 +36,7 @@ def iso_create(host: Host, sr: SR, param: Dict[str, Any]):
         yield param
 
 
-def try_get_and_store_vm_ip_serial(vm: VM, timeout: int):
+def try_get_and_store_vm_ip_serial(vm: VM, timeout: int) -> bool:
     domid = vm.param_get("dom-id")
     logging.debug(f"Domain ID {domid}")
     command = f"xl console -t serial {domid} | grep '~xcp-ng-tests~.*~end~' | head -n 1"
@@ -51,18 +52,18 @@ def try_get_and_store_vm_ip_serial(vm: VM, timeout: int):
     return True
 
 
-def vm_shutdown_without_tools(vm: VM):
+def vm_shutdown_without_tools(vm: VM) -> None:
     if vm.is_running():
         vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
         wait_for(vm.is_halted, "Wait for VM halted")
 
 
-def wait_for_vm_running_and_ssh_up_without_tools(vm: VM):
+def wait_for_vm_running_and_ssh_up_without_tools(vm: VM) -> None:
     wait_for(vm.is_running, "Wait for VM running")
     wait_for(vm.is_ssh_up, "Wait for SSH up")
 
 
-def enable_testsign(vm: VM, rootcert: Union[str, None]):
+def enable_testsign(vm: VM, rootcert: PureWindowsPath | None) -> None:
     assert vm.is_running()
 
     if strtobool(vm.param_get("platform", "secureboot")):
@@ -88,7 +89,7 @@ if ($LASTEXITCODE -ne 0) {{throw}}"""
     wait_for_vm_running_and_ssh_up_without_tools(vm)
 
 
-def insert_cd_safe(vm: VM, vdi_name: str, cd_path="D:/", retries=2):
+def insert_cd_safe(vm: VM, vdi_name: str, cd_path: str = "D:/", retries: int = 2) -> None:
     """
     Insert a CD with retry.
 
@@ -121,13 +122,13 @@ def insert_cd_safe(vm: VM, vdi_name: str, cd_path="D:/", retries=2):
     raise TimeoutError(f"Waiting for CD at {cd_path} failed")
 
 
-def vif_get_mac_without_separator(vif: VIF):
+def vif_get_mac_without_separator(vif: VIF) -> str:
     mac = vif.param_get("MAC")
     assert mac is not None
     return mac.replace(":", "")
 
 
-def vif_has_rss(vif: VIF):
+def vif_has_rss(vif: VIF) -> bool:
     # Even if the Xenvif hash setting request fails, Windows can still report the NIC as having RSS enabled as long as
     # the relevant OIDs are supported (Get-NetAdapterRss reports Enabled as True and Profile as Default).
     # We need to explicitly check MaxProcessors to see if the hash setting request has really succeeded.
@@ -141,7 +142,7 @@ Get-NetAdapterRss).MaxProcessors -gt 0"""
     )
 
 
-def vif_get_dns(vif: VIF):
+def vif_get_dns(vif: VIF) -> list[str]:
     mac = vif_get_mac_without_separator(vif)
     return vif.vm.execute_powershell_script(
         rf"""Import-Module DnsClient; Get-NetAdapter |
@@ -151,7 +152,7 @@ Select-Object -ExpandProperty ServerAddresses"""
     ).splitlines()
 
 
-def vif_set_dns(vif: VIF, nameservers: List[str]):
+def vif_set_dns(vif: VIF, nameservers: list[str]) -> None:
     mac = vif_get_mac_without_separator(vif)
     vif.vm.execute_powershell_script(
         rf"""Import-Module DnsClient; Get-NetAdapter |
@@ -161,7 +162,7 @@ Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
     )
 
 
-def is_vm_offboarded_xenvif(vm: VM):
+def is_vm_offboarded_xenvif(vm: VM) -> bool:
     try:
         val = vm.execute_powershell_script(
             r'$null -eq (Get-ScheduledTask "Copy-XenVifSettings" -ErrorAction SilentlyContinue)', simple_output=True
@@ -176,19 +177,19 @@ def is_vm_offboarded_xenvif(vm: VM):
         return False
 
 
-def wait_for_vm_xenvif_offboard(vm: VM):
+def wait_for_vm_xenvif_offboard(vm: VM) -> None:
     # Xenvif offboard will reset the NIC, so need to wait for it to disappear first
     wait_for(lambda: is_vm_offboarded_xenvif(vm), timeout_secs=180, retry_delay_secs=15)
 
 
-def set_vm_dns(vm: VM):
+def set_vm_dns(vm: VM) -> None:
     logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
     vif = vm.vifs()[0]
     assert TEST_DNS_SERVER not in vif_get_dns(vif)
     vif_set_dns(vif, [TEST_DNS_SERVER])
 
 
-def check_vm_dns(vm: VM):
+def check_vm_dns(vm: VM) -> None:
     # The restore task takes time to fire so wait for it
     vif = vm.vifs()[0]
     wait_for(
@@ -199,7 +200,7 @@ def check_vm_dns(vm: VM):
     )
 
 
-def check_vm_distro(vm: VM):
+def check_vm_distro(vm: VM) -> None:
     # anything goes, as long as it's not empty
     wait_for(
         lambda: vm.xenstore_read("data/os_distro", accept_unknown_key=True) is not None,
@@ -208,7 +209,7 @@ def check_vm_distro(vm: VM):
     )
 
 
-def check_vm_clipboard(vm: VM):
+def check_vm_clipboard(vm: VM) -> None:
     # Key must not exist prior to our write. If it does, likely nothing is watching
     assert vm.xenstore_read("data/set_clipboard", accept_unknown_key=True) is None
     vm.xenstore_write("data/set_clipboard", "foobar")

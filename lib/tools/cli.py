@@ -2,6 +2,8 @@
 
 The main entrypoint for running tools script.
 """
+from __future__ import annotations
+
 import argparse
 import logging
 from pathlib import Path
@@ -11,7 +13,7 @@ from lib.tools import logger
 from lib.tools.inventory import into_inventory, load_inventory
 from lib.tools.tasks.update import update_all
 
-def _command_update(args):
+def _command_update(args: argparse.Namespace) -> None:
     if args.inventory:
         inventory = load_inventory(args.inventory)
     else:
@@ -20,7 +22,7 @@ def _command_update(args):
     update_all(inventory)
 
 
-def cli():
+def cli() -> None:
     parser = argparse.ArgumentParser(
         description="Tools that help developers for running recurrent tasks on their XCP-ng sandbox."
     )
