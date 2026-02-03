@@ -36,12 +36,12 @@ class TestXFSSRCreateDestroy:
                                             host: Host,
                                             unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
                                             image_format: ImageFormat
-                                            ) -> None:
+                                            ):
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
             "xfsprogs must not be installed on the host at the beginning of the tests"
         sr_disk = unused_512B_disks[host][0]["name"]
-        sr = None
+        sr: SR | None = None
         try:
             sr = host.sr_create('xfs', "XFS-local-SR-test", {
                 'device': '/dev/' + sr_disk,
@@ -56,7 +56,7 @@ class TestXFSSRCreateDestroy:
     def test_create_and_destroy_sr(self,
                                    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
                                    host_with_xfsprogs: Host
-                                   ) -> None:
+                                   ):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_xfsprogs
         sr_disk = unused_512B_disks[host][0]["name"]
@@ -70,10 +70,10 @@ class TestXFSSRCreateDestroy:
 @pytest.mark.usefixtures("xfs_sr")
 class TestXFSSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, xfs_sr):
+    def test_quicktest(self, xfs_sr: SR):
         xfs_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_xfs_sr):
+    def test_vdi_is_not_open(self, vdi_on_xfs_sr: VDI):
         assert not vdi_is_open(vdi_on_xfs_sr)
 
     def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: ImageFormat):
@@ -85,7 +85,7 @@ class TestXFSSR:
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_xfs_sr):
+    def test_start_and_shutdown_VM(self, vm_on_xfs_sr: VM):
         vm = vm_on_xfs_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -93,7 +93,7 @@ class TestXFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_xfs_sr):
+    def test_snapshot(self, vm_on_xfs_sr: VM):
         vm = vm_on_xfs_sr
         vm.start()
         try:
@@ -120,7 +120,7 @@ class TestXFSSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_xfs_sr, host, xfs_sr):
+    def test_reboot(self, vm_on_xfs_sr: VM, host: Host, xfs_sr: SR):
         sr = xfs_sr
         vm = vm_on_xfs_sr
         host.reboot(verify=True)
@@ -131,7 +131,7 @@ class TestXFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.reboot
-    def test_xfsprogs_missing(self, host, xfs_sr):
+    def test_xfsprogs_missing(self, host: Host, xfs_sr: SR):
         sr = xfs_sr
         xfsprogs_installed = True
         try:

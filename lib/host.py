@@ -225,6 +225,16 @@ class Host:
     def remove_xcpng_repo(self, name):
         self.ssh(f'rm -f /etc/yum.repos.d/xcp-ng-{name}.repo')
 
+    @overload
+    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = True) -> str:
+        ...
+
+    @overload
+    def execute_script(
+        self, script_contents: str, *, shebang: str = ..., simple_output: Literal[False]
+    ) -> commands.SSHResult:
+        ...
+
     def execute_script(self, script_contents, shebang='sh', simple_output=True):
         with tempfile.NamedTemporaryFile('w') as script:
             os.chmod(script.name, 0o775)

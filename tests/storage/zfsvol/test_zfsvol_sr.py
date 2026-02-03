@@ -5,6 +5,7 @@ import pytest
 import logging
 
 from lib.common import vm_image, wait_for
+from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
@@ -16,6 +17,7 @@ from tests.storage import CoalesceOperation, ImageFormat, XVACompression, coales
 
 pytestmark = pytest.mark.usefixtures("host_at_least_8_3")
 
+
 class TestZfsvolSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,
@@ -23,7 +25,7 @@ class TestZfsvolSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_and_destroy_sr(self, sr_disk_wiped, host_with_zfsvol):
+    def test_create_and_destroy_sr(self, sr_disk_wiped: str, host_with_zfsvol: Host):
         host = host_with_zfsvol
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {'device': '/dev/' + sr_disk_wiped}, verify=True)
@@ -38,12 +40,12 @@ class TestZfsvolVm:
 
     @pytest.mark.xfail
     @pytest.mark.quicktest
-    def test_quicktest(self, zfsvol_sr):
+    def test_quicktest(self, zfsvol_sr: SR):
         zfsvol_sr.run_quicktest()
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_zfsvol_sr):
+    def test_start_and_shutdown_VM(self, vm_on_zfsvol_sr: VM):
         vm = vm_on_zfsvol_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -52,7 +54,7 @@ class TestZfsvolVm:
     @pytest.mark.xfail # needs support for destroying snapshots
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_zfsvol_sr):
+    def test_snapshot(self, vm_on_zfsvol_sr: VM):
         vm = vm_on_zfsvol_sr
         vm.start()
         try:
@@ -75,7 +77,8 @@ class TestZfsvolVm:
     def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat):
         vm = storage_test_vm
         sr = zfsvol_sr
-        vdi = sr.create_vdi(image_format=image_format)
+        vdi: VDI | None = sr.create_vdi(image_format=image_format)
+        assert vdi is not None
         image_path = f'/tmp/{vdi.uuid}.{image_format}'
         try:
             vbd = vm.connect_vdi(vdi)
@@ -109,7 +112,7 @@ class TestZfsvolVm:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_zfsvol_sr, host, zfsvol_sr):
+    def test_reboot(self, vm_on_zfsvol_sr: VM, host: Host, zfsvol_sr: SR):
         sr = zfsvol_sr
         vm = vm_on_zfsvol_sr
         host.reboot(verify=True)

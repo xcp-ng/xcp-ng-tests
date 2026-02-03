@@ -743,7 +743,7 @@ def nfs_iso_sr(host, nfs_iso_device_config):
     sr.forget()
 
 @pytest.fixture(scope='function')
-def exit_on_fistpoint(host):
+def exit_on_fistpoint(host) -> Generator[None]:
     from lib.fistpoint import FistPoint
     logging.info(">> Enabling exit on fistpoint")
     FistPoint.enable_exit_on_fistpoint(host)

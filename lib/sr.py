@@ -3,12 +3,6 @@ from __future__ import annotations
 import logging
 import time
 
-from typing import TYPE_CHECKING, Optional
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.pool import Pool
-
 import lib.commands as commands
 from lib.common import (
     GiB,
@@ -20,6 +14,12 @@ from lib.common import (
     wait_for_not,
 )
 from lib.vdi import VDI, ImageFormat
+
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.pool import Pool
 
 class SR:
     def __init__(self, uuid, pool: Pool):

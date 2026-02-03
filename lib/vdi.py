@@ -30,10 +30,10 @@ class VDI:
         ...
 
     @overload
-    def __init__(self, uuid, *, host: Literal[None] = None, sr: "SR"):
+    def __init__(self, uuid: str, *, host: Literal[None] = None, sr: SR):
         ...
 
-    def __init__(self, uuid, *, host=None, sr=None):
+    def __init__(self, uuid: str, *, host=None, sr=None):
         self.uuid = uuid
         # TODO: use a different approach when migration is possible
         if sr is None:
