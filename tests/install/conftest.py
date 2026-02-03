@@ -114,8 +114,8 @@ def system_disks_names(request):
 #     in contexts where the same IP is reused by successively different MACs
 #     (when cloning VMs from cache)
 @pytest.fixture(scope='function')
-def remastered_iso(installer_iso, answerfile):
-    iso_file = installer_iso['iso']
+def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile | None) -> Generator[str, None, None]:
+    iso_file = str(installer_iso['iso'])
     unsigned = installer_iso['unsigned']
 
     assert "iso-remaster" in TOOLS

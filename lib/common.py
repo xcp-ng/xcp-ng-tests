@@ -24,7 +24,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Literal,
     Optional,
     TypeAlias,
@@ -54,14 +53,14 @@ class PackageManagerEnum(Enum):
     APT_GET = 3
 
 # Common VM images used in tests
-def vm_image(vm_key):
+def vm_image(vm_key: str) -> str:
     from data import DEF_VM_URL, VM_IMAGES
     url = VM_IMAGES[vm_key]
     if not url.startswith('http'):
         url = DEF_VM_URL + url
     return url
 
-def prefix_object_name(label):
+def prefix_object_name(label: str) -> str:
     name_prefix = None
     try:
         from data import OBJECTS_NAME_PREFIX
@@ -72,7 +71,7 @@ def prefix_object_name(label):
         name_prefix = f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
 
-def shortened_nodeid(nodeid):
+def shortened_nodeid(nodeid: str) -> str:
     components = nodeid.split("::")
     # module
     components[0] = strip_prefix(components[0], "tests/")
@@ -86,9 +85,9 @@ def shortened_nodeid(nodeid):
 
     return "::".join(components)
 
-def expand_scope_relative_nodeid(scoped_nodeid, scope, ref_nodeid):
+def expand_scope_relative_nodeid(scoped_nodeid: str, scope: str, ref_nodeid: str) -> str:
     if scope == 'session' or scope == 'package':
-        base = ()
+        base = []
     elif scope == 'module':
         base = ref_nodeid.split("::", 1)[:1]
     elif scope == 'class':
@@ -110,7 +109,7 @@ def ensure_type(tp: type[T], v: object) -> T:
 def ensure_type(tp: Any, v: object) -> Any:
     ...
 
-def ensure_type(tp, v):
+def ensure_type(tp: Any, v: object) -> Any:
     """
     Cast a value to the specified type, and checks it's actual type at run time
 
@@ -158,7 +157,8 @@ def callable_marker(value: Union[T, Callable[..., T]], request: pytest.FixtureRe
     else:
         return value
 
-def wait_for(fn: Callable[[], object], msg=None, timeout_secs=2 * 60, retry_delay_secs=2, invert=False):
+def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
+             invert: bool = False) -> None:
     if msg is not None:
         logging.info(msg)
     start_time = time.perf_counter()
@@ -175,20 +175,22 @@ def wait_for(fn: Callable[[], object], msg=None, timeout_secs=2 * 60, retry_dela
             )
         time.sleep(retry_delay_secs)
 
-def wait_for_not(*args, **kwargs):
-    return wait_for(*args, **kwargs, invert=True)
+def wait_for_not(
+    fn: Callable[[], Any], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2
+) -> None:
+    return wait_for(fn, msg, timeout_secs, retry_delay_secs, True)
 
-def is_uuid(maybe_uuid):
+def is_uuid(maybe_uuid: str) -> bool:
     try:
         UUID(maybe_uuid, version=4)
         return True
     except ValueError:
         return False
 
-def to_xapi_bool(b: bool):
+def to_xapi_bool(b: bool) -> str:
     return 'true' if b else 'false'
 
-def parse_xe_dict(xe_dict):
+def parse_xe_dict(xe_dict: str) -> dict[str, str]:
     """
     Parses a xe param containing keys and values, e.g. "major: 7; minor: 20; micro: 0; build: 3".
 
@@ -200,25 +202,25 @@ def parse_xe_dict(xe_dict):
         res[key.strip()] = value.strip()
     return res
 
-def safe_split(text, sep=','):
+def safe_split(text: str, sep: str = ',') -> list[str]:
     """ A split function that returns an empty list if the input string is empty. """
     return text.split(sep) if len(text) > 0 else []
 
-def strip_prefix(string, prefix):
+def strip_prefix(string: str, prefix: str) -> str:
     if sys.version_info >= (3, 9):
         return string.removeprefix(prefix)
     if string.startswith(prefix):
         return string[len(prefix):]
     return string
 
-def strip_suffix(string, suffix):
+def strip_suffix(string: str, suffix: str) -> str:
     if sys.version_info >= (3, 9):
         return string.removesuffix(suffix)
     if string.endswith(suffix):
         return string[:-len(suffix)]
     return string
 
-def setup_formatted_and_mounted_disk(host: Host, sr_disk, fs_type, mountpoint):
+def setup_formatted_and_mounted_disk(host: Host, sr_disk: str, fs_type: str, mountpoint: str) -> None:
     if fs_type == 'ext4':
         option_force = '-F'
     elif fs_type == 'xfs':
@@ -241,13 +243,13 @@ def setup_formatted_and_mounted_disk(host: Host, sr_disk, fs_type, mountpoint):
         host.ssh('cp -f /etc/fstab.orig /etc/fstab')
         raise
 
-def teardown_formatted_and_mounted_disk(host: Host, mountpoint):
+def teardown_formatted_and_mounted_disk(host: Host, mountpoint: str) -> None:
     logging.info(f"<< Restore fstab and unmount {mountpoint} on host {host}")
     host.ssh('cp -f /etc/fstab.orig /etc/fstab')
     host.ssh(f'umount {mountpoint}')
     host.ssh(f'rmdir {mountpoint}')
 
-def exec_nofail(func):
+def exec_nofail(func: Callable[[], Any]) -> list[Exception]:
     """ Execute a function, log a warning if it fails, and return eiter [] or [e] where e is the exception. """
     caller_name = inspect.stack()[1].function
     try:
@@ -260,7 +262,7 @@ def exec_nofail(func):
         )
         return [e]
 
-def raise_errors(errors):
+def raise_errors(errors: list[Exception]) -> None:
     if not errors:
         return
     elif len(errors) == 1:
@@ -268,21 +270,21 @@ def raise_errors(errors):
     else:
         raise Exception("Several exceptions were catched: " + "\n".join(repr(e) for e in errors))
 
-def strtobool(str):
+def strtobool(val: str | None) -> bool:
     # Note: `distutils` package is deprecated and slated for removal in Python 3.12.
     # There is not alternative for strtobool.
     # See: https://peps.python.org/pep-0632/#migration-advice
     # So this is a custom implementation with differences:
     # - A boolean is returned instead of integer
     # - Empty string and None are supported (False is returned in this case)
-    if not str:
+    if not val:
         return False
-    str = str.lower()
-    if str in ('y', 'yes', 't', 'true', 'on', '1'):
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
         return True
-    if str in ('n', 'no', 'f', 'false', 'off', '0'):
+    if val in ('n', 'no', 'f', 'false', 'off', '0'):
         return False
-    raise ValueError("invalid truth value '{}'".format(str))
+    raise ValueError("invalid truth value '{}'".format(val))
 
 def url_download(url: str, filename: str) -> None:
     r = requests.get(url, stream=True)
@@ -293,7 +295,7 @@ def url_download(url: str, filename: str) -> None:
             fd.write(chunk)
     os.rename(tempfilename, filename)
 
-def randid(length=6):
+def randid(length: int = 6) -> str:
     """
     Generates a random string of a specified length.
     The string consists of lowercase letters, uppercase letters, and digits.
@@ -320,7 +322,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: Opti
                accept_unknown_key: bool = False) -> Optional[str]:
     """ Common implementation for param_get. """
     import lib.commands as commands
-    args: Dict[str, Union[str, bool]] = {'uuid': uuid, 'param-name': param_name}
+    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
     try:
@@ -332,9 +334,10 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: Opti
             raise
     return value
 
-def _param_set(host, xe_prefix, uuid, param_name, value, key=None):
+def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str | bool | dict[str, str],
+               key: str | None = None) -> None:
     """ Common implementation for param_set. """
-    args = {'uuid': uuid}
+    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid}
 
     if key is not None:
         param_name = '{}:{}'.format(param_name, key)
@@ -343,24 +346,25 @@ def _param_set(host, xe_prefix, uuid, param_name, value, key=None):
 
     host.xe(f'{xe_prefix}-param-set', args)
 
-def _param_add(host, xe_prefix, uuid, param_name, value, key=None):
+def _param_add(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str, key: str | None = None) -> None:
     """ Common implementation for param_add. """
     param_key = f'{key}={value}' if key is not None else value
-    args = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
+    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
 
     host.xe(f'{xe_prefix}-param-add', args)
 
-def _param_remove(host, xe_prefix, uuid, param_name, key, accept_unknown_key=False):
+def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str,
+                  accept_unknown_key: bool = False) -> None:
     """ Common implementation for param_remove. """
     import lib.commands as commands
-    args = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
+    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
     try:
         host.xe(f'{xe_prefix}-param-remove', args)
     except commands.SSHCommandFailed as e:
         if not accept_unknown_key or e.stdout != "Error: Key %s not found in map" % key:
             raise
 
-def _param_clear(host, xe_prefix, uuid, param_name):
+def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None:
     """ Common implementation for param_clear. """
-    args = {'uuid': uuid, 'param-name': param_name}
+    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)

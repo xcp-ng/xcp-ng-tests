@@ -1,9 +1,10 @@
 import pytest
 
 import hashlib
-import subprocess
 
 from lib import commands
+
+from typing import cast
 
 # This test is designed to verify the accessibility of the XOA deployment script
 #
@@ -38,12 +39,10 @@ def test_access_links(host, command_id, url_id):
     # This ensures the content is accessible and identical from both locations
     local_result = commands.local_cmd(COMMAND)
 
-    assert local_result.returncode == 0, (
-        f"Failed to fetch URL locally: {local_result.stdout}"
-    )
+    assert local_result.returncode == 0, f"Failed to fetch URL locally: {local_result.stdout}"
 
     # Extract checksums
-    local_checksum = hashlib.sha256(local_result.stdout.split()[0].encode('utf-8')).hexdigest()
+    local_checksum = hashlib.sha256(cast(str, local_result.stdout).split()[0].encode('utf-8')).hexdigest()
     remote_checksum = hashlib.sha256(remote_result.split()[0].encode('utf-8')).hexdigest()
 
     assert local_checksum == remote_checksum, (
