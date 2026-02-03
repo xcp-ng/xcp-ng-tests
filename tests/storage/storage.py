@@ -229,7 +229,8 @@ def xva_export_import(vm: VM, compression: XVACompression):
         vm.host.ssh(f'rm -f {xva_path}')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
-    vdi = sr.create_vdi(image_format=image_format)
+    vdi: VDI | None = sr.create_vdi(image_format=image_format)
+    assert vdi is not None
     image_path = f'/tmp/{vdi.uuid}.{image_format}'
     try:
         vbd = vm.connect_vdi(vdi)
@@ -242,7 +243,8 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
         vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
         vm.disconnect_vdi(vdi)
         vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
-        vdi = vdi.destroy()
+        vdi.destroy()
+        vdi = None
         # check that the zero blocks are not part of the result
         size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
         assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
