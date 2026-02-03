@@ -90,7 +90,8 @@ class TestZfsvolVm:
             vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
             vm.disconnect_vdi(vdi)
             vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
-            vdi = vdi.destroy()
+            vdi.destroy()
+            vdi = None
             # check that the zero blocks are not part of the result
             size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
             if image_format == 'vhd':

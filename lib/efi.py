@@ -470,6 +470,7 @@ class EFIAuth:
         assert self._owner_cert is not None
         if shutil.which('sbsign'):
             signed = get_signed_name(image)
+            assert self._owner_cert.key is not None
             commands.local_cmd([
                 'sbsign', '--key', self._owner_cert.key, '--cert', self._owner_cert.pub,
                 image, '--output', signed

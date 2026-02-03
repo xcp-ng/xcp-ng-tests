@@ -58,7 +58,7 @@ class BaseVM:
         return n
 
     # @abstractmethod
-    def _disk_list(self):
+    def _disk_list(self) -> str:
         raise NotImplementedError()
 
     def vdi_uuids(self, sr_uuid: Optional[str] = None) -> List[str]:
@@ -95,9 +95,9 @@ class BaseVM:
         assert sr.attached_to_host(self.host)
         return sr
 
-    def export(self, filepath, compress='none', use_cache=False) -> None:
+    def export(self, filepath: str, compress: str = 'none', use_cache: bool = False) -> None:
         logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
-        params = {
+        params: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
             'compress': compress,
             'filename': filepath

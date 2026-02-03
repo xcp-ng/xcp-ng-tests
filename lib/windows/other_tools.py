@@ -8,7 +8,7 @@ from . import WINDOWS_SHUTDOWN_COMMAND, enable_testsign, insert_cd_safe, wait_fo
 
 from typing import Any, Dict
 
-def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]):
+def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]) -> None:
     if param.get("vendor_device"):
         assert not strtobool(vm.param_get("has-vendor-device"))
         vm.param_set("has-vendor-device", True)
@@ -23,7 +23,7 @@ def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, An
         if param.get("testsign_cert"):
             logging.info("Enable testsigning")
             rootcert = PureWindowsPath("D:\\") / param["path"] / param["testsign_cert"]
-            enable_testsign(vm, rootcert)
+            enable_testsign(vm, str(rootcert))
 
             # HACK: Sometimes after rebooting the CD drive just vanishes. Check for it again and
             # reboot/reinsert CD if needed.

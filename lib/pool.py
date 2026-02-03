@@ -11,7 +11,7 @@ from lib.common import HostAddress, _param_get, _param_set, safe_split, wait_for
 from lib.efi import EFIAuth
 from lib.host import Host
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 if TYPE_CHECKING:
     from lib.sr import SR
@@ -38,16 +38,18 @@ class Pool:
                 host = Host(self, self.host_ip(host_uuid))
                 self.hosts.append(host)
         self.uuid = self.master.xe('pool-list', minimal=True)
-        self.saved_uefi_certs: Optional[Dict[str, Any]] = None
+        self.saved_uefi_certs: dict[str, Any] | None = None
         self.pre_existing_sr_uuids = safe_split(self.master.xe('sr-list', {'minimal': 'true'}), ',')
 
-    def param_get(self, param_name, key=None, accept_unknown_key=False):
+    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> Optional[str]:
         return _param_get(self.master, Pool.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name, value, key=None):
+    def param_set(self, param_name: str, value: Any, key: str | None = None) -> None:
         _param_set(self.master, Pool.xe_prefix, self.uuid, param_name, value, key)
 
-    def exec_on_hosts_on_error_rollback(self, func, rollback_func, host_list=[]):
+    def exec_on_hosts_on_error_rollback(self, func: Callable[[Host], Any],
+                                        rollback_func: Callable[[Host], Any] | None,
+                                        host_list: list[Host] = []) -> None:
         """
         Execute a function on all hosts of the pool.
 
@@ -77,7 +79,7 @@ class Pool:
                         pass
                 raise e
 
-    def exec_on_hosts_on_error_continue(self, func, host_list=[]):
+    def exec_on_hosts_on_error_continue(self, func: Callable[[Host], Any], host_list: list[Host] = []) -> None:
         """
         Execute a function on all hosts of the pool.
 
@@ -102,10 +104,10 @@ class Pool:
     def hosts_uuids(self) -> list[str]:
         return safe_split(self.master.xe('host-list', {}, minimal=True))
 
-    def host_ip(self, host_uuid) -> str:
+    def host_ip(self, host_uuid: str) -> str:
         return self.master.xe('host-param-get', {'uuid': host_uuid, 'param-name': 'address'})
 
-    def get_host_by_uuid(self, host_uuid) -> Host:
+    def get_host_by_uuid(self, host_uuid: str) -> Host:
         for host in self.hosts:
             if host.uuid == host_uuid:
                 return host
@@ -126,7 +128,7 @@ class Pool:
     def get_vdi_sr_uuid(self, vdi_uuid: str) -> str:
         return self.master.xe('vdi-param-get', {'uuid': vdi_uuid, 'param-name': 'sr-uuid'})
 
-    def get_iso_sr(self) -> SR:
+    def get_iso_sr(self) -> "SR":
         uuids = safe_split(self.master.xe('sr-list', {'type': 'iso',
                                                       'content-type': 'iso',
                                                       'is-tools-sr': False},
@@ -134,7 +136,7 @@ class Pool:
         assert len(uuids) == 1  # we may need to allow finer selection if this triggers
         return SR(uuids[0], self)
 
-    def push_iso(self, local_file, remote_filename=None) -> str:
+    def push_iso(self, local_file: str, remote_filename: str | None = None) -> str:
         iso_sr = self.get_iso_sr()
         mountpoint = f"/run/sr-mount/{iso_sr.uuid}"
         if remote_filename is None:
@@ -147,7 +149,7 @@ class Pool:
         iso_sr.scan()
         return os.path.basename(remote_filename)
 
-    def remove_iso(self, remote_filename):
+    def remove_iso(self, remote_filename: str) -> None:
         iso_sr = self.get_iso_sr()
         fullpath = f"/run/sr-mount/{iso_sr.uuid}/{remote_filename}"
         logging.info("Removing %s from ISO-SR server", remote_filename)
@@ -210,7 +212,7 @@ class Pool:
                 % ' & '.join(saved_certs.keys())
             )
 
-    def restore_uefi_certs(self):
+    def restore_uefi_certs(self) -> None:
         # See explanation in save_uefi_certs().
         assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
         assert self.saved_uefi_certs is not None
@@ -232,7 +234,7 @@ class Pool:
                 self.master.ssh(f'rm -f {tmp_file}')
             self.saved_uefi_certs = None
 
-    def clear_uefi_certs(self):
+    def clear_uefi_certs(self) -> None:
         """
         Clear UEFI certificates on XCP-ng 8.2.
 
@@ -250,15 +252,15 @@ class Pool:
         for host in self.hosts:
             host.ssh(f'rm -f {host.varstore_dir()}/*')
 
-    def clear_custom_uefi_certs(self):
+    def clear_custom_uefi_certs(self) -> None:
         """ Clear Custom UEFI certificates on XCP-ng 8.3+. """
         assert self.master.xcp_version >= version.parse("8.3"), "function only relevant on XCP-ng 8.3+"
         logging.info('Clearing custom pool UEFI certificates')
         self.master.ssh('secureboot-certs clear')
 
-    def install_custom_uefi_certs(self, auths: Iterable[EFIAuth]):
+    def install_custom_uefi_certs(self, auths: Iterable[EFIAuth]) -> None:
         host = self.master
-        auths_dict = {}
+        auths_dict: dict[str, str] = {}
 
         try:
             for auth in auths:
@@ -284,12 +286,12 @@ class Pool:
         finally:
             host.ssh('rm -f ' + ' '.join(auths_dict.values()))
 
-    def eject_host(self, host: Host):
+    def eject_host(self, host: Host) -> None:
         master = self.master
         master.xe('pool-eject', {'host-uuid': host.uuid, 'force': True})
         wait_for_not(lambda: host.uuid in self.hosts_uuids(), f"Wait for host {host} to be ejected of pool {master}.")
         self.hosts = [h for h in self.hosts if h.uuid != host.uuid]
         wait_for(host.is_enabled, f"Wait for host {host} to restart in its own pool.", timeout_secs=10 * 60)
 
-    def network_named(self, network_name):
+    def network_named(self, network_name: str) -> str:
         return self.master.xe('network-list', {'name-label': network_name}, minimal=True)

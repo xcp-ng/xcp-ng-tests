@@ -1,43 +1,60 @@
+from __future__ import annotations
+
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from lib.vm import VM
+
 
 class VIF:
     xe_prefix = "vif"
+    uuid: str
+    vm: VM
+    device: str
 
-    def __init__(self, uuid, vm):
+    def __init__(self, uuid: str, vm: VM):
         self.uuid = uuid
         self.vm = vm
+        self.device = self.param_get('device') # type: ignore
 
-    def plug(self):
+    def plug(self) -> None:
         self.vm.host.xe("vif-plug", {'uuid': self.uuid})
 
-    def unplug(self):
+    def unplug(self) -> None:
         self.vm.host.xe("vif-unplug", {'uuid': self.uuid})
 
-    def param_get(self, param_name, key=None, accept_unknown_key=False):
-        return _param_get(self.vm.host, VIF.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+    def param_get(self, param_name: str, key: Optional[str] = None, accept_unknown_key: bool = False) -> Optional[str]:
+        return _param_get(self.vm.host, self.xe_prefix, self.uuid,
+                          param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name, value, key=None):
-        _param_set(self.vm.host, VIF.xe_prefix, self.uuid, param_name, value, key)
+    def param_set(self, param_name: str, value: str, key: Optional[str] = None) -> None:
+        _param_set(self.vm.host, self.xe_prefix, self.uuid,
+                   param_name, value, key)
 
-    def param_add(self, param_name, value, key=None):
-        _param_add(self.vm.host, VIF.xe_prefix, self.uuid, param_name, value, key)
+    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
+        _param_remove(self.vm.host, self.xe_prefix, self.uuid,
+                      param_name, key, accept_unknown_key)
 
-    def param_clear(self, param_name):
-        _param_clear(self.vm.host, VIF.xe_prefix, self.uuid, param_name)
+    def param_add(self, param_name: str, value: str, key: Optional[str] = None) -> None:
+        _param_add(self.vm.host, self.xe_prefix, self.uuid,
+                   param_name, value, key)
 
-    def param_remove(self, param_name, key, accept_unknown_key=False):
-        _param_remove(self.vm.host, VIF.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+    def param_clear(self, param_name: str) -> None:
+        _param_clear(self.vm.host, self.xe_prefix, self.uuid,
+                     param_name)
 
-    def device_id(self):
+    def device_id(self) -> str:
         """ Build the identifier that will allow to grep for the VIF's interrupts. """
         dom_id = self.vm.param_get('dom-id')
         device = self.param_get('device')
         return f"vif{dom_id}.{device}"
 
-    def move(self, network_uuid):
+    def move(self, network_uuid: str) -> None:
         self.vm.host.xe('vif-move', {'uuid': self.uuid, 'network-uuid': network_uuid})
 
-    def destroy(self):
+    def destroy(self) -> None:
         self.vm.host.xe('vif-destroy', {'uuid': self.uuid})
 
     def mac_address(self) -> str:
