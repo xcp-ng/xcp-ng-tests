@@ -9,7 +9,7 @@ import subprocess
 import lib.config as config
 from lib.netutil import wrap_ip
 
-from typing import TYPE_CHECKING, List, Literal, Union, overload
+from typing import TYPE_CHECKING, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.common import HostAddress
@@ -137,7 +137,7 @@ def _ssh(
     if res.returncode == 255:
         return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, cmd)
 
-    output: Union[bytes, str] = res.stdout
+    output: str | bytes = res.stdout
     if banner_res:
         if banner_res.returncode == 255:
             return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), cmd)
@@ -186,7 +186,7 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True, background: bool = False,
         decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> Union[str, bytes, SSHResult, None]:
+        -> str | bytes | SSHResult | None:
     ...
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True,

@@ -31,7 +31,7 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, cast, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -52,7 +52,7 @@ def host_data(hostname_or_ip: str) -> dict[str, str]:
 
 class Host:
     xe_prefix = "host"
-    pool: Pool
+    pool: "Pool"
 
     # Data extraction is automatic, no conversion from str is done.
     BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
@@ -69,7 +69,7 @@ class Host:
     def __init__(self, pool: Pool, hostname_or_ip: str):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
-        self.xo_srv_id: Optional[str] = None
+        self.xo_srv_id: str | None = None
 
         h_data = host_data(self.hostname_or_ip)
         self.user = h_data['user']
@@ -82,7 +82,7 @@ class Host:
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
-        self._dom0: Optional[VM] = None
+        self._dom0: VM | None = None
 
         self.rescan_block_devices_info()
 
@@ -117,7 +117,7 @@ class Host:
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
             multiplexing: bool = True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+            -> str | bytes | commands.SSHResult | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
@@ -150,7 +150,7 @@ class Host:
 
     def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
-            -> Union[str, commands.SSHResult]:
+            -> str | commands.SSHResult:
         maybe_param_minimal = '--minimal' if minimal else ''
         maybe_param_force = '--force' if force else ''
 
@@ -176,16 +176,16 @@ class Host:
         return result
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None, accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
         return _param_get(self, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
@@ -358,8 +358,8 @@ class Host:
         logging.info("Could not find a VM in cache for %r", uri)
         return None
 
-    def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> "VM":
-        vm = None
+    def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
+        vm: VM | None = None
         if use_cache:
             assert sr_uuid is not None
             if '://' in uri and uri.startswith("clone"):
@@ -772,7 +772,7 @@ class Host:
             self._dom0 = VM(self.get_dom0_uuid(), self)
         return self._dom0
 
-    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> Optional[SR]:
+    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> SR | None:
         sr_uuid = self.xe("vdi-param-get", {
             "param-name": "sr-uuid",
             "uuid": vdi_uuid,
