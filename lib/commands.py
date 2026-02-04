@@ -9,7 +9,7 @@ import subprocess
 import lib.config as config
 from lib.netutil import wrap_ip
 
-from typing import TYPE_CHECKING, List, Literal, Union, overload
+from typing import TYPE_CHECKING, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.common import HostAddress
@@ -67,9 +67,17 @@ def _ellide_log_lines(log: str) -> str:
         reduced_message.append("(...)")
     return "\n{}".format("\n".join(reduced_message))
 
-def _ssh(hostname_or_ip: str, cmd: str, check: bool, simple_output: bool, suppress_fingerprint_warnings: bool,
-         background: bool, decode: bool, options: list[str], multiplexing: bool) -> Union[SSHResult, SSHCommandFailed,
-                                                                                          str, bytes, None]:
+def _ssh(
+    hostname_or_ip: str,
+    cmd: str,
+    check: bool,
+    simple_output: bool,
+    suppress_fingerprint_warnings: bool,
+    background: bool,
+    decode: bool,
+    options: list[str],
+    multiplexing: bool,
+) -> SSHResult | SSHCommandFailed | str | bytes | None:
     opts = list(options)
     opts += ['-o', 'BatchMode yes']
     opts += ['-o', 'PubkeyAcceptedAlgorithms +ssh-rsa']
@@ -178,12 +186,12 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True, background: bool = False,
         decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> Union[str, bytes, SSHResult, None]:
+        -> str | bytes | SSHResult | None:
     ...
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True,
         background: bool = False, decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> Union[str, bytes, SSHResult, None]:
+        -> str | bytes | SSHResult | None:
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
                          background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):

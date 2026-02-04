@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from lib.common import (
@@ -11,7 +13,7 @@ from lib.common import (
     wait_for_not,
 )
 
-from typing import TYPE_CHECKING, Callable, Literal, Optional, TypeVar, overload
+from typing import TYPE_CHECKING, Callable, Literal, TypeVar, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -26,14 +28,14 @@ class VDI:
     sr: "SR"
 
     @overload
-    def __init__(self, uuid: str, *, host: "Host", sr: Literal[None] = None):
+    def __init__(self, uuid: str, *, host: Host, sr: Literal[None] = None):
         ...
 
     @overload
     def __init__(self, uuid: str, *, host: Literal[None] = None, sr: SR):
         ...
 
-    def __init__(self, uuid: str, *, host: Optional["Host"] = None, sr: Optional["SR"] = None):
+    def __init__(self, uuid: str, *, host: Host | None = None, sr: SR | None = None):
         self.uuid = uuid
         # TODO: use a different approach when migration is possible
         if sr is None:
@@ -72,7 +74,7 @@ class VDI:
     def __str__(self) -> str:
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 
-    def get_parent(self) -> Optional[str]:
+    def get_parent(self) -> str | None:
         return self.param_get("sm-config", key="vhd-parent", accept_unknown_key=True)
 
     def get_image_format(self) -> ImageFormat | None:
@@ -82,25 +84,25 @@ class VDI:
         return ensure_type(ImageFormat, v)
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None,
-                  accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None,
+                  accept_unknown_key: bool = False) -> str | None:
         return _param_get(self.sr.pool.master, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name: str, value: str, key: Optional[str] = None) -> None:
+    def param_set(self, param_name: str, value: str, key: str | None = None) -> None:
         _param_set(self.sr.pool.master, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
-    def param_add(self, param_name: str, value: str, key: Optional[str] = None) -> None:
+    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
         _param_add(self.sr.pool.master, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
@@ -114,7 +116,7 @@ class VDI:
 
     def wait_for_coalesce(self, fn: Callable[[], R] | None = None) -> R | None:
         previous_parent = self.get_parent()
-        ret = None
+        ret: R | None = None
         if fn is not None:
             ret = fn()
         # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.

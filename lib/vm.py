@@ -27,7 +27,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, cast, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 class VM(BaseVM):
     def __init__(self, uuid: str, host: 'Host'):
         super().__init__(uuid, host)
-        self.ip: Optional[str] = None
-        self.previous_host: Optional[Host] = None # previous host when migrated or being migrated
+        self.ip: str | None = None
+        self.previous_host: Host | None = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
         self.create_vdis_list()
@@ -126,11 +126,11 @@ class VM(BaseVM):
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> Union[str, bytes, commands.SSHResult, None]:
+            decode: bool = True) -> str | bytes | commands.SSHResult | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> Union[str, bytes, commands.SSHResult, None]:
+            decode: bool = True) -> str | bytes | commands.SSHResult | None:
         # raises by default for any nonzero return code
         assert self.ip is not None
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
@@ -249,9 +249,9 @@ class VM(BaseVM):
         assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host: Host, sr: Optional[SR] = None, network: Optional[str] = None) -> None:
+    def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None) -> None:
         msg = "Migrate VM to host %s" % target_host
-        params: dict[str, Union[str, bool, dict[str, str]]] = {
+        params: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
             'host-uuid': target_host.uuid,
             'live': self.is_running()
@@ -299,7 +299,7 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis: Optional[List[str]] = None) -> Snapshot:
+    def snapshot(self, ignore_vdis: List[str] | None = None) -> Snapshot:
         logging.info("Snapshot VM")
         args: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
@@ -385,8 +385,8 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
-    def create_vif(self, vif_num: int, *, network_uuid: Optional[str] = None,
-                   network_name: Optional[str] = None) -> VIF:
+    def create_vif(self, vif_num: int, *, network_uuid: str | None = None,
+                   network_name: str | None = None) -> VIF:
         assert bool(network_uuid) != bool(network_name), \
             "create_vif needs network_uuid XOR network_name"
         if network_name:
@@ -450,7 +450,7 @@ class VM(BaseVM):
     def execute_script(self, script_contents: str, *, simple_output: Literal[False]) -> commands.SSHResult:
         ...
 
-    def execute_script(self, script_contents: str, simple_output: bool = True) -> Union[str, commands.SSHResult]:
+    def execute_script(self, script_contents: str, simple_output: bool = True) -> str | commands.SSHResult:
         with tempfile.NamedTemporaryFile('w') as f:
             f.write(script_contents)
             f.flush()
@@ -652,7 +652,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name: Optional[str] = None) -> "VM":
+    def clone(self, *, name: str | None = None) -> "VM":
         if name is None:
             name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
@@ -787,7 +787,7 @@ class VM(BaseVM):
             self,
             script_contents: str,
             simple_output: bool = True,
-            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> Union[str, commands.SSHResult]:
+            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str | commands.SSHResult:
         # ProgressPreference is needed to suppress any clixml progress output,
         # as it's not filtered away from stdout by default, and we're grabbing stdout.
         assert self.is_windows

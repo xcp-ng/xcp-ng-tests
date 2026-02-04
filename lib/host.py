@@ -32,7 +32,7 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, cast, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -70,7 +70,7 @@ class Host:
     def __init__(self, pool: "Pool", hostname_or_ip: str):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
-        self.xo_srv_id: Optional[str] = None
+        self.xo_srv_id: str | None = None
 
         h_data = host_data(self.hostname_or_ip)
         self.user = h_data['user']
@@ -83,7 +83,7 @@ class Host:
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
-        self._dom0: Optional["VM"] = None
+        self._dom0: VM | None = None
 
         self.rescan_block_devices_info()
 
@@ -118,12 +118,12 @@ class Host:
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
             multiplexing: bool = True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+            -> str | bytes | commands.SSHResult | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
-            multiplexing: bool = True) -> Union[str, bytes, commands.SSHResult, None]:
+            multiplexing: bool = True) -> str | bytes | commands.SSHResult | None:
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
                             background=background, decode=decode, multiplexing=multiplexing)
@@ -151,7 +151,7 @@ class Host:
 
     def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
-            -> Union[str, commands.SSHResult]:
+            -> str | commands.SSHResult:
         maybe_param_minimal = '--minimal' if minimal else ''
         maybe_param_force = '--force' if force else ''
 
@@ -177,20 +177,20 @@ class Host:
         return result
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None, accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
         return _param_get(self, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name: str, value: str, key: Optional[str] = None) -> None:
+    def param_set(self, param_name: str, value: str, key: str | None = None) -> None:
         _param_set(self, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
@@ -198,7 +198,7 @@ class Host:
         _param_remove(self, self.xe_prefix, self.uuid,
                       param_name, key, accept_unknown_key)
 
-    def param_add(self, param_name: str, value: str, key: Optional[str] = None) -> None:
+    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
         _param_add(self, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
@@ -241,7 +241,7 @@ class Host:
         ...
 
     def execute_script(self, script_contents: str, shebang: str = 'sh',
-                       simple_output: bool = True) -> Union[str, commands.SSHResult]:
+                       simple_output: bool = True) -> str | commands.SSHResult:
         with tempfile.NamedTemporaryFile('w') as script:
             os.chmod(script.name, 0o775)
             script.write('#!/usr/bin/env ' + shebang + '\n')
@@ -269,7 +269,7 @@ class Host:
             inventory[key] = raw_value.strip('\'')
         return inventory
 
-    def xo_get_server_id(self, store: bool = True) -> Optional[str]:
+    def xo_get_server_id(self, store: bool = True) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
         for server in servers:
             if server['host'] == wrap_ip(self.hostname_or_ip):
@@ -287,7 +287,7 @@ class Host:
                 if server['host'] == wrap_ip(self.hostname_or_ip):
                     xo_cli('server.remove', {'id': server['id']})
 
-    def xo_server_add(self, username: str, password: str, label: Optional[str] = None,
+    def xo_server_add(self, username: str, password: str, label: str | None = None,
                       unregister_first: bool = True) -> None:
         """ Returns the server ID created by XO's `server.add`. """
         if unregister_first:
@@ -306,7 +306,7 @@ class Host:
         )
         self.xo_srv_id = xo_srv_id
 
-    def xo_server_status(self) -> Optional[str]:
+    def xo_server_status(self) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
         for server in servers:
             if server['host'] == wrap_ip(self.hostname_or_ip):
@@ -330,7 +330,7 @@ class Host:
     def vm_cache_key(uri: str) -> str:
         return f"[Cache for {strip_suffix(uri, '.xva')}]"
 
-    def cached_vm(self, uri: str, sr_uuid: str) -> Optional["VM"]:
+    def cached_vm(self, uri: str, sr_uuid: str) -> VM | None:
         assert sr_uuid, "A SR UUID is necessary to use import cache"
         cache_key = self.vm_cache_key(uri)
         # Look for an existing cache VM
@@ -347,8 +347,8 @@ class Host:
         logging.info("Could not find a VM in cache for %r", uri)
         return None
 
-    def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> "VM":
-        vm = None
+    def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
+        vm: VM | None = None
         if use_cache:
             assert sr_uuid is not None
             if '://' in uri and uri.startswith("clone"):
@@ -507,7 +507,7 @@ class Host:
         except ValueError:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
-    def yum_install(self, packages: list[str], enablerepo: Optional[str] = None) -> str:
+    def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
         cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
         if enablerepo is not None:
@@ -764,7 +764,7 @@ class Host:
             self._dom0 = VM(self.get_dom0_uuid(), self)
         return self._dom0
 
-    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> Optional[SR]:
+    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> SR | None:
         sr_uuid = self.xe("vdi-param-get", {
             "param-name": "sr-uuid",
             "uuid": vdi_uuid,
@@ -773,7 +773,7 @@ class Host:
             return None
         return SR(sr_uuid, self.pool)
 
-    def lvs(self, vgName: Optional[str] = None, ignore_MGT: bool = True) -> list[str]:
+    def lvs(self, vgName: str | None = None, ignore_MGT: bool = True) -> list[str]:
         ret: list[str] = []
         cmd = 'lvs --noheadings -o LV_NAME'
         if vgName:

@@ -11,7 +11,7 @@ from lib.sr import SR
 from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -56,7 +56,7 @@ def wait_for_vm_running_and_ssh_up_without_tools(vm: VM) -> None:
     wait_for(vm.is_ssh_up, "Wait for SSH up")
 
 
-def enable_testsign(vm: VM, rootcert: Optional[str]) -> None:
+def enable_testsign(vm: VM, rootcert: str | None) -> None:
     if rootcert is not None:
         vm.execute_powershell_script(
             f"""certutil -addstore -f Root '{rootcert}';
