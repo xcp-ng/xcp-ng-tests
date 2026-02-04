@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.serialization.pkcs7 import PKCS7PrivateKeyTy
 
 import lib.commands as commands
 
-from typing import Any, Iterable, Literal, Optional, Self, Union, cast
+from typing import Any, Iterable, Literal, Self, cast
 
 class _EfiGlobalTempdir:
     _instance = None
@@ -230,7 +230,7 @@ def certs_to_sig_db(certs: list[str] | str) -> bytes:
 
 
 def sign_efi_sig_db(
-    sig_db: bytes, var: str, key: str, cert: str, time: Optional[datetime] = None, guid: Optional[GUID] = None
+    sig_db: bytes, var: str, key: str, cert: str, time: datetime | None = None, guid: GUID | None = None
 ) -> bytes:
     """Return a pkcs7 SignedData from a UEFI signature database."""
     global p7_out
@@ -363,7 +363,7 @@ def pesign(key: str, cert: str, name: str, image: str) -> str:
 
 
 class Certificate:
-    def __init__(self, pub: str, key: Optional[str]):
+    def __init__(self, pub: str, key: str | None) -> None:
         self.pub = pub
         self.key = key
 
@@ -397,15 +397,15 @@ class Certificate:
 
 
 class EFIAuth:
-    _auth_data: Optional[bytes]
+    _auth_data: bytes | None
     name: Literal["PK", "KEK", "db", "dbx"]
 
     def __init__(
         self,
         name: Literal["PK", "KEK", "db", "dbx"],
-        owner_cert: Optional[Certificate] = None,
-        other_certs: Optional[Iterable[Union[Certificate, str]]] = None,
-    ):
+        owner_cert: Certificate | None = None,
+        other_certs: Iterable[Certificate | str] | None = None,
+    ) -> None:
         assert name in SECURE_BOOT_VARIABLES
         assert owner_cert is None or owner_cert.key is not None, "owner cert must have private key"
         self.name = name
@@ -418,7 +418,7 @@ class EFIAuth:
 
     @classmethod
     def self_signed(
-        cls, name: Literal["PK", "KEK", "db", "dbx"], other_certs: Optional[Iterable[Union[Certificate, str]]] = None
+        cls, name: Literal["PK", "KEK", "db", "dbx"], other_certs: Iterable[Certificate | str] | None = None
     ) -> Self:
         return cls(name, owner_cert=Certificate.self_signed(name + " Owner"), other_certs=other_certs)
 
