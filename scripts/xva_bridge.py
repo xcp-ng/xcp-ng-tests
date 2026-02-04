@@ -8,8 +8,8 @@ import logging
 import os
 from xml.dom import minidom
 
-import libarchive
-import libarchive.ffi
+import libarchive  # type: ignore
+import libarchive.ffi  # type: ignore
 
 class XvaHeaderMember:
     def __init__(self, member: minidom.Element):
@@ -124,10 +124,10 @@ if __name__ == "__main__":
                         setattr(new_entry, attr, getattr(entry, attr))
 
                     # ArchiveEntry doesn't expose block copying, so write the entry manually via the FFI interface
-                    libarchive.ffi.write_header(output_file._pointer, new_entry._entry_p)
+                    libarchive.ffi.write_header(output_file._pointer, new_entry._entry_p)  # type: ignore # noqa: SLF001
                     for block in entry.get_blocks():
-                        libarchive.ffi.write_data(output_file._pointer, block, len(block))
-                    libarchive.ffi.write_finish_entry(output_file._pointer)
+                        libarchive.ffi.write_data(output_file._pointer, block, len(block)) # type: ignore # noqa: SLF001
+                    libarchive.ffi.write_finish_entry(output_file._pointer)  # type: ignore  # noqa: SLF001
 
             if args.in_place:
                 backup_path = args.backup_path
