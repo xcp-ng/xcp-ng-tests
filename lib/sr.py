@@ -15,7 +15,7 @@ from lib.common import (
 )
 from lib.vdi import VDI, ImageFormat
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -25,9 +25,9 @@ class SR:
     def __init__(self, uuid: str, pool: Pool):
         self.uuid = uuid
         self.pool = pool
-        self._is_shared: Optional[bool] = None # cached value for is_shared()
-        self._main_host: Optional[Host] = None # cached value for main_host()
-        self._type: Optional[str] = None # cache value for get_type()
+        self._is_shared: bool | None = None # cached value for is_shared()
+        self._main_host: Host | None = None # cached value for main_host()
+        self._type: str | None = None # cache value for get_type()
 
     def pbd_uuids(self) -> list[str]:
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))

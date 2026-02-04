@@ -13,7 +13,7 @@ from lib.common import (
     wait_for_not,
 )
 
-from typing import TYPE_CHECKING, Callable, Literal, Optional, TypeVar, overload
+from typing import TYPE_CHECKING, Callable, Literal, TypeVar, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -74,7 +74,7 @@ class VDI:
     def __str__(self) -> str:
         return f"VDI {self.uuid} on SR {self.sr.uuid}"
 
-    def get_parent(self) -> Optional[str]:
+    def get_parent(self) -> str | None:
         return self.param_get("sm-config", key="vhd-parent", accept_unknown_key=True)
 
     def get_image_format(self) -> ImageFormat | None:
@@ -84,17 +84,17 @@ class VDI:
         return ensure_type(ImageFormat, v)
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None,
-                  accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None,
+                  accept_unknown_key: bool = False) -> str | None:
         return _param_get(self.sr.pool.master, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
@@ -116,7 +116,7 @@ class VDI:
 
     def wait_for_coalesce(self, fn: Callable[[], R] | None = None) -> R | None:
         previous_parent = self.get_parent()
-        ret = None
+        ret: R | None = None
         if fn is not None:
             ret = fn()
         # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.

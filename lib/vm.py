@@ -27,16 +27,16 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, cast, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, cast, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
 
 class VM(BaseVM):
-    def __init__(self, uuid: str, host: Host):
+    def __init__(self, uuid: str, host: Host) -> None:
         super().__init__(uuid, host)
-        self.ip: Optional[str] = None
-        self.previous_host: Optional[Host] = None # previous host when migrated or being migrated
+        self.ip: str | None = None
+        self.previous_host: Host | None = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
         self.create_vdis_list()

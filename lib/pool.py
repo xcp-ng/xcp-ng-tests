@@ -12,7 +12,7 @@ from lib.efi import EFIAuth
 from lib.host import Host
 from lib.sr import SR
 
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable
 
 class Pool:
     xe_prefix = "pool"
@@ -111,13 +111,13 @@ class Pool:
                 return host
         raise Exception(f"Host with uuid {host_uuid} not found in pool.")
 
-    def first_host_that_isnt(self, host: Host) -> Optional[Host]:
+    def first_host_that_isnt(self, host: Host) -> Host | None:
         for h in self.hosts:
             if h != host:
                 return h
         return None
 
-    def first_shared_sr(self) -> Optional[SR]:
+    def first_shared_sr(self) -> SR | None:
         uuids = safe_split(self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True))
         if len(uuids) > 0:
             return SR(uuids[0], self)

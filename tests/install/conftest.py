@@ -12,7 +12,7 @@ from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
 
-from typing import Generator, Sequence, Union
+from typing import Generator, Sequence
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
@@ -39,7 +39,7 @@ def skip_package_source(version, package_source):
     return True, "unknown source type {}".format(package_source)
 
 @pytest.fixture(scope='function')
-def answerfile(request: pytest.FixtureRequest) -> Generator[Union[AnswerFile, None], None, None]:
+def answerfile(request: pytest.FixtureRequest) -> Generator[AnswerFile | None, None, None]:
     """
     Makes an AnswerFile object available to test and other fixtures.
 
