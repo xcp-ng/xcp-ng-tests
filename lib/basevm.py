@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, List, Literal, Optional, overload
+from typing import TYPE_CHECKING, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -22,17 +22,17 @@ class BaseVM:
         self.host = host
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None,
-                  accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None,
+                  accept_unknown_key: bool = False) -> str | None:
         return _param_get(self.host, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
@@ -61,7 +61,7 @@ class BaseVM:
     def _disk_list(self) -> str:
         raise NotImplementedError()
 
-    def vdi_uuids(self, sr_uuid: Optional[str] = None) -> List[str]:
+    def vdi_uuids(self, sr_uuid: str | None = None) -> List[str]:
         output = self._disk_list()
         if output == '':
             return []
