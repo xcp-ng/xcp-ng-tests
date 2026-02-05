@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
@@ -18,7 +20,7 @@ from lib.windows import (
 from lib.windows.guest_tools import install_guest_tools
 from lib.windows.other_tools import install_other_drivers
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Generator, Tuple
 
 @pytest.fixture(scope="module")
 def running_windows_vm_without_tools(imported_vm: VM) -> VM:
@@ -36,7 +38,9 @@ def running_windows_vm_without_tools(imported_vm: VM) -> VM:
 
 
 @pytest.fixture(scope="module")
-def unsealed_windows_vm_and_snapshot(running_windows_vm_without_tools: VM):
+def unsealed_windows_vm_and_snapshot(
+    running_windows_vm_without_tools: VM
+) -> Generator[Tuple[VM, Snapshot], None, None]:
     """Unseal VM and get its IP, then shut it down. Cache the unsealed state in a snapshot to save time."""
     vm = running_windows_vm_without_tools
     # vm.shutdown is not usable yet (there's no tools).
@@ -48,7 +52,7 @@ def unsealed_windows_vm_and_snapshot(running_windows_vm_without_tools: VM):
 
 
 @pytest.fixture
-def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: Tuple[VM, Snapshot]):
+def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: Tuple[VM, Snapshot]) -> Generator[VM, None, None]:
     vm, snapshot = unsealed_windows_vm_and_snapshot
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -57,7 +61,9 @@ def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: Tuple[VM, Snap
 
 
 @pytest.fixture(scope="class")
-def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest_tools_iso: Dict[str, Any]):
+def vm_install_test_tools_per_test_class(
+    unsealed_windows_vm_and_snapshot: Tuple[VM, Snapshot], guest_tools_iso: Dict[str, Any]
+) -> Generator[VM, None, None]:
     vm, snapshot = unsealed_windows_vm_and_snapshot
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -68,7 +74,7 @@ def vm_install_test_tools_per_test_class(unsealed_windows_vm_and_snapshot, guest
 
 
 @pytest.fixture
-def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]):
+def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]) -> VM:
     install_guest_tools(running_unsealed_windows_vm, guest_tools_iso, PowerAction.Nothing)
     return running_unsealed_windows_vm
 
@@ -78,12 +84,14 @@ def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools
     ids=list(WIN_GUEST_TOOLS_ISOS.keys()),
     params=list(WIN_GUEST_TOOLS_ISOS.values()),
 )
-def guest_tools_iso(host: Host, request: pytest.FixtureRequest, nfs_iso_sr: SR):
+def guest_tools_iso(
+    host: Host, request: pytest.FixtureRequest, nfs_iso_sr: SR
+) -> Generator[Dict[str, Any], None, None]:
     yield from iso_create(host, nfs_iso_sr, request.param)
 
 
 @pytest.fixture(scope="module")
-def other_tools_iso(host: Host, nfs_iso_sr: SR):
+def other_tools_iso(host: Host, nfs_iso_sr: SR) -> Generator[Dict[str, Any], None, None]:
     yield from iso_create(host, nfs_iso_sr, OTHER_GUEST_TOOLS_ISO)
 
 
@@ -92,7 +100,7 @@ def vm_install_other_drivers(
     unsealed_windows_vm_and_snapshot: Tuple[VM, Snapshot],
     other_tools_iso: Dict[str, Any],
     request: pytest.FixtureRequest,
-):
+) -> Generator[Tuple[VM, Dict[str, Any]], None, None]:
     vm, snapshot = unsealed_windows_vm_and_snapshot
     param = request.param
     install_other_drivers(vm, other_tools_iso["name"], param)
