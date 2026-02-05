@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
@@ -19,7 +21,7 @@ from typing import Any, Dict, Tuple
 # Test uninstallation of other drivers using the XenClean program.
 
 
-def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
+def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]) -> None:
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     logging.info("Run XenClean")
@@ -39,19 +41,24 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestXenClean:
-    def test_xenclean_without_tools(self, running_unsealed_windows_vm: VM, guest_tools_iso):
+    def test_xenclean_without_tools(
+        self, running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm = running_unsealed_windows_vm
         logging.info("XenClean with empty VM")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_with_test_tools_early(self, vm_install_test_tools_no_reboot: VM, guest_tools_iso):
+    def test_xenclean_with_test_tools_early(
+        self, vm_install_test_tools_no_reboot: VM, guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm = vm_install_test_tools_no_reboot
         logging.info("XenClean with test tools (without reboot)")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_with_test_tools(self, vm_install_test_tools_no_reboot: VM, guest_tools_iso):
+    def test_xenclean_with_test_tools(self, vm_install_test_tools_no_reboot: VM,
+                                      guest_tools_iso: Dict[str, Any]) -> None:
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         # HACK: In some cases, vm.reboot(verify=False) followed by vm.insert_cd() (as called by run_xenclean)
@@ -65,7 +72,9 @@ class TestXenClean:
         assert vm.are_windows_tools_uninstalled()
         check_vm_dns(vm)
 
-    def test_xenclean_with_other_tools(self, vm_install_other_drivers: Tuple[VM, Dict], guest_tools_iso):
+    def test_xenclean_with_other_tools(
+        self, vm_install_other_drivers: Tuple[VM, Dict[str, Any]], guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm, param = vm_install_other_drivers
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
