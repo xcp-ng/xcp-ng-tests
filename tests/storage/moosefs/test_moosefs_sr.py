@@ -5,6 +5,11 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
+from lib.pool import Pool
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 from tests.storage import vdi_is_open
 
 # Requirements:
@@ -19,7 +24,7 @@ class TestMooseFSSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_moosefs_sr_without_mfsmount(self, host, moosefs_device_config):
+    def test_create_moosefs_sr_without_mfsmount(self, host: Host, moosefs_device_config: dict[str, str]) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mount.moosefs'), \
             "MooseFS client should not be installed on the host"
@@ -34,7 +39,9 @@ class TestMooseFSSRCreateDestroy:
 
     # MooseFS doesn't support IPv6
     @pytest.mark.usefixtures("host_no_ipv6")
-    def test_create_and_destroy_sr(self, moosefs_device_config, pool_with_moosefs_enabled):
+    def test_create_and_destroy_sr(
+        self, moosefs_device_config: dict[str, str], pool_with_moosefs_enabled: Pool
+    ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = pool_with_moosefs_enabled.master
         sr = master.sr_create('moosefs', "MooseFS-SR-test2", moosefs_device_config, shared=True, verify=True)
@@ -48,15 +55,15 @@ class TestMooseFSSRCreateDestroy:
 @pytest.mark.usefixtures("moosefs_sr", "host_no_ipv6")
 class TestMooseFSSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, moosefs_sr):
+    def test_quicktest(self, moosefs_sr: SR) -> None:
         moosefs_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_moosefs_sr):
+    def test_vdi_is_not_open(self, vdi_on_moosefs_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_moosefs_sr)
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_moosefs_sr):
+    def test_start_and_shutdown_VM(self, vm_on_moosefs_sr: VM) -> None:
         vm = vm_on_moosefs_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -64,7 +71,7 @@ class TestMooseFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_moosefs_sr):
+    def test_snapshot(self, vm_on_moosefs_sr: VM) -> None:
         vm = vm_on_moosefs_sr
         vm.start()
         try:
@@ -73,7 +80,7 @@ class TestMooseFSSR:
         finally:
             vm.shutdown(verify=True)
 
-    def test_moosefs_missing_client_scan_fails(self, host, moosefs_sr):
+    def test_moosefs_missing_client_scan_fails(self, host: Host, moosefs_sr: SR) -> None:
         sr = moosefs_sr
         moosefs_installed = True
         try:
@@ -88,7 +95,7 @@ class TestMooseFSSR:
             if not moosefs_installed:
                 host.yum_install(['moosefs-client'])
 
-    def test_moosefs_missing_client_pbd_plug_fails(self, host, moosefs_sr):
+    def test_moosefs_missing_client_pbd_plug_fails(self, host: Host, moosefs_sr: SR) -> None:
         sr = moosefs_sr
         pbd_uuid = sr.pbd_for_host(host)
         moosefs_installed = True
@@ -113,7 +120,7 @@ class TestMooseFSSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_moosefs_sr, host, moosefs_sr):
+    def test_reboot(self, vm_on_moosefs_sr: VM, host: Host, moosefs_sr: SR) -> None:
         sr = moosefs_sr
         vm = vm_on_moosefs_sr
         host.reboot(verify=True)
