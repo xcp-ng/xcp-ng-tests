@@ -5,23 +5,27 @@ import pytest
 import logging
 
 from lib import config
+from lib.host import Host
 from lib.sr import SR
-from lib.vdi import ImageFormat
+from lib.vdi import VDI, ImageFormat
+from lib.vm import VM
+
+from typing import Generator
 
 # --- Dispatch fixture for NFS versions ----------------------------------------
 
 @pytest.fixture
-def dispatch_nfs(request):
+def dispatch_nfs(request: pytest.FixtureRequest) -> Generator[SR | VDI | VM, None, None]:
     yield request.getfixturevalue(request.param)
 
 # --- NFS3 fixtures ------------------------------------------------------------
 
 @pytest.fixture(scope='package')
-def nfs_device_config():
+def nfs_device_config() -> dict[str, str]:
     return config.sr_device_config("NFS_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
-def nfs_sr(host, image_format: ImageFormat, nfs_device_config):
+def nfs_sr(host: Host, image_format: ImageFormat, nfs_device_config: dict[str, str]) -> Generator[SR, None, None]:
     """ A NFS SR on first host. """
     sr = host.sr_create(
         'nfs', "NFS-SR-test", nfs_device_config | {'preferred-image-formats': image_format}, shared=True
@@ -31,13 +35,13 @@ def nfs_sr(host, image_format: ImageFormat, nfs_device_config):
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_nfs_sr(nfs_sr: SR):
+def vdi_on_nfs_sr(nfs_sr: SR) -> Generator[VDI, None, None]:
     vdi = nfs_sr.create_vdi('NFS-VDI-test')
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_nfs_sr(host, nfs_sr, vm_ref):
+def vm_on_nfs_sr(host: Host, nfs_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=nfs_sr.uuid)
     yield vm
     # teardown
@@ -47,11 +51,11 @@ def vm_on_nfs_sr(host, nfs_sr, vm_ref):
 # --- NFS4+ only fixtures ------------------------------------------------------
 
 @pytest.fixture(scope='package')
-def nfs4_device_config():
+def nfs4_device_config() -> dict[str, str]:
     return config.sr_device_config("NFS4_DEVICE_CONFIG")
 
 @pytest.fixture(scope='package')
-def nfs4_sr(host, image_format: ImageFormat, nfs4_device_config):
+def nfs4_sr(host: Host, image_format: ImageFormat, nfs4_device_config: dict[str, str]) -> Generator[SR, None, None]:
     """ A NFS4+ SR on first host. """
     sr = host.sr_create(
         'nfs', "NFS4-SR-test", nfs4_device_config | {'preferred-image-formats': image_format}, shared=True
@@ -61,13 +65,13 @@ def nfs4_sr(host, image_format: ImageFormat, nfs4_device_config):
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_nfs4_sr(nfs4_sr: SR):
+def vdi_on_nfs4_sr(nfs4_sr: SR) -> Generator[VDI, None, None]:
     vdi = nfs4_sr.create_vdi('NFS4-VDI-test')
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_nfs4_sr(host, nfs4_sr, vm_ref):
+def vm_on_nfs4_sr(host: Host, nfs4_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=nfs4_sr.uuid)
     yield vm
     # teardown
