@@ -31,7 +31,7 @@ class TestLocalISOSRCreateDestroy:
                 'location': '/this/does/not/exist',
                 'legacy_mode': 'true'
             }
-            host.sr_create('iso', "ISO-local-SR-test", device_config, verify=True)
+            sr = host.sr_create('iso', "ISO-local-SR-test", device_config, verify=True)
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:

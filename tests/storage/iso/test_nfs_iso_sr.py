@@ -23,7 +23,7 @@ class TestNFSISOSRCreateDestroy:
         try:
             wrong_device_config = nfs_iso_device_config.copy()
             wrong_device_config['location'] += '/wrongpath'
-            host.sr_create('iso', "ISO-NFS-SR-test", wrong_device_config, verify=True)
+            sr = host.sr_create('iso', "ISO-NFS-SR-test", wrong_device_config, verify=True)
         except Exception:
             logging.info("SR creation failed, as expected.")
         if sr is not None:
