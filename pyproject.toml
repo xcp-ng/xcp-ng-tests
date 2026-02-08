@@ -36,8 +36,17 @@ dev = [
     "autopep8",
 ]
 
+[tool.mypy]
+disallow_any_generics = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+
 [tool.pyright]
 typeCheckingMode = "standard"
+reportMissingParameterType = "error"
+reportUnknownParameterType = "error"
 
 [tool.ruff]
 preview = true

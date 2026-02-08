@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-import argparse
 import dataclasses
 import itertools
 import logging
 import os
 import tempfile
+from argparse import Action, ArgumentParser, Namespace
 
 import git
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
@@ -43,7 +43,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable
+from typing import Any, Dict, Generator, Iterable, Sequence
 
 # Do we cache VMs?
 try:
@@ -52,8 +52,9 @@ except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
 
-class SplitCommaAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+class SplitCommaAction(Action):
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[Any] | None,
+                 option_string: str | None = None) -> None:
         items = getattr(namespace, self.dest, None)
         if items is None:
             items = []
