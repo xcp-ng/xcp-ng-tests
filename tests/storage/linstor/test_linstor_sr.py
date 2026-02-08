@@ -6,6 +6,10 @@ import time
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
 from lib.host import Host
+from lib.pool import Pool
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 from tests.storage import vdi_is_open
 
 from .conftest import LINSTOR_PACKAGE
@@ -21,7 +25,9 @@ class TestLinstorSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_without_linstor(self, host, lvm_disks, provisioning_type, storage_pool_name):
+    def test_create_sr_without_linstor(
+        self, host: Host, lvm_disks: None, provisioning_type: str, storage_pool_name: str
+    ) -> None:
         # This test must be the first in the series in this module
         assert not host.is_package_installed('python-linstor'), \
             "linstor must not be installed on the host at the beginning of the tests"
@@ -39,7 +45,9 @@ class TestLinstorSRCreateDestroy:
         except SSHCommandFailed as e:
             logging.info("SR creation failed, as expected: {}".format(e))
 
-    def test_create_and_destroy_sr(self, pool_with_linstor, provisioning_type, storage_pool_name):
+    def test_create_and_destroy_sr(
+        self, pool_with_linstor: Pool, provisioning_type: str, storage_pool_name: str
+    ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         master = pool_with_linstor.master
         sr = master.sr_create('linstor', 'LINSTOR-SR-test', {
@@ -56,7 +64,7 @@ class TestLinstorSRCreateDestroy:
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, linstor_sr, provisioning_type):
+    def test_quicktest(self, linstor_sr: SR, provisioning_type: str) -> None:
         try:
             linstor_sr.run_quicktest()
         except Exception:
@@ -67,12 +75,12 @@ class TestLinstorSR:
             if provisioning_type == "thick":
                 pytest.fail("Expected failure for thick provisioning did not occur (XPASS)")
 
-    def test_vdi_is_not_open(self, vdi_on_linstor_sr):
+    def test_vdi_is_not_open(self, vdi_on_linstor_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_linstor_sr)
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_linstor_sr):
+    def test_start_and_shutdown_VM(self, vm_on_linstor_sr: VM) -> None:
         vm = vm_on_linstor_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -80,7 +88,7 @@ class TestLinstorSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_linstor_sr):
+    def test_snapshot(self, vm_on_linstor_sr: VM) -> None:
         vm = vm_on_linstor_sr
         vm.start()
         try:
@@ -93,7 +101,7 @@ class TestLinstorSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_linstor_sr, host, linstor_sr):
+    def test_reboot(self, vm_on_linstor_sr: VM, host: Host, linstor_sr: SR) -> None:
         sr = linstor_sr
         vm = vm_on_linstor_sr
         host.reboot(verify=True)
@@ -104,7 +112,7 @@ class TestLinstorSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.reboot
-    def test_linstor_missing(self, linstor_sr, host):
+    def test_linstor_missing(self, linstor_sr: SR, host: Host) -> None:
         sr = linstor_sr
         linstor_installed = True
         try:
@@ -138,7 +146,7 @@ class TestLinstorSR:
 
 # --- Test diskless resources --------------------------------------------------
 
-def _get_diskful_hosts(host: Host, controller_option, sr_group_name, vdi_uuid):
+def _get_diskful_hosts(host: Host, controller_option: str, sr_group_name: str, vdi_uuid: str) -> list[str]:
     # TODO: If any resource is in a temporary creation state or unknown, then need to wait intelligently.
     attempt = 0
     retries = 3
@@ -168,15 +176,18 @@ def _get_diskful_hosts(host: Host, controller_option, sr_group_name, vdi_uuid):
             if attempt >= retries:
                 raise
             time.sleep(sleep_sec)
+    return []
 
-def _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi_uuid, diskless):
+def _ensure_resource_remain_diskless(
+    host: Host, controller_option: str, sr_group_name: str, vdi_uuid: str, diskless: list[Host]
+) -> None:
     diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid)
     for diskless_host in diskless:
         assert diskless_host.param_get("name-label").lower() not in diskfuls
 
 class TestLinstorDisklessResource:
     @pytest.mark.small_vm
-    def test_diskless_kept(self, host, linstor_sr, vm_on_linstor_sr, storage_pool_name):
+    def test_diskless_kept(self, host: Host, linstor_sr: SR, vm_on_linstor_sr: VM, storage_pool_name: str) -> None:
         vm = vm_on_linstor_sr
         vdi_uuids = vm.vdi_uuids(sr_uuid=linstor_sr.uuid)
         vdi_uuid = vdi_uuids[0]
