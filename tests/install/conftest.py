@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 import pytest_dependency  # type: ignore
 
@@ -12,12 +14,16 @@ from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
 
-from typing import Generator, Sequence
+from typing import TYPE_CHECKING, Any, Generator, Sequence
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.vm import VM
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
 # package_source values for each ISO.
-def skip_package_source(version, package_source):
+def skip_package_source(version: str, package_source: str) -> tuple[bool, str]:
     if version not in ISO_IMAGES:
         return True, "version of ISO {} is unknown".format(version)
 
@@ -73,7 +79,7 @@ def answerfile(request: pytest.FixtureRequest) -> Generator[AnswerFile | None, N
 
 
 @pytest.fixture(scope='function')
-def installer_iso(request):
+def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
     iso_key = request.getfixturevalue("iso_version")
     package_source = request.getfixturevalue("package_source")
     skip, reason = skip_package_source(iso_key, package_source)
@@ -97,7 +103,7 @@ def installer_iso(request):
                 )
 
 @pytest.fixture(scope='function')
-def system_disks_names(request):
+def system_disks_names(request: pytest.FixtureRequest) -> Generator[str, None, None]:
     firmware = request.getfixturevalue("firmware")
     yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
 
@@ -265,12 +271,13 @@ sed -i "${{SED_COMMANDS[@]}}" \
         yield remastered_iso
 
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host, create_vms, remastered_iso):
+def vm_booted_with_installer(host: Host, create_vms: list[VM], remastered_iso: str) -> Generator[VM, None, None]:
     host_vm, = create_vms # one single VM
     iso = remastered_iso
 
     vif = host_vm.vifs()[0]
     mac_address = vif.param_get('MAC')
+    assert mac_address is not None
     logging.info("Host VM has MAC %s", mac_address)
 
     remote_iso = None
@@ -290,16 +297,19 @@ def vm_booted_with_installer(host, create_vms, remastered_iso):
             logging.info("Host VM has IPs %s", ips)
             assert len(ips) == 1
             host_vm.ip = ips[0]
+            ip = host_vm.ip
+            assert ip is not None
 
             # host may not be up if ARP cache was filled
-            wait_for(lambda: local_cmd(["ping", "-c1", host_vm.ip], check=False),
+            wait_for(lambda: local_cmd(["ping", "-c1", ip], check=False),
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: local_cmd(["nc", "-zw5", host_vm.ip, "22"], check=False),
+            wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
                      "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
 
             yield host_vm
 
             logging.info("Shutting down Host VM")
+            assert host_vm.ip is not None
             installer.poweroff(host_vm.ip)
             wait_for(host_vm.is_halted, "Wait for host VM halted")
 
@@ -318,7 +328,7 @@ def vm_booted_with_installer(host, create_vms, remastered_iso):
             host.pool.remove_iso(remote_iso)
 
 @pytest.fixture(scope='function')
-def xcpng_chained(request):
+def xcpng_chained(request: pytest.FixtureRequest) -> None:
     # take test name from mark
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"
