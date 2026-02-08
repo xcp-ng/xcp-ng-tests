@@ -133,7 +133,7 @@ def expand_scope_relative_nodeid(scoped_nodeid: str, scope: str, ref_nodeid: str
     return "::".join(itertools.chain(base, (scoped_nodeid,)))
 
 @lru_cache(maxsize=None)
-def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:
+def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:  # noqa: ANN401
     return TypeAdapter(tp)
 
 @overload
@@ -141,7 +141,7 @@ def ensure_type(tp: type[T], v: object) -> T:
     ...
 
 @overload
-def ensure_type(tp: Any, v: object) -> Any:
+def ensure_type(tp: Any, v: object) -> Any:  # noqa: ANN401
     ...
 
 def ensure_type(tp: Any, v: object) -> Any:
