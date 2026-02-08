@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-import argparse
 import dataclasses
 import itertools
 import logging
 import os
 import tempfile
+from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
 
 import git
@@ -44,7 +44,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable, List, Optional
+from typing import Any, Dict, Generator, Iterable, List, Optional, Sequence
 
 # Do we cache VMs?
 try:
@@ -53,8 +53,9 @@ except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
 
-class SplitCommaAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+class SplitCommaAction(Action):
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[str] | None,
+                 option_string: str | None = None) -> None:
         items = getattr(namespace, self.dest, None)
         if items is None:
             items = []
@@ -290,7 +291,7 @@ def pytest_runtest_makereport(
 
 # END make test results visible from fixtures
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitCode) -> None:
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED \
             and session.config.getoption("--no-fail-if-no-tests"):
         session.exitstatus = pytest.ExitCode.OK

@@ -38,6 +38,11 @@ dev = [
 
 [tool.pyright]
 typeCheckingMode = "standard"
+reportMissingParameterType = "error"
+reportUnknownParameterType = "error"
+
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
 
 [tool.ruff]
 preview = true
@@ -49,6 +54,7 @@ quote-style = "preserve"
 
 [tool.ruff.lint]
 select = [
+  "ANN",  # flake8-annotations
   "D",  # pydocstyle
   "F",  # Pyflakes
   "I",  # isort
@@ -59,6 +65,7 @@ select = [
 ]
 # don't use some of the default D and SIM rules
 ignore = [
+  "ANN204",  # missing-return-type-special-method
   "D100",  # undocumented-public-module
   "D101",  # undocumented-public-class
   "D102",  # undocumented-public-method
