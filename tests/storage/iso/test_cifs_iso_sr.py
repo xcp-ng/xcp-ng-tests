@@ -3,6 +3,10 @@ import pytest
 import logging
 import os
 
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
+
 from .conftest import check_iso_mount_and_read_from_vm, copy_tools_iso_to_iso_sr, remove_iso_from_sr
 
 # Requirements:
@@ -18,7 +22,7 @@ class TestCIFSISOSRCreateDestroy:
     because they precisely need to test SR creation and destruction
     """
 
-    def test_create_sr_with_bad_location(self, host, cifs_iso_device_config):
+    def test_create_sr_with_bad_location(self, host: Host, cifs_iso_device_config: dict[str, str]) -> None:
         sr = None
         try:
             wrong_device_config = cifs_iso_device_config.copy()
@@ -30,7 +34,7 @@ class TestCIFSISOSRCreateDestroy:
             sr.forget()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host, cifs_iso_device_config):
+    def test_create_and_destroy_sr(self, host: Host, cifs_iso_device_config: dict[str, str]) -> None:
         sr = host.sr_create('iso', "ISO-CIFS-SR-test", cifs_iso_device_config, shared=True, verify=True)
         sr.forget()
 
@@ -38,10 +42,10 @@ class TestCIFSISOSRCreateDestroy:
 @pytest.mark.usefixtures("cifs_iso_sr")
 class TestCIFSISOSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, cifs_iso_sr):
+    def test_quicktest(self, cifs_iso_sr: SR) -> None:
         cifs_iso_sr.run_quicktest()
 
-    def test_iso_mount_and_read(self, host, cifs_iso_sr, running_unix_vm):
+    def test_iso_mount_and_read(self, host: Host, cifs_iso_sr: SR, running_unix_vm: VM) -> None:
         # create the ISO SR on CIFS
         sr = cifs_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr)

@@ -5,10 +5,13 @@ import time
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
 from lib.host import Host
+from lib.sr import SR
 from lib.vm import VM
 from pkgfixtures import formatted_and_mounted_ext4_disk
 
-def create_local_iso_sr(host: Host, location):
+from typing import Generator
+
+def create_local_iso_sr(host: Host, location: str) -> SR:
     host.ssh(f'mkdir -p {location}')
     device_config = {
         'location': location,
@@ -17,7 +20,7 @@ def create_local_iso_sr(host: Host, location):
     return host.sr_create('iso', "ISO-local-SR-test", device_config, verify=True)
 
 @pytest.fixture(scope='module')
-def local_iso_sr(host: Host, formatted_and_mounted_ext4_disk):
+def local_iso_sr(host: Host, formatted_and_mounted_ext4_disk: str) -> Generator[tuple[SR, str], None, None]:
     """ An ISO SR on first host. """
     location = formatted_and_mounted_ext4_disk + '/iso_sr'
     sr = create_local_iso_sr(host, location)
@@ -25,7 +28,7 @@ def local_iso_sr(host: Host, formatted_and_mounted_ext4_disk):
     # teardown
     sr.destroy()
 
-def copy_tools_iso_to_iso_sr(host: Host, sr, location=None):
+def copy_tools_iso_to_iso_sr(host: Host, sr: SR, location: str | None = None) -> str:
     # copy the ISO file to the right location
     iso_path = host.ssh('find /opt/xensource/packages/iso/ -name "*.iso"')
     iso_new_name = sr.uuid + "_test.iso"
@@ -37,7 +40,7 @@ def copy_tools_iso_to_iso_sr(host: Host, sr, location=None):
     sr.scan()
     return iso_new_path
 
-def check_iso_mount_and_read_from_vm(host: Host, iso_name, vm: VM):
+def check_iso_mount_and_read_from_vm(host: Host, iso_name: str, vm: VM) -> None:
     """ Helper test function shared by several tests. """
     host.xe('vm-cd-insert', {'cd-name': iso_name, 'uuid': vm.uuid})
     try:
@@ -56,6 +59,6 @@ def check_iso_mount_and_read_from_vm(host: Host, iso_name, vm: VM):
     finally:
         host.xe('vm-cd-eject', {'uuid': vm.uuid})
 
-def remove_iso_from_sr(host: Host, sr, iso_path):
+def remove_iso_from_sr(host: Host, sr: SR, iso_path: str) -> None:
     host.ssh(f'rm -f {iso_path}')
     sr.scan()

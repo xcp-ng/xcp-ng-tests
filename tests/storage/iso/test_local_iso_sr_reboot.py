@@ -3,6 +3,9 @@ import pytest
 import os
 
 from lib.common import wait_for
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
 
 from .conftest import check_iso_mount_and_read_from_vm, copy_tools_iso_to_iso_sr, remove_iso_from_sr
 
@@ -22,7 +25,7 @@ class TestLocalISOSRReboot:
     This test is longer because the host reboots between the creation of the SR and the test with the ISO file.
     """
 
-    def test_iso_mount_and_read_after_reboot(self, host, local_iso_sr, unix_vm):
+    def test_iso_mount_and_read_after_reboot(self, host: Host, local_iso_sr: tuple[SR, str], unix_vm: VM) -> None:
         sr, location = local_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr, location)
         host.reboot(verify=True)
