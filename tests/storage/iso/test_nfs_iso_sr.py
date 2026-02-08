@@ -3,6 +3,10 @@ import pytest
 import logging
 import os
 
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
+
 from .conftest import check_iso_mount_and_read_from_vm, copy_tools_iso_to_iso_sr, remove_iso_from_sr
 
 # Requirements:
@@ -18,7 +22,7 @@ class TestNFSISOSRCreateDestroy:
     because they precisely need to test SR creation and destruction
     """
 
-    def test_create_sr_with_bad_location(self, host, nfs_iso_device_config):
+    def test_create_sr_with_bad_location(self, host: Host, nfs_iso_device_config: dict[str, str]) -> None:
         sr = None
         try:
             wrong_device_config = nfs_iso_device_config.copy()
@@ -30,7 +34,7 @@ class TestNFSISOSRCreateDestroy:
             sr.forget()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host, nfs_iso_device_config):
+    def test_create_and_destroy_sr(self, host: Host, nfs_iso_device_config: dict[str, str]) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('iso', "ISO-NFS-SR-test", nfs_iso_device_config, shared=True, verify=True)
         sr.forget()
@@ -40,10 +44,10 @@ class TestNFSISOSRCreateDestroy:
 @pytest.mark.usefixtures("nfs_iso_sr")
 class TestNFSISOSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, nfs_iso_sr):
+    def test_quicktest(self, nfs_iso_sr: SR) -> None:
         nfs_iso_sr.run_quicktest()
 
-    def test_iso_mount_and_read(self, host, nfs_iso_sr, running_unix_vm):
+    def test_iso_mount_and_read(self, host: Host, nfs_iso_sr: SR, running_unix_vm: VM) -> None:
         # create the ISO SR on NFS
         sr = nfs_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr)
