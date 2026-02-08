@@ -84,7 +84,7 @@ def hosts_with_traffic_rules(hosts_with_xo: list[Host]) -> Generator[list[Host],
     # check host: xcp-ng-xapi-plugins minimal version
     minimal = Evr.parse("xcp-ng-xapi-plugins-1.17.0")
 
-    def host_with_xcp_ng_xapi_plugins(host: Host):
+    def host_with_xcp_ng_xapi_plugins(host: Host) -> None:
         # get the package version
         packages = json.loads(host.xe('host-call-plugin', {
             'host-uuid': host.uuid,
@@ -154,7 +154,7 @@ def vm_with_tcpdump_scope_function(vm_with_tcpdump_scope_module: VM) -> Generato
 
 # ---- Bond ----
 @pytest.fixture(scope='function')
-def bond_lacp(host: Host, empty_network: Network):
+def bond_lacp(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
     if len(HOST_FREE_NICS) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
@@ -170,7 +170,7 @@ def bond_lacp(host: Host, empty_network: Network):
     bond.destroy()
 
 @pytest.fixture(scope='function')
-def bond_activebackup(host: Host, empty_network: Network):
+def bond_activebackup(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
     if len(HOST_FREE_NICS) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
@@ -186,7 +186,7 @@ def bond_activebackup(host: Host, empty_network: Network):
     bond.destroy()
 
 @pytest.fixture(scope='function')
-def bond_balanceslb(host: Host, empty_network: Network):
+def bond_balanceslb(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
     if len(HOST_FREE_NICS) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 

@@ -113,7 +113,7 @@ u32 = 'I'
 EFI_GUID = '16s'
 
 
-def efi_pack(fmt: str, *args: Any) -> bytes:
+def efi_pack(fmt: str, *args: Any) -> bytes:  # noqa: ANN401
     """
     Return bytes of an EFI struct (little endian).
 

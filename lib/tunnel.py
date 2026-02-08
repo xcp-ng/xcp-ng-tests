@@ -42,7 +42,7 @@ class Tunnel:
     def param_clear(self, param_name: str) -> None:
         _param_clear(self.host, self.xe_prefix, self.uuid, param_name)
 
-    def destroy(self):
+    def destroy(self) -> None:
         logging.info(f"Destroying Tunnel: {self.uuid}")
         self.host.xe('tunnel-destroy', {'uuid': self.uuid})
 
