@@ -30,7 +30,7 @@ class GlusterFsConfig:
 def _glusterfs_config() -> GlusterFsConfig:
     return GlusterFsConfig()
 
-def _setup_host_with_glusterfs(host: Host):
+def _setup_host_with_glusterfs(host: Host) -> None:
     for service in ['iptables', 'ip6tables']:
         host.ssh(f'cp /etc/sysconfig/{service} /etc/sysconfig/{service}.orig')
 
@@ -49,7 +49,7 @@ def _setup_host_with_glusterfs(host: Host):
 
     host.ssh('systemctl enable --now glusterd.service')
 
-def _uninstall_host_glusterfs(host: Host):
+def _uninstall_host_glusterfs(host: Host) -> None:
     errors = []
     errors += exec_nofail(lambda: host.ssh('systemctl disable --now glusterd.service'))
 
@@ -58,7 +58,7 @@ def _uninstall_host_glusterfs(host: Host):
 
     raise_errors(errors)
 
-def _restore_host_iptables(host: Host):
+def _restore_host_iptables(host: Host) -> None:
     errors = []
 
     iptables = 'ip6tables' if is_ipv6(host.hostname_or_ip) else 'iptables'
@@ -78,7 +78,7 @@ def _restore_host_iptables(host: Host):
     raise_errors(errors)
 
 @pytest.fixture(scope='package')
-def pool_without_glusterfs(host: Host) -> Generator[Pool]:
+def pool_without_glusterfs(host: Host) -> Generator[Pool, None, None]:
     for h in host.pool.hosts:
         if h.file_exists('/usr/sbin/glusterd'):
             raise Exception(
@@ -91,13 +91,13 @@ def pool_with_glusterfs(
     pool_without_glusterfs: Pool,
     pool_with_saved_yum_state: Pool,
     _glusterfs_config: GlusterFsConfig
-) -> Generator[Pool]:
+) -> Generator[Pool, None, None]:
 
-    def _host_rollback(host: Host):
+    def _host_rollback(host: Host) -> None:
         _uninstall_host_glusterfs(host)
         _restore_host_iptables(host)
 
-    def _disable_yum_rollback(host: Host):
+    def _disable_yum_rollback(host: Host) -> None:
         host.saved_rollback_id = None
 
     pool = pool_with_saved_yum_state
@@ -117,7 +117,7 @@ def gluster_disk(
     pool_with_unused_512B_disk: Pool,
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     _glusterfs_config: GlusterFsConfig,
-) -> Generator[None]:
+) -> Generator[None, None, None]:
     pool = pool_with_unused_512B_disk
     mountpoint = '/mnt/sr_disk'
     for h in pool.hosts:
@@ -134,10 +134,10 @@ def gluster_disk(
         lambda h: teardown_formatted_and_mounted_disk(h, mountpoint)
     )
 
-def _fallback_gluster_teardown(host: Host):
+def _fallback_gluster_teardown(host: Host) -> None:
     # See: https://microdevsys.com/wp/volume-delete-volume-failed-some-of-the-peers-are-down/
     # Remove all peers and bricks from the hosts volume and then stop and destroy volume.
-    def teardown_for_host(h: Host):
+    def teardown_for_host(h: Host) -> None:
         logging.info("< Fallback teardown on host: %s" % h)
         hosts = h.pool.hosts
 
@@ -179,7 +179,7 @@ def gluster_volume_started(
     hostA2: Host,
     gluster_disk: None,
     _glusterfs_config: GlusterFsConfig
-) -> Generator[None]:
+) -> Generator[None, None, None]:
     hosts = host.pool.hosts
 
     if is_ipv6(host.hostname_or_ip):
@@ -249,7 +249,7 @@ def glusterfs_sr(
     gluster_volume_started: None,
     glusterfs_device_config: dict[str, str],
     _glusterfs_config: GlusterFsConfig
-) -> Generator[SR]:
+) -> Generator[SR, None, None]:
     """ A GlusterFS SR on first host. """
     # Create the SR
     sr = host.sr_create('glusterfs', "GlusterFS-SR-test", glusterfs_device_config, shared=True)
@@ -262,13 +262,13 @@ def glusterfs_sr(
         raise pytest.fail("Could not destroy glusterfs SR, leaving packages in place for manual cleanup") from e
 
 @pytest.fixture(scope='module')
-def vdi_on_glusterfs_sr(glusterfs_sr: SR) -> Generator[VDI]:
+def vdi_on_glusterfs_sr(glusterfs_sr: SR) -> Generator[VDI, None, None]:
     vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test')
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_glusterfs_sr(host: Host, glusterfs_sr: SR, vm_ref: str) -> Generator[VM]:
+def vm_on_glusterfs_sr(host: Host, glusterfs_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=glusterfs_sr.uuid)
     yield vm
     # teardown
