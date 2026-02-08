@@ -38,6 +38,20 @@ def ovs_vsctl_bridge_to_parent(host: Host, br: str) -> str:
 
     return cache_ovs_vsctl_bridge_to_parent[key]
 
+def ofctl_dumpflows(host: Host, br: str) -> list[str]:
+    """
+    Get the list of dump-flows installed for the bridge {br}
+    """
+    br = ovs_vsctl_bridge_to_parent(host, br)
+    return host.ssh(
+        f"ovs-ofctl -O OpenFlow11 dump-flows '{br}' | grep -F cookie=",
+    ).splitlines()
+
+def count_of(host: Host, br: str) -> int:
+    """
+    Return the number of OF flows in the bridge (excluding the default one)
+    """
+    return len(ofctl_dumpflows(host, br)) - 1
 def ofproto_trace_drop_in_port(
     host: Host, br: str, flow: str, in_port: str,
     vlan_tag: int | None, vlan_device: str | None,
@@ -239,7 +253,7 @@ def has_running_vm_on_network(host: Host, network_uuid: str) -> bool:
 
 @pytest.mark.small_vm
 class TestSimple:
-    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer):
+    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer) -> None:
         host = hosts_with_traffic_rules[0]
         vm = imported_vm.clone()
         defer(lambda: vm.destroy())
@@ -330,7 +344,7 @@ class TestSimple:
 
         assert_clean_openflow_state(host, hostBr)
 
-    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer):
+    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer) -> None:
         host = hosts_with_traffic_rules[0]
         vm = imported_vm.clone()
         defer(lambda: vm.destroy())
@@ -443,7 +457,7 @@ class TestMigrate:
         local_sr_on_hostA2: SR,
         imported_vm: VM,
         defer: Defer,
-    ):
+    ) -> None:
         hostA1 = hosts_with_traffic_rules[0]
 
         vm = imported_vm.clone()
@@ -506,7 +520,7 @@ class TestMigrate:
         local_sr_on_hostA2: SR,
         imported_vm: VM,
         defer: Defer,
-    ):
+    ) -> None:
         hostA1 = hosts_with_traffic_rules[0]
 
         vm = imported_vm.clone()
@@ -571,7 +585,7 @@ class TestMigrate:
 @pytest.mark.small_vm
 class TestVLAN:
     def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, empty_network: Network,
-                     vlan: VLAN, defer: Defer):
+                     vlan: VLAN, defer: Defer) -> None:
         host = hosts_with_traffic_rules[0]
         network = empty_network
 
@@ -699,7 +713,7 @@ class TestVLAN:
         assert_clean_openflow_state(host, hostBr)
 
     def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
-                         empty_network: Network, vlan: VLAN, defer: Defer):
+                         empty_network: Network, vlan: VLAN, defer: Defer) -> None:
         host = hosts_with_traffic_rules[0]
         network = empty_network
         vm = imported_vm.clone()
@@ -802,7 +816,7 @@ class TestVLAN:
 @pytest.mark.small_vm
 class TestTunnel:
     def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
-                     tunnel: Tunnel, tunnel_protocol: str, defer: Defer):
+                     tunnel: Tunnel, tunnel_protocol: str, defer: Defer) -> None:
         host = hosts_with_traffic_rules[0]
         network = Network(host, tunnel.access_pif().network_uuid())
         hostBr = network.bridge()
@@ -852,7 +866,7 @@ class TestTunnel:
         assert_clean_openflow_state(host, hostBr)
 
     def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
-                         tunnel: Tunnel, tunnel_protocol: str, defer: Defer):
+                         tunnel: Tunnel, tunnel_protocol: str, defer: Defer) -> None:
         host = hosts_with_traffic_rules[0]
         network = Network(host, tunnel.access_pif().network_uuid())
         vm = imported_vm.clone()

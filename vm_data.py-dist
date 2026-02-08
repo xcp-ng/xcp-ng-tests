@@ -3,6 +3,8 @@
 # Consult README.md for accepted values.
 # Example value: "http://somewhere/images/small_vm.xva"
 
+from jobs import VMSDef
+
 # The "single" element contains 1 entry per VM filename:
 # "small_vm": "alpine-minimal-3.12.0.xva",
 # "small_vm_unix_tools": "centos7-64-created_8.0-zstd.xva",
@@ -26,7 +28,7 @@
 #         ("alpine-uefi-minimal-efitools-3.12.0.xva", r"8\.2\."),
 #         ...],
 
-VMS: dict[str, dict[str, str | list]] = {
+VMS: VMSDef = {
     "single": {
         # basic small VM
         "small_vm": "",

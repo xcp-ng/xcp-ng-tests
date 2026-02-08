@@ -42,7 +42,7 @@ class VLAN:
     def param_clear(self, param_name: str) -> None:
         _param_clear(self.host, self.xe_prefix, self.uuid, param_name)
 
-    def destroy(self):
+    def destroy(self) -> None:
         logging.info(f"Destroying VLAN: {self.uuid}")
         self.host.xe('vlan-destroy', {'uuid': self.uuid})
 

@@ -87,8 +87,10 @@ class AnswerFile:
 def poweroff(ip: str) -> None:
     ssh(ip, "nohup sh -c 'sleep 2 && poweroff' >/dev/null 2>&1 &")
 
-def wait_for_install_failure_or(ip: str, cmd: Callable[[], bool], msg: str | None = None, timeout_secs=2 * 60) -> None:
-    def inner():
+def wait_for_install_failure_or(
+    ip: str, cmd: Callable[[], bool], msg: str | None = None, timeout_secs: int = 2 * 60
+) -> None:
+    def inner() -> bool:
         # Scans the logs for a failure entry formatted as: INFO [<timestamp>] INSTALL FAILED.
         # If found, it returns that line and the rest of the file (to capture stack traces/errors).
         # If not found, it returns an empty string.
