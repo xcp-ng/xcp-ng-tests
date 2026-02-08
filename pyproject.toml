@@ -35,6 +35,8 @@ dev = [
 
 [tool.pyright]
 typeCheckingMode = "standard"
+reportMissingParameterType = "error"
+reportUnknownParameterType = "error"
 
 [tool.ruff]
 preview = true
