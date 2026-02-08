@@ -31,6 +31,9 @@ dev = [
     "types-requests",
     "typing-extensions",
     "libarchive-c==5.3",
+    "types-pygments",
+    "types-colorama",
+    "types-pexpect",
 ]
 
 [tool.pyright]
