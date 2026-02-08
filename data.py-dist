@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
 
-def hash_password(password):
+def hash_password(password: str) -> str:
     """Hash password for /etc/password."""
     salt = crypt.mksalt(crypt.METHOD_SHA512)  # type: ignore
-    return crypt.crypt(password, salt)
+    return crypt.crypt(password, salt)  # type: ignore
 
 HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
 
