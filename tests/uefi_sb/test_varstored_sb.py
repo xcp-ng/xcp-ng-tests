@@ -4,6 +4,7 @@ import logging
 
 from lib.commands import SSHCommandFailed
 from lib.efi import EFI_AT_ATTRS, EFI_VARIABLE_APPEND_WRITE, SB_CERTS, EFIAuth, image_security_database_guid
+from lib.snapshot import Snapshot
 from lib.vm import VM
 
 from .utils import (
@@ -15,6 +16,8 @@ from .utils import (
     revert_vm_state,
     sign_efi_bins,
 )
+
+from typing import Generator
 
 # These tests check the behaviour of XAPI and varstored as they are in XCP-ng 8.3
 # For XCP-ng 8.2, see test_uefistored_sb.py
@@ -36,41 +39,46 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 @pytest.mark.usefixtures("host_at_least_8_3")
 @pytest.mark.usefixtures("unix_vm")
 class TestGuestLinuxUEFISecureBoot:
+    PK: EFIAuth
+    KEK: EFIAuth
+    db: EFIAuth
+    dbx: EFIAuth
+
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
         yield
         revert_vm_state(vm, snapshot)
 
     @pytest.mark.multi_vms  # test that SB works on various UEFI unix/linux VMs, not just on `small_vm`
-    def test_boot_success_when_vm_db_set_and_images_signed(self, uefi_vm):
+    def test_boot_success_when_vm_db_set_and_images_signed(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         sign_efi_bins(vm, self.db)
         vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_succeeded(vm)
 
-    def test_boot_fails_when_vm_db_set_and_images_unsigned(self, uefi_vm):
+    def test_boot_fails_when_vm_db_set_and_images_unsigned(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
-    def test_boot_succeeds_when_vm_certs_set_and_sb_disabled(self, uefi_vm):
+    def test_boot_succeeds_when_vm_certs_set_and_sb_disabled(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         vm.param_set('platform', False, key='secureboot')
         boot_and_check_no_sb_errors(vm)
 
-    def test_boot_fails_when_vm_dbx_revokes_signed_images(self, uefi_vm):
+    def test_boot_fails_when_vm_dbx_revokes_signed_images(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db, self.dbx])
         sign_efi_bins(vm, self.db)
         vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_failed(vm)
 
-    def test_boot_success_when_initial_vm_keys_not_signed_by_parent(self, uefi_vm):
+    def test_boot_success_when_initial_vm_keys_not_signed_by_parent(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         PK, KEK, db, _ = generate_keys(self_signed=True)
         vm.install_uefi_certs([PK, KEK, db])
@@ -78,7 +86,7 @@ class TestGuestLinuxUEFISecureBoot:
         vm.param_set('platform', True, key='secureboot')
         boot_and_check_sb_succeeded(vm)
 
-    def test_sb_off_really_means_off(self, uefi_vm):
+    def test_sb_off_really_means_off(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         sign_efi_bins(vm, self.db)
@@ -88,7 +96,7 @@ class TestGuestLinuxUEFISecureBoot:
         logging.info("Check that SB is NOT enabled according to the OS.")
         assert not vm.booted_with_secureboot()
 
-    def test_append_with_default(self, uefi_vm: VM):
+    def test_append_with_default(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.host.pool.clear_custom_uefi_certs()
         vm.set_uefi_user_mode()
@@ -101,7 +109,7 @@ class TestGuestLinuxUEFISecureBoot:
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
 
-    def test_append_with_poison(self, uefi_vm: VM):
+    def test_append_with_poison(self, uefi_vm: VM) -> None:
         """
         Context: https://xcp-ng.org/blog/2025/10/30/xcp-ng-8-3-varstored-update-unbootable-vm-risk-and-remediation/
 
@@ -132,13 +140,13 @@ class TestGuestLinuxUEFISecureBoot:
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestWindowsUEFISecureBoot:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         yield
         revert_vm_state(vm, snapshot)
 
     @pytest.mark.small_vm  # test on the smallest Windows VM, if that means anything with Windows
-    def test_windows_fails(self, uefi_vm):
+    def test_windows_fails(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         PK, KEK, db, _ = generate_keys(self_signed=True)
         vm.install_uefi_certs([PK, KEK, db])
@@ -146,7 +154,7 @@ class TestGuestWindowsUEFISecureBoot:
         boot_and_check_sb_failed(vm)
 
     @pytest.mark.multi_vms  # test that SB works on every Windows VM we have
-    def test_windows_succeeds(self, uefi_vm):
+    def test_windows_succeeds(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set('platform', True, key='secureboot')
         # Install certs in the VM. They must be official MS certs.
@@ -162,30 +170,30 @@ class TestGuestWindowsUEFISecureBoot:
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestCertsMissingAndSbOn:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         vm.param_set('platform', True, key='secureboot')
         yield
         revert_vm_state(vm, snapshot)
 
-    def test_setup_mode_and_sb_on(self, uefi_vm):
+    def test_setup_mode_and_sb_on(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.set_uefi_setup_mode()
         boot_and_check_no_sb_errors(vm)
 
-    def test_only_pk_present_but_sb_on(self, uefi_vm):
+    def test_only_pk_present_but_sb_on(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         PK, _, _, _ = generate_keys()
         vm.install_uefi_certs([PK])
         boot_and_check_sb_failed(vm)
 
-    def test_only_pk_and_kek_present_but_sb_on(self, uefi_vm):
+    def test_only_pk_and_kek_present_but_sb_on(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         PK, KEK, _, _ = generate_keys()
         vm.install_uefi_certs([PK, KEK])
         boot_and_check_sb_failed(vm)
 
-    def test_only_pk_and_db_present_but_sb_on(self, uefi_vm):
+    def test_only_pk_and_db_present_but_sb_on(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         PK, _, db, _ = generate_keys()
         vm.install_uefi_certs([PK, db])
@@ -197,12 +205,12 @@ class TestCertsMissingAndSbOn:
 @pytest.mark.usefixtures("unix_vm")
 class TestUEFIKeyExchange:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         yield
         revert_vm_state(vm, snapshot)
 
-    def test_key_exchanges(self, uefi_vm):
+    def test_key_exchanges(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.set_uefi_setup_mode()
 
@@ -214,14 +222,14 @@ class TestUEFIKeyExchange:
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestWindowsUEFIKeyUpgrade:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         if not vm.get_vtpm_uuid():
             vm.create_vtpm()
         yield
         revert_vm_state(vm, snapshot)
 
-    def install_old_certs(self, vm: VM):
+    def install_old_certs(self, vm: VM) -> list[EFIAuth]:
         """Populate a key set that looks like the old defaults."""
         PK = EFIAuth.self_signed("PK")
         KEK = EFIAuth.self_signed("KEK", other_certs=[SB_CERTS.kek_ms_2011()])
@@ -237,7 +245,7 @@ class TestGuestWindowsUEFIKeyUpgrade:
         vm.install_uefi_certs([PK, KEK, db, dbx])
         return [PK, KEK, db, dbx]
 
-    def install_new_certs(self, vm: VM, signer: EFIAuth):
+    def install_new_certs(self, vm: VM, signer: EFIAuth) -> None:
         """Populate a key set that looks like the new defaults with 2023 MS keys."""
         newPK = EFIAuth.self_signed("PK")
         newKEK = EFIAuth("KEK", other_certs=[SB_CERTS.kek_ms_2011(), SB_CERTS.kek_ms_2023()])
@@ -263,7 +271,7 @@ class TestGuestWindowsUEFIKeyUpgrade:
 
         vm.install_uefi_certs([newPK, newKEK, newdb, newdbx])
 
-    def test_key_upgrade(self, uefi_vm: VM):
+    def test_key_upgrade(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set("platform", True, key="secureboot")
 
@@ -275,7 +283,7 @@ class TestGuestWindowsUEFIKeyUpgrade:
         self.install_new_certs(vm, PK)
         boot_and_check_sb_succeeded(vm)
 
-    def test_key_upgrade_bitlocker(self, uefi_vm: VM):
+    def test_key_upgrade_bitlocker(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set("platform", True, key="secureboot")
 

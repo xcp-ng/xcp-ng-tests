@@ -5,25 +5,29 @@ from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.efi import EFI_AT_ATTRS_BYTES, EFIAuth, get_md5sum_from_auth, get_secure_boot_guid
 from lib.host import Host
+from lib.snapshot import Snapshot
+from lib.vm import VM
 
-from typing import Literal, overload
+from typing import Literal, cast, overload
 
 VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 
 
 @overload
-def generate_keys(*, self_signed: bool = False, as_dict: Literal[True] = True) -> dict[str, EFIAuth]:
+def generate_keys(*, self_signed: bool = False, as_dict: Literal[True]) -> dict[str, EFIAuth]:
     ...
 
 
 @overload
 def generate_keys(
-    *, self_signed: bool = False, as_dict: Literal[False]
+    *, self_signed: bool = False, as_dict: Literal[False] = False
 ) -> tuple[EFIAuth, EFIAuth, EFIAuth, EFIAuth]:
     ...
 
 
-def generate_keys(*, self_signed=False, as_dict=False):
+def generate_keys(
+    *, self_signed: bool = False, as_dict: bool = False
+) -> tuple[EFIAuth, EFIAuth, EFIAuth, EFIAuth] | dict[str, EFIAuth]:
     logging.info('Generating keys' + (' (self signed)' if self_signed else ''))
     PK = EFIAuth.self_signed('PK')
     KEK = EFIAuth.self_signed('KEK')
@@ -47,7 +51,7 @@ def generate_keys(*, self_signed=False, as_dict=False):
         return PK, KEK, db, dbx
 
 
-def revert_vm_state(vm, snapshot):
+def revert_vm_state(vm: VM, snapshot: Snapshot) -> None:
     try:
         snapshot.revert()
     finally:
@@ -57,7 +61,7 @@ def revert_vm_state(vm, snapshot):
         vm.rm_messages(VM_SECURE_BOOT_FAILED)
 
 
-def boot_and_check_sb_failed(vm):
+def boot_and_check_sb_failed(vm: VM) -> None:
     vm.start()
     wait_for(lambda: vm.get_messages(VM_SECURE_BOOT_FAILED), 'Wait for message %s' % VM_SECURE_BOOT_FAILED)
 
@@ -66,20 +70,20 @@ def boot_and_check_sb_failed(vm):
     assert vm.is_in_uefi_shell()
 
 
-def boot_and_check_no_sb_errors(vm):
+def boot_and_check_no_sb_errors(vm: VM) -> None:
     vm.start()
     vm.wait_for_vm_running_and_ssh_up()
     logging.info("Verify there's no %s message" % VM_SECURE_BOOT_FAILED)
     assert not vm.get_messages(VM_SECURE_BOOT_FAILED)
 
 
-def boot_and_check_sb_succeeded(vm):
+def boot_and_check_sb_succeeded(vm: VM) -> None:
     boot_and_check_no_sb_errors(vm)
     logging.info("Check that SB is enabled according to the OS.")
     assert vm.booted_with_secureboot()
 
 
-def sign_efi_bins(vm, db):
+def sign_efi_bins(vm: VM, db: EFIAuth) -> None:
     """
     Sign a unix VM's EFI binaries.
 
@@ -98,7 +102,7 @@ def sign_efi_bins(vm, db):
         vm.shutdown(verify=True)
 
 
-def _test_key_exchanges(vm):
+def _test_key_exchanges(vm: VM) -> None:
     PK = EFIAuth.self_signed('PK')
     null_PK = EFIAuth('PK')
     new_PK = EFIAuth.self_signed('PK')
@@ -159,8 +163,10 @@ def _test_key_exchanges(vm):
         logging.info('> Testing {} ({})'.format(auth.name, i))
 
         ok = True
+        auth_data = auth.auth_data()
+        assert auth_data is not None
         try:
-            vm.set_efi_var(auth.name, auth.guid, EFI_AT_ATTRS_BYTES, auth.auth_data())
+            vm.set_efi_var(auth.name, auth.guid, EFI_AT_ATTRS_BYTES, auth_data)
         except SSHCommandFailed:
             ok = False
 
@@ -168,7 +174,7 @@ def _test_key_exchanges(vm):
             raise AssertionError('Failed to set {} {}'.format(i, auth.name))
 
 
-def check_disk_cert_md5sum(host: Host, key, reference_file, do_assert=True):
+def check_disk_cert_md5sum(host: Host, key: str, reference_file: str, do_assert: bool = True) -> bool | None:
     auth_filepath_on_host = f'{host.varstore_dir()}/{key}.auth'
     assert host.file_exists(auth_filepath_on_host)
     with open(reference_file, 'rb') as rf:
@@ -178,11 +184,12 @@ def check_disk_cert_md5sum(host: Host, key, reference_file, do_assert=True):
     logging.debug('Host disk MD5: %s' % host_disk_md5)
     if do_assert:
         assert host_disk_md5 == reference_md5
+        return None
     else:
         return host_disk_md5 == reference_md5
 
 
-def check_vm_cert_md5sum(vm, key, reference_file):
+def check_vm_cert_md5sum(vm: VM, key: str, reference_file: str) -> None:
     res = vm.host.ssh(
         f'varstore-get {vm.uuid} {get_secure_boot_guid(key)} {key}',
         check=False,
@@ -191,4 +198,5 @@ def check_vm_cert_md5sum(vm, key, reference_file):
     )
     assert res.returncode == 0, f"Cert {key} must be present"
     reference_md5 = get_md5sum_from_auth(reference_file)
+    assert isinstance(res.stdout, bytes)
     assert hashlib.md5(res.stdout).hexdigest() == reference_md5
