@@ -4,12 +4,14 @@ import logging
 
 from lib.host import Host
 
+from typing import Generator
+
 # Requirements:
 # From --hosts parameter:
 # - host(A1): first XCP-ng host > 8.2.
 
 @pytest.fixture(scope='module')
-def host_with_raid(host: Host):
+def host_with_raid(host: Host) -> Generator[Host, None, None]:
     dummy_raid = False
     if not host.file_exists('/dev/md127', regular_file=False):
         logging.info("> Host has no raids, creating one for tests")
@@ -29,6 +31,6 @@ def host_with_raid(host: Host):
         host.ssh('losetup -d /dev/loop1')
         host.ssh('rm -rf raid-1 raid-0')
 
-def test_check_raid_pool(host_with_raid):
+def test_check_raid_pool(host_with_raid: Host) -> None:
     host = host_with_raid
     host.call_plugin('raid.py', 'check_raid_pool')
