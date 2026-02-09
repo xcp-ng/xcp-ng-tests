@@ -18,7 +18,7 @@ from lib.vm import VM
 # - A Linux UEFI VM to import
 # - The UEFI VM must have `efitools` installed (and `util-linux` for Alpine VM)
 
-def set_and_assert_var(vm, cert, new, should_pass):
+def set_and_assert_var(vm: VM, cert: Certificate, new: bytes, should_pass: bool) -> None:
     var = 'myvariable'
 
     old = vm.get_efi_var(var, global_variable_guid)
@@ -42,7 +42,7 @@ def set_and_assert_var(vm, cert, new, should_pass):
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("unix_vm")
-def test_auth_variable(uefi_vm):
+def test_auth_variable(uefi_vm: VM) -> None:
     vm = uefi_vm
     vm.start()
 
@@ -71,7 +71,7 @@ def test_auth_variable(uefi_vm):
 
 @pytest.mark.small_vm # run with a small VM to test the features (/!\ but this small VM must have efitools)
 @pytest.mark.usefixtures("unix_vm")
-def test_db_append(uefi_vm: VM):
+def test_db_append(uefi_vm: VM) -> None:
     """Pass if appending the DB succeeds. Otherwise, fail."""
     vm = uefi_vm
 

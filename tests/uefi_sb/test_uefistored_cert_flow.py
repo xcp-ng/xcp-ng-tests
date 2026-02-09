@@ -3,7 +3,15 @@ import pytest
 import hashlib
 import logging
 
+from lib.efi import EFIAuth
+from lib.host import Host
+from lib.pool import Pool
+from lib.snapshot import Snapshot
+from lib.vm import VM
+
 from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, revert_vm_state
+
+from typing import Generator
 
 # These tests check the behaviour of XAPI and uefistored as they are in XCP-ng 8.2
 # For XCP-ng 8.3 or later, see test_varstored_cert_flow.py
@@ -18,7 +26,7 @@ from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, 
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
-def install_certs_to_disks(pool, certs_dict, keys):
+def install_certs_to_disks(pool: Pool, certs_dict: dict[str, EFIAuth], keys: list[str]) -> None:
     for host in pool.hosts:
         logging.debug('Installing to host %s:' % host.hostname_or_ip)
         for key in keys:
@@ -32,7 +40,7 @@ def install_certs_to_disks(pool, certs_dict, keys):
 @pytest.mark.usefixtures("host_less_than_8_3", "pool_without_uefi_certs")
 class TestPoolToDiskCertInheritanceAtVmStart:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         yield
         # Revert the VM, which has the interesting effect of also shutting it down instantly
@@ -40,7 +48,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         # clear pool certs for next test
         vm.host.pool.clear_uefi_certs()
 
-    def test_pool_certs_present_and_disk_certs_absent(self, uefi_vm):
+    def test_pool_certs_present_and_disk_certs_absent(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with certs on pool and no certs on host disks
         pool_auths = generate_keys(as_dict=True)
@@ -52,7 +60,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
-    def test_pool_certs_present_and_disk_certs_different(self, uefi_vm):
+    def test_pool_certs_present_and_disk_certs_different(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with different certs on pool and disks
         pool_auths = generate_keys(as_dict=True)
@@ -67,7 +75,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
-    def test_pool_certs_absent_and_disk_certs_present(self, uefi_vm):
+    def test_pool_certs_absent_and_disk_certs_present(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with no pool certs and with certs on disks
         disk_auths = generate_keys(as_dict=True)
@@ -80,7 +88,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(residence_host, key, disk_auths[key].auth())
 
-    def test_pool_certs_present_and_some_different_disk_certs_present(self, uefi_vm):
+    def test_pool_certs_present_and_some_different_disk_certs_present(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with all certs on pool and just two certs on disks
         pool_auths = generate_keys(as_dict=True)
@@ -95,7 +103,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
-    def test_pool_certs_present_except_dbx_and_disk_certs_different(self, uefi_vm):
+    def test_pool_certs_present_except_dbx_and_disk_certs_different(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with no dbx on pool and all, different, certs on disks
         pool_auths = generate_keys(as_dict=True)
@@ -110,7 +118,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
         for key in ['PK', 'KEK', 'db']:
             check_disk_cert_md5sum(residence_host, key, pool_auths[key].auth())
 
-    def test_pool_certs_present_and_disk_certs_present_and_same(self, uefi_vm):
+    def test_pool_certs_present_and_disk_certs_present_and_same(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with certs on pool and no certs on host disks
         pool_auths = generate_keys(as_dict=True)
@@ -128,7 +136,7 @@ class TestPoolToDiskCertInheritanceAtVmStart:
 @pytest.mark.usefixtures("host_less_than_8_3", "pool_without_uefi_certs")
 class TestPoolToVMCertInheritance:
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         yield
         # Revert the VM, which has the interesting effect of also shutting it down instantly
@@ -136,7 +144,7 @@ class TestPoolToVMCertInheritance:
         # clear pool certs for next test
         vm.host.pool.clear_uefi_certs()
 
-    def test_pool_certs_absent_and_vm_certs_absent(self, uefi_vm):
+    def test_pool_certs_absent_and_vm_certs_absent(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with no certs on pool and no certs in the VM
         # start the VM so that certs may be synced to it if appropriate
@@ -145,7 +153,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             assert not vm.is_uefi_var_present(key)
 
-    def test_pool_certs_present_and_vm_certs_absent(self, uefi_vm):
+    def test_pool_certs_present_and_vm_certs_absent(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with certs on pool and no certs in the VM
         pool_auths = generate_keys(as_dict=True)
@@ -156,7 +164,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
 
-    def test_pool_certs_present_and_vm_certs_present(self, uefi_vm):
+    def test_pool_certs_present_and_vm_certs_present(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with all certs on pool and in the VM
         pool_auths = generate_keys(as_dict=True)
@@ -169,7 +177,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
-    def test_pools_certs_absent_and_vm_certs_present(self, uefi_vm):
+    def test_pools_certs_absent_and_vm_certs_present(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with no certs on pool and all certs in the VM
         vm_auths = generate_keys(as_dict=True)
@@ -180,7 +188,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
-    def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm):
+    def test_pool_certs_partially_present_and_vm_certs_partially_present(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         # start with some certs on pool and some certs in the VM, partially overlaping
         pool_auths = generate_keys(as_dict=True)
