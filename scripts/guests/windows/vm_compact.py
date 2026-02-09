@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import argparse
 import logging
 import os
@@ -14,6 +16,8 @@ from lib.pool import Pool
 from lib.vbd import VBD
 from lib.vm import VM
 
+from typing import Generator
+
 # Tool to compact Windows VMs prior to test XVA creation.
 # Requirements:
 # - ntfsclone (part of ntfs-3g) and sfdisk should be installed.
@@ -22,7 +26,7 @@ from lib.vm import VM
 # - The tool should be able to connect to and control the pool via XAPI.
 
 
-def get_partitions(part_table: str):
+def get_partitions(part_table: str) -> Generator[dict[str, str], None, None]:
     for line in part_table.splitlines():
         match = re.match(
             (
@@ -39,13 +43,13 @@ def get_partitions(part_table: str):
         yield match.groupdict()
 
 
-def get_device_path(vbd: VBD):
+def get_device_path(vbd: VBD) -> str:
     device = vbd.param_get("device")
     assert device
     return "/dev/" + device
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", required=True, metavar="HOST", help="host IP or hostname")
     parser.add_argument("--vm", nargs="+", required=True, metavar="VM_UUID", help="UUIDs of VMs to compact")
