@@ -3,14 +3,17 @@ import pytest
 import logging
 
 from lib.common import PackageManagerEnum
+from lib.vm import VM
+
+from typing import Generator
 
 @pytest.fixture(scope='module')
-def halted_uefi_unix_vm(uefi_vm, unix_vm):
+def halted_uefi_unix_vm(uefi_vm: VM, unix_vm: VM) -> Generator[VM, None, None]:
     assert uefi_vm.is_halted(), "The VM must be halted for these tests"
     yield uefi_vm
 
 @pytest.fixture(scope='module')
-def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm):
+def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm: VM) -> Generator[VM, None, None]:
     vm = halted_uefi_unix_vm
     snapshot = vm.snapshot()
 
@@ -22,7 +25,7 @@ def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm):
         snapshot.destroy()
 
 @pytest.fixture(scope='module')
-def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm):
+def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm: VM) -> Generator[VM, None, None]:
     vm = snapshotted_halted_uefi_unix_vm
 
     has_vtpm = vm.get_vtpm_uuid()
@@ -34,7 +37,7 @@ def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm):
         vm.destroy_vtpm()
 
 @pytest.fixture(scope='module')
-def started_unix_vm_with_vtpm(unix_vm_with_vtpm):
+def started_unix_vm_with_vtpm(unix_vm_with_vtpm: VM) -> Generator[VM, None, None]:
     vm = unix_vm_with_vtpm
 
     vm.start()
@@ -49,7 +52,7 @@ def started_unix_vm_with_vtpm(unix_vm_with_vtpm):
     vm.shutdown(verify=True, force_if_fails=True)
 
 @pytest.fixture(scope='module')
-def unix_vm_with_tpm2_tools(started_unix_vm_with_vtpm):
+def unix_vm_with_tpm2_tools(started_unix_vm_with_vtpm: VM) -> Generator[VM, None, None]:
     vm = started_unix_vm_with_vtpm
 
     pkg_mgr = vm.detect_package_manager()
