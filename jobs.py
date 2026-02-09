@@ -459,6 +459,17 @@ JOBS = {
             "--vm": "single/debian_uefi_vm",
         },
         "paths": ["tests/limits"],
+    },
+    "dts": {
+        "description": "Test verifying that Intel Digital Temperature Sensors works",
+        "requirements": [
+            "1 XCP-ng host >= 8.3",
+            "Intel CPU",
+            "DTS capability available"
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/misc/test_dts.py"],
     }
 }
 

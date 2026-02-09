@@ -1,5 +1,3 @@
-import subprocess
-
 NO_SUBLEAF = 0xffffffff
 
 def parse_xen_policy(text):
