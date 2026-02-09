@@ -8,12 +8,12 @@ from lib.host import Host
 
 MLX4_MODULE = 'mlx4_en'
 
-def load_unload_mlx_module(host: Host):
+def load_unload_mlx_module(host: Host) -> None:
     host.ssh(f'modprobe -v {MLX4_MODULE}')
     host.ssh(f'modprobe -r -v {MLX4_MODULE}')
 
 @pytest.mark.usefixtures("host_without_mlx_card")
-def test_install_mlx_modules_alt(host_without_mlx_compat_loaded: Host):
+def test_install_mlx_modules_alt(host_without_mlx_compat_loaded: Host) -> None:
     host = host_without_mlx_compat_loaded
 
     # Ensure the modules are unloaded
