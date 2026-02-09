@@ -11,23 +11,25 @@ from xml.dom import minidom
 import libarchive  # type: ignore
 import libarchive.ffi  # type: ignore
 
+from typing import Generator
+
 class XvaHeaderMember:
     def __init__(self, member: minidom.Element):
         self.member = member
 
-    def get_name(self):
+    def get_name(self) -> str | None:
         for child in self.member.childNodes:
             if child.nodeType == minidom.Node.ELEMENT_NODE and child.tagName == "name" and child.firstChild:
                 return child.firstChild.nodeValue
         return None
 
-    def get_value(self):
+    def get_value(self) -> str | None:
         for child in self.member.childNodes:
             if child.nodeType == minidom.Node.ELEMENT_NODE and child.tagName == "value" and child.firstChild:
                 return child.firstChild.nodeValue
         return None
 
-    def set_value(self, value: str):
+    def set_value(self, value: str) -> None:
         for child in self.member.childNodes:
             if child.nodeType == minidom.Node.ELEMENT_NODE and child.tagName == "value" and child.firstChild:
                 child.firstChild.nodeValue = value  # type: ignore
@@ -38,18 +40,20 @@ class XvaHeader:
     def __init__(self, header_bytes: bytes):
         self.xml = minidom.parseString(header_bytes.decode())
 
-    def members(self):
+    def members(self) -> Generator[XvaHeaderMember, None, None]:
         for member in self.xml.getElementsByTagName("member"):
             if member.nodeType == minidom.Node.ELEMENT_NODE:
                 yield XvaHeaderMember(member)
 
-    def get_bridge(self):
+    def get_bridge(self) -> str:
         for member in self.members():
             if member.get_name() == "bridge":
-                return member.get_value()
+                v = member.get_value()
+                assert v is not None
+                return v
         raise ValueError("Could not find bridge value in XVA header")
 
-    def set_bridge(self, bridge: str):
+    def set_bridge(self, bridge: str) -> None:
         for member in self.members():
             if member.get_name() == "bridge":
                 member.set_value(bridge)
