@@ -30,7 +30,7 @@ def existing_shared_sr(host: Host) -> SR:
 
 @pytest.mark.multi_vms # run them on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
-def test_vm_start_stop(imported_vm: VM):
+def test_vm_start_stop(imported_vm: VM) -> None:
     vm = imported_vm
     # if VM already running, stop it
     if (vm.is_running()):
@@ -47,19 +47,19 @@ def test_vm_start_stop(imported_vm: VM):
 @pytest.mark.big_vm # and also on a really big VM ideally
 @pytest.mark.usefixtures("started_vm")
 class TestBasicNoSSH:
-    def test_pause(self, imported_vm: VM):
+    def test_pause(self, imported_vm: VM) -> None:
         vm = imported_vm
         vm.pause(verify=True)
         vm.unpause()
         vm.wait_for_os_booted()
 
-    def test_suspend(self, imported_vm: VM):
+    def test_suspend(self, imported_vm: VM) -> None:
         vm = imported_vm
         vm.suspend(verify=True)
         vm.resume()
         vm.wait_for_os_booted()
 
-    def test_snapshot(self, imported_vm: VM):
+    def test_snapshot(self, imported_vm: VM) -> None:
         vm = imported_vm
         snapshot = vm.snapshot()
         try:
@@ -69,7 +69,7 @@ class TestBasicNoSSH:
         finally:
             snapshot.destroy(verify=True)
 
-    def test_checkpoint(self, imported_vm: VM):
+    def test_checkpoint(self, imported_vm: VM) -> None:
         vm = imported_vm
         snapshot = vm.checkpoint()
         try:
@@ -83,8 +83,8 @@ class TestBasicNoSSH:
     # We want to test storage migration (memory+disks) and live migration without storage migration (memory only).
     # The order will depend on the initial location of the VM: a local SR or a shared SR.
     @pytest.mark.usefixtures("hostA2")
-    def test_live_migrate(self, imported_vm: VM, existing_shared_sr: SR):
-        def live_migrate(vm, dest_host, dest_sr, check_vdis=False):
+    def test_live_migrate(self, imported_vm: VM, existing_shared_sr: SR) -> None:
+        def live_migrate(vm: VM, dest_host: Host, dest_sr: SR, check_vdis: bool = False) -> None:
             vm.migrate(dest_host, dest_sr)
             if check_vdis:
                 wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
@@ -95,6 +95,7 @@ class TestBasicNoSSH:
         initial_sr_shared = initial_sr.is_shared()
         host1 = vm.host
         host2 = host1.pool.first_host_that_isnt(host1)
+        assert host2 is not None, "A second host in the pool is required for live migration"
         # migrate to host 2
         if initial_sr_shared:
             logging.info("* VM on shared SR: preparing for live migration without storage motion *")
