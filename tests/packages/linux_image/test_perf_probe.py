@@ -5,7 +5,7 @@ import re
 
 from lib.host import Host
 
-def perf_probe(host: Host, probe):
+def perf_probe(host: Host, probe: str) -> list[str]:
     host.ssh(f'perf probe --add {probe}')
     host.ssh(f'perf record -e probe:{probe} -o ~/perf.data -aR -- sleep 10')
     host.ssh(f'perf probe --del {probe}')
@@ -15,7 +15,7 @@ def perf_probe(host: Host, probe):
 
     return re.findall(r'RECORD_SAMPLE', samples)
 
-def test_linux_image_perf_probe(host_with_perf):
+def test_linux_image_perf_probe(host_with_perf: Host) -> None:
     # Probe that triggers very often:
     probe = 'xen_flush_tlb_one_user'
 
