@@ -5,6 +5,8 @@ import logging
 import os
 import tempfile
 
+from lib.host import Host
+from lib.vm import VM
 from pkgfixtures import host_with_saved_yum_state
 
 # Requirements:
@@ -20,7 +22,7 @@ VCPUS = '8'
 @pytest.mark.filterwarnings("ignore::ResourceWarning")
 @pytest.mark.debian_uefi_vm
 class TestVIFLimit:
-    def test_vif_limit(self, host_with_saved_yum_state, imported_vm):
+    def test_vif_limit(self, host_with_saved_yum_state: Host, imported_vm: VM) -> None:
         host = host_with_saved_yum_state
         vm = imported_vm
         interface_name = "enX"
