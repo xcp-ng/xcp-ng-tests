@@ -6,8 +6,10 @@ import logging
 from lib.host import Host
 from pkgfixtures import host_with_saved_yum_state
 
+from typing import Generator
+
 @pytest.fixture(scope="package")
-def host_without_mlx_compat_loaded(host_with_saved_yum_state: Host):
+def host_without_mlx_compat_loaded(host_with_saved_yum_state: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
 
     # We need to check if mlx_compat module is loaded. If it is already loaded,
@@ -27,7 +29,7 @@ def host_without_mlx_compat_loaded(host_with_saved_yum_state: Host):
         host.ssh('modprobe -v mlx_compat')
 
 @pytest.fixture(scope="package")
-def host_without_mlx_card(host: Host):
+def host_without_mlx_card(host: Host) -> Generator[Host, None, None]:
     if host.ssh_with_result('lspci | grep Mellanox').returncode == 0:
         # Skip test to not mess with mellanox card
         pytest.skip("This test can't be run on a host with a mellanox card")
