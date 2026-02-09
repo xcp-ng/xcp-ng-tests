@@ -9,7 +9,7 @@ from lib.host import Host
 # - an XCP-ng host (--hosts) >= 8.2
 
 pytest.fixture(scope='module')
-def test_failed_units(host: Host):
+def test_failed_units(host: Host) -> None:
     failed_services = host.ssh('systemctl --state=failed --full --all --no-pager --no-legend')
     if failed_services:
         pytest.fail(failed_services)
@@ -22,7 +22,7 @@ white_list_issues = [
 ]
 
 pytest.fixture(scope='module')
-def test_verify_default_target(host):
+def test_verify_default_target(host: Host) -> None:
     analyse = host.ssh('systemd-analyze verify default.target')
     err = False
     for line in analyse.splitlines():
