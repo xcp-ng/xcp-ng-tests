@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import pytest
 
+from lib.vm import VM
+
+from typing import Generator
+
 @pytest.fixture(scope='function')
-def vm_with_vcpu_count(request, imported_vm):
+def vm_with_vcpu_count(request: pytest.FixtureRequest, imported_vm: VM) -> Generator[VM, None, None]:
     """
     Clone the imported VM and set it up with a given vCPU count (default: 128).
 

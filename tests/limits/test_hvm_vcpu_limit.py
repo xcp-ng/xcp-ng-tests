@@ -1,6 +1,9 @@
+
 import pytest
 
 import logging
+
+from lib.vm import VM
 
 # Test that HVM VMs can be booted with XEN in both UEFI and BIOS modes with
 # 128 vCPUs, and that all 128 vCPUs come up inside the guest.
@@ -18,12 +21,12 @@ HVM_MAX_VCPUS = 128
 @pytest.mark.multi_vms
 class TestHvmVcpuLimit:
     @pytest.mark.parametrize('vm_with_vcpu_count', [HVM_MAX_VCPUS], indirect=True)
-    def test_hvm_vcpu_limit(self, vm_with_vcpu_count):
+    def test_hvm_vcpu_limit(self, vm_with_vcpu_count: VM) -> None:
         vm = vm_with_vcpu_count
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
         try:
-            actual = int(vm.ssh(['nproc', '--all']))
+            actual = int(vm.ssh('nproc --all'))
             assert actual == HVM_MAX_VCPUS, f"Expected {HVM_MAX_VCPUS} vCPUs, got {actual}"
             logging.info("VM successfully booted in HVM %s mode with XEN and all %d vCPUs are up",
                          "UEFI" if vm.is_uefi else "BIOS", actual)
