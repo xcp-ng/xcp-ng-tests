@@ -3,6 +3,9 @@ import pytest
 import logging
 
 from lib.commands import SSHCommandFailed
+from lib.host import Host
+
+from typing import List
 
 # Requirements:
 # From --hosts parameter:
@@ -11,7 +14,7 @@ from lib.commands import SSHCommandFailed
 
 @pytest.mark.usefixtures("host_with_hvm_fep", "host_with_dynamically_disabled_ept_sp")
 class TestXtf:
-    _common_skips = [
+    _common_skips: List[str] = [
         # UMIP requires hardware support, that is a recent enough CPU
         'test-hvm32-umip',
         'test-hvm64-umip',
@@ -24,18 +27,18 @@ class TestXtf:
         'test-pv64-xsa-444',
     ]
 
-    def _extract_skipped_tests(self, output):
+    def _extract_skipped_tests(self, output: str) -> List[str]:
         skipped_tests = []
         for line in output.splitlines():
             if line.endswith(' SKIP'):
                 skipped_tests.append(line.split()[0])
         return skipped_tests
 
-    def test_self(self, host, xtf_runner):
+    def test_self(self, host: Host, xtf_runner: str) -> None:
         logging.info("Running selftest...")
         host.ssh(f'{xtf_runner} selftest -q --host')
 
-    def test_all(self, host, xtf_runner):
+    def test_all(self, host: Host, xtf_runner: str) -> None:
         logging.info("Running tests...")
         try:
             host.ssh(f'{xtf_runner} -aqq --host')
