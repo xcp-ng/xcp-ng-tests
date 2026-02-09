@@ -6,6 +6,8 @@ from lib.commands import SSHCommandFailed
 from lib.common import strtobool
 from lib.host import Host
 
+from typing import Generator
+
 # Requirements:
 # From --hosts parameter:
 # - A XCP-ng >= 8.3 pool with at least two hosts
@@ -21,18 +23,19 @@ XAPI_POOL_PEM_FILENAME = 'xapi-pool-tls.pem'
 XAPI_POOL_PEM_FILEPATH = f'/etc/xensource/{XAPI_POOL_PEM_FILENAME}'
 
 @pytest.fixture(scope="module")
-def host_with_tls_verification_enabled(hostA1):
+def host_with_tls_verification_enabled(hostA1: Host) -> Generator[Host, None, None]:
     for h in hostA1.pool.hosts:
         logging.info(f"Check that TLS verification is enabled on host {h}")
         assert strtobool(h.param_get("tls-verification-enabled")), f"TLS verification must be enabled on host {h}"
         logging.info(f"Check that the host certificate exists on host {h}")
         cert_uuid = hostA1.xe('certificate-list', {'host': h.uuid, 'type': 'host_internal'}, minimal=True)
         assert len(cert_uuid) > 0, f"A host_internal certificate must exist on host {h}"
+    yield hostA1
 
 
 @pytest.mark.usefixtures("host_at_least_8_3", "host_with_tls_verification_enabled")
 class TestTLSVerification:
-    def _test_tls_verification(self, hostA1: Host, with_toolstack_restart=False):
+    def _test_tls_verification(self, hostA1: Host, with_toolstack_restart: bool = False) -> None:
         for h in hostA1.pool.hosts[1:]:
             logging.info(f"Establish a connexion from host {hostA1} to host {h} by running 'xe host-dmesg'")
             hostA1.xe('host-dmesg', {'host': h.uuid})
@@ -44,10 +47,10 @@ class TestTLSVerification:
             logging.info(f"Test connexion from host {h} to host {hostA1} by running 'xe host-dmesg'")
             h.xe('host-dmesg', {'host': hostA1.uuid})
 
-    def test_tls_verification(self, hostA1):
+    def test_tls_verification(self, hostA1: Host) -> None:
         self._test_tls_verification(hostA1)
 
-    def test_refresh_certificate(self, hostA1):
+    def test_refresh_certificate(self, hostA1: Host) -> None:
         logging.info("Refresh the xapi:pool certificate on every pool member")
         for h in hostA1.pool.hosts:
             old_checksum = h.ssh(f'md5sum {XAPI_POOL_PEM_FILEPATH}').split()[0]
@@ -58,7 +61,7 @@ class TestTLSVerification:
         self._test_tls_verification(hostA1, with_toolstack_restart=True)
 
     @pytest.fixture(scope="function")
-    def hostA2_with_saved_cert(self, hostA2: Host):
+    def hostA2_with_saved_cert(self, hostA2: Host) -> Generator[Host, None, None]:
         tmp_dir = hostA2.ssh('mktemp -d')
         logging.info(f"Save {XAPI_POOL_PEM_FILEPATH} on {hostA2}")
         hostA2.ssh(f'cp {XAPI_POOL_PEM_FILEPATH} {tmp_dir}')
@@ -68,7 +71,7 @@ class TestTLSVerification:
         hostA2.ssh(f'rm -r {tmp_dir}')
         hostA2.ssh('systemctl reload-or-restart stunnel@xapi')
 
-    def test_break_cert(self, hostA1: Host, hostA2_with_saved_cert: Host):
+    def test_break_cert(self, hostA1: Host, hostA2_with_saved_cert: Host) -> None:
         hostA2 = hostA2_with_saved_cert
         logging.info(f"Replace the certificate on host {hostA2}")
         hostA2.ssh(f'rm {XAPI_POOL_PEM_FILEPATH}')
@@ -88,7 +91,7 @@ class TestTLSVerification:
 The server may be switched off or there may be network connectivity problems." in excinfo.value.stdout
         )
 
-    def test_toolstack_restart(self, hostA1: Host, hostA2: Host):
+    def test_toolstack_restart(self, hostA1: Host, hostA2: Host) -> None:
         """
         Same test as the previous one, but we don't break the cert.
 
