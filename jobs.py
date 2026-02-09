@@ -469,6 +469,12 @@ JOBS: dict[str, JobData] = {
             "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
+    },
+    "cpu-policy": {
+        "description": "Tests displaying CPU policies",
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/misc/test_cpu_policy.py"]
     }
 }
 
