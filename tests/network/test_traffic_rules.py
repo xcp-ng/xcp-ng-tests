@@ -98,3 +98,99 @@ class TestSimple:
 
         finally:
             vm.destroy()
+
+    def test_networkRule(self, connected_hosts_with_xo: list[Host], imported_vm: VM):
+        host = connected_hosts_with_xo[0]
+        vm = imported_vm.clone()
+        try:
+            networkId = host.management_network()
+            hostBr = "xenbr0" # XXX hardcoded: get info from host
+
+            n_prev = 0
+            n_curr = count_of(host, hostBr)
+            assert n_curr == 0, "no OF at init"
+
+            # add OF rule (before starting VM)
+            xo_cli('sdnController.addNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+                'allow': 'true',
+            })
+
+            n_prev = n_curr
+            n_curr = count_of(host, hostBr)
+            assert n_curr > 0, "OF should be added"
+
+            # start the VM
+            vm.start()
+
+            # wait for XO to see the VM
+            vm.wait_for_os_booted()
+
+            n_prev = n_curr
+            n_curr = count_of(host, hostBr)
+            assert n_curr == n_prev, "OF should be the same (after start)"
+
+            # add OF rule (while running)
+            xo_cli('sdnController.addNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.2',
+                'direction': 'to',
+                'protocol': 'icmp',
+                'allow': 'true',
+            })
+
+            n_prev = n_curr
+            n_curr = count_of(host, hostBr)
+            assert n_curr > n_prev, "OF should have increase"
+
+            # delete OF rule (while running)
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+            n_prev = n_curr
+            n_curr = count_of(host, hostBr)
+            assert n_curr < n_prev, "OF should have decrease"
+
+            vm.shutdown(verify=True)
+
+            n_prev = n_curr
+            n_curr = count_of(host, hostBr)
+            assert n_curr == n_prev, "OF should be the same (after shutdown)"
+
+            # delete OF rule (while stopped)
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.2',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+            n_prev = n_curr
+            n_curr = count_of(host, hostBr)
+            assert n_curr == 0, "no OF at end"
+        finally:
+            vm.destroy()
+
+            # remove networkRule
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.2',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+            # XXX manual OF rule cleanup
+            host.ssh(f"ovs-ofctl -O OpenFlow11 del-flows {hostBr} icmp")
