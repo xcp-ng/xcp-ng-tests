@@ -9,7 +9,7 @@ import subprocess
 import lib.config as config
 from lib.netutil import wrap_ip
 
-from typing import TYPE_CHECKING, List, Literal, overload
+from typing import TYPE_CHECKING, Generic, List, Literal, TypeVar, overload
 
 if TYPE_CHECKING:
     from lib.common import HostAddress
@@ -39,19 +39,21 @@ class LocalCommandFailed(BaseCommandFailed):
             f'Local command ({cmd}) failed with return code {returncode}{msg_end}'
         )
 
-class BaseCmdResult:
+ResultOutputT = TypeVar('ResultOutputT', str, bytes)
+
+class BaseCmdResult(Generic[ResultOutputT]):
     __slots__ = 'returncode', 'stdout'
 
-    def __init__(self, returncode: int, stdout: str | bytes):
+    def __init__(self, returncode: int, stdout: ResultOutputT):
         self.returncode = returncode
-        self.stdout = stdout
+        self.stdout: ResultOutputT = stdout
 
-class SSHResult(BaseCmdResult):
-    def __init__(self, returncode: int, stdout: str | bytes):
+class SSHResult(BaseCmdResult[ResultOutputT]):
+    def __init__(self, returncode: int, stdout: ResultOutputT):
         super(SSHResult, self).__init__(returncode, stdout)
 
-class LocalCommandResult(BaseCmdResult):
-    def __init__(self, returncode: int, stdout: str | bytes):
+class LocalCommandResult(BaseCmdResult[ResultOutputT]):
+    def __init__(self, returncode: int, stdout: ResultOutputT):
         super(LocalCommandResult, self).__init__(returncode, stdout)
 
 def _ellide_log_lines(log: str) -> str:
@@ -77,7 +79,7 @@ def _ssh(
     decode: bool,
     options: list[str],
     multiplexing: bool,
-) -> SSHResult | SSHCommandFailed | str | bytes | None:
+) -> SSHResult[str] | SSHResult[bytes] | SSHCommandFailed | str | bytes | None:
     opts = list(options)
     opts += ['-o', 'BatchMode yes']
     opts += ['-o', 'PubkeyAcceptedAlgorithms +ssh-rsa']
@@ -137,22 +139,26 @@ def _ssh(
     if res.returncode == 255:
         return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, cmd)
 
-    output: str | bytes = res.stdout
+    output: bytes = res.stdout
     if banner_res:
         if banner_res.returncode == 255:
             return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), cmd)
         output = output[len(banner_res.stdout):]
 
-    if decode:
-        assert isinstance(output, bytes)
-        output = output.decode()
-
     if res.returncode and check:
         return SSHCommandFailed(res.returncode, output_for_errors, cmd)
 
-    if simple_output:
-        return output.strip()
-    return SSHResult(res.returncode, output)
+    if decode:
+        output_str = output.decode()
+        if simple_output:
+            return output_str.strip()
+        else:
+            return SSHResult[str](res.returncode, output_str)
+    else:
+        if simple_output:
+            return output.strip()
+        else:
+            return SSHResult[bytes](res.returncode, output)
 
 # The actual code is in _ssh().
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
@@ -173,7 +179,13 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> SSHResult:
+        decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True) -> SSHResult[str]:
+    ...
+@overload
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
+        simple_output: Literal[False],
+        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        decode: Literal[False], options: List[str] = [], multiplexing: bool = True) -> SSHResult[bytes]:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
@@ -186,12 +198,12 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True, background: bool = False,
         decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> str | bytes | SSHResult | None:
+        -> str | bytes | SSHResult[str] | SSHResult[bytes] | None:
     ...
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True,
         background: bool = False, decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> str | bytes | SSHResult | None:
+        -> str | bytes | SSHResult[str] | SSHResult[bytes] | None:
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
                          background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
@@ -199,9 +211,21 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_out
     else:
         return result_or_exc
 
-def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings: bool = True,
+@overload
+def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, decode: Literal[True] = True,
+                    suppress_fingerprint_warnings: bool = True,
+                    background: bool = False, options: List[str] = [],
+                    multiplexing: bool = True) -> SSHResult[str]:
+    ...
+@overload
+def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, decode: Literal[False],
+                    suppress_fingerprint_warnings: bool = True,
+                    background: bool = False, options: List[str] = [],
+                    multiplexing: bool = True) -> SSHResult[bytes]:
+    ...
+def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, suppress_fingerprint_warnings: bool = True,
                     background: bool = False, decode: bool = True, options: List[str] = [],
-                    multiplexing: bool = True) -> SSHResult:
+                    multiplexing: bool = True) -> SSHResult[str] | SSHResult[bytes]:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
                          background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
@@ -267,7 +291,15 @@ def sftp(
 
     return res
 
-def local_cmd(cmd: List[str], check: bool = True, decode: bool = True) -> LocalCommandResult:
+@overload
+def local_cmd(cmd: List[str], *, check: bool = True, decode: Literal[True] = True) -> LocalCommandResult[str]:
+    ...
+@overload
+def local_cmd(cmd: List[str], *, check: bool = True, decode: Literal[False]) -> LocalCommandResult[bytes]:
+    ...
+def local_cmd(
+    cmd: List[str], *, check: bool = True, decode: bool = True
+) -> LocalCommandResult[str] | LocalCommandResult[bytes]:
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
@@ -280,10 +312,6 @@ def local_cmd(cmd: List[str], check: bool = True, decode: bool = True) -> LocalC
     # get a decoded version of the output in any case, replacing potential errors
     output_for_logs = res.stdout.decode(errors='replace').strip()
 
-    output: str | bytes = res.stdout
-    if decode:
-        output = res.stdout.decode()
-
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
     logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
@@ -291,7 +319,10 @@ def local_cmd(cmd: List[str], check: bool = True, decode: bool = True) -> LocalC
     if res.returncode and check:
         raise LocalCommandFailed(res.returncode, output_for_logs, command)
 
-    return LocalCommandResult(res.returncode, output)
+    if decode:
+        return LocalCommandResult[str](res.returncode, res.stdout.decode())
+    else:
+        return LocalCommandResult[bytes](res.returncode, res.stdout)
 
 def encode_powershell_command(cmd: str) -> str:
     return base64.b64encode(cmd.encode("utf-16-le")).decode("ascii")

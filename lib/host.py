@@ -104,7 +104,13 @@ class Host:
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: bool = True, multiplexing: bool = True) -> commands.SSHResult:
+            decode: Literal[True] = True, multiplexing: bool = True) -> commands.SSHResult[str]:
+        ...
+
+    @overload
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            decode: Literal[False], multiplexing: bool = True) -> commands.SSHResult[bytes]:
         ...
 
     @overload
@@ -117,17 +123,17 @@ class Host:
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
             multiplexing: bool = True) \
-            -> str | bytes | commands.SSHResult | None:
+            -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
-            multiplexing: bool = True) -> str | bytes | commands.SSHResult | None:
+            multiplexing: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
                             background=background, decode=decode, multiplexing=multiplexing)
 
-    def ssh_with_result(self, cmd: str) -> commands.SSHResult:
+    def ssh_with_result(self, cmd: str) -> commands.SSHResult[str]:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return commands.ssh_with_result(self.hostname_or_ip, cmd)
 
@@ -145,12 +151,12 @@ class Host:
 
     @overload
     def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
-           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult:
+           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
     def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
-            -> str | commands.SSHResult:
+            -> str | commands.SSHResult[str]:
         maybe_param_minimal = '--minimal' if minimal else ''
         maybe_param_force = '--force' if force else ''
 
@@ -166,14 +172,10 @@ class Host:
 
         command: str = f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
                        ' '.join(stringify(key, value) for key, value in args.items())
-        result = self.ssh(
-            command,
-            check=check,
-            simple_output=simple_output
-        )
-        assert isinstance(result, (str, commands.SSHResult))
-
-        return result
+        if simple_output:
+            return self.ssh(command, check=check, simple_output=True)
+        else:
+            return self.ssh(command, check=check, simple_output=False)
 
     @overload
     def param_get(self, param_name: str, key: str | None = ...,
@@ -236,11 +238,11 @@ class Host:
     @overload
     def execute_script(
         self, script_contents: str, *, shebang: str = ..., simple_output: Literal[False]
-    ) -> commands.SSHResult:
+    ) -> commands.SSHResult[str]:
         ...
 
     def execute_script(self, script_contents: str, shebang: str = 'sh',
-                       simple_output: bool = True) -> str | commands.SSHResult:
+                       simple_output: bool = True) -> str | commands.SSHResult[str]:
         with tempfile.NamedTemporaryFile('w') as script:
             os.chmod(script.name, 0o775)
             script.write('#!/usr/bin/env ' + shebang + '\n')
