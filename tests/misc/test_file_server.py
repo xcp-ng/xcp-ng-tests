@@ -20,7 +20,6 @@ def test_fileserver_redirect_https(host: Host) -> None:
     path = "/path/to/dir/file.txt"
     ip = wrap_ip(host.hostname_or_ip)
     res = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
-    assert isinstance(res.stdout, str)
     lines = res.stdout.splitlines()
     assert lines[0].strip() == "HTTP/1.1 301 Moved Permanently"
     assert _header_equal(lines[2], "location", "https://" + ip + path)
@@ -35,7 +34,6 @@ class TestHSTS:
         res = commands.local_cmd(
             ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
         )
-        assert isinstance(res.stdout, str)
         return res.stdout.splitlines()
 
     def test_fileserver_hsts_default(self, host: Host) -> None:
