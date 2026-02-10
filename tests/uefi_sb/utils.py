@@ -198,5 +198,4 @@ def check_vm_cert_md5sum(vm: VM, key: str, reference_file: str) -> None:
     )
     assert res.returncode == 0, f"Cert {key} must be present"
     reference_md5 = get_md5sum_from_auth(reference_file)
-    assert isinstance(res.stdout, bytes)
     assert hashlib.md5(res.stdout).hexdigest() == reference_md5

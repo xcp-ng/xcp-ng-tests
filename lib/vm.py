@@ -116,7 +116,12 @@ class VM(BaseVM):
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: bool = True) -> commands.SSHResult:
+            background: Literal[False] = False, decode: Literal[True] = True) -> commands.SSHResult[str]:
+        ...
+
+    @overload
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
+            background: Literal[False] = False, decode: Literal[False]) -> commands.SSHResult[bytes]:
         ...
 
     @overload
@@ -126,17 +131,17 @@ class VM(BaseVM):
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> str | bytes | commands.SSHResult | None:
+            decode: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> str | bytes | commands.SSHResult | None:
+            decode: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         # raises by default for any nonzero return code
         assert self.ip is not None
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
                             decode=decode)
 
-    def ssh_with_result(self, cmd: str) -> commands.SSHResult:
+    def ssh_with_result(self, cmd: str) -> commands.SSHResult[str]:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         assert self.ip is not None
         return commands.ssh_with_result(self.ip, cmd)
@@ -447,10 +452,10 @@ class VM(BaseVM):
         ...
 
     @overload
-    def execute_script(self, script_contents: str, *, simple_output: Literal[False]) -> commands.SSHResult:
+    def execute_script(self, script_contents: str, *, simple_output: Literal[False]) -> commands.SSHResult[str]:
         ...
 
-    def execute_script(self, script_contents: str, simple_output: bool = True) -> str | commands.SSHResult:
+    def execute_script(self, script_contents: str, simple_output: bool = True) -> str | commands.SSHResult[str]:
         with tempfile.NamedTemporaryFile('w') as f:
             f.write(script_contents)
             f.flush()
@@ -778,16 +783,19 @@ class VM(BaseVM):
         ...
 
     @overload
-    def execute_powershell_script(self, script_contents: str,
-                                  simple_output: Literal[False],
-                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> commands.SSHResult:
+    def execute_powershell_script(
+        self,
+        script_contents: str,
+        simple_output: Literal[False],
+        prepend: str = "$ProgressPreference = 'SilentlyContinue';",
+    ) -> commands.SSHResult[str]:
         ...
 
     def execute_powershell_script(
             self,
             script_contents: str,
             simple_output: bool = True,
-            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str | commands.SSHResult:
+            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str | commands.SSHResult[str]:
         # ProgressPreference is needed to suppress any clixml progress output,
         # as it's not filtered away from stdout by default, and we're grabbing stdout.
         assert self.is_windows
