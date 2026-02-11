@@ -16,12 +16,12 @@ from lib.windows import (
     wait_for_vm_xenvif_offboard,
 )
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 # Test uninstallation of other drivers using the XenClean program.
 
 
-def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]) -> None:
+def run_xenclean(vm: VM, guest_tools_iso: dict[str, Any]) -> None:
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     logging.info("Run XenClean")
@@ -42,7 +42,7 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]) -> None:
 @pytest.mark.usefixtures("windows_vm")
 class TestXenClean:
     def test_xenclean_without_tools(
-        self, running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]
+        self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]
     ) -> None:
         vm = running_unsealed_windows_vm
         logging.info("XenClean with empty VM")
@@ -50,7 +50,7 @@ class TestXenClean:
         assert vm.are_windows_tools_uninstalled()
 
     def test_xenclean_with_test_tools_early(
-        self, vm_install_test_tools_no_reboot: VM, guest_tools_iso: Dict[str, Any]
+        self, vm_install_test_tools_no_reboot: VM, guest_tools_iso: dict[str, Any]
     ) -> None:
         vm = vm_install_test_tools_no_reboot
         logging.info("XenClean with test tools (without reboot)")
@@ -58,7 +58,7 @@ class TestXenClean:
         assert vm.are_windows_tools_uninstalled()
 
     def test_xenclean_with_test_tools(self, vm_install_test_tools_no_reboot: VM,
-                                      guest_tools_iso: Dict[str, Any]) -> None:
+                                      guest_tools_iso: dict[str, Any]) -> None:
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         # HACK: In some cases, vm.reboot(verify=False) followed by vm.insert_cd() (as called by run_xenclean)
@@ -73,7 +73,7 @@ class TestXenClean:
         check_vm_dns(vm)
 
     def test_xenclean_with_other_tools(
-        self, vm_install_other_drivers: Tuple[VM, Dict[str, Any]], guest_tools_iso: Dict[str, Any]
+        self, vm_install_other_drivers: tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
     ) -> None:
         vm, param = vm_install_other_drivers
         if param.get("vendor_device"):
