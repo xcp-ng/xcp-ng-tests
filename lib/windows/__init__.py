@@ -12,7 +12,7 @@ from lib.sr import SR
 from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Dict, Generator
+from typing import Any, Generator
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -25,7 +25,7 @@ class PowerAction(enum.Enum):
     Reboot = "reboot"
 
 
-def iso_create(host: Host, sr: SR, param: Dict[str, Any]) -> Generator[dict[str, Any], None, None]:
+def iso_create(host: Host, sr: SR, param: dict[str, Any]) -> Generator[dict[str, Any], None, None]:
     if param["download"]:
         vdi = host.import_iso(ISO_DOWNLOAD_URL + param["name"], sr)
         new_param = param.copy()

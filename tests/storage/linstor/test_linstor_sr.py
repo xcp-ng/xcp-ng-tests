@@ -20,7 +20,7 @@ from tests.storage import vdi_is_open
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
-from typing import Generator, Tuple
+from typing import Generator
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
@@ -153,7 +153,7 @@ class TestLinstorSR:
         yield vdi_host, vm, volume_name
 
     @pytest.mark.small_vm
-    def test_resynchronization(self, host_and_vm_with_corrupted_vdi_on_linstor_sr: Tuple[Host, VM, str]) -> None:
+    def test_resynchronization(self, host_and_vm_with_corrupted_vdi_on_linstor_sr: tuple[Host, VM, str]) -> None:
         (host, vm, resource_name) = host_and_vm_with_corrupted_vdi_on_linstor_sr
         hostname = host.hostname()
 
