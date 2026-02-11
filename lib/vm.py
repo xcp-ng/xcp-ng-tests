@@ -27,7 +27,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, cast, overload
+from typing import TYPE_CHECKING, Iterable, Literal, cast, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -304,7 +304,7 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis: List[str] | None = None) -> Snapshot:
+    def snapshot(self, ignore_vdis: list[str] | None = None) -> Snapshot:
         logging.info("Snapshot VM")
         args: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
@@ -532,7 +532,7 @@ class VM(BaseVM):
         finally:
             snapshot.destroy(verify=True)
 
-    def get_messages(self, name: str) -> List[str]:
+    def get_messages(self, name: str) -> list[str]:
         args: dict[str, str | bool | dict[str, str]] = {
             'obj-uuid': self.uuid,
             'name': name,
@@ -606,14 +606,14 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def get_all_efi_bins(self) -> List[str]:
+    def get_all_efi_bins(self) -> list[str]:
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
             f'for file in $(find /boot -type f); do echo $file $(head -c {magicsz} $file); done', decode=False
         ).split(b'\n')
 
         magic = efi.EFI_HEADER_MAGIC.encode('ascii')
-        binaries: List[str] = []
+        binaries: list[str] = []
         for f in files:
             if magic in f:
                 # Avoid decoding an unsplit f, as some headers are not utf8

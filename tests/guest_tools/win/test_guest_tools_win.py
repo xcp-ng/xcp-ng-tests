@@ -22,7 +22,7 @@ from lib.windows.guest_tools import (
     uninstall_guest_tools,
 )
 
-from typing import Any, Tuple
+from typing import Any
 
 # Requirements:
 # - XCP-ng >= 8.2.
@@ -122,7 +122,7 @@ class TestGuestToolsWindowsDestructive:
         assert vm.are_windows_tools_uninstalled()
 
     def test_install_with_other_tools(
-        self, vm_install_other_drivers: Tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
+        self, vm_install_other_drivers: tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
     ) -> None:
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
