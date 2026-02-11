@@ -5,8 +5,6 @@ import logging
 from lib.commands import SSHCommandFailed
 from lib.host import Host
 
-from typing import List
-
 # Requirements:
 # From --hosts parameter:
 # - host: XCP-ng host >= 8.2, with Xen booted with the hvm_fep command line parameter
@@ -14,7 +12,7 @@ from typing import List
 
 @pytest.mark.usefixtures("host_with_hvm_fep", "host_with_dynamically_disabled_ept_sp")
 class TestXtf:
-    _common_skips: List[str] = [
+    _common_skips: list[str] = [
         # UMIP requires hardware support, that is a recent enough CPU
         'test-hvm32-umip',
         'test-hvm64-umip',
@@ -27,7 +25,7 @@ class TestXtf:
         'test-pv64-xsa-444',
     ]
 
-    def _extract_skipped_tests(self, output: str) -> List[str]:
+    def _extract_skipped_tests(self, output: str) -> list[str]:
         skipped_tests = []
         for line in output.splitlines():
             if line.endswith(' SKIP'):
