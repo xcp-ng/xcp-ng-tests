@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, List, Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -61,7 +61,7 @@ class BaseVM:
     def _disk_list(self) -> str:
         raise NotImplementedError()
 
-    def vdi_uuids(self, sr_uuid: str | None = None) -> List[str]:
+    def vdi_uuids(self, sr_uuid: str | None = None) -> list[str]:
         output = self._disk_list()
         if output == '':
             return []

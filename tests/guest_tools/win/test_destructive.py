@@ -13,7 +13,7 @@ from lib.windows import (
 )
 from lib.windows.guest_tools import ERROR_INSTALL_FAILURE, install_guest_tools, uninstall_guest_tools
 
-from typing import Any, Tuple
+from typing import Any
 
 # Requirements:
 # - Same as TestGuestToolsWindowsNondestructive.
@@ -42,7 +42,7 @@ class TestGuestToolsWindowsDestructive:
         assert vm.are_windows_tools_uninstalled()
 
     def test_install_with_other_tools(
-        self, vm_install_other_drivers: Tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
+        self, vm_install_other_drivers: tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
     ) -> None:
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
