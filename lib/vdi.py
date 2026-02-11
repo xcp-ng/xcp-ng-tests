@@ -28,11 +28,11 @@ class VDI:
     sr: SR
 
     @overload
-    def __init__(self, uuid: str, *, host: Host, sr: Literal[None] = None) -> None:
+    def __init__(self, uuid: str, *, host: Host, sr: Literal[None] = ...) -> None:
         ...
 
     @overload
-    def __init__(self, uuid: str, *, host: Literal[None] = None, sr: SR) -> None:
+    def __init__(self, uuid: str, *, host: Literal[None] = ..., sr: SR) -> None:
         ...
 
     def __init__(self, uuid: str, *, host: Host | None = None, sr: SR | None = None) -> None:
