@@ -43,7 +43,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable, Sequence
+from typing import Any, Generator, Iterable, Sequence
 
 # Do we cache VMs?
 try:
@@ -200,7 +200,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
 # FIXME we may have to move this into lib/ if fixtures in sub-packages
 # want to make use of this feature
 
-PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.TestReport]]()
+PHASE_REPORT_KEY = pytest.StashKey[dict[str, pytest.TestReport]]()
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[Any]
