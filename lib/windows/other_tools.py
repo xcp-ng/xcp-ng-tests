@@ -6,9 +6,9 @@ from lib.vm import VM
 
 from . import WINDOWS_SHUTDOWN_COMMAND, enable_testsign, insert_cd_safe, wait_for_vm_running_and_ssh_up_without_tools
 
-from typing import Any, Dict
+from typing import Any
 
-def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]) -> None:
+def install_other_drivers(vm: VM, other_tools_iso_name: str, param: dict[str, Any]) -> None:
     if param.get("vendor_device"):
         assert not strtobool(vm.param_get("has-vendor-device"))
         vm.param_set("has-vendor-device", True)

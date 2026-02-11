@@ -5,13 +5,11 @@ import subprocess
 
 from lib.host import Host
 
-from typing import List
-
 # Requirements:
 # - 2 XCP-ng host of same version
 
 pytest.fixture(scope='module')
-def test_fs_diff(hosts: List[Host]) -> None:
+def test_fs_diff(hosts: list[Host]) -> None:
     assert len(hosts) == 2, "This test requires exactly 2 hosts"
 
     assert (hosts[0].xcp_version == hosts[1].xcp_version), "Host versions must be the same"
