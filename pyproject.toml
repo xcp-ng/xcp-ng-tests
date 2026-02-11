@@ -54,6 +54,7 @@ select = [
   "I",  # isort
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
+  "UP006",  # non-pep585-annotation
   "UP007",  # non-pep604-annotation-union
 ]
 # don't use some of the default D and SIM rules
