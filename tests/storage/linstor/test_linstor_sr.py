@@ -154,7 +154,7 @@ class TestLinstorSR:
         yield vdi_host, vm, volume_name
 
     @pytest.mark.small_vm
-    def test_resynchronization(self, host_and_vm_with_corrupted_vdi_on_linstor_sr: Tuple[Host, VM, str]) -> None:
+    def test_resynchronization(self, host_and_vm_with_corrupted_vdi_on_linstor_sr: tuple[Host, VM, str]) -> None:
         (host, vm, resource_name) = host_and_vm_with_corrupted_vdi_on_linstor_sr
         hostname = host.hostname()
 

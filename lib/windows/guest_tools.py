@@ -13,7 +13,7 @@ from . import (
     wait_for_vm_xenvif_offboard,
 )
 
-from typing import Any, Dict
+from typing import Any
 
 ERROR_SUCCESS = 0
 ERROR_INSTALL_FAILURE = 1603
@@ -23,7 +23,7 @@ ERROR_SUCCESS_REBOOT_REQUIRED = 3010
 GUEST_TOOLS_COPY_PATH = "C:\\package.msi"
 
 
-def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAction,
+def install_guest_tools(vm: VM, guest_tools_iso: dict[str, Any], action: PowerAction,
                         check: bool = True) -> int | None:
     insert_cd_safe(vm, guest_tools_iso["name"])
 
