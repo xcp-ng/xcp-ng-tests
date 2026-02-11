@@ -7,10 +7,10 @@ from lib.typing import JSONType
 from typing import Literal, overload
 
 @overload
-def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_json: Literal[False] = False) -> str:
+def xo_cli(action: str, args: dict[str, str] = ..., *, check: bool = ..., use_json: Literal[False] = ...) -> str:
     ...
 @overload
-def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_json: Literal[True]) -> JSONType:
+def xo_cli(action: str, args: dict[str, str] = ..., *, check: bool = ..., use_json: Literal[True]) -> JSONType:
     ...
 
 def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_json: bool = False) -> JSONType | str:

@@ -108,33 +108,33 @@ class VM(BaseVM):
             return True
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[False]) -> bytes:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[False]) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[True] = True) -> commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[False]) -> commands.SSHResult[bytes]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[False]) -> commands.SSHResult[bytes]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[True], decode: bool = True) -> None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            background: Literal[True], decode: bool = ...) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str | commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> str | commands.SSHResult[str]:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
@@ -463,7 +463,7 @@ class VM(BaseVM):
             self.ssh(f'kill {pid}')
 
     @overload
-    def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
+    def execute_script(self, script_contents: str, *, simple_output: Literal[True] = ...) -> str:
         ...
 
     @overload
@@ -828,8 +828,8 @@ class VM(BaseVM):
 
     @overload
     def execute_powershell_script(self, script_contents: str,
-                                  simple_output: Literal[True] = True,
-                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str:
+                                  simple_output: Literal[True] = ...,
+                                  prepend: str = ...) -> str:
         ...
 
     @overload
@@ -837,7 +837,7 @@ class VM(BaseVM):
         self,
         script_contents: str,
         simple_output: Literal[False],
-        prepend: str = "$ProgressPreference = 'SilentlyContinue';",
+        prepend: str = ...,
     ) -> commands.SSHResult[str]:
         ...
 
@@ -945,7 +945,7 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
     @overload
-    def xenstore_read(self, path: str, accept_unknown_key: Literal[False] = False) -> str:
+    def xenstore_read(self, path: str, accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload

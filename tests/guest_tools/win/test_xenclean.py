@@ -34,7 +34,7 @@ ONBOARD_EXIT_CODE_FILE = "C:\\onboard.txt"
 
 
 @overload
-def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any], onboard: Literal[False] = False) -> None:  #
+def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any], onboard: Literal[False] = ...) -> None:  #
     ...
 
 
