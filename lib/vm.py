@@ -105,33 +105,33 @@ class VM(BaseVM):
             return True
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[False]) -> bytes:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[False]) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[True] = True) -> commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[False]) -> commands.SSHResult[bytes]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[False]) -> commands.SSHResult[bytes]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[True], decode: bool = True) -> None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            background: Literal[True], decode: bool = ...) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ..., background: bool = ...,
+            decode: bool = ...) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
