@@ -53,7 +53,7 @@ except ImportError:
 assert CACHE_IMPORTED_VM in [True, False]
 
 class SplitCommaAction(Action):
-    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[Any] | None,
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[str] | None,
                  option_string: str | None = None) -> None:
         items = getattr(namespace, self.dest, None)
         if items is None:

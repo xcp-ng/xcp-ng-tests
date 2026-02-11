@@ -98,39 +98,39 @@ class Host:
         return self.param_get('name-label')
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True, multiplexing: bool = True) -> str:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[True] = ..., multiplexing: bool = ...) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[False], multiplexing: bool = True) -> bytes:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[False], multiplexing: bool = ...) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True, multiplexing: bool = True) -> commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[True] = ..., multiplexing: bool = ...) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[False], multiplexing: bool = True) -> commands.SSHResult[bytes]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[False], multiplexing: bool = ...) -> commands.SSHResult[bytes]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[True],
-            decode: bool = True, multiplexing: bool = True) -> None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[True],
+            decode: bool = ..., multiplexing: bool = ...) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True, multiplexing: bool = True) -> str | commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[True] = ..., multiplexing: bool = ...) -> str | commands.SSHResult[str]:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
@@ -152,12 +152,12 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = ..., *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = ..., *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
@@ -239,7 +239,7 @@ class Host:
         self.ssh(f'rm -f /etc/yum.repos.d/xcp-ng-{name}.repo')
 
     @overload
-    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = True) -> str:
+    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = ...) -> str:
         ...
 
     @overload
