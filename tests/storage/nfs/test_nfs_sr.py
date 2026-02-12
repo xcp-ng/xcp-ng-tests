@@ -129,9 +129,9 @@ class TestNFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
-    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat, defer: Defer) \
-            -> None:
-        vdi_export_import(storage_test_vm, dispatch_nfs, image_format, defer)
+    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat,
+                               temp_large_dir: str, defer: Defer) -> None:
+        vdi_export_import(storage_test_vm, dispatch_nfs, image_format, temp_large_dir, defer)
 
     # *** tests with reboots (longer tests).
 
