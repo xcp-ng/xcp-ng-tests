@@ -237,3 +237,41 @@ class TestMigrate:
 
         assert count_of(hostA1, hostBr) == 0, "no OF after deleteRule (on hostA1)"
         assert count_of(hostA2, hostBr) == 0, "no OF after deleteRule (on hostA2)"
+
+    def test_networkRule(self, connected_hosts_with_xo: list[Host], hostA2: Host, local_sr_on_hostA2, running_vm: VM):
+        hostA1 = connected_hosts_with_xo[0]
+
+        vm = running_vm
+        networkId = hostA1.management_network()
+        hostBr = "xenbr0" # XXX hardcoded: get info from host
+
+        assert count_of(hostA1, hostBr) == 0, "no OF at init (on hostA1)"
+        assert count_of(hostA2, hostBr) == 0, "no OF at init (on hostA2)"
+
+        # add OF rule
+        xo_cli('sdnController.addNetworkRule', {
+            'networkId': networkId,
+            'ipRange': '10.0.0.1',
+            'direction': 'to',
+            'protocol': 'icmp',
+            'allow': 'true',
+        })
+        try:
+            assert count_of(hostA1, hostBr) > 0, "OF after addNetworkRule (on hostA1)"
+            assert count_of(hostA2, hostBr) > 0, "OF after addNetworkRule (on hostA2)"
+
+            vm.migrate(hostA2, local_sr_on_hostA2)
+
+            assert count_of(hostA1, hostBr) > 0, "OF after addNetworkRule (on hostA1)"
+            assert count_of(hostA2, hostBr) > 0, "OF after addNetworkRule (on hostA2)"
+
+        finally:
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+        assert count_of(hostA1, hostBr) == 0, "1 OF after migrate (on hostA1)"
+        assert count_of(hostA2, hostBr) == 0, "1 OF after migrate (on hostA2)"
