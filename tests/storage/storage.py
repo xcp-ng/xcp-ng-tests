@@ -253,7 +253,7 @@ def xva_export_import(vm: VM, compression: XVACompression, defer: Defer) -> None
     imported_vm.wait_for_vm_running_and_ssh_up()
     randstream(imported_vm, 'validate --expected-checksum 24e905d6 /root/data')
 
-def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, defer: Defer) -> None:
+def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
     vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
     defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
     assert vdi_src is not None
@@ -274,7 +274,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, defer: Defer) -
     randstream(vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}')
     vm.disconnect_vdi(vdi_src)
 
-    image_path = f'/tmp/{vdi_src.uuid}.{image_format}'
+    image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
     defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
 
     vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})

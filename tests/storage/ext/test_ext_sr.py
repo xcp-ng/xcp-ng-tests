@@ -96,8 +96,9 @@ class TestEXTSR:
         xva_export_import(vm_on_ext_sr, compression, defer)
 
     @pytest.mark.small_vm
-    def test_vdi_export_import(self, storage_test_vm: VM, ext_sr: SR, image_format: ImageFormat, defer: Defer) -> None:
-        vdi_export_import(storage_test_vm, ext_sr, image_format, defer)
+    def test_vdi_export_import(self, storage_test_vm: VM, ext_sr: SR, image_format: ImageFormat, temp_large_dir: str,
+                               defer: Defer) -> None:
+        vdi_export_import(storage_test_vm, ext_sr, image_format, temp_large_dir, defer)
 
     # *** tests with reboots (longer tests).
 
