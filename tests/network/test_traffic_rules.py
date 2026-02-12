@@ -192,5 +192,48 @@ class TestSimple:
                 'protocol': 'icmp',
             })
 
-            # XXX manual OF rule cleanup
-            host.ssh(f"ovs-ofctl -O OpenFlow11 del-flows {hostBr} icmp")
+
+# XXX xo-cli (on test host) should be configured to see the host
+# XXX particular configuration
+@pytest.mark.complex_prerequisites
+@pytest.mark.small_vm
+class TestMigrate:
+    def test_vifRule(self, connected_hosts_with_xo: list[Host], hostA2: Host, local_sr_on_hostA2, running_vm: VM):
+        hostA1 = connected_hosts_with_xo[0]
+
+        vm = running_vm
+        vifId = vm.vifs()[0].uuid
+        hostBr = "xenbr0" # XXX hardcoded: get info from host
+
+        assert count_of(hostA1, hostBr) == 0, "no OF at init (on hostA1)"
+        assert count_of(hostA2, hostBr) == 0, "no OF at init (on hostA2)"
+
+        # add OF rule
+        xo_cli('sdnController.addRule', {
+            'vifId': vifId,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:80',
+            'allow': 'true',
+        })
+        try:
+            assert count_of(hostA1, hostBr) == 1, "1 OF after addRule (on hostA1)"
+            assert count_of(hostA2, hostBr) == 1, "1 OF after addRule (on hostA2)"
+
+            vm.migrate(hostA2, local_sr_on_hostA2)
+
+            assert count_of(hostA1, hostBr) == 1, "1 OF after migrate (on hostA1)"
+            assert count_of(hostA2, hostBr) == 1, "1 OF after migrate (on hostA2)"
+
+        finally:
+            xo_cli('sdnController.deleteRule', {
+                'vifId': vifId,
+                'ipRange': '0.0.0.0/0',
+                'direction': 'to',
+                'protocol': 'tcp',
+                'port': 'json:80',
+            })
+
+        assert count_of(hostA1, hostBr) == 0, "no OF after deleteRule (on hostA1)"
+        assert count_of(hostA2, hostBr) == 0, "no OF after deleteRule (on hostA2)"
