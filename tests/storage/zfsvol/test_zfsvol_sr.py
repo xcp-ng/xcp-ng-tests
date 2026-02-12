@@ -84,8 +84,8 @@ class TestZfsvolVm:
         xva_export_import(vm_on_zfsvol_sr, compression, defer)
 
     @pytest.mark.small_vm
-    def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat, defer: Defer) \
-            -> None:
+    def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat, temp_large_dir: str,
+                               defer: Defer) -> None:
         vm = storage_test_vm
         sr = zfsvol_sr
         vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
@@ -110,7 +110,7 @@ class TestZfsvolVm:
         )
         vm.disconnect_vdi(vdi_src)
 
-        image_path = f'/tmp/{vdi_src.uuid}.{image_format}'
+        image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
         defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
 
         vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})
