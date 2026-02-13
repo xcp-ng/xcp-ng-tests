@@ -1,0 +1,811 @@
+from __future__ import annotations
+
+import pytest
+
+import logging
+
+from lib.common import Defer, wait_for, wait_for_not
+from lib.host import Host
+from lib.network import Network
+from lib.sr import SR
+from lib.tunnel import Tunnel
+from lib.vlan import VLAN
+from lib.vm import VM
+from lib.xo import xo_cli
+
+# Requirements:
+# xo-cli (on the host running the test) is expected to be usable
+# From --hosts parameter:
+# - host(A1): first XCP-ng host (no traffic rules should be already present on the host)
+# From --vm parameter
+# - A VM to import
+
+# Special requirements for some tests:
+# - TestVLAN needs at least 1 free NICs (see HOST_FREE_NICS in data.py)
+# - TestMigrate needs second XCP-ng host in the same pool
+# - TestTunnel will create encrypted tunnel (and only one could be created at a time)
+
+CACHE_ovs_vsctl_bridge_to_parent: dict[str, str] = {}
+
+def ovs_vsctl_bridge_to_parent(host: Host, br: str) -> str:
+    global CACHE_ovs_vsctl_bridge_to_parent
+
+    if br not in CACHE_ovs_vsctl_bridge_to_parent:
+        CACHE_ovs_vsctl_bridge_to_parent[br] = host.ssh(f"ovs-vsctl br-to-parent {br}")
+
+    return CACHE_ovs_vsctl_bridge_to_parent[br]
+
+def ofctl_dumpflows(host: Host, br: str) -> list[str]:
+    """
+    Get the list of dump-flows installed for the bridge {br}
+    """
+    br = ovs_vsctl_bridge_to_parent(host, br)
+    return host.ssh(
+        f"ovs-ofctl -O OpenFlow11 dump-flows '{br}' | grep -F cookie=",
+    ).splitlines()
+
+def count_of(host: Host, br: str):
+    """
+    Return the number of OF flows in the bridge (excluding the default one)
+    """
+    return len(ofctl_dumpflows(host, br)) - 1
+
+def ofproto_trace_drop_in_port(
+    host: Host, br: str, flow: str, in_port: str,
+    vlan_tag: int | None, vlan_device: str | None,
+) -> bool:
+    """
+    Run ovs-appctl ofproto/trace program to check OpenFlow rules processing
+    on a specific port of a bridge.
+    """
+    if vlan_device == in_port:
+        flow = f"in_port={in_port},vlan_vid={vlan_tag},{flow}"
+    else:
+        flow = f"in_port={in_port},{flow}"
+
+    logging.debug(f"ofproto/trace port='{in_port}'")
+    result = host.ssh(f"ovs-appctl ofproto/trace {br} {flow}")
+    return result.endswith("Datapath actions: drop")
+
+def ofproto_trace_drop(
+    host: Host, br: str, flow: str,
+    network_br: str | None = None,
+    vlan_tag: int | None = None, vlan_device: str | None = None,
+) -> bool:
+    """
+    Run ovs-appctl ofproto/trace program to check OpenFlow rules processing
+    on all ports of a bridge.
+    """
+    def is_not_xapi_port(portname: str) -> bool:
+        """
+        Return False if portname has the form of "{br}_port"
+        it is the internal communication port for linking hosts
+        """
+        return not portname.startswith(f"{br}_port")
+
+    ports = host.ssh(f"ovs-vsctl list-ports {network_br or br}").splitlines()
+    ports = list(filter(is_not_xapi_port, ports))
+    if len(ports) == 0:
+        # no ports on bridge, packet will pass
+        return False
+
+    br = ovs_vsctl_bridge_to_parent(host, br)
+    logging.debug(f"ofproto/trace: dumping flows: {br}")
+    host.ssh(f"ovs-ofctl -O OpenFlow11 dump-flows {br}")
+
+    return all([
+        ofproto_trace_drop_in_port(
+            host, br, flow, port,
+            vlan_tag, vlan_device,
+        )
+        for port in ports
+    ])
+
+@pytest.mark.small_vm
+class TestSimple:
+    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer):
+        host = hosts_with_traffic_rules[0]
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+
+        vif = vm.vifs()[0]
+        vifId = vif.uuid
+        macAddress = vif.mac_address()
+        hostBr = vif.network().bridge()
+
+        assert count_of(host, hostBr) == 0, "no OF at init"
+
+        # add OF rule (before starting VM)
+        xo_cli('sdnController.addRule', {
+            'vifId': vifId,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:80',
+            'allow': 'false',
+        })
+
+        # before starting the VM, traffic pass
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        # start the VM and wait for XO to see the VM
+        vm.start()
+        vm.wait_for_os_booted()
+
+        # right after VM booted
+        assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        # add OF rule (while running)
+        xo_cli('sdnController.addRule', {
+            'vifId': vifId,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:81',
+            'allow': 'false',
+        })
+
+        # new rule added, both traffic dropped
+        assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        # delete OF rule (while running)
+        xo_cli('sdnController.deleteRule', {
+            'vifId': vifId,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:80',
+        })
+
+        # first rule deleted, traffic should pass (and 2nd rule drop traffic)
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        vm.shutdown(verify=True)
+
+        # after shutdown, two rules removed (vif not here anymore)
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        vm.start()
+        vm.wait_for_os_booted()
+
+        # after restarted, only the second rule apply
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        vm.shutdown(verify=True)
+
+        # delete OF rule (while stopped)
+        xo_cli('sdnController.deleteRule', {
+            'vifId': vifId,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:81',
+        })
+
+        # no more traffic blocked
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        assert count_of(host, hostBr) == 0, "no OF at end"
+
+    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer):
+        host = hosts_with_traffic_rules[0]
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+        networkId = host.management_network()
+        hostBr = Network(host, networkId).bridge()
+
+        assert count_of(host, hostBr) == 0, "no OF at init"
+
+        # add OF rule (before starting VM)
+        xo_cli('sdnController.addNetworkRule', {
+            'networkId': networkId,
+            'ipRange': '10.0.0.1',
+            'direction': 'to',
+            'protocol': 'icmp',
+            'allow': 'false',
+        })
+        defer(
+            lambda:
+                xo_cli('sdnController.deleteNetworkRule', {
+                    'networkId': networkId,
+                    'ipRange': '10.0.0.1',
+                    'direction': 'to',
+                    'protocol': 'icmp',
+                })
+        )
+
+        # the rule is not applied as there is no interface in the network at the time
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
+
+        # start the VM
+        vm.start()
+
+        # wait for XO to see the VM
+        vm.wait_for_os_booted()
+
+        # the rule is applied (after booting VM)
+        assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
+
+        # add OF rule (while running)
+        xo_cli('sdnController.addNetworkRule', {
+            'networkId': networkId,
+            'ipRange': '10.0.0.2',
+            'direction': 'to',
+            'protocol': 'icmp',
+            'allow': 'false',
+        })
+        defer(
+            lambda:
+                xo_cli('sdnController.deleteNetworkRule', {
+                    'networkId': networkId,
+                    'ipRange': '10.0.0.2',
+                    'direction': 'to',
+                    'protocol': 'icmp',
+                })
+        )
+
+        # both rules are applied
+        assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
+
+        # delete OF rule (while running)
+        xo_cli('sdnController.deleteNetworkRule', {
+            'networkId': networkId,
+            'ipRange': '10.0.0.1',
+            'direction': 'to',
+            'protocol': 'icmp',
+        })
+
+        # second rule only is applied
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
+
+        # restart the VM
+        vm.shutdown(verify=True)
+        vm.start()
+        vm.wait_for_os_booted()
+
+        # same as previous (after VM restart)
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
+
+        vm.shutdown(verify=True)
+
+        # delete OF rule (while stopped)
+        xo_cli('sdnController.deleteNetworkRule', {
+            'networkId': networkId,
+            'ipRange': '10.0.0.2',
+            'direction': 'to',
+            'protocol': 'icmp',
+        })
+
+        # no more rules
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
+
+        assert count_of(host, hostBr) == 0, "no OF at end"
+
+
+@pytest.mark.small_vm
+class TestMigrate:
+    def test_vifRule(
+        self,
+        hosts_with_traffic_rules: list[Host],
+        hostA2: Host,
+        local_sr_on_hostA2: SR,
+        imported_vm: VM,
+        defer: Defer,
+    ):
+        hostA1 = hosts_with_traffic_rules[0]
+
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+        vm.start()
+        vm.wait_for_vm_running_and_ssh_up()
+
+        vif = vm.vifs()[0]
+        vifId = vif.uuid
+        macAddress = vif.mac_address()
+        hostBr = vif.network().bridge()
+
+        assert count_of(hostA1, hostBr) == 0, "no OF at init (on hostA1)"
+        assert count_of(hostA2, hostBr) == 0, "no OF at init (on hostA2)"
+
+        # no drop before adding the rule
+        assert not ofproto_trace_drop(hostA1, hostBr, f"icmp,dl_src={macAddress}")
+        assert not ofproto_trace_drop(hostA2, hostBr, f"icmp,dl_src={macAddress}")
+
+        # add OF rule
+        logging.info("sdnController.addRule")
+        xo_cli('sdnController.addRule', {
+            'vifId': vifId,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'icmp',
+            'allow': 'false',
+        })
+        try:
+            # drop after adding the rule
+            assert ofproto_trace_drop(hostA1, hostBr, f"icmp,dl_src={macAddress}")
+
+            vm.migrate(hostA2, local_sr_on_hostA2)
+
+            wait_for(
+                lambda: ofproto_trace_drop(hostA2, hostBr, f"icmp,dl_src={macAddress}"),
+                msg="Wait for still dropping after migrate",
+                timeout_secs=30,
+            )
+
+        finally:
+            logging.info("sdnController.deleteRule")
+            xo_cli('sdnController.deleteRule', {
+                'vifId': vifId,
+                'ipRange': '0.0.0.0/0',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+        # no more drop after deleting the rule
+        assert not ofproto_trace_drop(hostA1, hostBr, f"icmp,dl_src={macAddress}")
+        assert not ofproto_trace_drop(hostA2, hostBr, f"icmp,dl_src={macAddress}")
+
+        assert count_of(hostA1, hostBr) == 0, "no OF after deleteRule (on hostA1)"
+        assert count_of(hostA2, hostBr) == 0, "no OF after deleteRule (on hostA2)"
+
+    def test_networkRule(
+        self,
+        hosts_with_traffic_rules: list[Host],
+        hostA2: Host,
+        local_sr_on_hostA1: SR,
+        local_sr_on_hostA2: SR,
+        imported_vm: VM,
+        defer: Defer,
+    ):
+        hostA1 = hosts_with_traffic_rules[0]
+
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+        vm.start(on=hostA1.name()) # the test is assymetric, start with the VM on know host
+        vm.wait_for_vm_running_and_ssh_up()
+
+        networkId = hostA1.management_network()
+        hostA1Br = Network(hostA1, networkId).bridge()
+        hostA2Br = Network(hostA2, networkId).bridge()
+
+        assert count_of(hostA1, hostA1Br) == 0, "no OF at init (on hostA1)"
+        assert count_of(hostA2, hostA2Br) == 0, "no OF at init (on hostA2)"
+
+        # no rule
+        assert not ofproto_trace_drop(hostA1, hostA1Br, "icmp,nw_dst=10.0.0.1")
+        assert not ofproto_trace_drop(hostA2, hostA2Br, "icmp,nw_dst=10.0.0.1")
+
+        # add OF rule
+        logging.info("sdnController.addNetworkRule")
+        xo_cli('sdnController.addNetworkRule', {
+            'networkId': networkId,
+            'ipRange': '10.0.0.1',
+            'direction': 'to',
+            'protocol': 'icmp',
+            'allow': 'false',
+        })
+        try:
+            logging.info("check pre-migrate")
+            wait_for(
+                lambda: ofproto_trace_drop(hostA1, hostA1Br, "icmp,nw_dst=10.0.0.1"),
+                msg="Wait for the rule to applied on hostA1",
+                timeout_secs=30,
+            )
+
+            vm.migrate(hostA2, local_sr_on_hostA2)
+
+            logging.info("check post-migrate")
+            wait_for(
+                lambda: ofproto_trace_drop(hostA2, hostA2Br, "icmp,nw_dst=10.0.0.1"),
+                msg="Wait for the rule to applied on hostA2",
+                timeout_secs=30,
+            )
+
+        finally:
+            logging.info("sdnController.deleteNetworkRule")
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+        # no more rule
+        logging.info("check post-delete")
+        assert not ofproto_trace_drop(hostA1, hostA1Br, "icmp,nw_dst=10.0.0.1")
+        assert not ofproto_trace_drop(hostA2, hostA2Br, "icmp,nw_dst=10.0.0.1")
+
+        assert count_of(hostA1, hostA1Br) == 0, "no OF at end (on hostA1)"
+        assert count_of(hostA2, hostA2Br) == 0, "no OF at end (on hostA2)"
+
+
+@pytest.mark.complex_prerequisites
+@pytest.mark.small_vm
+class TestVLAN:
+    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, empty_network: Network,
+                     vlan: VLAN, defer: Defer):
+        host = hosts_with_traffic_rules[0]
+        network = empty_network
+
+        vlan_tag = vlan.tag()
+        vlan_device = vlan.untagged_PIF().device()
+
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+
+        # get bridge of the network of the tagged PIF
+        hostBr = Network(host, vlan.tagged_PIF().network_uuid()).bridge()
+        netBr = network.bridge()
+        logging.info(f"host bridge for vlan: {hostBr} / {netBr}")
+
+        assert count_of(host, hostBr) == 0, "no OF at start"
+
+        vif = vm.create_vif(1, network_uuid=network.uuid)
+        macAddress = vif.mac_address()
+        vm.start()
+
+        # no rule applied
+        assert not ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=81,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+        assert not ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=82,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+
+        logging.info("sdnController.addRule1")
+        xo_cli('sdnController.addRule', {
+            'vifId': vif.uuid,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:81',
+            'allow': 'false',
+        })
+
+        vm.wait_for_os_booted()
+
+        # rule applied
+        assert ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=81,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+        assert not ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=82,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+
+        logging.info("sdnController.addRule2")
+        xo_cli('sdnController.addRule', {
+            'vifId': vif.uuid,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'from',
+            'protocol': 'tcp',
+            'port': 'json:82',
+            'allow': 'false',
+        })
+
+        assert ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=81,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+        assert ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_src=82,dl_dst={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+
+        logging.info("sdnController.deleteRule1")
+        xo_cli('sdnController.deleteRule', {
+            'vifId': vif.uuid,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:81',
+        })
+
+        assert not ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=81,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+        assert ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_src=82,dl_dst={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+
+        logging.info("sdnController.deleteRule2")
+        xo_cli('sdnController.deleteRule', {
+            'vifId': vif.uuid,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'from',
+            'protocol': 'tcp',
+            'port': 'json:82',
+        })
+
+        # rule not applied
+        assert not ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_dst=81,dl_src={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+        assert not ofproto_trace_drop(
+            host, hostBr,
+            f"tcp,tp_src=82,dl_dst={macAddress}",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+
+        assert count_of(host, hostBr) == 0, "no OF at end"
+
+    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
+                         empty_network: Network, vlan: VLAN, defer: Defer):
+        host = hosts_with_traffic_rules[0]
+        network = empty_network
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+        vlan_tag = vlan.tag()
+        vlan_device = vlan.untagged_PIF().device()
+
+        networkId = network.uuid
+        logging.info(f"networkId = {networkId}")
+
+        try:
+            # get bridge of the network of the tagged PIF
+            hostBr = Network(host, vlan.tagged_PIF().network_uuid()).bridge()
+            netBr = Network(host, networkId).bridge()
+            logging.info(f"host bridge for vlan: {hostBr} / {netBr}")
+
+            # put one vif in the VLAN
+            vm.create_vif(1, network_uuid=networkId)
+
+            assert count_of(host, hostBr) == 0, "no OF at init"
+
+            # no rules
+            assert not ofproto_trace_drop(
+                host, hostBr, "icmp,nw_dst=10.0.0.1",
+                network_br=netBr,
+                vlan_tag=vlan_tag, vlan_device=vlan_device,
+            )
+
+            # add OF rule (before starting VM)
+            logging.info("sdnController.addNetworkRule")
+            xo_cli('sdnController.addNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+                'allow': 'false',
+            })
+
+            # XXX weird, but no OF so seems expected
+            logging.info("check pre-start")
+            wait_for_not(
+                lambda: ofproto_trace_drop(
+                    host, hostBr, "icmp,nw_dst=10.0.0.1",
+                    network_br=netBr,
+                    vlan_tag=vlan_tag, vlan_device=vlan_device,
+                ),
+                msg="Wait for the rule to not apply for now (nobody connected to the network)",
+                timeout_secs=30,
+                delayed_start_secs=2,
+            )
+
+            # start the VM
+            vm.start()
+
+            # rule is applied
+            logging.info("check post-start")
+            wait_for(
+                lambda: ofproto_trace_drop(
+                    host, hostBr, "icmp,nw_dst=10.0.0.1",
+                    network_br=netBr,
+                    vlan_tag=vlan_tag, vlan_device=vlan_device,
+                ),
+                msg="Wait for the rule to be applied",
+                timeout_secs=30,
+                delayed_start_secs=5,
+            )
+
+            vm.shutdown(verify=True, force=True)
+
+            # XXX weird, but no OF so seems expected
+            logging.info("check post-shutdown")
+            wait_for_not(
+                lambda: ofproto_trace_drop(
+                    host, hostBr, "icmp,nw_dst=10.0.0.1",
+                    network_br=netBr,
+                    vlan_tag=vlan_tag, vlan_device=vlan_device,
+                ),
+                msg="Wait for the rule to not apply for now (nobody connected to the network)",
+                timeout_secs=30,
+                delayed_start_secs=2,
+            )
+
+        finally:
+            # delete networkRule
+            logging.info("sdnController.deleteNetworkRule")
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+        # no rule applied
+        assert not ofproto_trace_drop(
+            host, hostBr, "icmp,nw_dst=10.0.0.1",
+            network_br=netBr,
+            vlan_tag=vlan_tag, vlan_device=vlan_device,
+        )
+
+        assert count_of(host, hostBr) == 0, "no OF at end"
+
+
+@pytest.mark.small_vm
+class TestTunnel:
+    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
+                     tunnel: Tunnel, tunnel_protocol: str, defer: Defer):
+        host = hosts_with_traffic_rules[0]
+        network = Network(host, tunnel.access_PIF().network_uuid())
+        hostBr = network.bridge()
+
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+
+        assert count_of(host, hostBr) == 0, "no OF at start"
+
+        vif = vm.create_vif(1, network_uuid=network.uuid)
+        macAddress = vif.mac_address()
+        vm.start()
+
+        # no rule applied
+        assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
+
+        logging.info("sdnController.addRule")
+        xo_cli('sdnController.addRule', {
+            'vifId': vif.uuid,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:81',
+            'allow': 'false',
+        })
+
+        # rule applied
+        wait_for(
+            lambda: ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}"),
+            msg="Wait for rule to apply",
+            timeout_secs=30,
+            delayed_start_secs=2,
+        )
+
+        logging.info("sdnController.deleteRule")
+        xo_cli('sdnController.deleteRule', {
+            'vifId': vif.uuid,
+            'ipRange': '0.0.0.0/0',
+            'direction': 'to',
+            'protocol': 'tcp',
+            'port': 'json:81',
+        })
+
+        wait_for_not(
+            lambda: ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}"),
+            msg="Wait for rule to not apply anymore",
+            timeout_secs=30,
+            delayed_start_secs=2,
+        )
+
+        assert count_of(host, hostBr) == 0, "no OF at end"
+
+    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
+                         tunnel: Tunnel, tunnel_protocol: str, defer: Defer):
+        host = hosts_with_traffic_rules[0]
+        network = Network(host, tunnel.access_PIF().network_uuid())
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
+        hostBr = network.bridge()
+
+        networkId = network.uuid
+        logging.info(f"networkId = {networkId}")
+
+        try:
+            # put one vif in the Tunnel
+            vm.create_vif(1, network_uuid=networkId)
+
+            assert count_of(host, hostBr) == 0, "no OF at init"
+
+            # no rules
+            assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+
+            # add OF rule (before starting VM)
+            logging.info("sdnController.addNetworkRule")
+            xo_cli('sdnController.addNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+                'allow': 'false',
+            })
+
+            # XXX weird, but no OF so seems expected
+            logging.info("check pre-start")
+            wait_for_not(
+                lambda: ofproto_trace_drop(
+                    host, hostBr, "icmp,nw_dst=10.0.0.1",
+                ),
+                msg="Wait for the rule to not apply for now (nobody connected to the network)",
+                timeout_secs=30,
+                delayed_start_secs=2,
+            )
+
+            # start the VM
+            vm.start()
+
+            # rule is applied
+            logging.info("check post-start")
+            wait_for(
+                lambda: ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1"),
+                msg="Wait for the rule to be applied",
+                timeout_secs=30,
+                delayed_start_secs=5,
+            )
+
+            vm.shutdown(verify=True, force=True)
+
+            # XXX weird, but no OF so seems expected
+            logging.info("check post-shutdown")
+            wait_for_not(
+                lambda: ofproto_trace_drop(
+                    host, hostBr, "icmp,nw_dst=10.0.0.1",
+                ),
+                msg="Wait for the rule to not apply for now (nobody connected to the network)",
+                timeout_secs=30,
+                delayed_start_secs=2,
+            )
+
+        finally:
+            # delete networkRule
+            logging.info("sdnController.deleteNetworkRule")
+            xo_cli('sdnController.deleteNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+            })
+
+        # no rule applied
+        assert not ofproto_trace_drop(
+            host, hostBr, "icmp,nw_dst=10.0.0.1",
+        )
+
+        assert count_of(host, hostBr) == 0, "no OF at end"
