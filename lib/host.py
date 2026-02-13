@@ -36,7 +36,9 @@ from lib.netutil import wrap_ip
 from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
+from lib.tunnel import Tunnel
 from lib.vdi import VDI
+from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
@@ -808,3 +810,35 @@ class Host:
         logging.info(f"New Network: {uuid}")
 
         return Network(self, uuid)
+
+    def create_vlan(self, network: Network, pif: PIF, vlan: int) -> VLAN:
+        args: dict[str, str | bool] = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'vlan': str(vlan),
+        }
+
+        untagged_pif_uuid = self.xe("vlan-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": untagged_pif_uuid,
+            "param-name": "vlan-master-of",
+        })
+        logging.info(f"New VLAN: {uuid} (untagged-pif: {untagged_pif_uuid})")
+
+        return VLAN(self, uuid)
+
+    def create_tunnel(self, network: Network, pif: PIF, protocol: str) -> Tunnel:
+        args: dict[str, str | bool] = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'protocol': protocol,
+        }
+
+        access_pif_uuid = self.xe("tunnel-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": access_pif_uuid,
+            "param-name": "tunnel-access-PIF-of",
+        })
+        logging.info(f"New Tunnel: {uuid} (access-pif: {access_pif_uuid})")
+
+        return Tunnel(self, uuid)

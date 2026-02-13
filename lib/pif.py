@@ -51,6 +51,18 @@ class PIF:
         assert uuid is not None, "unexpected PIF without network-uuid"
         return uuid
 
+    def ip_configuration_mode(self) -> str:
+        mode = self.param_get("IP-configuration-mode")
+        assert mode
+        return mode
+
+    def vlan(self) -> int | None:
+        vlan = self.param_get('VLAN')
+        if vlan is None:
+            return None
+        else:
+            return int(vlan)
+
     def reconfigure_ip(self, mode: str) -> None:
         self.host.xe("pif-reconfigure-ip", {
             "uuid": self.uuid,

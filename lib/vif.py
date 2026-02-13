@@ -1,6 +1,7 @@
 import logging
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.network import Network
 
 class VIF:
     xe_prefix = "vif"
@@ -41,6 +42,11 @@ class VIF:
         mac_address = self.param_get('MAC')
         assert mac_address is not None, "VIF must have a MAC address"
         return mac_address
+
+    def network(self) -> Network:
+        network_uuid = self.param_get('network-uuid')
+        assert network_uuid is not None, "VIF must have a network-uuid"
+        return Network(self.vm.host, network_uuid)
 
     def plug(self):
         logging.info("Plugging VIF %s on VM %s", self.param_get('device'), self.vm.uuid)

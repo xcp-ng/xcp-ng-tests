@@ -49,3 +49,8 @@ class Network:
 
     def MTU(self) -> int:
         return int(self.param_get('MTU') or '0')
+
+    def bridge(self) -> str:
+        bridge = self.param_get('bridge')
+        assert bridge is not None, "network must have a bridge"
+        return bridge
