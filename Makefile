@@ -5,7 +5,7 @@
 
 # By default, only run the non-fix version of the hooks so it doesn't modify any files
 # It runs on all files managed by git (untracked files are not checked)
-check: ruff autopep8 flake8 pyright
+check: ruff autopep8 flake8 ty pyright
 
 # Use the `fix` directive to let autopep8 auto-format the code and ruff sort the imports
 # It runs on all files managed by git (untracked files are not modified)
