@@ -19,19 +19,19 @@ class XvaHeaderMember:
 
     def get_name(self) -> str | None:
         for child in self.member.childNodes:
-            if child.nodeType == minidom.Node.ELEMENT_NODE and child.tagName == "name" and child.firstChild:
+            if isinstance(child, minidom.Element) and child.tagName == "name" and child.firstChild:
                 return child.firstChild.nodeValue
         return None
 
     def get_value(self) -> str | None:
         for child in self.member.childNodes:
-            if child.nodeType == minidom.Node.ELEMENT_NODE and child.tagName == "value" and child.firstChild:
+            if isinstance(child, minidom.Element) and child.tagName == "value" and child.firstChild:
                 return child.firstChild.nodeValue
         return None
 
     def set_value(self, value: str) -> None:
         for child in self.member.childNodes:
-            if child.nodeType == minidom.Node.ELEMENT_NODE and child.tagName == "value" and child.firstChild:
+            if isinstance(child, minidom.Element) and child.tagName == "value" and child.firstChild:
                 child.firstChild.nodeValue = value  # type: ignore
         return None
 
