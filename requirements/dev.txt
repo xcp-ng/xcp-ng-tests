@@ -11,4 +11,5 @@ ruff
 types-requests
 typing-extensions
 libarchive-c==5.3
+types-passlib
 -r base.txt

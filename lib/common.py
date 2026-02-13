@@ -18,6 +18,7 @@ from functools import lru_cache
 from uuid import UUID
 
 import requests
+from passlib.hash import sha512_crypt
 from pydantic import TypeAdapter
 
 from typing import (
@@ -367,3 +368,8 @@ def _param_clear(host, xe_prefix, uuid, param_name):
     """ Common implementation for param_clear. """
     args = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)
+
+def hash_password(password: str) -> str:
+    """Hash password for /etc/password."""
+    logging.warning("-------------------- hashing the password! --------------------")
+    return sha512_crypt.using(rounds=5000).hash(password)

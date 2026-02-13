@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import legacycrypt as crypt     # type: ignore
 import os
-from typing import Any, TYPE_CHECKING
+
+from lib.common import hash_password
+
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from lib.typing import IsoImageDef
@@ -14,11 +16,6 @@ if TYPE_CHECKING:
 # You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
 HOST_DEFAULT_USER = "root"
 HOST_DEFAULT_PASSWORD = ""
-
-def hash_password(password):
-    """Hash password for /etc/password."""
-    salt = crypt.mksalt(crypt.METHOD_SHA512)
-    return crypt.crypt(password, salt)
 
 HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
 
