@@ -124,8 +124,9 @@ class TestNFSSR:
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, defer: Defer) -> None:
-        xva_export_import(dispatch_nfs, compression, defer)
+    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) \
+            -> None:
+        xva_export_import(dispatch_nfs, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
