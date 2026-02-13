@@ -1,7 +1,7 @@
 
 
-ignore_ssh_banner = False
-ssh_output_max_lines = 20
+ignore_ssh_banner: bool = False
+ssh_output_max_lines: int = 20
 
 def sr_device_config(datakey: str, *, required: list[str] = []) -> dict[str, str]:
     import data  # import here to avoid depending on this user file for collecting tests

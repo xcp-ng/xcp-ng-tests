@@ -656,7 +656,7 @@ class Host:
         )  # limit to: sd, blkext
 
         self.block_devices_info = [
-            Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore[misc]
+            Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore
                                   for key, value in re.findall(r'(\S+)=(".*?"|\S+)', line)})
             for line in output_string.strip().splitlines()
         ]
