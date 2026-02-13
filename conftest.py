@@ -268,6 +268,11 @@ def hosts_with_xo(hosts, registered_xo_cli):
             h.xo_server_remove()
 
 @pytest.fixture(scope='session')
+def connected_hosts_with_xo(hosts: list[Host], registered_xo_cli):
+    connected = [h for h in hosts if not h.skip_xo_config and h.xo_server_connected()]
+    yield connected
+
+@pytest.fixture(scope='session')
 def hostA1(hosts):
     """ Master of first pool (pool A). """
     yield hosts[0]
