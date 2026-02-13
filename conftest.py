@@ -211,6 +211,7 @@ def pytest_runtest_makereport(
 
     # store test results for each phase of a call, which can
     # be "setup", "call", "teardown"
+    assert rep.when is not None
     item.stash.setdefault(PHASE_REPORT_KEY, {})[rep.when] = rep
 
     return rep
