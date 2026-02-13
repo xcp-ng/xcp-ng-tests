@@ -33,6 +33,15 @@ repos:
         require_serial: true
         entry: "uv run flake8"
         types: ["python"]
+      - id: "ty"
+        name: "ty"
+        language: "system"
+        require_serial: true
+        entry: "uv run ty check ."
+        types: ["python"]
+        stages: ["manual"]
+        pass_filenames: false
+        always_run: true
       - id: "mypy"
         name: "mypy"
         language: "system"
