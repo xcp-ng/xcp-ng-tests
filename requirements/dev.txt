@@ -13,4 +13,5 @@ libarchive-c==5.3
 types-pygments
 types-colorama
 types-pexpect
+ty
 -r base.txt

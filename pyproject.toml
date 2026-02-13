@@ -32,12 +32,16 @@ dev = [
     "types-pygments",
     "types-colorama",
     "types-pexpect",
+    "ty",
 ]
 
 [tool.pyright]
 typeCheckingMode = "standard"
 reportMissingParameterType = "error"
 reportUnknownParameterType = "error"
+
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
 
 [tool.ruff]
 preview = true
@@ -54,9 +58,11 @@ select = [
   "I",  # isort
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
+  "ANN",  # flake8-annotations
 ]
 # don't use some of the default D and SIM rules
 ignore = [
+  "ANN401",  # missing-return-type-special-method. Might be removed later.
   "D100",  # undocumented-public-module
   "D101",  # undocumented-public-class
   "D102",  # undocumented-public-method
@@ -77,6 +83,7 @@ ignore = [
   "SIM105",  # suppressible-exception
   "SIM108",  # if-else-block-instead-of-if-exp
 ]
+flake8-annotations.mypy-init-return = true
 
 # restrict to the PEP 257 rules
 pydocstyle.convention = "pep257"
