@@ -63,8 +63,22 @@ class PIF:
 
     def network_uuid(self) -> str:
         uuid = self.param_get("network-uuid")
-        assert uuid is not None, "unexpected PIF without network-uuid"
+        assert uuid is not None
         return uuid
+
+    def ip_configuration_mode(self) -> str:
+        mode = self.param_get("IP-configuration-mode")
+        assert mode
+        return mode
+
+    def vlan(self) -> int | None:
+        vlan_str = self.param_get('VLAN')
+        assert vlan_str
+        vlan = int(vlan_str)
+        if vlan == -1:
+            return None
+        else:
+            return vlan
 
     def reconfigure_ip(self, mode: str) -> None:
         self.host.xe("pif-reconfigure-ip", {
