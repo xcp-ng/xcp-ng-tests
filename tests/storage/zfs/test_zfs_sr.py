@@ -106,8 +106,9 @@ class TestZFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_zfs_sr: VM, compression: XVACompression, defer: Defer) -> None:
-        xva_export_import(vm_on_zfs_sr, compression, defer)
+    def test_xva_export_import(self, vm_on_zfs_sr: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) \
+            -> None:
+        xva_export_import(vm_on_zfs_sr, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, zfs_sr: SR, image_format: ImageFormat, temp_large_dir: str,
