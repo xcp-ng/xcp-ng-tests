@@ -222,36 +222,57 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(vm: VM, compression: XVACompression, defer: Defer) -> None:
-    vm.vdis[0].resize(config.volume_size)
+def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
+    # we can't shrink a volume
+    volume_size = max(vm.vdis[0].get_virtual_size(), config.volume_size)
+    vm.vdis[0].resize(volume_size)
+    # The resulting volume size is a multiple of the block size. Store the actual VDI size, so we can make comparisons
+    # later in the test
+    volume_size = vm.vdis[0].get_virtual_size()
     # The tests using this function are using specific fixtures to create the VM on the expected SR
     # In consequence, we can't use the storage_test_vm, so we have to start the VM explicitly and install randstream
     vm.start()
     vm.wait_for_vm_running_and_ssh_up()
     install_randstream(vm)
 
-    # 500MiB, so we have some data to check and some empty spaces in the exported image
-    # TODO: resize the vm partitions and write more data in the disk (like 1/2 of the disk size)
-    #       to ensure we can export and import large xva images
-    randstream(vm, 'generate --size 500MiB /root/data')
-    randstream(vm, 'validate --expected-checksum 24e905d6 /root/data')
+    is_alpine = vm.ssh_with_result('apk --version').returncode == 0
+    if is_alpine:
+        # growpart is not available in alpine 3.12
+        # vm.ssh('apk add cloud-utils-growpart e2fsprogs-extra')
+        vm.ssh('apk add gawk util-linux e2fsprogs-extra')
+        vm.ssh('wget https://raw.githubusercontent.com/canonical/cloud-utils/main/bin/growpart -O /usr/bin/growpart')
+        vm.ssh('chmod +x /usr/bin/growpart')
+        # TODO: maybe use `findmnt -no SOURCE /` from util-linux to get the blockdevice mounted on /
+        growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
+        assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
+        vm.ssh('resize2fs /dev/xvda3')
+        stream_size = volume_size // 2
+    else:
+        stream_size = 500 * MiB
+
+    checksum = randstream(vm, f'generate --size {stream_size} /root/data')
+    randstream(vm, f'validate --expected-checksum {checksum} /root/data')
     vm.shutdown(verify=True)
 
-    xva_path = f'/tmp/{vm.uuid}.xva'
+    xva_path = f'{temp_large_dir}/{vm.uuid}.xva'
     defer(lambda: vm.host.ssh(f'rm -f {xva_path}'))
     vm.export(xva_path, compression)
     # check that the zero blocks are not part of the result. Most of the data is from the random stream, so
-    # compression has little effect. We just check the result is between 500 and 700 MiB
+    # compression has little effect. We just take into account the system size
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {xva_path}').split()[0])
-    assert 500 < size_mb < 700, f"unexpected xva size: {size_mb}"
+    min_size = stream_size / MiB
+    max_size = (stream_size + volume_size / 1000) * 1.1 / MiB + 200
+    assert min_size < size_mb < max_size, (
+        f"unexpected xva size {size_mb}MiB, was expected to be between {min_size}MiB and {max_size}MiB"
+    )
 
     imported_vm = vm.host.import_vm(xva_path, vm.vdis[0].sr.uuid)
     defer(lambda: imported_vm.destroy())
-    assert vm.vdis[0].get_virtual_size() == config.volume_size
+    assert vm.vdis[0].get_virtual_size() == volume_size
 
     imported_vm.start()
     imported_vm.wait_for_vm_running_and_ssh_up()
-    randstream(imported_vm, 'validate --expected-checksum 24e905d6 /root/data')
+    randstream(imported_vm, f'validate --expected-checksum {checksum} /root/data')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
     vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
