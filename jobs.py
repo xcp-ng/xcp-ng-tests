@@ -78,7 +78,7 @@ JOBS: dict[str, JobData] = {
     "network-advanced": {
         "description": "a group of network tests with complex prerequisites",
         "requirements": [
-            "A pool with at least 1 host.",
+            "A pool with at least 1 host (if more, with same network configuration).",
             "At least 2 free NICs on every host.",
             "A small VM that can be imported on the SRs.",
         ],
