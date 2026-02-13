@@ -171,7 +171,7 @@ ISO_IMAGES: dict[str, "IsoImageDef"] = {
 # - 'default': keep using the pool's default SR
 # - 'local': use the first local SR found instead
 # - A UUID of the SR to be used
-DEFAULT_SR = 'default'
+DEFAULT_SR: str = 'default'
 
 # Whether to cache VMs on the test host, that is import them only if not already
 # present in the target SR. This also causes the VM to be cloned at the beginning
@@ -182,7 +182,7 @@ DEFAULT_SR = 'default'
 # Example description: "[Cache for http://example.com/images/filename.xva]"
 # Delete the VM to remove it from cache.
 # This setting affects VMs managed by the `imported_vm` fixture.
-CACHE_IMPORTED_VM = False
+CACHE_IMPORTED_VM: bool = False
 
 # Default LINSTOR redundancy configuration for creating SRs.
 LINSTOR_REDUNDANCY = 2
