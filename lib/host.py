@@ -29,7 +29,6 @@ from lib.common import (
     strtobool,
     to_xapi_bool,
     wait_for,
-    wait_for_not,
 )
 from lib.netutil import wrap_ip
 from lib.pif import PIF
@@ -92,38 +91,39 @@ class Host:
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True) -> str:
+            decode: Literal[True] = True, multiplexing=True) -> str:
         ...
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[False]) -> bytes:
+            decode: Literal[False], multiplexing=True) -> bytes:
         ...
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: bool = True) -> commands.SSHResult:
+            decode: bool = True, multiplexing=True) -> commands.SSHResult:
         ...
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[True],
-            decode: bool = True) -> None:
+            decode: bool = True, multiplexing=True) -> None:
         ...
 
     @overload
     def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True) \
+            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
+            multiplexing=True) \
             -> Union[str, bytes, commands.SSHResult, None]:
         ...
 
     def ssh(self, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-            background=False, decode=True):
+            background=False, decode=True, multiplexing=True):
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
-                            background=background, decode=decode)
+                            background=background, decode=decode, multiplexing=multiplexing)
 
     def ssh_with_result(self, cmd) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
@@ -550,14 +550,11 @@ class Host:
 
     def reboot(self, verify=False):
         logging.info("Reboot host %s" % self)
-        try:
-            self.ssh(['reboot'])
-        except commands.SSHCommandFailed as e:
-            # ssh connection may get killed by the reboot and terminate with an error code
-            if "closed by remote host" not in e.stdout:
-                raise
+        # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
+        # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
+        self.ssh(['systemd-run --on-active=2s reboot'])
         if verify:
-            wait_for_not(self.is_enabled, "Wait for host down")
+            wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
             wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
             wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
