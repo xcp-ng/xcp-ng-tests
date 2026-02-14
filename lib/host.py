@@ -550,14 +550,11 @@ class Host:
 
     def reboot(self, verify=False):
         logging.info("Reboot host %s" % self)
-        try:
-            self.ssh(['reboot'])
-        except commands.SSHCommandFailed as e:
-            # ssh connection may get killed by the reboot and terminate with an error code
-            if "closed by remote host" not in e.stdout:
-                raise
+        # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
+        # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
+        self.ssh(['systemd-run --on-active=2s reboot'])
         if verify:
-            wait_for_not(self.is_enabled, "Wait for host down")
+            wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
             wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
             wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
