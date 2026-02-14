@@ -2,6 +2,7 @@ import pytest
 
 import subprocess
 
+from lib.host import Host
 from lib.netutil import wrap_ip
 
 # This test installs netdata and netdata-ui packages, verifies the service status,
@@ -13,7 +14,8 @@ from lib.netutil import wrap_ip
 
 @pytest.mark.usefixtures("host_with_netdata")
 class TestsNetdata:
-    def __get_headers(host, port, path=None):
+    @staticmethod
+    def __get_headers(host: Host, port, path=None):
         url = f"http://{wrap_ip(host.hostname_or_ip)}:{port}"
         if path is not None:
             url += f"/{path}"

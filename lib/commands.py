@@ -86,6 +86,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         opts.append(f'-o "ControlPath ~/.ssh/control-{os.getpid()}:%h:%p:%r"')
         opts.append('-o "ControlPersist 10m"')
         opts.append('-o "ServerAliveInterval 10s"')
+        opts.append('-o "LogLevel ERROR"')
     else:
         opts.append('-o "ControlMaster no"')
 

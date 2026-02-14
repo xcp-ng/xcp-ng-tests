@@ -14,6 +14,7 @@ dependencies = [
     "pytest>=8.0.0",
     "pytest-dependency",
     "requests",
+    "types-pyyaml",
 ]
 
 [dependency-groups]
@@ -81,6 +82,10 @@ pydocstyle.convention = "pep257"
 # pytest requires some import and function arguments to match, but
 # the linter doesn't know that
 "tests/**/*.py" = [
+  "F401",  # F401 unused-import
+  "F811",  # F811 redefined-while-unused
+]
+"conftest.py" = [
   "F401",  # F401 unused-import
   "F811",  # F811 redefined-while-unused
 ]
