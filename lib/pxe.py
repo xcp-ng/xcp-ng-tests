@@ -21,26 +21,24 @@ def server_push_config(mac_address: str, tmp_local_path: str) -> None:
     assert mac_address
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     server_remove_config(mac_address)
-    ssh(PXE_CONFIG_SERVER, ['mkdir', '-p', remote_dir])
+    ssh(PXE_CONFIG_SERVER, f'mkdir -p {remote_dir}')
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
     scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
 
 def server_remove_config(mac_address: str) -> None:
     assert mac_address # protection against deleting the whole parent dir!
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    ssh(PXE_CONFIG_SERVER, ['rm', '-rf', remote_dir])
+    ssh(PXE_CONFIG_SERVER, f'rm -rf {remote_dir}')
 
 def server_remove_bootconf(mac_address: str) -> None:
     assert mac_address
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
-    ssh(PXE_CONFIG_SERVER, ['rm', '-rf', distant_file])
+    ssh(PXE_CONFIG_SERVER, f'rm -rf {distant_file}')
 
 def arp_addresses_for(mac_address: str) -> list[str]:
     output = ssh(
         ARP_SERVER,
-        ['ip', 'neigh', 'show', 'nud', 'reachable',
-         '|', 'grep', mac_address,
-         '|', 'awk', '\'{ print $1 }\'']
+        f"ip neigh show nud reachable | grep {mac_address} | awk '{{ print $1 }}'"
     )
     candidate_ips = output.splitlines()
     return candidate_ips

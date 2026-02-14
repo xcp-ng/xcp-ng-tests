@@ -3,6 +3,7 @@ import pytest
 import logging
 
 from lib.common import wait_for
+from lib.vm import VM
 
 from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, revert_vm_state
 
@@ -79,7 +80,7 @@ class TestVMCertMisc:
         finally:
             snapshot.destroy()
 
-    def test_vm_import_restores_certs(self, uefi_vm, formatted_and_mounted_ext4_disk):
+    def test_vm_import_restores_certs(self, uefi_vm: VM, formatted_and_mounted_ext4_disk):
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
@@ -97,7 +98,7 @@ class TestVMCertMisc:
                     logging.info(f"Destroy VM {vm2.uuid}")
                     vm2.destroy(verify=True)
             finally:
-                vm.host.ssh(['rm', '-f', filepath], check=False)
+                vm.host.ssh('rm -f {filepath}', check=False)
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
