@@ -119,3 +119,8 @@ exclude=[".git", ".venv", "data.py", "vm_data.py"]
 # We force them back to the upstream value, so we can just download the expected python version
 python-downloads = "automatic"
 python-preference = "managed"
+
+[tool.pytest-language-server]
+# pytest-language-server shows some internal variables, like host, as undeclared fixture.
+# An undeclared fixture would be cought by pyright/mypy. Just disable that diagnostic.
+disabled_diagnostics = ["undeclared-fixture"]
