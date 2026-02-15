@@ -439,6 +439,7 @@ A few plugins are recommended to properly report the diagnostics during the deve
 * [BasedPyright](https://open-vsx.org/extension/detachhead/basedpyright)
 * [flake8](https://open-vsx.org/extension/ms-python/flake8)
 * [ruff](https://open-vsx.org/extension/charliermarsh/ruff)
+* [pytest Language Server](https://open-vsx.org/extension/bellini666/pytest-language-server)
 * [autopep8](https://open-vsx.org/extension/ms-python/autopep8)
 
 
@@ -458,6 +459,8 @@ Install the required language servers:
 * [BasedPyright](https://docs.basedpyright.com/latest/) with `uv tool install basedpyright`
 * [pylsp](https://github.com/python-lsp/python-lsp-server) with `uv tool install python-lsp-server[flake8] --with pylsp-rope`.
   It's used to get immediate flake8 feedback in the text editor.
+* [pytest-language-server](https://github.com/bellini666/pytest-language-server) with
+  `uv tool install pytest-language-server`. It allows to navigate in pytest fixtures.
 
 [ruff](https://docs.astral.sh/ruff/), which is also used as a language server, is already installed as a dev dependency.
 
@@ -469,6 +472,7 @@ configuration (`.git/info/exclude`).
 [[language]]
 name = "python"
 language-servers = [
+  "pytest-language-server",
   "basedpyright",
   "pylsp",
   "ruff",
