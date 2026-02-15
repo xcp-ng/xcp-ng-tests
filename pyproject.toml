@@ -133,3 +133,6 @@ exclude=[".git", ".venv", "data.py", "vm_data.py"]
 # We force them back to the upstream value, so we can just download the expected python version
 python-downloads = "automatic"
 python-preference = "managed"
+
+[tool.pytest-language-server]
+disabled_diagnostics = ["undeclared-fixture"]
