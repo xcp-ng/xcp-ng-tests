@@ -128,3 +128,6 @@ ignore = [
   "F",  # already done by ruff
 ]
 exclude=[".git", ".venv", "data.py", "vm_data.py"]
+
+[tool.pytest-language-server]
+disabled_diagnostics = ["undeclared-fixture"]
