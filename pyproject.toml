@@ -113,3 +113,9 @@ ignore = [
   "F",  # already done by ruff
 ]
 exclude=[".git", ".venv", "data.py", "vm_data.py"]
+
+[tool.uv]
+# fedora is changing the defaults: https://src.fedoraproject.org/rpms/uv/blob/f43/f/uv.toml
+# We force them back to the upstream value, so we can just download the expected python version
+python-downloads = "automatic"
+python-preference = "managed"
