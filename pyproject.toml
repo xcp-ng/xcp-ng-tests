@@ -78,8 +78,8 @@ ignore = [
 pydocstyle.convention = "pep257"
 
 [tool.ruff.lint.extend-per-file-ignores]
-# pytest requires some import and function arguments to match, but
-# the linter doesn't know that
+# Pytest fixtures are often flagged as unused imports (F401) or 
+# redefined variables (F811) because they are injected by name.
 "tests/**/*.py" = [
   "F401",  # F401 unused-import
   "F811",  # F811 redefined-while-unused
