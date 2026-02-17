@@ -6,9 +6,11 @@ flake8
 flake8-pyproject
 pydocstyle
 pyright
-pyyaml>=6.0
 ruff
 types-requests
 typing-extensions
 libarchive-c==5.3
+types-pygments
+types-colorama
+types-pexpect
 -r base.txt
