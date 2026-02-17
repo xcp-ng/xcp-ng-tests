@@ -1,5 +1,4 @@
 # generated with update_requirements.py, do not edit manually
-ansible>=5.0.1
 bs4>=0.0.1
 mypy
 flake8
