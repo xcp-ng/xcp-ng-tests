@@ -3,7 +3,7 @@ import logging
 from lib.commands import SSHCommandFailed
 from lib.host import Host
 
-from typing import Final
+from typing import Any, Final, Self
 
 FISTPOINT_DIR: Final = "/tmp"
 LVHDRT_EXIT_FIST: Final = "fist_LVHDRT_exit"
@@ -35,12 +35,12 @@ class FistPoint:
         self.host = host
 
     @staticmethod
-    def enable_exit_on_fistpoint(host: Host):
+    def enable_exit_on_fistpoint(host: Host) -> None:
         host.create_file(FistPoint._get_path(LVHDRT_EXIT_FIST), "")
 
     @staticmethod
-    def disable_exit_on_fistpoint(host: Host):
-        host.ssh(["rm", FistPoint._get_path(LVHDRT_EXIT_FIST)])
+    def disable_exit_on_fistpoint(host: Host) -> None:
+        host.ssh(f'rm {FistPoint._get_path(LVHDRT_EXIT_FIST)}')
 
     @staticmethod
     def _get_name(name: str) -> str:
@@ -50,24 +50,24 @@ class FistPoint:
             return f"fist_{name}"
 
     @staticmethod
-    def _get_path(name) -> str:
+    def _get_path(name: str) -> str:
         return f"{FISTPOINT_DIR}/{name}"
 
-    def enable(self):
+    def enable(self) -> None:
         logging.info(f"Enable fistpoint {self.fistpointName}")
         self.host.create_file(self._get_path(self.fistpointName), "")
 
-    def disable(self):
+    def disable(self) -> None:
         logging.info(f"Disabling fistpoint {self.fistpointName}")
         try:
-            self.host.ssh(["rm", self._get_path(self.fistpointName)])
+            self.host.ssh(f'rm {self._get_path(self.fistpointName)}')
         except SSHCommandFailed as e:
             logging.info(f"Failed trying to disable fistpoint {self._get_path(self.fistpointName)} with error {e}")
             raise
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.enable()
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, *args: Any) -> None:
         self.disable()

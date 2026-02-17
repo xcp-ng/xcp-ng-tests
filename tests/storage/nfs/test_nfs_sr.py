@@ -4,6 +4,7 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
@@ -22,7 +23,7 @@ from tests.storage import (
 
 class TestNFSSRCreateDestroy:
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_device_config', 'nfs4_device_config'], indirect=True)
-    def test_create_and_destroy_sr(self, host, dispatch_nfs):
+    def test_create_and_destroy_sr(self, host: Host, dispatch_nfs: dict[str, str]) -> None:
         device_config = dispatch_nfs
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('nfs', "NFS-SR-test", device_config, shared=True, verify=True)
@@ -37,12 +38,12 @@ class TestNFSSRCreateDestroy:
 class TestNFSSR:
     @pytest.mark.quicktest
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
-    def test_quicktest(self, dispatch_nfs):
+    def test_quicktest(self, dispatch_nfs: SR) -> None:
         sr = dispatch_nfs
         sr.run_quicktest()
 
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
-    def test_vdi_is_not_open(self, dispatch_nfs):
+    def test_vdi_is_not_open(self, dispatch_nfs: VDI) -> None:
         vdi = dispatch_nfs
         assert not vdi_is_open(vdi)
 
@@ -51,7 +52,7 @@ class TestNFSSR:
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_plugin_nfs_on_on_slave(self, dispatch_nfs: VM):
+    def test_plugin_nfs_on_on_slave(self, dispatch_nfs: VM) -> None:
         vm = dispatch_nfs
         vm.start()
         vm.wait_for_os_booted()
@@ -80,7 +81,7 @@ class TestNFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
-    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: ImageFormat):
+    def test_vdi_image_format(self, dispatch_nfs: VDI, image_format: ImageFormat) -> None:
         fmt = dispatch_nfs.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:
@@ -92,7 +93,7 @@ class TestNFSSR:
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_start_and_shutdown_VM(self, dispatch_nfs):
+    def test_start_and_shutdown_VM(self, dispatch_nfs: VM) -> None:
         vm = dispatch_nfs
         vm.start()
         vm.wait_for_os_booted()
@@ -103,7 +104,7 @@ class TestNFSSR:
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_snapshot(self, dispatch_nfs):
+    def test_snapshot(self, dispatch_nfs: VM) -> None:
         vm = dispatch_nfs
         vm.start()
         try:
@@ -115,7 +116,7 @@ class TestNFSSR:
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
-    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation):
+    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation) -> None:
         coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op)
 
     @pytest.mark.small_vm
@@ -123,12 +124,12 @@ class TestNFSSR:
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression):
+    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression) -> None:
         xva_export_import(dispatch_nfs, compression)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
-    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat):
+    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat) -> None:
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format)
 
     # *** tests with reboots (longer tests).
@@ -138,7 +139,7 @@ class TestNFSSR:
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_reboot(self, host, dispatch_nfs):
+    def test_reboot(self, host: Host, dispatch_nfs: VM) -> None:
         vm = dispatch_nfs
         sr = vm.get_sr()
         host.reboot(verify=True)

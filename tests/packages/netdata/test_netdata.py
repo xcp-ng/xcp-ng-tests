@@ -2,6 +2,7 @@ import pytest
 
 import subprocess
 
+from lib.host import Host
 from lib.netutil import wrap_ip
 
 # This test installs netdata and netdata-ui packages, verifies the service status,
@@ -13,7 +14,8 @@ from lib.netutil import wrap_ip
 
 @pytest.mark.usefixtures("host_with_netdata")
 class TestsNetdata:
-    def __get_headers(host, port, path=None):
+    @staticmethod
+    def __get_headers(host: Host, port: int, path: str | None = None) -> list[str]:
         url = f"http://{wrap_ip(host.hostname_or_ip)}:{port}"
         if path is not None:
             url += f"/{path}"
@@ -26,21 +28,21 @@ class TestsNetdata:
         return stdout.decode().splitlines()
 
     # Verify the ActiveState for the netdata service
-    def test_netdata_service(self, host):
-        host.ssh(['systemctl', 'is-active', 'netdata.service'])
+    def test_netdata_service(self, host: Host) -> None:
+        host.ssh('systemctl is-active netdata.service')
 
     # Netdata configuration should be accessible only from the host
-    def test_netdata_conf(self, host):
+    def test_netdata_conf(self, host: Host) -> None:
         lines = TestsNetdata.__get_headers(host, 19999, "netdata.conf")
         response = lines[0].strip()
         assert response == "HTTP/1.1 403 Forbidden" or \
                response == "HTTP/1.1 451 Unavailable For Legal Reasons"
 
-        stdout = host.ssh(['curl', "-XGET", "-k", "-I", '-s', 'localhost:19999/netdata.conf'])
+        stdout = host.ssh('curl -XGET -k -I -s localhost:19999/netdata.conf')
         lines = stdout.splitlines()
         assert lines[0].strip() == "HTTP/1.1 200 OK"
 
     # Verify the web UI is accessible. i.e. port 19999 is opened
-    def test_netdata_webui(self, host):
+    def test_netdata_webui(self, host: Host) -> None:
         lines = TestsNetdata.__get_headers(host, 19999)
         assert lines[0].strip() == "HTTP/1.1 200 OK"

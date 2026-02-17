@@ -3,14 +3,17 @@ import pytest
 import logging
 
 from lib.common import PackageManagerEnum
+from lib.vm import VM
+
+from typing import Generator
 
 @pytest.fixture(scope='module')
-def halted_uefi_unix_vm(uefi_vm, unix_vm):
+def halted_uefi_unix_vm(uefi_vm: VM, unix_vm: VM) -> Generator[VM, None, None]:
     assert uefi_vm.is_halted(), "The VM must be halted for these tests"
     yield uefi_vm
 
 @pytest.fixture(scope='module')
-def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm):
+def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm: VM) -> Generator[VM, None, None]:
     vm = halted_uefi_unix_vm
     snapshot = vm.snapshot()
 
@@ -22,7 +25,7 @@ def snapshotted_halted_uefi_unix_vm(halted_uefi_unix_vm):
         snapshot.destroy()
 
 @pytest.fixture(scope='module')
-def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm):
+def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm: VM) -> Generator[VM, None, None]:
     vm = snapshotted_halted_uefi_unix_vm
 
     has_vtpm = vm.get_vtpm_uuid()
@@ -34,7 +37,7 @@ def unix_vm_with_vtpm(snapshotted_halted_uefi_unix_vm):
         vm.destroy_vtpm()
 
 @pytest.fixture(scope='module')
-def started_unix_vm_with_vtpm(unix_vm_with_vtpm):
+def started_unix_vm_with_vtpm(unix_vm_with_vtpm: VM) -> Generator[VM, None, None]:
     vm = unix_vm_with_vtpm
 
     vm.start()
@@ -49,20 +52,20 @@ def started_unix_vm_with_vtpm(unix_vm_with_vtpm):
     vm.shutdown(verify=True, force_if_fails=True)
 
 @pytest.fixture(scope='module')
-def unix_vm_with_tpm2_tools(started_unix_vm_with_vtpm):
+def unix_vm_with_tpm2_tools(started_unix_vm_with_vtpm: VM) -> Generator[VM, None, None]:
     vm = started_unix_vm_with_vtpm
 
     pkg_mgr = vm.detect_package_manager()
     if pkg_mgr == PackageManagerEnum.APT_GET:
         # Old versions of apt-get doesn't support the --update option with the
         # install command so we have to first update then install
-        cmd = ['apt-get', 'update', '&&', 'apt-get']
+        cmd = 'apt-get update && apt-get'
     elif pkg_mgr == PackageManagerEnum.RPM:
-        cmd = ['yum']
+        cmd = 'yum'
     else:
         pytest.fail("Unsupported package manager for this test. Cannot install tpm2-tools")
 
     logging.info("Installing tpm2-tools package using '%s'" % cmd[0])
-    vm.ssh(cmd + ['install', '-y', 'tpm2-tools'])
+    vm.ssh(f'{cmd} install -y tpm2-tools')
 
     yield vm

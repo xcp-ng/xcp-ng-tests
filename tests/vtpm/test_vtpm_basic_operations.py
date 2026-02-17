@@ -3,6 +3,7 @@ import pytest
 import logging
 
 import lib.commands as commands
+from lib.vm import VM
 
 # These tests are basic tests for vTPM devices.
 #   - Create / Destroy a vTPM device on a VM
@@ -63,7 +64,7 @@ rm -rf ${TMPDIR}
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
-def test_create_and_destroy_vtpm(halted_uefi_unix_vm):
+def test_create_and_destroy_vtpm(halted_uefi_unix_vm: VM) -> None:
     vm = halted_uefi_unix_vm
     image_has_vtpm = vm.get_vtpm_uuid()
     try:
@@ -85,7 +86,7 @@ def test_create_and_destroy_vtpm(halted_uefi_unix_vm):
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
-def test_vtpm(unix_vm_with_tpm2_tools):
+def test_vtpm(unix_vm_with_tpm2_tools: VM) -> None:
     global vtpm_signing_test_script
     vm = unix_vm_with_tpm2_tools
 

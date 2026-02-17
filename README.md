@@ -1,6 +1,6 @@
 # Test scripts for XCP-ng
 
-Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
+Note: this is a perpetual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
 
@@ -14,13 +14,15 @@ Extra test-specific requirements are documented in the test file "Requirements" 
 
 ### Quick install
 
-Install `uv` with one of these commands
+Install `uv` with one of these commands. Using your system's native package
+manager is often the most reliable way to ensure `uv` is integrated with your OS
+and easily updatable.
 
-~~~sh
-pip install uv                                      # for Fedora-based and older distros
-pipx install uv                                     # for newer distros
-curl -LsSf https://astral.sh/uv/install.sh | sh     # if you don't mind an installer modifying your environment
-~~~
+| Method                     | Command                     | Note                                                                         |
+| -------------------------- | --------------------------- | ---------------------------------------------------------------------------- |
+| **System Package Manager** | `<your-pkg-mgr> install uv` | Use your distribution's manager (e.g., `apt`, `dnf`, `pacman`, or `zypper`). |
+| **pipx**                   | `pipx install uv`           | Recommended for installing Python tools in isolated environments.            |
+| **pip**                    | `pip install uv`            | A fallback if `pipx` is not available.                                       |
 
 You have two options to run the tests:
 
@@ -129,7 +131,7 @@ The lock file allows `uv` to install the dependencies at the exact same versions
 on all the environments.
 
 ## Other requirements
-* XCP-ng hosts that you can ssh to using a SSH key, non-interactively
+* XCP-ng hosts that you can ssh to using an SSH key, non-interactively
 * VM images suited to what the tests want. Some tests want a linux VM with SSH, available to import as an OVA over HTTP, for example.
 
 On XCP-ng's test lab, the CI SSH private key allows to connect to any host installed for CI via PXE, and to any linux VM imported from pre-made images (OVA).
@@ -167,9 +169,9 @@ The `--hosts` parameter can be specified several times. Then `pytest` will run t
 When a test requires a single pool of several hosts, only mention the master host in the `--hosts` option.
 
 Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those are tests that will import a VM before testing stuff on it:
-* `OVA_URL` is an URL to download an OVA. It can also be a simple a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
+* `OVA_URL` is a URL to download an OVA. It can also be simply a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
 * `VM_key` refers to a key in `data.py`'s `VM_IMAGES` dict. Example: `mini-linux-x86_64-uefi`.
-* `IP_address` allows to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
+* `IP_address` allows you to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
@@ -196,7 +198,7 @@ We defined various markers, that currently belong to the following conceptual fa
   * Automatically added based on the fixtures required by the tests: do they require a VM? Unix? Windows? UEFI? Do they need a free disk that they can format? Do they require a second host in the first pool? A second pool? /!\ Not all fixtures are automatically translated into markers! (this is handled by the `pytest_collection_modifyitems` hook in `conftest.py`)
   * Manually added to the tests by developers for easier test filtering: does the test reboot a host? Is it a flaky test? Does it have complex prerequisites?
 * Target markers, manually added, that hint about what kind of configuration is best appropriate with a given test:
-  * Tests that should be preferrably just run with a small and fast-booting VM, for faster execution.
+  * Tests that should preferably just run with a small and fast-booting VM, for faster execution.
   * Tests that should be run on the largest variety of VMs.
   * Tests that should be run at least once with a very big VM.
 * Markers used in the tests themselves to change their behaviour. Those won't be very useful to select tests with `-m`. We're just mentioning them for the sake of completeness.
@@ -275,7 +277,7 @@ $ ./jobs.py show sb-unix-multi
 }
 ```
 
-Here you get the requirements for the job and the test selection (`paths` and optionnaly `markers` and/or `name_filter`).
+Here you get the requirements for the job and the test selection (`paths` and optionally `markers` and/or `name_filter`).
 
 A very important information is also the `--vm` (single VM) or `--vm[]` (multiple VMs) parameter. The value is the key of a list of VMs that must be defined in `vm_data.py`, or the job won't execute (actually, you can still execute the job by passing one or more `--vm` parameters manually). Check the example `vm_data.py-dist` file. Inside XCP-ng's testing lab, a ready to use `vm_data.py` is available that lists the VMs available in the lab.
 
@@ -354,7 +356,7 @@ Check `./jobs.py --help` and `./jobs.py {command name} --help`.
 
 ## Development
 
-This projects uses multiple code checkers to ensure a high quality and coherence of the code.
+This project uses multiple code checkers to ensure a high quality and coherence of the code.
 The checkers are run in the CI on github and will report any failure in the PRs.
 
 To run the checkers locally, you need to install the dev dependencies, and run these commands:
@@ -366,7 +368,77 @@ ruff check lib/ tests/
 flake8
 ```
 
-The code checker diagnostics can also be shown directly in your IDE or text editor.
+> [!NOTE]
+> There is also a `Makefile` to run checks, just launch `make` command at root level project.
+
+The code checker diagnostics can also be shown directly in your IDE or text editor, by using plugins or language
+servers (LSP).
+
+These configurations are provided as optional suggestions for convenience and do not imply official support or a
+requirement to use specific tools.
+
+### [VSCodium](https://vscodium.com/)
+
+A few plugins are recommended to properly report the diagnostics during the development:
+* [BasedPyright](https://open-vsx.org/extension/detachhead/basedpyright)
+* [flake8](https://open-vsx.org/extension/ms-python/flake8)
+* [ruff](https://open-vsx.org/extension/charliermarsh/ruff)
+
+### [Helix](https://helix-editor.com/)
+
+Install the required language servers:
+* [BasedPyright](https://docs.basedpyright.com/latest/) with `uv tool install basedpyright`
+* [pylsp](https://github.com/python-lsp/python-lsp-server) with `uv tool install python-lsp-server[flake8] --with pylsp-rope`.
+  It's used to get immediate flake8 feedback in the text editor.
+
+[ruff](https://docs.astral.sh/ruff/), which is also used as a language server, is already installed as a dev dependency.
+
+Create a `.helix/language.toml` in the project. Make sure to exclude it in git,
+either in your user configuration (`~/.config/git/ignore`) or in the project
+configuration (`.git/info/exclude`).
+
+~~~toml
+[[language]]
+name = "python"
+language-servers = [
+  "basedpyright",
+  "pylsp",
+  "ruff",
+]
+auto-format = false
+
+[language-server.basedpyright]
+environment = { "LANG" = "en" }
+config.basedpyright.analysis = { typeCheckingMode = "standard", diagnosticMode = "workspace" }
+
+[language-server.pylsp.config.pylsp.plugins]
+autopep8.enabled = false
+flake8.enabled = true
+jedi.enabled = false
+mccabe.enabled = false
+preload.enabled = false
+pycodestyle.enabled = false
+pydocstyle.enabled = false
+pyflakes.enabled = false
+pylint.enabled = false
+yapf.enabled = false
+~~~
+
+### Other LSP-Compatible Editors
+
+Most modern editors use the Language Server Protocol (LSP) to enhance
+functionality. The following servers are generally suggested for this project:
+
+* basedpyright: Real-time type checking ('uv tool install basedpyright').
+* pylsp: Coding style feedback via flake8 (`uv tool install "python-lsp-server[flake8]"`).
+* ruff: Immediate linting (included as a dev dependency).
+
+Configuration is highly editor-specific; please consult your editor's
+documentation. Contributions to these docs via PR are always welcome!
+
+### Others
+
+Please add your configuration hints here!
 
 ## VM setup
 Many tests expect VMs with:
@@ -431,71 +503,6 @@ New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Pr
 * Reboot, check it's still OK
 * Poweroff
 
-## Automating VM Setup with Ansible
-
-There is an Ansible runner that performs automatic updates on VMs using Ansible
-playbooks. The runner then exports the updated VMs as XVAs. The runner is found
-at `scripts/ansible/runner.py`.
-
-```bash
-usage: runner.py [-h] [--http HTTP] [--print-images] [--host HOST]
-                 [--export-directory EXPORT_DIRECTORY]
-                 playbook
-
-Run a playbook for updating test VMs
-
-positional arguments:
-  playbook              The Ansible playbook.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --http HTTP           The HTTP/PXE server containing the test VMs. Defaults
-                        to DEF_VM_URL in data.py, if not found then defaults
-                        to http://pxe/images/
-  --print-images        Show the available images on the PXE server and then
-                        exit.
-  --host HOST, -x HOST  The XCP-ng hostname or IP address. Defaults to host
-                        found in data.py
-  --export-directory EXPORT_DIRECTORY, -e EXPORT_DIRECTORY
-                        The directory on the XCP-ng host to export the updated
-                        image. Defaults to /root/ansible-updates/
-```
-
-### The Ansible Playbook
-
-The Ansible playbook must have a host name that matches the file name of an
-XVA located at the http server found using the `DEF_VM_URL` variable in
-data.py.
-
-Ansible host names do not support hyphens, so they are converted to underscores.
-
-For example, `alpine-uefi-minimal-3.12.0.xva` becomes `alpine_uefi_minimal_3.12.0.xva`.
-
-The runner then spins a VM using that XVA, applys the Ansible playbook, then
-exports the VM to a new XVA.
-
-As an example, given `DEF_VM_URL = "http://pxe/images/"` in `data.py` and
-the following playbook, the runner will look for an XVA file at
-`http://pxe/images/alpine-uefi-minimal-3.12.0.xva` and update it as described.
-
-Note that the "hosts" in Ansible refers to the VMs, not the XCP-ng host.
-The XCP-ng host used to run the VM is picked randomly from the HOSTS variable
-in data.py.
-
-```yaml
----
-- hosts: alpine_uefi_minimal_3.12.0.xva
-  remote_user: root
-  gather_facts: no
-  tasks:
-    - name: Install Python for Ansible
-      raw: test -f /usr/bin/python3 || apk add --update --no-cache python3
-
-    - name: Install util-linux and efitools
-      community.general.apk:
-        name: util-linux efitools
-```
-
 ## install_xcpng.py
 
 This script installs, upgrades or restores XCP-ng in a VM using a PXE server whose configuration can be defined dynamically. Basically, it writes files in a directory named after the MAC address of the VM, on a PXE server that will then build a boot configuration for the given MAC address. This is rather specific to Vates' test lab at the moment. If you are interested in automated installation in general, check https://xcp-ng.org/docs/install.html#automated-install.
@@ -551,3 +558,64 @@ INFO:root:Setting bridge to xenbr0
 ```
 
 For more details, see `xva_bridge.py --help`.
+
+## Tools
+
+Helper tools are available through the entrypoint `scripts/tools.py`:
+
+```bash
+uv run scripts/tools.py -h
+```
+
+### Update
+
+This command performs an update operation on remote targets.
+
+```bash
+uv run scripts/tools.py update -H primary1 primary2
+```
+
+For each primary target :
+
+1. Clean cached metadata
+2. Update with repository manager (yum): Optionally enables repositories
+3. Reboot
+4. Get attached secondary hosts and repeats three previous steps for each secondary
+
+**Inventory file**
+
+`update` command can read an inventory file in [TOML v1.0.0](https://toml.io/en/v1.0.0) format:
+
+```bash
+uv run scripts/tools.py update -i my_inventory.toml
+```
+
+> [!NOTE]
+> You can use either `-i/--inventory` or `-H/--hosts`.
+>
+> **Above flags can't be used together**
+
+Take a look at an example inventory file:
+
+```toml
+# my_inventory.toml
+
+[all]
+enablerepos = ["xcp-ng-base"]
+
+[servers]
+
+[servers."ip_or_hostname-1"]
+
+[servers."ip_or_hostname-2"]
+
+enablerepos = ["xcp-ng-updates"]
+```
+
+> [!IMPORTANT]
+> Config values under `servers` override values under `all`. For instance, the above inventory would produce
+> the following python dict:
+>
+> `{'ip_or_hostname-1': {'enablerepos': ['xcp-ng-base']}, 'ip_or_hostname-2': {'enablerepos': ['xcp-ng-updates']}}`
+>
+> Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.

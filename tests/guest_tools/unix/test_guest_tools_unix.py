@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
 import time
 
 from lib.common import PackageManagerEnum, wait_for
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
 
 # Requirements:
 # From --hosts parameter:
@@ -13,30 +18,32 @@ from lib.common import PackageManagerEnum, wait_for
 # - A VM to import, supported by the Linux/install.sh script of the guest tools ISO
 #   (without this flag you get an alpine, and that is not suitable)
 
+
 class State:
-    def __init__(self):
-        self.tools_version = None
-        self.vm_distro = None
+    def __init__(self) -> None:
+        self.tools_version: str | None = None
+        self.vm_distro: str | None = None
+
 
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("unix_vm")
 class TestGuestToolsUnix:
     @pytest.fixture(scope='class')
-    def state(self):
+    def state(self) -> State:
         return State()
 
-    def _check_tools_version(self, vm, tools_version):
+    def _check_tools_version(self, vm: VM, tools_version: str | None) -> None:
         logging.info("Check that the detected tools version is '%s'" % tools_version)
         detected_version = vm.tools_version()
         assert detected_version == tools_version
 
-    def _check_os_info(self, vm, vm_distro):
+    def _check_os_info(self, vm: VM, vm_distro: str | None) -> None:
         logging.info("Check that the detected distro is '%s'" % vm_distro)
         detected_distro = vm.distro()
         assert detected_distro == vm_distro
 
     @pytest.fixture(scope="class", autouse=True)
-    def vm_install(self, running_vm, state):
+    def vm_install(self, running_vm: VM, state: State) -> None:
         vm = running_vm
 
         # skip test for some unixes
@@ -45,7 +52,7 @@ class TestGuestToolsUnix:
             pytest.skip('Alpine not supported by the guest tools installation script at the moment')
 
         print("Check that we are able to detect that xe-daemon is running")
-        vm.ssh(['pgrep', '-f', 'xe-daemon'])
+        vm.ssh('pgrep -f xe-daemon')
 
         # remove the installed tools
         logging.info("Detect package manager and uninstall the guest tools")
@@ -55,71 +62,72 @@ class TestGuestToolsUnix:
             # However, the following implementation will also work for a single xe-guest-utilities RPM.
             vm.execute_script('rpm -qa | grep xe-guest-utilities | xargs rpm -e')
         elif pkg_mgr == PackageManagerEnum.APT_GET:
-            vm.ssh(['apt-get', 'remove', '-y', 'xe-guest-utilities'])
+            vm.ssh('apt-get remove -y xe-guest-utilities')
         else:
             pytest.skip("Package manager '%s' not supported in this test" % pkg_mgr)
 
         # check that xe-daemon is not running anymore
-        assert vm.ssh_with_result(['pgrep', '-f', 'xe-daemon']).returncode != 0, \
+        assert vm.ssh_with_result('pgrep -f xe-daemon').returncode != 0, \
             "xe-daemon must not be running anymore"
 
         # mount ISO
         logging.info("Mount guest tools ISO")
         vm.insert_guest_tools_iso()
-        tmp_mnt = vm.ssh(['mktemp', '-d'])
+        tmp_mnt = vm.ssh('mktemp -d')
         time.sleep(2) # wait a small amount of time just to ensure the device is available
-        vm.ssh(['mount', '-t', 'iso9660', '/dev/cdrom', tmp_mnt])
+        vm.ssh(f'mount -t iso9660 /dev/cdrom {tmp_mnt}')
 
         # get tools version number for future checks
         prefix = 'xe-guest-utilities_'
         suffix = '_x86_64.tgz'
-        tgz_filename = vm.ssh(['find', tmp_mnt, '-name', prefix + '*' + suffix])
+        tgz_filename = vm.ssh(f'find {tmp_mnt} -name {prefix}*{suffix}')
         state.tools_version = tgz_filename.split('/')[-1][len(prefix):-len(suffix)]
 
         # install tools
         logging.info("Install tools %s using install.sh" % state.tools_version)
-        vm.ssh([tmp_mnt + '/Linux/install.sh', '-n'])
+        vm.ssh(f'{tmp_mnt}/Linux/install.sh -n')
 
         # unmount ISO
         logging.info("Unmount guest tools ISO")
-        vm.ssh(['umount', tmp_mnt])
+        vm.ssh(f'umount {tmp_mnt}')
         vm.eject_cd()
 
         # check that xe-daemon is running
-        wait_for(lambda: vm.ssh_with_result(['pgrep', '-f', 'xe-daemon']).returncode == 0,
+        wait_for(lambda: vm.ssh_with_result('pgrep -f xe-daemon').returncode == 0,
                  "Wait for xe-daemon running")
 
-    def test_check_tools(self, running_vm, state):
+    def test_check_tools(self, running_vm: VM, state: State) -> None:
         vm = running_vm
         self._check_tools_version(vm, state.tools_version)
         self._check_os_info(vm, state.vm_distro)
 
-    def test_check_tools_after_reboot(self, running_vm, state):
+    def test_check_tools_after_reboot(self, running_vm: VM, state: State) -> None:
         vm = running_vm
         vm.reboot(verify=True)
         self._check_tools_version(vm, state.tools_version)
         self._check_os_info(vm, state.vm_distro)
 
-    def test_xenstore(self, running_vm):
+    def test_xenstore(self, running_vm: VM) -> None:
         logging.info("Testing various xenstore commands from the guest")
         vm = running_vm
-        vm.ssh(['xenstore-ls'])
-        vm.ssh(['xenstore-exists', 'vm'])
-        vm.ssh(['xenstore-list', 'data'])
-        assert vm.ssh(['xenstore-read', 'vm']) == '/vm/%s' % vm.uuid
-        vm.ssh(['xenstore-write', 'data/test-xcp-ng', 'Test'])
-        assert vm.ssh(['xenstore-read', 'data/test-xcp-ng']) == 'Test'
-        vm.ssh(['xenstore-rm', 'data/test-xcp-ng'])
-        assert vm.ssh_with_result(['xenstore-exists', 'data/test-xcp-ng']).returncode != 0
+        vm.ssh('xenstore-ls')
+        vm.ssh('xenstore-exists vm')
+        vm.ssh('xenstore-list data')
+        assert vm.ssh('xenstore-read vm') == f'/vm/{vm.uuid}'
+        vm.ssh('xenstore-write data/test-xcp-ng Test')
+        assert vm.ssh('xenstore-read data/test-xcp-ng') == 'Test'
+        vm.ssh('xenstore-rm data/test-xcp-ng')
+        assert vm.ssh_with_result('xenstore-exists data/test-xcp-ng').returncode != 0
 
-    def test_clean_shutdown(self, running_vm):
+    def test_clean_shutdown(self, running_vm: VM) -> None:
         vm = running_vm
         vm.shutdown(verify=True)
         # restore VM state
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
 
-    def test_storage_migration(self, running_vm, host, hostA2, local_sr_on_hostA2, state):
+    def test_storage_migration(self, running_vm: VM, host: Host, hostA2: Host,
+                               local_sr_on_hostA2: SR, state: State) -> None:
         vm = running_vm
         # migrate to default SR on hostA2
         vm.migrate(hostA2, local_sr_on_hostA2)

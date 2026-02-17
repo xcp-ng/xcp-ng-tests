@@ -6,15 +6,16 @@ import logging
 
 from lib.host import Host
 from lib.sr import SR
-from lib.vdi import ImageFormat
+from lib.vdi import VDI, ImageFormat
+from lib.vm import VM
 
-from typing import Generator
+from typing import Any, Generator
 
 @pytest.fixture(scope='package')
 def ext_sr(host: Host,
            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
            image_format: ImageFormat
-           ) -> Generator[SR]:
+           ) -> Generator[SR, None, None]:
     """ An EXT SR on first host. """
     sr_disk = unused_512B_disks[host][0]["name"]
     sr = host.sr_create('ext', "EXT-local-SR-test",
@@ -25,13 +26,13 @@ def ext_sr(host: Host,
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_ext_sr(ext_sr: SR):
+def vdi_on_ext_sr(ext_sr: SR) -> Generator[VDI, None, None]:
     vdi = ext_sr.create_vdi('EXT-local-VDI-test')
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_ext_sr(host, ext_sr, vm_ref):
+def vm_on_ext_sr(host: Host, ext_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=ext_sr.uuid)
     yield vm
     # teardown

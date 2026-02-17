@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
@@ -7,11 +9,13 @@ from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
 from lib.vm import VM
 from lib.windows import (
-    WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
+    check_vm_clipboard,
+    check_vm_distro,
     check_vm_dns,
     set_vm_dns,
     vif_has_rss,
+    vm_shutdown_without_tools,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
 from lib.windows.guest_tools import (
@@ -68,22 +72,24 @@ from typing import Any, Tuple
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindows:
-    def test_drivers_detected(self, vm_install_test_tools_per_test_class: VM):
+    def test_drivers_detected(self, vm_install_test_tools_per_test_class: VM) -> None:
         pass
 
-    def test_vif_replug(self, vm_install_test_tools_per_test_class: VM):
+    def test_vif_replug(self, vm_install_test_tools_per_test_class: VM) -> None:
         vm = vm_install_test_tools_per_test_class
-        vifs = vm.vifs()
-        for vif in vifs:
-            assert strtobool(vif.param_get("currently-attached"))
-            vif.unplug()
-            # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
-            assert not strtobool(vif.param_get("currently-attached"))
-            time.sleep(5)
-            vif.plug()
-        wait_for(vm.is_ssh_up, "Wait for SSH up")
+        for _iter in range(3):
+            vifs = vm.vifs()
+            for vif in vifs:
+                assert strtobool(vif.param_get("currently-attached"))
+                vif.unplug()
+                # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
+                # TODO reference: XCPNG-1395
+                assert not strtobool(vif.param_get("currently-attached"))
+                time.sleep(5)
+                vif.plug()
+            wait_for(vm.is_ssh_up, "Wait for SSH up")
 
-    def test_rss(self, vm_install_test_tools_per_test_class: VM):
+    def test_rss(self, vm_install_test_tools_per_test_class: VM) -> None:
         """
         Receive-side scaling is known to be broken on some driver versions.
 
@@ -94,15 +100,55 @@ class TestGuestToolsWindows:
         for vif in vifs:
             assert vif_has_rss(vif)
 
+    def test_reporting_after_xeniface_disable(self, vm_install_test_tools_per_test_class: VM) -> None:
+        vm = vm_install_test_tools_per_test_class
+        for _iter in range(3):
+            logging.info("Disable Xeniface")
+            vm.execute_powershell_script(r'Disable-PnpDevice "XENBUS\VEN_XN&DEV_IFACE\_" -Confirm:$false')
+            vm.xenstore_rm("data/os_distro", accept_unknown_key=True)
+            logging.info("Enable Xeniface")
+            vm.execute_powershell_script(r'Enable-PnpDevice "XENBUS\VEN_XN&DEV_IFACE\_" -Confirm:$false')
+            check_vm_distro(vm)
+            check_vm_clipboard(vm)
+
+    def test_reporting_after_suspend(self, vm_install_test_tools_per_test_class: VM) -> None:
+        vm = vm_install_test_tools_per_test_class
+        for _iter in range(3):
+            vm.suspend(verify=True)
+            vm.resume()
+            wait_for_vm_running_and_ssh_up_without_tools(vm)
+            check_vm_distro(vm)
+            check_vm_clipboard(vm)
+
+    def test_xenvbd_unmap(self, vm_install_test_tools_per_test_class: VM) -> None:
+        """Xenvbd must always advertise unmap to allow migration between backends with different discard support."""
+        vm = vm_install_test_tools_per_test_class
+        trim_supported = strtobool(
+            vm.execute_powershell_script(r'''$null -ne (fsutil fsinfo sectorInfo C: |
+Select-String "Trim Supported")''')
+        )
+        assert trim_supported
+
+    def test_xenvbd_ssd(self, vm_install_test_tools_per_test_class: VM) -> None:
+        """Xenvbd must always advertise as SSD to avoid unnecessary defragging by Windows."""
+        vm = vm_install_test_tools_per_test_class
+        is_ssd = strtobool(
+            # We have to filter Get-PhysicalDisk instead of piping directly from Get-Disk since direct Get-PhysicalDisk
+            # by ID doesn't work on Server 2016.
+            vm.execute_powershell_script(
+                r'''$disk = Get-Partition -DriveLetter ($Env:SystemDrive[0]) | Get-Disk;
+(Get-PhysicalDisk | Where-Object UniqueId -eq $disk.UniqueId).MediaType -eq "SSD"'''
+            )
+        )
+        assert is_ssd
+
 
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestGuestToolsWindowsDestructive:
-    def test_uninstall_tools(self, vm_install_test_tools_no_reboot: VM):
+    def test_uninstall_tools(self, vm_install_test_tools_no_reboot: VM) -> None:
         vm = vm_install_test_tools_no_reboot
-        vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
-        wait_for(vm.is_halted, "Shutdown VM")
-
+        vm_shutdown_without_tools(vm)
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
 
@@ -113,7 +159,7 @@ class TestGuestToolsWindowsDestructive:
         assert vm.are_windows_tools_uninstalled()
         check_vm_dns(vm)
 
-    def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot: VM):
+    def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot: VM) -> None:
         vm = vm_install_test_tools_no_reboot
         logging.info("Uninstall Windows PV drivers before rebooting")
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
@@ -121,7 +167,7 @@ class TestGuestToolsWindowsDestructive:
 
     def test_install_with_other_tools(
         self, vm_install_other_drivers: Tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
-    ):
+    ) -> None:
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
             install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
@@ -131,7 +177,7 @@ class TestGuestToolsWindowsDestructive:
             assert exitcode == ERROR_INSTALL_FAILURE
 
     @pytest.mark.usefixtures("uefi_vm")
-    def test_uefi_vm_suspend_refused_without_tools(self, running_unsealed_windows_vm: VM):
+    def test_uefi_vm_suspend_refused_without_tools(self, running_unsealed_windows_vm: VM) -> None:
         vm = running_unsealed_windows_vm
         with pytest.raises(SSHCommandFailed, match="lacks the feature"):
             vm.suspend()
@@ -139,7 +185,7 @@ class TestGuestToolsWindowsDestructive:
 
     # Test of the unplug rework, where the driver must remain activated even if the device ID changes.
     # Also serves as a "close-enough" test of vendor device toggling.
-    def test_toggle_device_id(self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]):
+    def test_toggle_device_id(self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]) -> None:
         vm = running_unsealed_windows_vm
         assert vm.param_get("platform", "device_id") == "0002"
         install_guest_tools(vm, guest_tools_iso, PowerAction.Shutdown, check=False)

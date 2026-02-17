@@ -7,6 +7,7 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
@@ -19,12 +20,6 @@ from tests.storage import (
     vdi_is_open,
     xva_export_import,
 )
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.vdi import VDI
 
 from .conftest import POOL_NAME, POOL_PATH
 
@@ -72,13 +67,13 @@ class TestZFSSRCreateDestroy:
 @pytest.mark.usefixtures("zpool_vol0")
 class TestZFSSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, zfs_sr):
+    def test_quicktest(self, zfs_sr: SR) -> None:
         zfs_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_zfs_sr):
+    def test_vdi_is_not_open(self, vdi_on_zfs_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_zfs_sr)
 
-    def test_vdi_image_format(self, vdi_on_zfs_sr: VDI, image_format: ImageFormat):
+    def test_vdi_image_format(self, vdi_on_zfs_sr: VDI, image_format: ImageFormat) -> None:
         fmt = vdi_on_zfs_sr.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:
@@ -87,7 +82,7 @@ class TestZFSSR:
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_zfs_sr):
+    def test_start_and_shutdown_VM(self, vm_on_zfs_sr: VM) -> None:
         vm = vm_on_zfs_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -95,7 +90,7 @@ class TestZFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_zfs_sr):
+    def test_snapshot(self, vm_on_zfs_sr: VM) -> None:
         vm = vm_on_zfs_sr
         vm.start()
         try:
@@ -106,23 +101,23 @@ class TestZFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
-    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, vdi_op: CoalesceOperation):
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, vdi_op: CoalesceOperation) -> None:
         coalesce_integrity(storage_test_vm, vdi_on_zfs_sr, vdi_op)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_zfs_sr: VM, compression: XVACompression):
+    def test_xva_export_import(self, vm_on_zfs_sr: VM, compression: XVACompression) -> None:
         xva_export_import(vm_on_zfs_sr, compression)
 
     @pytest.mark.small_vm
-    def test_vdi_export_import(self, storage_test_vm: VM, zfs_sr: SR, image_format: ImageFormat):
+    def test_vdi_export_import(self, storage_test_vm: VM, zfs_sr: SR, image_format: ImageFormat) -> None:
         vdi_export_import(storage_test_vm, zfs_sr, image_format)
 
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_zfs_sr, host, zfs_sr):
+    def test_reboot(self, vm_on_zfs_sr: VM, host: Host, zfs_sr: SR) -> None:
         sr = zfs_sr
         vm = vm_on_zfs_sr
         host.reboot(verify=True)
@@ -133,7 +128,7 @@ class TestZFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.reboot
-    def test_zfs_missing(self, host, zfs_sr):
+    def test_zfs_missing(self, host: Host, zfs_sr: SR) -> None:
         sr = zfs_sr
         zfs_installed = True
         try:
@@ -150,23 +145,23 @@ class TestZFSSR:
             logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
             host.yum_install(['zfs'])
-            host.ssh(['modprobe', 'zfs'])
+            host.ssh('modprobe zfs')
             zfs_installed = True
-            host.ssh(['zpool', 'import', POOL_NAME])
+            host.ssh(f'zpool import {POOL_NAME}')
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not zfs_installed:
                 host.yum_install(['zfs'])
-                host.ssh(['modprobe', 'zfs'])
+                host.ssh('modprobe zfs')
 
     @pytest.mark.reboot
-    def test_zfs_unmounted(self, host, zfs_sr):
+    def test_zfs_unmounted(self, host: Host, zfs_sr: SR) -> None:
         sr = zfs_sr
         zpool_imported = True
         try:
             # Simulate broken mountpoint
-            host.ssh(['zpool', 'export', POOL_NAME])
+            host.ssh(f'zpool export {POOL_NAME}')
             zpool_imported = False
             try:
                 sr.scan()
@@ -178,12 +173,12 @@ class TestZFSSR:
             time.sleep(10)
             logging.info("Assert PBD not attached")
             assert not sr.all_pbds_attached()
-            host.ssh(['zpool', 'import', POOL_NAME])
+            host.ssh(f'zpool import {POOL_NAME}')
             zpool_imported = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not zpool_imported:
-                host.ssh(['zpool', 'import', POOL_NAME])
+                host.ssh(f'zpool import {POOL_NAME}')
 
     # *** End of tests with reboots

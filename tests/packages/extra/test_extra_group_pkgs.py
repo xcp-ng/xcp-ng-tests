@@ -2,11 +2,14 @@
 # From --hosts parameter:
 # - host(A1): any master host of a pool, with access to XCP-ng RPM repositories and reports.xcp-ng.org.
 
-def test_extra_group_packages_url_resolved(host, extra_pkgs):
-    for p in extra_pkgs:
-        host.ssh(['yumdownloader', '--resolve', '--urls', p])
+from lib.host import Host
 
-def test_extra_group_packages_can_be_installed(host_with_saved_yum_state, extra_pkgs):
+def test_extra_group_packages_url_resolved(host: Host, extra_pkgs: list[str]) -> None:
+    host.yum_clean_metadata()
+    for p in extra_pkgs:
+        host.ssh(f'yumdownloader --resolve --urls {p}')
+
+def test_extra_group_packages_can_be_installed(host_with_saved_yum_state: Host, extra_pkgs: list[str]) -> None:
     # Just try to install all packages together. Installing them one by one
     # takes too much time due to the generation of the initrd.
     host_with_saved_yum_state.yum_install(extra_pkgs)
