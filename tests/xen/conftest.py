@@ -8,15 +8,17 @@ from packaging import version
 from lib.host import Host
 from pkgfixtures import host_with_saved_yum_state
 
+from typing import Generator
+
 @pytest.fixture(scope="package")
-def host_with_hvm_fep(host: Host):
+def host_with_hvm_fep(host: Host) -> Generator[Host, None, None]:
     logging.info("Checking for HVM FEP support")
     if 'hvm_fep' not in host.ssh('xl info xen_commandline').split():
         pytest.fail("HVM FEP is required for some of the XTF tests")
     yield host
 
 @pytest.fixture(scope="package")
-def host_with_dynamically_disabled_ept_sp(host: Host):
+def host_with_dynamically_disabled_ept_sp(host: Host) -> Generator[Host, None, None]:
     """
     Disable EPT superpages before running XTF.
 
@@ -29,7 +31,7 @@ def host_with_dynamically_disabled_ept_sp(host: Host):
     host.ssh('xl set-parameters ept=exec-sp')
 
 @pytest.fixture(scope="package")
-def host_with_git_and_gcc_and_py3(host_with_saved_yum_state: Host):
+def host_with_git_and_gcc_and_py3(host_with_saved_yum_state: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
     host_less_8_3 = host.xcp_version < version.parse("8.3")
     if host_less_8_3:
@@ -42,7 +44,7 @@ def host_with_git_and_gcc_and_py3(host_with_saved_yum_state: Host):
         host.ssh('rm /usr/bin/python3')
 
 @pytest.fixture(scope="package")
-def xtf_runner(host_with_git_and_gcc_and_py3: Host):
+def xtf_runner(host_with_git_and_gcc_and_py3: Host) -> Generator[str, None, None]:
     host = host_with_git_and_gcc_and_py3
     logging.info("Download and build XTF")
     tmp_dir = host.ssh('mktemp -d')
@@ -63,7 +65,7 @@ make -j$(nproc)
     host.ssh(f'rm -rf {tmp_dir}')
 
 @pytest.fixture(scope="package")
-def host_with_dom0_tests(host_with_saved_yum_state):
+def host_with_dom0_tests(host_with_saved_yum_state: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
     host.yum_install(['xen-dom0-tests'])
     yield host

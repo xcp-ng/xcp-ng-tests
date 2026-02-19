@@ -49,42 +49,42 @@ def do_execute_xst(host: Host, modname: str, testname: str | None = None) -> Non
 @pytest.mark.reboot  # host_with_ring0_tests
 @pytest.mark.usefixtures("host_with_ring0_tests")
 class TestRing0Tests:
-    def test_privcmd_restrict(self, host: Host):
+    def test_privcmd_restrict(self, host: Host) -> None:
         host.ssh("/usr/bin/privcmd-restrict_test")
 
-    def test_xst_alloc_balloon(self, host: Host):
+    def test_xst_alloc_balloon(self, host: Host) -> None:
         do_execute_xst(host, "alloc_balloon")
 
-    def test_xst_big_module(self, host: Host):
+    def test_xst_big_module(self, host: Host) -> None:
         do_execute_xst(host, "big_module")
 
     @pytest.mark.skip("may hang system with fifo evtchn")
-    def test_xst_evtchn_latency(self, host: Host):
+    def test_xst_evtchn_latency(self, host: Host) -> None:
         do_execute_xst(host, "evtchn_latency", "evtchn_lat")
 
     @pytest.mark.skip("only makes sense for 2l evtchn")
-    def test_xst_evtchn_limit(self, host: Host):
+    def test_xst_evtchn_limit(self, host: Host) -> None:
         do_execute_xst(host, "evtchn_limit")
 
-    def test_xst_evtchn_stress(self, host: Host):
+    def test_xst_evtchn_stress(self, host: Host) -> None:
         do_execute_xst(host, "evtchn_stress")
 
     @pytest.mark.skip("leaks event channels infinitely")
-    def test_xst_evtchn_unbind(self, host: Host):
+    def test_xst_evtchn_unbind(self, host: Host) -> None:
         do_execute_xst(host, "evtchn_unbind")
 
-    def test_xst_get_user_pages(self, host: Host):
+    def test_xst_get_user_pages(self, host: Host) -> None:
         host.ssh("modprobe xst_get_user_pages")
         try:
             host.ssh("/usr/bin/gup_test")
         finally:
             host.ssh("modprobe -r xst_get_user_pages", check=False)
 
-    def test_xst_grant_copy_perf(self, host: Host):
+    def test_xst_grant_copy_perf(self, host: Host) -> None:
         do_execute_xst(host, "grant_copy_perf", "gntcpy_perf")
 
     @pytest.mark.small_vm
-    def test_xst_ioemu_msi(self, host: Host, running_unix_vm: VM):
+    def test_xst_ioemu_msi(self, host: Host, running_unix_vm: VM) -> None:
         # TODO: validate MSI reception in guest
         vm = running_unix_vm
         domid = vm.param_get("dom-id")
@@ -98,7 +98,7 @@ class TestRing0Tests:
             host.ssh("modprobe -r xst_ioemu_msi", check=False)
 
     @pytest.mark.usefixtures("host_at_least_8_3")
-    def test_xst_livepatch(self, host_without_livepatch_loaded: Host):
+    def test_xst_livepatch(self, host_without_livepatch_loaded: Host) -> None:
         """
         This test loads a `livepatch_testee` module, and triggers the test
         function `test_function_default` by writing to
@@ -130,7 +130,7 @@ class TestRing0Tests:
         finally:
             host.ssh("modprobe -r livepatch_testee", check=False)
 
-    def test_xst_memory_leak(self, host: Host):
+    def test_xst_memory_leak(self, host: Host) -> None:
         if not host.file_exists("/sys/kernel/debug/kmemleak"):
             pytest.skip("CONFIG_DEBUG_KMEMLEAK is not set")
 
@@ -148,15 +148,15 @@ class TestRing0Tests:
         finally:
             host.ssh("modprobe -r xst_memory_leak", check=False)
 
-    def test_xst_pte_set_clear_flags(self, host: Host):
+    def test_xst_pte_set_clear_flags(self, host: Host) -> None:
         do_execute_xst(host, "pte_set_clear_flags")
 
-    def test_xst_ptwr_xchg(self, host: Host):
+    def test_xst_ptwr_xchg(self, host: Host) -> None:
         do_execute_xst(host, "ptwr_xchg")
 
-    def test_xst_set_memory_uc(self, host: Host):
+    def test_xst_set_memory_uc(self, host: Host) -> None:
         do_execute_xst(host, "set_memory_uc")
 
     @pytest.mark.skip("crashes the host, disabled by default")
-    def test_xst_soft_lockup(self, host: Host):
+    def test_xst_soft_lockup(self, host: Host) -> None:
         do_execute_xst(host, "soft_lockup")

@@ -4,7 +4,10 @@ import logging
 import os
 import re
 
+from lib.host import Host
 from lib.vm import VM
+
+from typing import Generator
 
 # AMD grant-tables cachability parameter tests.
 # This file contains 2 tests to check if the hvmloader PCI bar fix is applied or not
@@ -15,13 +18,13 @@ from lib.vm import VM
 # - At least one XCP-ng host (>=8.3)
 # - A Linux VM
 
-def xen_platform_pci_id(vm: VM):
+def xen_platform_pci_id(vm: VM) -> str:
     pci_path = vm.ssh('ls -d /sys/bus/pci/drivers/xen-platform-pci/0000:*')
     if pci_path is not None:
         return os.path.basename(pci_path)
     pytest.fail("'xen-platform-pci' PCI not found")
 
-def xen_platform_pci_io_address(vm: VM, xen_platform_pci_id):
+def xen_platform_pci_io_address(vm: VM, xen_platform_pci_id: str) -> int:
     # Find 'xen-platform-pci' IO mem resource address.
     pci_resource_output = vm.ssh(f'cat /sys/devices/pci0000:00/{xen_platform_pci_id}/resource')
 
@@ -30,11 +33,11 @@ def xen_platform_pci_io_address(vm: VM, xen_platform_pci_id):
     start_address = int(address_line[0], 16)
     return start_address
 
-def mtrr_ranges(vm):
+def mtrr_ranges(vm: VM) -> list[str]:
     # List and check MTRR ranges.
     return vm.ssh('cat /proc/mtrr').splitlines()
 
-def are_grant_tables_inside_uncachable_mapping(mtrr_ranges_list, pci_io_address):
+def are_grant_tables_inside_uncachable_mapping(mtrr_ranges_list: list[str], pci_io_address: int) -> bool:
     regexp = r'reg(.*): base=(0x[0-9a-f]*) \(.*\), size=(.*)MB, count=(.*): (.*)'
 
     for mtrr_range in mtrr_ranges_list:
@@ -55,7 +58,7 @@ def are_grant_tables_inside_uncachable_mapping(mtrr_ranges_list, pci_io_address)
 @pytest.mark.usefixtures("running_unix_vm")
 class TestXenPlatformPciBarUc:
     @pytest.fixture
-    def host_with_xen_platform_pci_bar_uc_set_to_true(self, host):
+    def host_with_xen_platform_pci_bar_uc_set_to_true(self, host: Host) -> Generator[Host, None, None]:
         host.ssh('echo xen-platform-pci-bar-uc=true > /etc/xenopsd.conf.d/hvmloader.conf')
         host.restart_toolstack(verify=True)
         yield host
@@ -63,7 +66,9 @@ class TestXenPlatformPciBarUc:
         host.restart_toolstack(verify=True)
 
     @pytest.fixture
-    def vm_with_xen_platform_pci_bar_uc_set_to_true(self, host_with_xen_platform_pci_bar_uc_set_to_true, unix_vm):
+    def vm_with_xen_platform_pci_bar_uc_set_to_true(
+        self, host_with_xen_platform_pci_bar_uc_set_to_true: Host, unix_vm: VM
+    ) -> VM:
         if unix_vm.is_running():
             unix_vm.shutdown(verify=True)
         unix_vm.start(on=host_with_xen_platform_pci_bar_uc_set_to_true.uuid)
@@ -71,7 +76,7 @@ class TestXenPlatformPciBarUc:
         return unix_vm
 
     @pytest.fixture
-    def host_with_xen_platform_pci_bar_uc_set_to_false(self, host):
+    def host_with_xen_platform_pci_bar_uc_set_to_false(self, host: Host) -> Generator[Host, None, None]:
         host.ssh('echo xen-platform-pci-bar-uc=false > /etc/xenopsd.conf.d/hvmloader.conf')
         host.restart_toolstack(verify=True)
         yield host
@@ -79,7 +84,9 @@ class TestXenPlatformPciBarUc:
         host.restart_toolstack(verify=True)
 
     @pytest.fixture
-    def vm_with_xen_platform_pci_bar_uc_set_to_false(self, host_with_xen_platform_pci_bar_uc_set_to_false, unix_vm):
+    def vm_with_xen_platform_pci_bar_uc_set_to_false(
+        self, host_with_xen_platform_pci_bar_uc_set_to_false: Host, unix_vm: VM
+    ) -> VM:
         if unix_vm.is_running():
             unix_vm.shutdown(verify=True)
         unix_vm.start(on=host_with_xen_platform_pci_bar_uc_set_to_false.uuid)
@@ -87,8 +94,10 @@ class TestXenPlatformPciBarUc:
         return unix_vm
 
     # Check the default behavior when 'xen_platform_pci_bar_uc' is true
-    def test_xen_platform_pci_bar_uc_true(self, host_with_xen_platform_pci_bar_uc_set_to_true,
-                                          vm_with_xen_platform_pci_bar_uc_set_to_true):
+    def test_xen_platform_pci_bar_uc_true(
+        self, host_with_xen_platform_pci_bar_uc_set_to_true: Host,
+        vm_with_xen_platform_pci_bar_uc_set_to_true: VM
+    ) -> None:
         pci_id = xen_platform_pci_id(vm_with_xen_platform_pci_bar_uc_set_to_true)
         pci_io_address = xen_platform_pci_io_address(vm_with_xen_platform_pci_bar_uc_set_to_true, pci_id)
         logging.info(f"'xen-platform-pci' PCI IO mem address is 0x{pci_io_address:016X}")
@@ -100,8 +109,10 @@ class TestXenPlatformPciBarUc:
             pytest.fail("Grant_tables are outside of the uncachable MTRR ranges but 'xen-platform-pci-bar-uc' is true")
 
     # Check the alternate behavior when 'xen_platform_pci_bar_uc' is explicitely set to false
-    def test_xen_platform_pci_bar_uc_false(self, host_with_xen_platform_pci_bar_uc_set_to_false,
-                                           vm_with_xen_platform_pci_bar_uc_set_to_false):
+    def test_xen_platform_pci_bar_uc_false(
+        self, host_with_xen_platform_pci_bar_uc_set_to_false: Host,
+        vm_with_xen_platform_pci_bar_uc_set_to_false: VM
+    ) -> None:
         pci_id = xen_platform_pci_id(vm_with_xen_platform_pci_bar_uc_set_to_false)
         pci_io_address = xen_platform_pci_io_address(vm_with_xen_platform_pci_bar_uc_set_to_false, pci_id)
         logging.info(f"'xen-platform-pci' PCI IO mem address is 0x{pci_io_address:016X}")
