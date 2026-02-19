@@ -5,15 +5,12 @@ import pytest
 import logging
 
 from lib import config
-from lib.vdi import ImageFormat
+from lib.host import Host
+from lib.sr import SR
+from lib.vdi import VDI, ImageFormat
+from lib.vm import VM
 
-from typing import TYPE_CHECKING, Generator
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.sr import SR
-    from lib.vdi import VDI
-    from lib.vm import VM
+from typing import Generator
 
 @pytest.fixture(scope='package')
 def largeblock_sr(host: Host,
