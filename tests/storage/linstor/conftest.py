@@ -9,6 +9,11 @@ from dataclasses import dataclass
 
 import lib.commands as commands
 from lib import config
+from lib.host import Host
+from lib.pool import Pool
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 
 try:
     from data import LINSTOR_REDUNDANCY  # type: ignore
@@ -26,14 +31,7 @@ from pkgfixtures import (
     xfs_sr_on_hostB1,
 )
 
-from typing import TYPE_CHECKING, Generator
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.pool import Pool
-    from lib.sr import SR
-    from lib.vdi import VDI
-    from lib.vm import VM
+from typing import Generator
 
 GROUP_NAME = 'linstor_group'
 STORAGE_POOL_NAME = f'{GROUP_NAME}/thin_device'
