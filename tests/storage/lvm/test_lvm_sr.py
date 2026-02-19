@@ -32,7 +32,7 @@ class TestLVMSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_with_missing_device(self, host):
+    def test_create_sr_with_missing_device(self, host: Host) -> None:
         try_to_create_sr_with_missing_device('lvm', 'LVM-local-SR-test', host)
 
     def test_create_and_destroy_sr(self, host: Host,
@@ -54,13 +54,13 @@ class TestLVMSRCreateDestroy:
 @pytest.mark.usefixtures("lvm_sr")
 class TestLVMSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, lvm_sr):
+    def test_quicktest(self, lvm_sr: SR) -> None:
         lvm_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_lvm_sr):
+    def test_vdi_is_not_open(self, vdi_on_lvm_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_lvm_sr)
 
-    def test_vdi_image_format(self, vdi_on_lvm_sr: VDI, image_format: ImageFormat):
+    def test_vdi_image_format(self, vdi_on_lvm_sr: VDI, image_format: ImageFormat) -> None:
         fmt = vdi_on_lvm_sr.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:
@@ -69,7 +69,7 @@ class TestLVMSR:
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_lvm_sr):
+    def test_start_and_shutdown_VM(self, vm_on_lvm_sr: VM) -> None:
         vm = vm_on_lvm_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -77,7 +77,7 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_lvm_sr):
+    def test_snapshot(self, vm_on_lvm_sr: VM) -> None:
         vm = vm_on_lvm_sr
         vm.start()
         try:
@@ -88,7 +88,9 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize_on_inflate_after_setSize(self, host, lvm_sr, vm_on_lvm_sr, exit_on_fistpoint):
+    def test_failing_resize_on_inflate_after_setSize(
+        self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM, exit_on_fistpoint: None
+    ) -> None:
         vm = vm_on_lvm_sr
         lvinflate = ""
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
@@ -114,7 +116,9 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize_on_inflate_after_setSizePhys(self, host, lvm_sr, vm_on_lvm_sr, exit_on_fistpoint):
+    def test_failing_resize_on_inflate_after_setSizePhys(
+        self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM, exit_on_fistpoint: None
+    ) -> None:
         vm = vm_on_lvm_sr
         lvinflate = ""
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
@@ -140,23 +144,23 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
-    def test_coalesce(self, storage_test_vm: VM, vdi_on_lvm_sr: VDI, vdi_op: CoalesceOperation):
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_lvm_sr: VDI, vdi_op: CoalesceOperation) -> None:
         coalesce_integrity(storage_test_vm, vdi_on_lvm_sr, vdi_op)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression):
+    def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression) -> None:
         xva_export_import(vm_on_lvm_sr, compression)
 
     @pytest.mark.small_vm
-    def test_vdi_export_import(self, storage_test_vm: VM, lvm_sr: SR, image_format: ImageFormat):
+    def test_vdi_export_import(self, storage_test_vm: VM, lvm_sr: SR, image_format: ImageFormat) -> None:
         vdi_export_import(storage_test_vm, lvm_sr, image_format)
 
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, host, lvm_sr, vm_on_lvm_sr):
+    def test_reboot(self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM) -> None:
         sr = lvm_sr
         vm = vm_on_lvm_sr
         host.reboot(verify=True)

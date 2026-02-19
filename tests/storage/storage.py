@@ -13,7 +13,7 @@ from typing import Literal
 
 RANDSTREAM_1GIB_CHECKSUM = '65280014'
 
-def try_to_create_sr_with_missing_device(sr_type, label, host):
+def try_to_create_sr_with_missing_device(sr_type: str, label: str, host: Host) -> None:
     try:
         host.sr_create(sr_type, label, {}, verify=True)
     except SSHCommandFailed as e:
@@ -24,10 +24,10 @@ def try_to_create_sr_with_missing_device(sr_type, label, host):
         return
     assert False, 'SR creation should not have succeeded!'
 
-def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR):
+def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     """ Storage migration of a shutdown VM, then migrate it back. """
     prov_sr = vm.get_sr()
-    vdi_name = None
+    vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
 
@@ -77,9 +77,9 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     if vdi_name is not None:
         vm.destroy_vdi_by_name(vdi_name)
 
-def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR):
+def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     prov_sr = vm.get_sr()
-    vdi_name = None
+    vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
     vbd = None
@@ -123,7 +123,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     if vdi_name is not None:
         vm.destroy_vdi_by_name(vdi_name)
 
-def vdi_is_open(vdi):
+def vdi_is_open(vdi: VDI) -> bool:
     sr = vdi.sr
 
     get_sr_ref = f"""
@@ -150,7 +150,7 @@ print(sr_ref)
     }))
 
 
-def install_randstream(vm: 'VM'):
+def install_randstream(vm: VM) -> None:
     BASE_URL = 'https://github.com/xcp-ng/randstream/releases/download'
     VERSION = '0.4.1'
     CHECKSUM = {
@@ -169,20 +169,20 @@ def install_randstream(vm: 'VM'):
     if vm.is_windows:
         raise ValueError("Windows is not currently supported")
     else:
-        os = vm.ssh('uname -s')
-        assert os in CHECKSUM, f"{os} is not currently supported"
-        tt = TARGET_TRIPLE[os]
-        cs = CHECKSUM[os]
+        os_name = vm.ssh('uname -s')
+        assert os_name in CHECKSUM, f"{os_name} is not currently supported"
+        tt = TARGET_TRIPLE[os_name]
+        cs = CHECKSUM[os_name]
         fn = '/tmp/randstream.tgz'
         vm.ssh(f"echo '{cs}  -' > {fn}.sum && wget -nv {BASE_URL}/{VERSION}/randstream-{VERSION}-{tt}.tar.gz -O - | tee {fn} | sha256sum -c {fn}.sum && tar -xzf {fn} -C /usr/bin/ ./randstream")  # noqa: E501
         vm.ssh(f"rm -f {fn} {fn}.sum")
 
 CoalesceOperation = Literal['snapshot', 'clone']
 
-def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation):
+def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation) -> None:
     vbd = vm.connect_vdi(vdi)
     dev = f'/dev/{vbd.param_get("device")}'
-    new_vdi = None
+    new_vdi: VDI | None = None
     try:
         vm.ssh(f"randstream generate -v {dev}")
         # default seed is 0
@@ -201,7 +201,7 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation):
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(vm: VM, compression: XVACompression):
+def xva_export_import(vm: VM, compression: XVACompression) -> None:
     # The tests using this function are using specific fixtures to create the VM on the expected SR
     # In consequence, we can't use the storage_test_vm, so we have to start the VM explicitly and install randstream
     vm.start()
@@ -228,7 +228,7 @@ def xva_export_import(vm: VM, compression: XVACompression):
             imported_vm.destroy()
         vm.host.ssh(f'rm -f {xva_path}')
 
-def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat):
+def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat) -> None:
     vdi: VDI | None = sr.create_vdi(image_format=image_format)
     assert vdi is not None
     image_path = f'/tmp/{vdi.uuid}.{image_format}'

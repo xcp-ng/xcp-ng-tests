@@ -41,7 +41,7 @@ class TestXFSSRCreateDestroy:
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
             "xfsprogs must not be installed on the host at the beginning of the tests"
         sr_disk = unused_512B_disks[host][0]["name"]
-        sr = None
+        sr: SR | None = None
         try:
             sr = host.sr_create('xfs', "XFS-local-SR-test", {
                 'device': '/dev/' + sr_disk,
@@ -70,13 +70,13 @@ class TestXFSSRCreateDestroy:
 @pytest.mark.usefixtures("xfs_sr")
 class TestXFSSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, xfs_sr):
+    def test_quicktest(self, xfs_sr: SR) -> None:
         xfs_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_xfs_sr):
+    def test_vdi_is_not_open(self, vdi_on_xfs_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_xfs_sr)
 
-    def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: ImageFormat):
+    def test_vdi_image_format(self, vdi_on_xfs_sr: VDI, image_format: ImageFormat) -> None:
         fmt = vdi_on_xfs_sr.get_image_format()
         # feature-detect: if the SM doesn't report image-format, skip this check
         if not fmt:
@@ -85,7 +85,7 @@ class TestXFSSR:
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_xfs_sr):
+    def test_start_and_shutdown_VM(self, vm_on_xfs_sr: VM) -> None:
         vm = vm_on_xfs_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -93,7 +93,7 @@ class TestXFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_xfs_sr):
+    def test_snapshot(self, vm_on_xfs_sr: VM) -> None:
         vm = vm_on_xfs_sr
         vm.start()
         try:
@@ -104,23 +104,23 @@ class TestXFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
-    def test_coalesce(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, vdi_op: CoalesceOperation):
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, vdi_op: CoalesceOperation) -> None:
         coalesce_integrity(storage_test_vm, vdi_on_xfs_sr, vdi_op)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_xfs_sr: VM, compression: XVACompression):
+    def test_xva_export_import(self, vm_on_xfs_sr: VM, compression: XVACompression) -> None:
         xva_export_import(vm_on_xfs_sr, compression)
 
     @pytest.mark.small_vm
-    def test_vdi_export_import(self, storage_test_vm: VM, xfs_sr: SR, image_format: ImageFormat):
+    def test_vdi_export_import(self, storage_test_vm: VM, xfs_sr: SR, image_format: ImageFormat) -> None:
         vdi_export_import(storage_test_vm, xfs_sr, image_format)
 
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_xfs_sr, host, xfs_sr):
+    def test_reboot(self, vm_on_xfs_sr: VM, host: Host, xfs_sr: SR) -> None:
         sr = xfs_sr
         vm = vm_on_xfs_sr
         host.reboot(verify=True)
@@ -131,7 +131,7 @@ class TestXFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.reboot
-    def test_xfsprogs_missing(self, host, xfs_sr):
+    def test_xfsprogs_missing(self, host: Host, xfs_sr: SR) -> None:
         sr = xfs_sr
         xfsprogs_installed = True
         try:

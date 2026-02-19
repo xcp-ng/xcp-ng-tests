@@ -5,7 +5,9 @@ import pytest
 from lib.vm import VM
 from tests.storage import install_randstream
 
-def pytest_collection_modifyitems(config, items):
+from typing import Any, Generator
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     # modify ordering so that ext is always tested first,
     # before more complex storage drivers
     for item in reversed(list(items)):
@@ -14,6 +16,6 @@ def pytest_collection_modifyitems(config, items):
             items.insert(0, item)
 
 @pytest.fixture(scope='module')
-def storage_test_vm(running_unix_vm: VM):
+def storage_test_vm(running_unix_vm: VM) -> Generator[VM, None, None]:
     install_randstream(running_unix_vm)
     yield running_unix_vm

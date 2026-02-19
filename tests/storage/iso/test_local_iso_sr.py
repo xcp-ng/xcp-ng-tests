@@ -3,6 +3,10 @@ import pytest
 import logging
 import os
 
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
+
 from .conftest import (
     check_iso_mount_and_read_from_vm,
     copy_tools_iso_to_iso_sr,
@@ -24,7 +28,7 @@ class TestLocalISOSRCreateDestroy:
     because they precisely need to test SR creation and destruction
     """
 
-    def test_create_sr_with_bad_location(self, host):
+    def test_create_sr_with_bad_location(self, host: Host) -> None:
         sr = None
         try:
             device_config = {
@@ -38,7 +42,7 @@ class TestLocalISOSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host, formatted_and_mounted_ext4_disk):
+    def test_create_and_destroy_sr(self, host: Host, formatted_and_mounted_ext4_disk: str) -> None:
         location = formatted_and_mounted_ext4_disk + '/iso_sr'
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = create_local_iso_sr(host, location)
@@ -48,11 +52,11 @@ class TestLocalISOSRCreateDestroy:
 @pytest.mark.usefixtures("local_iso_sr")
 class TestLocalISOSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, local_iso_sr):
+    def test_quicktest(self, local_iso_sr: tuple[SR, str]) -> None:
         sr, _ = local_iso_sr
         sr.run_quicktest()
 
-    def test_iso_mount_and_read(self, host, local_iso_sr, unix_vm):
+    def test_iso_mount_and_read(self, host: Host, local_iso_sr: tuple[SR, str], unix_vm: VM) -> None:
         sr, location = local_iso_sr
         iso_path = copy_tools_iso_to_iso_sr(host, sr, location)
         unix_vm.start(on=host.uuid)
