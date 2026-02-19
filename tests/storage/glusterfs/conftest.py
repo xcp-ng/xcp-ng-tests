@@ -6,19 +6,17 @@ import logging
 from dataclasses import dataclass
 
 from lib.common import exec_nofail, raise_errors, setup_formatted_and_mounted_disk, teardown_formatted_and_mounted_disk
+from lib.host import Host
 from lib.netutil import is_ipv6
-
-from typing import TYPE_CHECKING, Generator
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.pool import Pool
-    from lib.sr import SR
-    from lib.vdi import VDI
-    from lib.vm import VM
+from lib.pool import Pool
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
+
+from typing import Generator
 
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 
