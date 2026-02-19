@@ -8,7 +8,23 @@ from lib.common import wait_for
 # The pool needs a shared SR to use `host.evacuate`. All three fixtures below are needed.
 from tests.storage.nfs.conftest import nfs_device_config, nfs_sr, vm_on_nfs_sr
 
-# Requirements:
+def features(names):
+    """
+    Decorator to declare features tested by a test.
+    Automatically adds pytest markers: feature:<name>
+    """
+    def decorator(func):
+        feature_set = set(names)
+        setattr(func, "_features", feature_set)
+
+        # Attach pytest markers dynamically
+        for name in feature_set:
+            marker = pytest.mark.__getattr__(f"feature_{name}")
+            func = marker(func)
+
+        return func
+    return decorator
+
 # From --hosts parameter:
 # - host(A1): first XCP-ng host >= 8.3 (for most tests)
 # - hostA2: Second member of the pool.
@@ -69,7 +85,10 @@ class TestHostEvacuate:
 @pytest.mark.small_vm # what we test here is the network-uuid option, the goal is not to test with various VMs
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestHostEvacuateWithNetwork:
+    @features(["migration"])
     def test_host_evacuate_with_network(self, host, hostA2, second_network, vm_on_nfs_sr):
+        """description: prout prout
+           features: migration"""
         _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr)
 
     def test_host_evacuate_with_network_no_ip(self, host, hostA2, second_network, vm_on_nfs_sr):

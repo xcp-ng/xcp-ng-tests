@@ -760,3 +760,5 @@ def cifs_iso_sr(host, cifs_iso_device_config):
     yield sr
     # teardown
     sr.forget()
+
+pytest_plugins = ["pytest_features"]
