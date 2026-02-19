@@ -47,6 +47,9 @@ import sys
 import tempfile
 from enum import StrEnum, auto
 from fnmatch import fnmatch
+from subprocess import CompletedProcess
+
+from typing import Any, cast
 
 class DataType(StrEnum):
     FILE = auto()
@@ -55,10 +58,10 @@ class DataType(StrEnum):
     BROKEN_SYMLINK = auto()
     PACKAGE = auto()
 
-def ignore_file(filename, ignored_files):
+def ignore_file(filename: str, ignored_files: list[str]) -> bool:
     return any(fnmatch(filename, i) for i in ignored_files)
 
-def ssh_cmd(host, cmd):
+def ssh_cmd(host: str, cmd: str) -> str:
     args = ["ssh", f"root@{host}", cmd]
 
     cmdres = subprocess.run(args, capture_output=True, text=True)
@@ -67,10 +70,10 @@ def ssh_cmd(host, cmd):
 
     return cmdres.stdout
 
-def ssh_get_files(host, file_type, folders):
+def ssh_get_files(host: str, file_type: DataType, folders: list[str]) -> dict[str, str] | None:
     md5sum = False
     readlink = False
-    folders = " ".join(folders)
+    folders_concatenated = " ".join(folders)
 
     match file_type:
         case DataType.FILE:
@@ -89,7 +92,7 @@ def ssh_get_files(host, file_type, folders):
             print("Unknown file type: ", file=sys.stderr)
             return None
 
-    find_cmd = f"find {folders} {find_type}"
+    find_cmd = f"find {folders_concatenated} {find_type}"
     if readlink:
         find_cmd += " -exec readlink -n {} \\; -exec echo -n '  ' \\; -print"
     elif md5sum:
@@ -99,14 +102,14 @@ def ssh_get_files(host, file_type, folders):
 
     rawres = ssh_cmd(host, find_cmd)
 
-    res = dict()
+    res: dict[str, str] = dict()
     for line in rawres.splitlines():
         entry = line.split(' ', 1)
         res[entry[1].strip()] = entry[0].strip()
 
     return res
 
-def ssh_get_packages(host):
+def ssh_get_packages(host: str) -> dict[str, str]:
     packages = dict()
 
     res = ssh_cmd(host, "rpm -qa --queryformat '%{NAME} %{VERSION}\n'")
@@ -116,8 +119,8 @@ def ssh_get_packages(host):
 
     return packages
 
-def get_data(host, folders):
-    ref_data = dict()
+def get_data(host: str, folders: list[str]) -> dict[DataType, dict[str, str] | None]:
+    ref_data: dict[DataType, dict[str, str] | None] = dict()
 
     try:
         ref_data[DataType.FILE] = ssh_get_files(host, DataType.FILE, folders)
@@ -131,7 +134,7 @@ def get_data(host, folders):
 
     return ref_data
 
-def sftp_get(host, remote_file, local_file):
+def sftp_get(host: str, remote_file: str, local_file: str) -> CompletedProcess[bytes]:
     opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
     args = f"sftp {opts} -b - root@{host}"
@@ -150,7 +153,7 @@ def sftp_get(host, remote_file, local_file):
 
     return res
 
-def remote_diff(host_ref, host_test, filename):
+def remote_diff(host_ref: str, host_test: str, filename: str) -> None:
     file_ref = None
     file_test = None
     try:
@@ -189,7 +192,7 @@ def remote_diff(host_ref, host_test, filename):
         if file_test is not None and os.path.exists(file_test):
             os.remove(file_test)
 
-def print_results(results, show_diff, show_ignored):
+def print_results(results: dict[str, Any], show_diff: bool, show_ignored: bool) -> None:
     # Print what differs
     for dtype in DataType:
         if dtype == DataType.PACKAGE:
@@ -213,11 +216,13 @@ def print_results(results, show_diff, show_ignored):
         for f in results['ignored_files']:
             print(f"{f}")
 
-def compare_data(ref, test, ignored_file_patterns):
+def compare_data(
+    ref: dict[str, Any], test: dict[str, Any], ignored_file_patterns: list[str]
+) -> tuple[dict[str, Any], int]:
     ref_data = ref['data']
     test_data = test['data']
     err = 0
-    results = {
+    results: dict[str | DataType, Any] = {
         'host': {
             'ref': ref['host'],
             'test': test['host']
@@ -282,16 +287,16 @@ def compare_data(ref, test, ignored_file_patterns):
     return results, err
 
 # Load a previously saved json file containing reference data
-def load_reference_files(filename):
+def load_reference_files(filename: str) -> dict[DataType, dict[str, str] | None]:
     try:
         with open(filename, 'r') as fd:
-            return json.load(fd)
+            return cast(dict[DataType, dict[str, str] | None], json.load(fd))
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         exit(-1)
 
 # Save files from a reference host in json format
-def save_reference_data(files, filename):
+def save_reference_data(files: dict[DataType, dict[str, str] | None], filename: str) -> None:
     try:
         with open(filename, 'w') as fd:
             json.dump(files, fd, indent=4)
@@ -299,10 +304,10 @@ def save_reference_data(files, filename):
         print(f"Error: {e}", file=sys.stderr)
         exit(-1)
 
-def main():
-    ref_data = None
-    folders = ["/boot", "/etc", "/opt", "/usr"]
-    ignored_file_patterns = [
+def main() -> int:
+    ref_data: dict[DataType, dict[str, str] | None] | None = None
+    folders: list[str] = ["/boot", "/etc", "/opt", "/usr"]
+    ignored_file_patterns: list[str] = [
         '/boot/initrd-*',
         '/boot/efi/*',
         '/boot/grub/*',
@@ -361,13 +366,13 @@ def main():
     ]
 
     parser = argparse.ArgumentParser(description='Spot filesystem differences between 2 XCP-ng hosts')
-    parser.add_argument('--reference-host', '-r', dest='ref_host',
+    parser.add_argument('--reference-host', '-r', dest='ref_host', type=str,
                         help='The XCP-ng host used as reference')
-    parser.add_argument('--test-host', '-t', dest='test_host',
+    parser.add_argument('--test-host', '-t', dest='test_host', type=str,
                         help='The XCP-ng host to be tested after install or upgrade')
-    parser.add_argument('--save-reference', '-s', dest='save_ref',
+    parser.add_argument('--save-reference', '-s', dest='save_ref', type=str,
                         help='Save filesystem information of the reference host to a file')
-    parser.add_argument('--load-reference', '-l', dest='load_ref',
+    parser.add_argument('--load-reference', '-l', dest='load_ref', type=str,
                         help='Load reference filesystem information from a file')
     parser.add_argument('--show-diff', '-d', action='store_true', dest='show_diff',
                         help='Show diff of text files that differ. A reference host must be supplied with -r')
@@ -412,8 +417,8 @@ def main():
         print(f"Get test host data from {args.test_host}")
     test_data = get_data(args.test_host, args.folders)
 
-    ref = dict([('data', ref_data), ('host', args.ref_host)])
-    test = dict([('data', test_data), ('host', args.test_host)])
+    ref: dict[str, Any] = dict([('data', ref_data), ('host', args.ref_host)])
+    test: dict[str, Any] = dict([('data', test_data), ('host', args.test_host)])
 
     results, err = compare_data(ref, test, args.ignored_file_patterns)
 

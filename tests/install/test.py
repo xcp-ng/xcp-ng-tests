@@ -12,6 +12,8 @@ from lib.pool import Pool
 from lib.vdi import VDI
 from lib.vm import VM
 
+from typing import Generator
+
 assert "MGMT" in NETWORKS
 
 # Requirements:
@@ -22,7 +24,7 @@ assert "MGMT" in NETWORKS
 #   there)
 
 @pytest.fixture
-def helper_vm_with_plugged_disk(running_vm, create_vms):
+def helper_vm_with_plugged_disk(running_vm: VM, create_vms: list[VM]) -> Generator[VM, None, None]:
     helper_vm = running_vm
     host_vm, = create_vms
 
@@ -93,9 +95,10 @@ class TestNested:
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_install(self, vm_booted_with_installer, system_disks_names,
-                     firmware, iso_version, package_source, local_sr):
+    def test_install(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+                     firmware: str, iso_version: str, package_source: str, local_sr: str) -> None:
         host_vm = vm_booted_with_installer
+        assert host_vm.ip is not None
         installer.monitor_install(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -118,8 +121,8 @@ class TestNested:
             vm="vm1",
             image_test=f"TestNested::test_install[{firmware}-{version}-{package_source}-{local_sr}]")])
     @pytest.mark.small_vm
-    def test_tune_firstboot(self, create_vms, helper_vm_with_plugged_disk: VM,
-                            firmware, version, machine, local_sr, package_source):
+    def test_tune_firstboot(self, create_vms: list[VM], helper_vm_with_plugged_disk: VM,
+                            firmware: str, version: str, machine: str, local_sr: str, package_source: str) -> None:
         helper_vm = helper_vm_with_plugged_disk
 
         helper_vm.ssh("mount /dev/xvdb1 /mnt")
@@ -136,10 +139,12 @@ class TestNested:
         finally:
             helper_vm.ssh("umount /dev/xvdb1")
 
-    def _test_firstboot(self, create_vms, mode, *, machine='DEFAULT', is_restore=False):
+    def _test_firstboot(self, create_vms: list[VM], mode: str, *,
+                        machine: str = 'DEFAULT', is_restore: bool = False) -> None:
         host_vm = create_vms[0]
         vif = host_vm.vifs()[0]
         mac_address = vif.param_get('MAC')
+        assert mac_address is not None
         logging.info("Host VM has MAC %s", mac_address)
 
         # succession of insta/upg/rst operations
@@ -185,20 +190,22 @@ class TestNested:
             logging.info("Host VM has IPs %s", ips)
             assert len(ips) == 1
             host_vm.ip = ips[0]
+            ip = host_vm.ip
+            assert ip is not None
 
             wait_for(
                 lambda: commands.local_cmd(
-                    ["nc", "-zw5", host_vm.ip, "22"], check=False).returncode == 0,
+                    ["nc", "-zw5", ip, "22"], check=False).returncode == 0,
                 "Wait for ssh back up on Host VM", retry_delay_secs=5, timeout_secs=4 * 60)
 
             logging.info("Checking installed version (expecting %r %r)",
                          expected_dist, expected_rel)
-            lsb_dist = commands.ssh(host_vm.ip, "lsb_release -si")
-            lsb_rel = commands.ssh(host_vm.ip, "lsb_release -sr")
+            lsb_dist = commands.ssh(ip, "lsb_release -si")
+            lsb_rel = commands.ssh(ip, "lsb_release -sr")
             assert (lsb_dist, lsb_rel) == (expected_dist, expected_rel)
 
             # pool master must be reachable here
-            pool = Pool(host_vm.ip)
+            pool = Pool(ip)
 
             # wait for XAPI
             wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
@@ -308,8 +315,8 @@ class TestNested:
             dict(vm="vm1",
                  image_test=("TestNested::test_tune_firstboot"
                              f"[None-{firmware}-{version}-{machine}-{package_source}-{local_sr}]"))])
-    def test_boot_inst(self, create_vms,
-                       firmware, version, machine, package_source, local_sr):
+    def test_boot_inst(self, create_vms: list[VM],
+                       firmware: str, version: str, machine: str, package_source: str, local_sr: str) -> None:
         self._test_firstboot(create_vms, version, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -343,9 +350,11 @@ class TestNested:
             {"TAG": "existing-installation",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_upgrade(self, vm_booted_with_installer, system_disks_names,
-                     firmware, orig_version, iso_version, machine, package_source, local_sr):
+    def test_upgrade(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+                     firmware: str, orig_version: str, iso_version: str, machine: str,
+                     package_source: str, local_sr: str) -> None:
         host_vm = vm_booted_with_installer
+        assert host_vm.ip is not None
         installer.monitor_upgrade(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -370,8 +379,8 @@ class TestNested:
         lambda firmware, mode, machine, package_source, local_sr: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_upgrade[{firmware}-{mode}-{machine}-{package_source}-{local_sr}]"))])
-    def test_boot_upg(self, create_vms,
-                      firmware, mode, machine, package_source, local_sr):
+    def test_boot_upg(self, create_vms: list[VM],
+                      firmware: str, mode: str, machine: str, package_source: str, local_sr: str) -> None:
         self._test_firstboot(create_vms, mode, machine=machine)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -400,9 +409,10 @@ class TestNested:
             {"TAG": "backup-disk",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_restore(self, vm_booted_with_installer, system_disks_names,
-                     firmware, orig_version, iso_version, package_source, local_sr):
+    def test_restore(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+                     firmware: str, orig_version: str, iso_version: str, package_source: str, local_sr: str) -> None:
         host_vm = vm_booted_with_installer
+        assert host_vm.ip is not None
         installer.monitor_restore(ip=host_vm.ip)
 
     @pytest.mark.usefixtures("xcpng_chained")
@@ -426,6 +436,6 @@ class TestNested:
         lambda firmware, mode, package_source, local_sr: [dict(
             vm="vm1",
             image_test=(f"TestNested::test_restore[{firmware}-{mode}-{package_source}-{local_sr}]"))])
-    def test_boot_rst(self, create_vms,
-                      firmware, mode, package_source, local_sr):
+    def test_boot_rst(self, create_vms: list[VM],
+                      firmware: str, mode: str, package_source: str, local_sr: str) -> None:
         self._test_firstboot(create_vms, mode, is_restore=True)

@@ -4,13 +4,15 @@ import logging
 import socket
 import ssl
 
+from lib.host import Host
+
 # This test is designed to verify that TLS connections is secured
 #
 # Requirements:
 # - An XCP-ng host
 
 @pytest.mark.parametrize("protocol_name", ["TLSv1", "TLSv1.1"])
-def test_tls_disabled(host: str, protocol_name: str):
+def test_tls_disabled(host: Host, protocol_name: str) -> None:
     """
     Verifies that specified TLS protocols are disabled on the XCP-ng host.
     Uses the ssl library directly. Should raise SSLError.
@@ -33,7 +35,7 @@ def test_tls_disabled(host: str, protocol_name: str):
             pytest.fail(f"Protocol {protocol} should be disabled but connection succeeded")
 
 @pytest.mark.parametrize("protocol_name", ["TLSv1.2"])
-def test_enabled(host: str, protocol_name: str):
+def test_enabled(host: Host, protocol_name: str) -> None:
     """
     Verifies that TLSv1.2 is enabled on the XCP-ng host.
     Uses the ssl library directly.

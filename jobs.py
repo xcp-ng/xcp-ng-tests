@@ -7,7 +7,18 @@ import sys
 
 from lib.commands import ssh
 
-JOBS = {
+from typing import NotRequired, TypedDict, cast
+
+class JobData(TypedDict):
+    description: str
+    requirements: list[str]
+    nb_pools: int
+    params: dict[str, str]
+    paths: list[str]
+    markers: NotRequired[str]
+    name_filter: NotRequired[str]
+
+JOBS: dict[str, JobData] = {
     "main": {
         "description": "a group of not-too-long tests that run either without a VM, or with a single small one",
         "requirements": [
@@ -473,12 +484,15 @@ BROKEN_TESTS = [
     "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
 ]
 
+VmDef = str | tuple[str, str]
+VMSDef = dict[str, dict[str, VmDef | list[VmDef]]]
+
 # Returns the vm filename or None if a host_version is passed and matches the one specified
 # with the vm filename in vm_data.py. ex: ("centos6-32-hvm-created_8.2-zstd.xva", "8\.2\..*")
-def filter_vm(vm, host_version):
+def filter_vm(vm: VmDef, host_version: str | None) -> str | None:
     import re
 
-    if type(vm) is tuple:
+    if isinstance(vm, tuple):
         if len(vm) != 2:
             print(f"ERROR: VM definition from vm_data.py is a tuple so it should contain exactly two items:\n{vm}")
             sys.exit(1)
@@ -497,34 +511,34 @@ def filter_vm(vm, host_version):
 
     return vm
 
-def get_vm_or_vms_refs(handle, host_version=None):
+def get_vm_or_vms_refs(handle: str, host_version: str | None = None) -> str | list[str]:
     try:
-        from vm_data import VMS
+        from vm_data import VMS as VMS_untyped
     except ImportError:
         print("ERROR: Could not import VMS from vm_data.py.")
-        print("Get the latest vm_data.py from XCP-ng's internal lab or copy data.py-dist and fill with your VM refs.")
+        print("Get the latest vm_data.py from XCP-ng's internal lab or copy vm_data.py-dist and fill"
+              " with your VM refs.")
         print("You may also bypass this error by providing your own --vm parameter(s).")
         sys.exit(1)
 
+    VMS = cast(VMSDef, VMS_untyped)
     category, key = handle.split("/")
-    if category not in VMS or not VMS[category].get(key):
+    if category not in VMS or key not in VMS[category]:
         print(f"ERROR: Could not find VMS['{category}']['{key}'] in vm_data.py, or it's empty.")
         print("You need to update your local vm_data.py.")
         print("You may also bypass this error by providing your own --vm parameter(s).")
         sys.exit(1)
 
-    if type(VMS[category][key]) is list:
+    vms: str | list[str] | None = []
+    vms_unfiltered = VMS[category][key]
+    if isinstance(vms_unfiltered, list):
         # Multi VMs
-        vms = list()
-        for vm in VMS[category][key]:
-            xva = filter_vm(vm, host_version)
-            if xva is not None:
-                vms.append(xva)
-        if len(vms) == 0:
+        vms = [xva for vm in vms_unfiltered if (xva := filter_vm(vm, host_version)) is not None]
+        if vms == []:
             vms = None
-    else:
+    elif isinstance(vms_unfiltered, str):
         # Single VMs
-        vms = filter_vm(VMS[category][key], host_version)
+        vms = filter_vm(vms_unfiltered, host_version)
 
     if vms is None:
         print(f"ERROR: Could not find VMS['{category}']['{key}'] for host version {host_version}.")
@@ -534,7 +548,8 @@ def get_vm_or_vms_refs(handle, host_version=None):
 
     return vms
 
-def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
+def build_pytest_cmd(job_data: JobData, hosts: str | None = None, host_version: str | None = None,
+                     pytest_args: list[str] = []) -> list[str]:
     markers = job_data.get("markers", None)
     name_filter = job_data.get("name_filter", None)
 
@@ -544,13 +559,12 @@ def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
     if hosts is not None:
         try:
             host = hosts.split(',')[0]
-            cmd = "lsb_release -sr"
-            host_version = ssh(host, cmd)
+            host_version = ssh(host, "lsb_release -sr")
         except Exception as e:
             print(e, file=sys.stderr)
 
-    def _join_pytest_args(arg, option):
-        cli_args = []
+    def _join_pytest_args(arg: str | None, option: str) -> str | None:
+        cli_args: list[str] = []
         try:
             while True:
                 i = pytest_args.index(option)
@@ -601,21 +615,21 @@ def build_pytest_cmd(job_data, hosts=None, host_version=None, pytest_args=[]):
     cmd += pytest_args
     return cmd
 
-def action_list(args):
+def action_list(args: argparse.Namespace) -> None:
     for job, data in JOBS.items():
         print(f"{job}: {data['description']}")
 
-def action_show(args):
+def action_show(args: argparse.Namespace) -> None:
     print(json.dumps(JOBS[args.job], indent=4))
 
-def action_collect(args):
+def action_collect(args: argparse.Namespace) -> None:
     cmd = build_pytest_cmd(JOBS[args.job], None, args.host_version, ["--collect-only"] + args.pytest_args)
     subprocess.run(cmd)
 
-def action_check(args):
+def action_check(args: argparse.Namespace) -> None:
     error = False
 
-    def extract_tests(cmd):
+    def extract_tests(cmd: list[str]) -> set[str]:
         tests = set()
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0 and res.returncode != 5: # 5 means no test found
@@ -664,6 +678,7 @@ STDOUT: ---
     multi_vm_tests = extract_tests(["pytest", "--collect-only", "-q", "-m", "multi_vms"]) - broken_tests
     job_tests = set()
     for job_data in JOBS.values():
+        assert isinstance(job_data["params"], dict)
         if "--vm[]" in job_data["params"]:
             job_tests |= extract_tests(build_pytest_cmd(job_data, None, None, ["--collect-only", "-q", "--vm=a_vm"]))
     tests_missing = sorted(list(multi_vm_tests - job_tests))
@@ -677,7 +692,7 @@ STDOUT: ---
     if error:
         sys.exit(1)
 
-def action_run(args):
+def action_run(args: argparse.Namespace) -> None:
     cmd = build_pytest_cmd(JOBS[args.job], args.hosts, None, args.pytest_args)
     print(subprocess.list2cmdline(cmd))
     if args.print_only:
@@ -685,15 +700,17 @@ def action_run(args):
 
     # check that enough pool masters have been provided
     nb_pools = len(args.hosts.split(","))
-    if nb_pools < JOBS[args.job]["nb_pools"]:
-        print(f"Error: only {nb_pools} master host(s) provided, {JOBS[args.job]['nb_pools']} required.")
+    job_nb_pools = JOBS[args.job]["nb_pools"]
+    assert isinstance(job_nb_pools, int)
+    if nb_pools < job_nb_pools:
+        print(f"Error: only {nb_pools} master host(s) provided, {job_nb_pools} required.")
         sys.exit(1)
 
     res = subprocess.run(cmd)
     if res.returncode:
         sys.exit(1)
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Manage test jobs")
     subparsers = parser.add_subparsers(dest="action", metavar="action")
     subparsers.required = True
