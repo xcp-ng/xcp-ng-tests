@@ -23,7 +23,8 @@ ERROR_SUCCESS_REBOOT_REQUIRED = 3010
 GUEST_TOOLS_COPY_PATH = "C:\\package.msi"
 
 
-def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAction, check: bool = True):
+def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAction,
+                        check: bool = True) -> int | None:
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     if guest_tools_iso.get("testsign_cert"):
@@ -69,7 +70,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
     return exitcode
 
 
-def uninstall_guest_tools(vm: VM, action: PowerAction):
+def uninstall_guest_tools(vm: VM, action: PowerAction) -> None:
     msiexec_args = f"/x {GUEST_TOOLS_COPY_PATH} /log C:\\tools_uninstall.log /passive /norestart"
     uninstall_cmd = f"Start-Process -Wait msiexec.exe -ArgumentList '{msiexec_args}';"
     if action != PowerAction.Nothing:

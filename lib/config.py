@@ -1,7 +1,9 @@
+
+
 ignore_ssh_banner = False
 ssh_output_max_lines = 20
 
-def sr_device_config(datakey, *, required=[]):
+def sr_device_config(datakey: str, *, required: list[str] = []) -> dict[str, str]:
     import data  # import here to avoid depending on this user file for collecting tests
     config = getattr(data, datakey)
     for required_field in required:

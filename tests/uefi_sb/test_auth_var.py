@@ -95,7 +95,9 @@ def test_db_append(uefi_vm: VM):
     assert old != b"", "db failed to install"
 
     vm_kek_key = vm.ssh('mktemp')
-    vm.scp(KEK.owner_cert().key, vm_kek_key)
+    key = KEK.owner_cert().key
+    assert key is not None
+    vm.scp(key, vm_kek_key)
 
     vm_db_cert = vm.ssh('mktemp')
     vm.scp(db2.pub, vm_db_cert)

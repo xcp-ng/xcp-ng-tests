@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
+from __future__ import annotations, print_function
 
 import atexit
 import copy
@@ -21,25 +21,25 @@ from cryptography.hazmat.primitives.serialization.pkcs7 import PKCS7PrivateKeyTy
 
 import lib.commands as commands
 
-from typing import Iterable, Literal, Optional, Self, Union, cast
+from typing import Any, Iterable, Literal, Self, cast
 
 class _EfiGlobalTempdir:
     _instance = None
 
-    def _safe_cleanup(self):
+    def _safe_cleanup(self) -> None:
         if self._instance is not None:
             try:
                 self._instance.cleanup()
             except OSError:
                 pass
 
-    def get(self):
+    def get(self) -> TemporaryDirectory[str]:
         if self._instance is None:
             self._instance = TemporaryDirectory()
             atexit.register(self._safe_cleanup)
         return self._instance
 
-    def getfile(self, suffix=None, prefix=None):
+    def getfile(self, suffix: str | None = None, prefix: str | None = None) -> str:
         fd, path = mkstemp(suffix=suffix, prefix=prefix, dir=self.get().name)
         os.close(fd)
         return path
@@ -51,31 +51,31 @@ _tempdir = _EfiGlobalTempdir()
 class _SecureBootCertList:
     _prefix = Path(__file__).parent / '../contrib'
 
-    def kek_ms_2011(self):
+    def kek_ms_2011(self) -> str:
         return str(self._prefix / "secureboot_objects/KEK/Certificates/MicCorKEKCA2011_2011-06-24.der")
 
-    def kek_ms_2023(self):
+    def kek_ms_2023(self) -> str:
         return str(self._prefix / "secureboot_objects/KEK/Certificates/microsoft corporation kek 2k ca 2023.der")
 
-    def db_win_2011(self):
+    def db_win_2011(self) -> str:
         return str(self._prefix / "secureboot_objects/DB/Certificates/MicWinProPCA2011_2011-10-19.der")
 
-    def db_uefi_2011(self):
+    def db_uefi_2011(self) -> str:
         return str(self._prefix / "secureboot_objects/DB/Certificates/MicCorUEFCA2011_2011-06-27.der")
 
-    def db_win_2023(self):
+    def db_win_2023(self) -> str:
         return str(self._prefix / "secureboot_objects/DB/Certificates/windows uefi ca 2023.der")
 
-    def db_uefi_2023(self):
+    def db_uefi_2023(self) -> str:
         return str(self._prefix / "secureboot_objects/DB/Certificates/microsoft uefi ca 2023.der")
 
-    def db_oprom_2023(self):
+    def db_oprom_2023(self) -> str:
         return str(self._prefix / "secureboot_objects/DB/Certificates/microsoft option rom uefi ca 2023.der")
 
-    def dbx_hashes_ms_amd64(self):
+    def dbx_hashes_ms_amd64(self) -> str:
         return str(self._prefix / "secureboot_objects/DBX/amd64/DBXUpdate.bin")
 
-    def dbx_poison(self):
+    def dbx_poison(self) -> str:
         return str(self._prefix / "varstored/dbx_poison.auth")
 
 
@@ -83,10 +83,10 @@ SB_CERTS = _SecureBootCertList()
 
 
 class GUID(UUID):
-    def as_bytes(self):
+    def as_bytes(self) -> bytes:
         return self.bytes_le
 
-    def as_str(self):
+    def as_str(self) -> str:
         return str(self)
 
 
@@ -113,16 +113,16 @@ u32 = 'I'
 EFI_GUID = '16s'
 
 
-def efi_pack(*args):
+def efi_pack(fmt: str, *args: Any) -> bytes:
     """
     Return bytes of an EFI struct (little endian).
 
     EFI structs are all packed as little endian.
     """
-    return struct.pack('<' + args[0], *args[1:])
+    return struct.pack('<' + fmt, *args)
 
 
-def pack_guid(data1, data2, data3, data4):
+def pack_guid(data1: int, data2: int, data3: int, data4: list[int]) -> bytes:
     return b''.join([
         struct.pack(u32, data1),
         struct.pack(u16, data2),
@@ -182,7 +182,7 @@ def get_secure_boot_guid(variable: str) -> GUID:
     }[variable]
 
 
-def cert_to_efi_sig_list(cert):
+def cert_to_efi_sig_list(cert: str) -> bytes:
     """Return an ESL from a PEM cert."""
     with open(cert, 'rb') as f:
         cert_raw = f.read()
@@ -190,10 +190,10 @@ def cert_to_efi_sig_list(cert):
         # that they come in a specific form. Since `cryptography` doesn't have
         # a way to detect cert format, we have to detect it ourselves.
         try:
-            cert = x509.load_pem_x509_certificate(cert_raw)
+            cert_obj = x509.load_pem_x509_certificate(cert_raw)
         except ValueError:
-            cert = x509.load_der_x509_certificate(cert_raw)
-        der = cert.public_bytes(Encoding.DER)
+            cert_obj = x509.load_der_x509_certificate(cert_raw)
+        der = cert_obj.public_bytes(Encoding.DER)
 
     signature_type = EFI_CERT_X509_GUID
     signature_list_size = len(der) + EFI_SIGNATURE_LIST_size + EFI_SIGNATURE_DATA_size
@@ -214,7 +214,7 @@ def cert_to_efi_sig_list(cert):
     )
 
 
-def certs_to_sig_db(certs) -> bytes:
+def certs_to_sig_db(certs: list[str] | str) -> bytes:
     """Returns a signature database from a list cert file paths."""
     if isinstance(certs, str):
         certs = [certs]
@@ -230,8 +230,8 @@ def certs_to_sig_db(certs) -> bytes:
 
 
 def sign_efi_sig_db(
-    sig_db: bytes, var: str, key: str, cert: str, time: Optional[datetime] = None, guid: Optional[GUID] = None
-):
+    sig_db: bytes, var: str, key: str, cert: str, time: datetime | None = None, guid: GUID | None = None
+) -> bytes:
     """Return a pkcs7 SignedData from a UEFI signature database."""
     global p7_out
 
@@ -280,7 +280,7 @@ def sign_efi_sig_db(
     return create_auth2_header(p7, timestamp) + p7 + sig_db
 
 
-def sign(payload: bytes, key_file: str, cert_file: str):
+def sign(payload: bytes, key_file: str, cert_file: str) -> bytes:
     """Returns a signed PKCS7 of payload signed by key and cert."""
     with open(key_file, 'rb') as f:
         priv_key = cast(PKCS7PrivateKeyTypes, serialization.load_pem_private_key(f.read(), password=None))
@@ -302,7 +302,7 @@ def sign(payload: bytes, key_file: str, cert_file: str):
     )
 
 
-def create_auth2_header(sig_db: bytes, timestamp: bytes):
+def create_auth2_header(sig_db: bytes, timestamp: bytes) -> bytes:
     """Return an EFI_AUTHENTICATE_VARIABLE_2 from a signature database."""
     length = len(sig_db) + WIN_CERTIFICATE_UEFI_GUID_offset
     revision = 0x200
@@ -312,18 +312,18 @@ def create_auth2_header(sig_db: bytes, timestamp: bytes):
     return timestamp + auth_info
 
 
-def timestamp():
+def timestamp() -> datetime:
     global time_offset
     time_offset += 1
     return time_seed + timedelta(seconds=time_offset)
 
 
-def get_signed_name(image: str):
+def get_signed_name(image: str) -> str:
     fpath, ext = os.path.splitext(image)
     return fpath + '-signed' + ext
 
 
-def pesign(key, cert, name, image):
+def pesign(key: str, cert: str, name: str, image: str) -> str:
     """Sign a binary using pesign."""
     with TemporaryDirectory(prefix='certdir_') as certdir:
         # Setup pesign cert dir. commands taken from:
@@ -363,12 +363,12 @@ def pesign(key, cert, name, image):
 
 
 class Certificate:
-    def __init__(self, pub: str, key: Optional[str]):
+    def __init__(self, pub: str, key: str | None) -> None:
         self.pub = pub
         self.key = key
 
     @classmethod
-    def self_signed(cls, common_name='XCP-ng Test Common Name'):
+    def self_signed(cls, common_name: str = 'XCP-ng Test Common Name') -> Self:
         pub = _tempdir.getfile(suffix='.pem')
         key = _tempdir.getfile(suffix='.pem')
 
@@ -380,11 +380,11 @@ class Certificate:
 
         return cls(pub, key)
 
-    def sign_efi_sig_db(self, var: str, data: bytes, guid: Optional[GUID]):
+    def sign_efi_sig_db(self, var: str, data: bytes, guid: GUID | None) -> bytes:
         assert self.key is not None
         return sign_efi_sig_db(data, var, self.key, self.pub, time=timestamp(), guid=guid)
 
-    def copy(self):
+    def copy(self) -> Certificate:
         newpub = _tempdir.getfile(suffix='.pem')
         shutil.copyfile(self.pub, newpub)
 
@@ -397,15 +397,15 @@ class Certificate:
 
 
 class EFIAuth:
-    _auth_data: Optional[bytes]
+    _auth_data: bytes | None
     name: Literal["PK", "KEK", "db", "dbx"]
 
     def __init__(
         self,
         name: Literal["PK", "KEK", "db", "dbx"],
-        owner_cert: Optional[Certificate] = None,
-        other_certs: Optional[Iterable[Union[Certificate, str]]] = None,
-    ):
+        owner_cert: Certificate | None = None,
+        other_certs: Iterable[Certificate | str] | None = None,
+    ) -> None:
         assert name in SECURE_BOOT_VARIABLES
         assert owner_cert is None or owner_cert.key is not None, "owner cert must have private key"
         self.name = name
@@ -418,26 +418,26 @@ class EFIAuth:
 
     @classmethod
     def self_signed(
-        cls, name: Literal["PK", "KEK", "db", "dbx"], other_certs: Optional[Iterable[Union[Certificate, str]]] = None
-    ):
+        cls, name: Literal["PK", "KEK", "db", "dbx"], other_certs: Iterable[Certificate | str] | None = None
+    ) -> Self:
         return cls(name, owner_cert=Certificate.self_signed(name + " Owner"), other_certs=other_certs)
 
-    def owner_cert(self):
+    def owner_cert(self) -> Certificate:
         assert self._owner_cert is not None
         return self._owner_cert
 
-    def is_signed(self):
+    def is_signed(self) -> bool:
         return self._auth_data is not None
 
-    def auth_data(self):
+    def auth_data(self) -> bytes | None:
         assert self.is_signed()
         return self._auth_data
 
-    def auth(self):
+    def auth(self) -> str:
         assert self.is_signed()
         return self._auth
 
-    def sign_with(self, signer: Self):
+    def sign_with(self, signer: Self) -> None:
         """Sign this object, using another EFIAuth object as signer."""
         owner_cert = signer.owner_cert()
         assert owner_cert is not None
@@ -447,7 +447,7 @@ class EFIAuth:
         with open(self._auth, 'wb') as f:
             f.write(self._auth_data)
 
-    def sign_auth(self, to_be_signed: Self):
+    def sign_auth(self, to_be_signed: Self) -> None:
         """
         Sign another EFIAuth object.
 
@@ -470,16 +470,18 @@ class EFIAuth:
         assert self._owner_cert is not None
         if shutil.which('sbsign'):
             signed = get_signed_name(image)
+            assert self._owner_cert.key is not None
             commands.local_cmd([
                 'sbsign', '--key', self._owner_cert.key, '--cert', self._owner_cert.pub,
                 image, '--output', signed
             ])
         else:
+            assert self._owner_cert.key is not None
             signed = pesign(self._owner_cert.key, self._owner_cert.pub, self.name, image)
 
         return signed
 
-    def copy(self, name: Optional[Literal["PK", "KEK", "db", "dbx"]] = None):
+    def copy(self, name: Literal["PK", "KEK", "db", "dbx"] | None = None) -> Self:
         """
         Make a copy of an existing EFIAuth object.
 
@@ -510,7 +512,7 @@ class EFIAuth:
             copied._auth_data = copy.copy(self._auth_data)
             shutil.copyfile(self._auth, copied._auth)
 
-        return copied
+        return cast(Self, copied)
 
     def _get_efi_signature_list(self) -> bytes:
         certs = []
@@ -551,7 +553,7 @@ def esl_from_auth_bytes(auth_data: bytes) -> bytes:
     return auth_data[auth_data.index(EFI_CERT_X509_GUID):]
 
 
-def get_md5sum_from_auth(auth: str):
+def get_md5sum_from_auth(auth: str) -> str:
     return hashlib.md5(esl_from_auth_file(auth)).hexdigest()
 
 

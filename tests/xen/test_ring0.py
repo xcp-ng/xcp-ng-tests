@@ -7,7 +7,7 @@ import time
 from lib.host import Host
 from lib.vm import VM
 
-from typing import Generator, Optional
+from typing import Generator
 
 # Requirements:
 # From --hosts parameter:
@@ -35,7 +35,7 @@ def host_without_livepatch_loaded(host: Host) -> Host:
     return host
 
 
-def do_execute_xst(host: Host, modname: str, testname: Optional[str] = None) -> None:
+def do_execute_xst(host: Host, modname: str, testname: str | None = None) -> None:
     if testname is None:
         testname = modname
     host.ssh(f"modprobe xst_{modname}")
