@@ -152,7 +152,7 @@ class TestGuestWindowsUEFISecureBoot:
         # Install certs in the VM. They must be official MS certs.
         # We install them first in the pool with `secureboot-certs install`, which requires internet access
         logging.info("Install MS certs on pool with secureboot-certs install")
-        vm.host.ssh(['secureboot-certs', 'install'])
+        vm.host.ssh('secureboot-certs install')
         # Now install the default pool certs in the VM
         vm.set_uefi_user_mode()
         boot_and_check_sb_succeeded(vm)

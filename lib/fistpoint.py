@@ -40,7 +40,7 @@ class FistPoint:
 
     @staticmethod
     def disable_exit_on_fistpoint(host: Host):
-        host.ssh(["rm", FistPoint._get_path(LVHDRT_EXIT_FIST)])
+        host.ssh(f'rm {FistPoint._get_path(LVHDRT_EXIT_FIST)}')
 
     @staticmethod
     def _get_name(name: str) -> str:
@@ -60,7 +60,7 @@ class FistPoint:
     def disable(self):
         logging.info(f"Disabling fistpoint {self.fistpointName}")
         try:
-            self.host.ssh(["rm", self._get_path(self.fistpointName)])
+            self.host.ssh(f'rm {self._get_path(self.fistpointName)}')
         except SSHCommandFailed as e:
             logging.info(f"Failed trying to disable fistpoint {self._get_path(self.fistpointName)} with error {e}")
             raise

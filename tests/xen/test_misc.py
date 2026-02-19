@@ -3,14 +3,16 @@ import pytest
 import logging
 import re
 
+from lib.host import Host
+
 # Misc tests for Xen host
 #
 # Requirements:
 # - XCP-ng host
 
 # Check for a valid "Latest ChangeSet" trace in 'xl dmesg'
-def test_xen_changeset(host):
-    changeset = host.ssh(['xl', 'dmesg', '|', 'grep', '"Latest ChangeSet"'])
+def test_xen_changeset(host: Host):
+    changeset = host.ssh('xl dmesg | grep "Latest ChangeSet"')
     regexp = r'.*Latest ChangeSet:\s*(([^,]+),.*)'
 
     m = re.match(regexp, changeset)

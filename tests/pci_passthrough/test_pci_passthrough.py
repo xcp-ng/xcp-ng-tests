@@ -2,6 +2,8 @@ import pytest
 
 import logging
 
+from lib.host import Host
+
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.3 with a PGPU to hide from dom0
 
@@ -21,19 +23,19 @@ class TestPCIPassthrough:
         host.reboot(verify=True)
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "enabled"
 
-    def test_access_status_manual_modification(self, host, enabled_pci_uuid):
+    def test_access_status_manual_modification(self, host: Host, enabled_pci_uuid):
         device_id = host.xe("pci-param-get", {"uuid": enabled_pci_uuid, "param-name": "pci-id"})
-        hidden_devices = host.ssh([XEN_CMDLINE, '--get-dom0', '"xen-pciback.hide"'])
+        hidden_devices = host.ssh(f'{XEN_CMDLINE} --get-dom0 "xen-pciback.hide"')
         if hidden_devices == "":
             hidden_devices = "xen-pciback.hide="
         devices = hidden_devices + f"({device_id})"
 
-        host.ssh([XEN_CMDLINE, '--set-dom0', f'"{devices}"'])
+        host.ssh(f'{XEN_CMDLINE} --set-dom0 "{devices}"')
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "disable_on_reboot"
         host.reboot(verify=True)
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "disabled"
 
-        host.ssh([XEN_CMDLINE, '--set-dom0', f'"{hidden_devices}"'])
+        host.ssh(f'{XEN_CMDLINE} --set-dom0 "{hidden_devices}"')
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "enable_on_reboot"
         host.reboot(verify=True)
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "enabled"

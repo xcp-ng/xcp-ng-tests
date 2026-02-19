@@ -29,9 +29,10 @@ def test_access_links(host, command_id, url_id):
         "vates": "https://repo.vates.tech/README.txt"
     }[url_id]
     COMMAND = command + [url]
+    COMMAND_STR = " ".join(COMMAND)
 
     # Download from remote host
-    remote_result = host.ssh(COMMAND)
+    remote_result = host.ssh(COMMAND_STR)
 
     # Verify the download worked by comparing with local download
     # This ensures the content is accessible and identical from both locations

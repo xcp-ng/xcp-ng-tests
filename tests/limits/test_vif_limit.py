@@ -49,8 +49,8 @@ class TestVIFLimit:
         try:
             logging.info('Verify the interfaces exist in the guest')
             for i in range(0, VIF_LIMIT):
-                if vm.ssh_with_result([f'test -d /sys/class/net/{interface_name}{i}']).returncode != 0:
-                    guest_error = vm.ssh_with_result(['dmesg | grep -B1 -A3 xen_netfront']).stdout
+                if vm.ssh_with_result(f'test -d /sys/class/net/{interface_name}{i}').returncode != 0:
+                    guest_error = vm.ssh_with_result('dmesg | grep -B1 -A3 xen_netfront').stdout
                     logging.error("dmesg:\n%s", guest_error)
                     assert False, "The interface does not exist in the guest, check dmesg output above for errors"
 
@@ -58,15 +58,15 @@ class TestVIFLimit:
             config = '\n'.join([f'iface {interface_name}{i} inet dhcp\n'
                                 f'auto {interface_name}{i}'
                                 for i in range(existing_vifs, VIF_LIMIT)])
-            vm.ssh([f'echo "{config}" >> /etc/network/interfaces'])
+            vm.ssh(f'echo "{config}" >> /etc/network/interfaces')
 
             logging.info('Install iperf3 on VM and host')
-            if vm.ssh_with_result(['apt install iperf3 --assume-yes']).returncode != 0:
+            if vm.ssh_with_result('apt install iperf3 --assume-yes').returncode != 0:
                 assert False, "Failed to install iperf3 on the VM"
             host.yum_install(['iperf3'])
 
             logging.info('Reconfigure VM networking')
-            if vm.ssh_with_result(['systemctl restart networking']).returncode != 0:
+            if vm.ssh_with_result('systemctl restart networking').returncode != 0:
                 assert False, "Failed to configure networking"
 
             # Test iperf on all interfaces in parallel
@@ -78,7 +78,7 @@ class TestVIFLimit:
                 host_script.write('\n'.join(iperf_configs))
                 host_script.flush()
                 host.scp(host_script.name, host_script.name)
-                host.ssh([f'nohup bash -c "bash {host_script.name}" < /dev/null &>/dev/null &'],
+                host.ssh(f'nohup bash -c "bash {host_script.name}" < /dev/null &>/dev/null &',
                          background=True)
 
             logging.info('Start multiple iperfs on separate interfaces on the VM')
@@ -90,12 +90,12 @@ class TestVIFLimit:
                 vm_script.write('\n'.join(iperf_configs))
                 vm_script.flush()
                 vm.scp(vm_script.name, vm_script.name)
-                stdout = vm.ssh([f'bash {vm_script.name}'])
+                stdout = vm.ssh(f'bash {vm_script.name}')
 
             # TODO: log this into some performance time series DB
             logging.info(stdout)
         finally:
-            vm.ssh(['pkill iperf3 || true'])
+            vm.ssh('pkill iperf3 || true')
             vm.shutdown(verify=True)
             vm.param_set('VCPUs-at-startup', original_vcpus_at_startup)
             vm.param_set('VCPUs-max', original_vcpus_max)

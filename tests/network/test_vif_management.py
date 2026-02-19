@@ -11,7 +11,7 @@ def count_interfaces(vm: VM) -> int:
     """
     Returns the number of interfaces returned by 'ip link show'
     """
-    ip_link_show = vm.ssh_with_result(['ip', 'link', 'show'])
+    ip_link_show = vm.ssh_with_result('ip link show')
     assert ip_link_show.returncode == 0
 
     stdout = ip_link_show.stdout

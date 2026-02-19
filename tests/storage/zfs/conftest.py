@@ -35,15 +35,15 @@ def host_with_zfs(host_without_zfs: Host,
                   ) -> Generator[Host]:
     host = host_with_saved_yum_state
     host.yum_install(['zfs'])
-    host.ssh(['modprobe', 'zfs'])
+    host.ssh('modprobe zfs')
     yield host
 
 @pytest.fixture(scope='package')
-def zpool_vol0(sr_disk_wiped, host_with_zfs):
-    host_with_zfs.ssh(['zpool', 'create', '-f', POOL_NAME, '/dev/' + sr_disk_wiped])
+def zpool_vol0(sr_disk_wiped, host_with_zfs: Host):
+    host_with_zfs.ssh(f'zpool create -f {POOL_NAME} /dev/{sr_disk_wiped}')
     yield
     # teardown
-    host_with_zfs.ssh(['zpool', 'destroy', POOL_NAME])
+    host_with_zfs.ssh(f'zpool destroy {POOL_NAME}')
 
 @pytest.fixture(scope='package')
 def zfs_sr(host: Host, image_format: ImageFormat, zpool_vol0: None) -> Generator[SR]:

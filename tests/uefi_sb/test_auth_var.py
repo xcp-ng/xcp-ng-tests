@@ -7,6 +7,7 @@ from lib.efi import (
     EFIAuth,
     global_variable_guid,
 )
+from lib.vm import VM
 
 # Requirements:
 # On the test runner:
@@ -70,7 +71,7 @@ def test_auth_variable(uefi_vm):
 
 @pytest.mark.small_vm # run with a small VM to test the features (/!\ but this small VM must have efitools)
 @pytest.mark.usefixtures("unix_vm")
-def test_db_append(uefi_vm):
+def test_db_append(uefi_vm: VM):
     """Pass if appending the DB succeeds. Otherwise, fail."""
     vm = uefi_vm
 
@@ -87,25 +88,23 @@ def test_db_append(uefi_vm):
     vm.wait_for_os_booted()
 
     # This particular test requires a VM that has efi-updatevar
-    assert vm.ssh_with_result(["which", "efi-updatevar"]).returncode == 0, "This test requires efi-updatevar"
+    assert vm.ssh_with_result('which efi-updatevar').returncode == 0, "This test requires efi-updatevar"
 
     old = vm.get_efi_var(db.name, db.guid)
 
     assert old != b"", "db failed to install"
 
-    vm_kek_key = vm.ssh(['mktemp'])
+    vm_kek_key = vm.ssh('mktemp')
     vm.scp(KEK.owner_cert().key, vm_kek_key)
 
-    vm_db_cert = vm.ssh(['mktemp'])
+    vm_db_cert = vm.ssh('mktemp')
     vm.scp(db2.pub, vm_db_cert)
 
-    vm.ssh([
-        "chattr",
-        "-i",
-        "/sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f"
-    ])
+    vm.ssh(
+        'chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f'
+    )
 
-    vm.ssh(["efi-updatevar", "-k", vm_kek_key, "-c", vm_db_cert, "-a", "db"])
+    vm.ssh(f'efi-updatevar -k {vm_kek_key} -c {vm_db_cert} -a db')
 
     new = vm.get_efi_var(db.name, db.guid)
 

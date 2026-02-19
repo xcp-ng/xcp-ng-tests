@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import base64
 import logging
 import os
 import platform
-import shlex
 import subprocess
 
 import lib.config as config
-from lib.common import HostAddress
 from lib.netutil import wrap_ip
 
-from typing import List, Literal, Union, overload
+from typing import TYPE_CHECKING, List, Literal, Union, overload
+
+if TYPE_CHECKING:
+    from lib.common import HostAddress
 
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
@@ -64,54 +67,54 @@ def _ellide_log_lines(log):
         reduced_message.append("(...)")
     return "\n{}".format("\n".join(reduced_message))
 
-def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-         background, decode, options, multiplexing) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
+def _ssh(
+    hostname_or_ip: str,
+    cmd: str,
+    check: bool,
+    simple_output: bool,
+    suppress_fingerprint_warnings: bool,
+    background: bool,
+    decode: bool,
+    options: list[str],
+    multiplexing: bool,
+) -> SSHResult | SSHCommandFailed | str | bytes | None:
     opts = list(options)
-    opts.append('-o "BatchMode yes"')
-    opts.append('-o "PubkeyAcceptedAlgorithms +ssh-rsa"')
+    opts += ['-o', 'BatchMode yes']
+    opts += ['-o', 'PubkeyAcceptedAlgorithms +ssh-rsa']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        opts.append('-o "StrictHostKeyChecking no"')
-        opts.append('-o "LogLevel ERROR"')
-        opts.append('-o "UserKnownHostsFile /dev/null"')
-    # ssh multiplexing is not always well supported on windows, so we disable it on that platform.
+        opts += ['-o', 'StrictHostKeyChecking no']
+        opts += ['-o', 'LogLevel ERROR']
+        opts += ['-o', 'UserKnownHostsFile /dev/null']
     # It could work with git bash—we might want to check that instead.
     # We use the pid in the control path to avoid a race condition on the master socket creation
     # when running the tests in parallel. The socket is removed by the ssh client olding the master
     # connection when it reaches the timeout.
     if multiplexing and platform.system() != "Windows":
-        opts.append('-o "ControlMaster auto"')
-        opts.append(f'-o "ControlPath ~/.ssh/control-{os.getpid()}:%h:%p:%r"')
-        opts.append('-o "ControlPersist 10m"')
-        opts.append('-o "ServerAliveInterval 10s"')
-        opts.append('-o "LogLevel ERROR"')
+        opts += ['-o', 'ControlMaster auto']
+        opts += ['-o', f'ControlPath ~/.ssh/control-{os.getpid()}:%h:%p:%r']
+        opts += ['-o', 'ControlPersist 10m']
+        opts += ['-o', 'ServerAliveInterval 10s']
     else:
-        opts.append('-o "ControlMaster no"')
+        opts += ['-o', 'ControlMaster no']
 
-    if isinstance(cmd, str):
-        command = cmd
-    else:
-        command = " ".join(cmd)
-
-    ssh_cmd = f"ssh root@{hostname_or_ip} {' '.join(opts)} {shlex.quote(command)}"
+    ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
 
     # Fetch banner and remove it to avoid stdout/stderr pollution.
     banner_res = None
     if config.ignore_ssh_banner:
         banner_res = subprocess.run(
-            "ssh root@%s %s '%s'" % (hostname_or_ip, ' '.join(opts), '\n'),
-            shell=True,
+            ['ssh', f'root@{hostname_or_ip}'] + opts + ['\n'],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False
         )
 
-    logging.debug(f"[{hostname_or_ip}] {command}")
+    logging.debug(f"[{hostname_or_ip}] {cmd}")
     process = subprocess.Popen(
         ssh_cmd,
-        shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
     )
@@ -132,12 +135,12 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 
     # Even if check is False, we still raise in case of return code 255, which means a SSH error.
     if res.returncode == 255:
-        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, command)
+        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, cmd)
 
     output: Union[bytes, str] = res.stdout
     if banner_res:
         if banner_res.returncode == 255:
-            return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), command)
+            return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), cmd)
         output = output[len(banner_res.stdout):]
 
     if decode:
@@ -145,7 +148,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         output = output.decode()
 
     if res.returncode and check:
-        return SSHCommandFailed(res.returncode, output_for_errors, command)
+        return SSHCommandFailed(res.returncode, output_for_errors, cmd)
 
     if simple_output:
         return output.strip()
@@ -155,37 +158,37 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
 @overload
-def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
         decode: Literal[True] = True, options: List[str] = [], multiplexing=True) -> str:
     ...
 @overload
-def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
         decode: Literal[False], options: List[str] = [], multiplexing=True) -> bytes:
     ...
 @overload
-def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
         decode: bool = True, options: List[str] = [], multiplexing=True) -> SSHResult:
     ...
 @overload
-def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[True],
         decode: bool = True, options: List[str] = [], multiplexing=True) -> None:
     ...
 @overload
-def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check=True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check=True,
         simple_output: bool = True,
         suppress_fingerprint_warnings=True, background: bool = False,
         decode: bool = True, options: List[str] = [], multiplexing=True) \
         -> Union[str, bytes, SSHResult, None]:
     ...
-def ssh(hostname_or_ip, cmd, *, check=True, simple_output=True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check=True, simple_output=True,
         suppress_fingerprint_warnings=True,
         background=False, decode=True, options=[], multiplexing=True):
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
@@ -195,7 +198,7 @@ def ssh(hostname_or_ip, cmd, *, check=True, simple_output=True,
     else:
         return result_or_exc
 
-def ssh_with_result(hostname_or_ip, cmd, suppress_fingerprint_warnings=True,
+def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings=True,
                     background=False, decode=True, options=[], multiplexing=True) -> SSHResult:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
                          background, decode, options, multiplexing)

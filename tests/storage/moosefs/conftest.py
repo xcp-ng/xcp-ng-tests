@@ -5,22 +5,23 @@ import logging
 from lib import config
 
 # explicit import for package-scope fixtures
+from lib.host import Host
 from pkgfixtures import pool_with_saved_yum_state
 
-def install_moosefs(host):
+def install_moosefs(host: Host):
     assert not host.file_exists('/usr/sbin/mount.moosefs'), \
         "MooseFS client should not be installed on the host before all tests"
-    host.ssh(['curl https://repository.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS'])
-    host.ssh(['curl http://repository.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo'])
+    host.ssh('curl https://repository.moosefs.com/RPM-GPG-KEY-MooseFS > /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS')
+    host.ssh('curl http://repository.moosefs.com/MooseFS-3-el7.repo > /etc/yum.repos.d/MooseFS.repo')
     host.yum_install(['fuse', 'moosefs-client'])
 
-def uninstall_moosefs_repo(host):
-    host.ssh(['rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS /etc/yum.repos.d/MooseFS.repo'])
+def uninstall_moosefs_repo(host: Host):
+    host.ssh('rm -f /etc/pki/rpm-gpg/RPM-GPG-KEY-MooseFS /etc/yum.repos.d/MooseFS.repo')
 
-def enable_moosefs(host):
+def enable_moosefs(host: Host):
     host.activate_smapi_driver('moosefs')
 
-def disable_moosefs(host):
+def disable_moosefs(host: Host):
     host.deactivate_smapi_driver('moosefs')
 
 @pytest.fixture(scope='package')

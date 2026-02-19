@@ -32,7 +32,7 @@ def _glusterfs_config() -> GlusterFsConfig:
 
 def _setup_host_with_glusterfs(host: Host):
     for service in ['iptables', 'ip6tables']:
-        host.ssh(['cp', '/etc/sysconfig/%s' % service, '/etc/sysconfig/%s.orig' % service])
+        host.ssh(f'cp /etc/sysconfig/{service} /etc/sysconfig/{service}.orig')
 
     host.yum_install(['glusterfs-server', 'xfsprogs'])
 
@@ -41,21 +41,20 @@ def _setup_host_with_glusterfs(host: Host):
         hostname_or_ip = h.hostname_or_ip
         if hostname_or_ip != host.hostname_or_ip:
             for port, proto in GLUSTERFS_PORTS:
-                host.ssh(
-                    [iptables, '-I', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT'])
+                host.ssh(f'{iptables} -I INPUT -p {proto} --dport {port} -s {hostname_or_ip} -j ACCEPT')
 
     # Make rules reboot-persistent
     for service in ['iptables', 'ip6tables']:
-        host.ssh(['service', service, 'save'])
+        host.ssh(f'service {service} save')
 
-    host.ssh(['systemctl', 'enable', '--now', 'glusterd.service'])
+    host.ssh('systemctl enable --now glusterd.service')
 
 def _uninstall_host_glusterfs(host: Host):
     errors = []
-    errors += exec_nofail(lambda: host.ssh(['systemctl', 'disable', '--now', 'glusterd.service']))
+    errors += exec_nofail(lambda: host.ssh('systemctl disable --now glusterd.service'))
 
     # Remove any remaining gluster-related data to avoid issues in future test runs
-    errors += exec_nofail(lambda: host.ssh(['rm', '-rf', '/var/lib/glusterd']))
+    errors += exec_nofail(lambda: host.ssh('rm -rf /var/lib/glusterd'))
 
     raise_errors(errors)
 
@@ -68,14 +67,12 @@ def _restore_host_iptables(host: Host):
         if hostname_or_ip != host.hostname_or_ip:
             for port, proto in GLUSTERFS_PORTS:
                 errors += exec_nofail(
-                    lambda: host.ssh(
-                        [iptables, '-D', 'INPUT', '-p', proto, '--dport', port, '-s', hostname_or_ip, '-j', 'ACCEPT']
-                    )
+                    lambda: host.ssh(f'{iptables} -D INPUT -p {proto} --dport {port} -s {hostname_or_ip} -j ACCEPT')
                 )
 
     for service in ['iptables', 'ip6tables']:
         errors += exec_nofail(
-            lambda: host.ssh(['mv', '/etc/sysconfig/%s.orig' % service, '/etc/sysconfig/%s' % service])
+            lambda: host.ssh(f'mv /etc/sysconfig/{service}.orig /etc/sysconfig/{service}')
         )
 
     raise_errors(errors)
@@ -144,26 +141,26 @@ def _fallback_gluster_teardown(host: Host):
         logging.info("< Fallback teardown on host: %s" % h)
         hosts = h.pool.hosts
 
-        h.ssh(['systemctl', 'restart', 'glusterd'])
+        h.ssh('systemctl restart glusterd')
 
-        gluster_cmd = ['gluster', '--mode=script', 'volume', 'remove-brick', 'vol0', 'replica', '1']
+        gluster_cmd = 'gluster --mode=script volume remove-brick vol0 replica 1'
         for h2 in hosts:
             if h.hostname_or_ip != h2.hostname_or_ip:
-                gluster_cmd.append('%s:/mnt/sr_disk/vol0/brick0' % h2.hostname_or_ip)
-        gluster_cmd.append('force')
+                gluster_cmd = f'{gluster_cmd} {h2.hostname_or_ip}:/mnt/sr_disk/vol0/brick0'
+        gluster_cmd = f'{gluster_cmd} force'
         h.ssh(gluster_cmd)
 
         for h2 in hosts:
             if h.hostname_or_ip != h2.hostname_or_ip:
-                h.ssh(['gluster', '--mode=script', 'peer', 'detach', h2.hostname_or_ip])
+                h.ssh(f'gluster --mode=script peer detach {h2.hostname_or_ip}')
 
         try:
             # Volume might already be stopped if failure happened on delete
-            h.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
+            h.ssh('gluster --mode=script volume stop vol0')
         except Exception:
             pass
 
-        h.ssh(['gluster', '--mode=script', 'volume', 'delete', 'vol0'])
+        h.ssh('gluster --mode=script volume delete vol0')
 
     try:
         teardown_for_host(host)
@@ -188,34 +185,31 @@ def gluster_volume_started(
     if is_ipv6(host.hostname_or_ip):
         # Configure gluster for IPv6 transport
         for h in hosts:
-            h.ssh([
-                'sed',
-                '-i',
-                '"s/#   option transport.address-family inet6/    option transport.address-family inet6/"',
-                '/etc/glusterfs/glusterd.vol'
-            ])
+            h.ssh(
+                'sed -i "s/#   option transport.address-family inet6/    option transport.address-family inet6/" /etc/glusterfs/glusterd.vol'  # noqa
+            )
         for h in hosts:
-            h.ssh(['systemctl', 'restart', 'glusterd'])
+            h.ssh('systemctl restart glusterd')
 
-    host.ssh(['mkdir', '-p', '/mnt/sr_disk/vol0/brick0'])
-    hostA2.ssh(['gluster', 'peer', 'probe', host.hostname_or_ip])
+    host.ssh('mkdir -p /mnt/sr_disk/vol0/brick0')
+    hostA2.ssh(f'gluster peer probe {host.hostname_or_ip}')
     for h in hosts[1:]:
-        h.ssh(['mkdir', '-p', '/mnt/sr_disk/vol0/brick0'])
-        host.ssh(['gluster', 'peer', 'probe', h.hostname_or_ip])
+        h.ssh('mkdir -p /mnt/sr_disk/vol0/brick0')
+        host.ssh(f'gluster peer probe {h.hostname_or_ip}')
 
     logging.info(">> create and start gluster volume vol0")
-    gluster_cmd = ['gluster', 'volume', 'create', 'vol0', 'replica', str(len(hosts))]
+    gluster_cmd = f'gluster volume create vol0 replica {str(len(hosts))}'
     for h in hosts:
-        gluster_cmd.append('%s:/mnt/sr_disk/vol0/brick0' % h.hostname_or_ip)
+        gluster_cmd = f'{gluster_cmd} {h.hostname_or_ip}:/mnt/sr_disk/vol0/brick0'
 
-    gluster_cmd.append('force')
+    gluster_cmd = f'{gluster_cmd} force'
     host.ssh(gluster_cmd)
-    host.ssh(['gluster', 'volume', 'set', 'vol0', 'group', 'virt'])
-    host.ssh(['gluster', 'volume', 'set', 'vol0', 'cluster.granular-entry-heal', 'enable'])
-    host.ssh(['gluster', 'volume', 'set', 'vol0', 'features.shard-block-size', '512MB'])
-    host.ssh(['gluster', 'volume', 'set', 'vol0', 'network.ping-timeout', '5'])
+    host.ssh('gluster volume set vol0 group virt')
+    host.ssh('gluster volume set vol0 cluster.granular-entry-heal enable')
+    host.ssh('gluster volume set vol0 features.shard-block-size 512MB')
+    host.ssh('gluster volume set vol0 network.ping-timeout 5')
 
-    host.ssh(['gluster', 'volume', 'start', 'vol0'])
+    host.ssh('gluster volume start vol0')
 
     yield
 
@@ -225,16 +219,16 @@ def gluster_volume_started(
 
     logging.info("<< stop and delete gluster volume vol0")
     try:
-        host.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
-        host.ssh(['gluster', '--mode=script', 'volume', 'delete', 'vol0'])
+        host.ssh('gluster --mode=script volume stop vol0')
+        host.ssh('gluster --mode=script volume delete vol0')
         for h in hosts[1:]:
-            host.ssh(['gluster', '--mode=script', 'peer', 'detach', h.hostname_or_ip])
+            host.ssh(f'gluster --mode=script peer detach {h.hostname_or_ip}')
     except Exception as e:
         logging.warning("<< Exception '%s' while tearing down gluster volume, attempting fallback teardown" % e)
         _fallback_gluster_teardown(host)
 
     for h in hosts:
-        h.ssh(['rm', '-rf', '/mnt/sr_disk/vol0'])
+        h.ssh('rm -rf /mnt/sr_disk/vol0')
 
 
 @pytest.fixture(scope='package')
