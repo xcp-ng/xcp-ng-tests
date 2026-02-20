@@ -3,6 +3,7 @@ import pytest
 import re
 
 import lib.commands as commands
+from lib.host import Host
 from lib.netutil import wrap_ip
 
 # These tests are meant to test an host fileserver behavior.
@@ -15,7 +16,7 @@ def _header_equal(header, name, value):
     regex = fr"{name}:\s?{re.escape(value)}"
     return re.match(regex, header) is not None
 
-def test_fileserver_redirect_https(host):
+def test_fileserver_redirect_https(host: Host):
     path = "/path/to/dir/file.txt"
     ip = wrap_ip(host.hostname_or_ip)
     res = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
@@ -28,18 +29,19 @@ class TestHSTS:
     HSTS_HEADER_NAME = "strict-transport-security"
     HSTS_HEADER_VALUE = "max-age=63072000"
 
-    def __get_header(host):
+    @staticmethod
+    def __get_header(host: Host):
         res = commands.local_cmd(
             ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
         )
         return res.stdout.splitlines()
 
-    def test_fileserver_hsts_default(self, host):
+    def test_fileserver_hsts_default(self, host: Host):
         # By default HSTS header should not be set
         for line in TestHSTS.__get_header(host):
             assert not _header_equal(line, TestHSTS.HSTS_HEADER_NAME, TestHSTS.HSTS_HEADER_VALUE)
 
-    def test_fileserver_hsts(self, host_with_hsts):
+    def test_fileserver_hsts(self, host_with_hsts: Host):
         hsts_header_found = False
 
         for line in TestHSTS.__get_header(host_with_hsts):

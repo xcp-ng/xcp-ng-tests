@@ -14,7 +14,9 @@ def count_interfaces(vm: VM) -> int:
     ip_link_show = vm.ssh_with_result(['ip', 'link', 'show'])
     assert ip_link_show.returncode == 0
 
-    return ip_link_show.stdout.count('link/ether')
+    stdout = ip_link_show.stdout
+    assert isinstance(stdout, str)
+    return stdout.count('link/ether')
 
 @pytest.mark.small_vm
 class TestVIFManagement:
@@ -29,10 +31,10 @@ class TestVIFManagement:
         # number of interfaces in the VM
         n_interfaces = count_interfaces(vm)
 
-        try:
-            # create a new VIF in the management network
-            vif_new = vm.create_vif(n_vif, network_uuid=network_uuid)
+        # create a new VIF in the management network
+        vif_new = vm.create_vif(n_vif, network_uuid=network_uuid)
 
+        try:
             # check one more VIF
             assert len(vm.vifs()) == n_vif + 1
             assert count_interfaces(vm) == n_interfaces
