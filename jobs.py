@@ -447,8 +447,8 @@ JOBS = {
         "params": {},
         "paths": ["tests/misc/test_pool.py"],
     },
-    "limit-tests": {
-        "description": "Tests verifying we can hit our supported limits",
+    "limit-tests-vif": {
+        "description": "Tests verifying we can hit our supported vif limits",
         "requirements": [
             "1 XCP-ng host >= 8.2"
         ],
@@ -458,7 +458,18 @@ JOBS = {
             # multiple interfaces on the same network, so use Debian instead
             "--vm": "single/debian_uefi_vm",
         },
-        "paths": ["tests/limits"],
+        "paths": ["tests/limits/test_vif_limit.py"],
+    },
+    "limit-tests-vcpus-unix": {
+        "description": "Tests verifying we can hit our supported vCPU limits (Unix)",
+        "requirements": [
+            "1 XCP-ng host >= 8.3"
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm[]": "multi/uefi_unix",
+        },
+        "paths": ["tests/limits/test_vcpu_limit.py"],
     }
 }
 
