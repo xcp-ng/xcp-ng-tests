@@ -1,5 +1,7 @@
 import base64
 import logging
+import os
+import platform
 import shlex
 import subprocess
 
@@ -63,7 +65,7 @@ def _ellide_log_lines(log):
     return "\n{}".format("\n".join(reduced_message))
 
 def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-         background, decode, options) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
+         background, decode, options, multiplexing) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
     opts = list(options)
     opts.append('-o "BatchMode yes"')
     opts.append('-o "PubkeyAcceptedAlgorithms +ssh-rsa"')
@@ -74,6 +76,18 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
         opts.append('-o "StrictHostKeyChecking no"')
         opts.append('-o "LogLevel ERROR"')
         opts.append('-o "UserKnownHostsFile /dev/null"')
+    # ssh multiplexing is not always well supported on windows, so we disable it on that platform.
+    # It could work with git bash—we might want to check that instead.
+    # We use the pid in the control path to avoid a race condition on the master socket creation
+    # when running the tests in parallel. The socket is removed by the ssh client olding the master
+    # connection when it reaches the timeout.
+    if multiplexing and platform.system() != "Windows":
+        opts.append('-o "ControlMaster auto"')
+        opts.append(f'-o "ControlPath ~/.ssh/control-{os.getpid()}:%h:%p:%r"')
+        opts.append('-o "ControlPersist 10m"')
+        opts.append('-o "ServerAliveInterval 10s"')
+    else:
+        opts.append('-o "ControlMaster no"')
 
     if isinstance(cmd, str):
         command = cmd
@@ -143,47 +157,47 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
 def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[True] = True, options: List[str] = []) -> str:
+        decode: Literal[True] = True, options: List[str] = [], multiplexing=True) -> str:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[False], options: List[str] = []) -> bytes:
+        decode: Literal[False], options: List[str] = [], multiplexing=True) -> bytes:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: bool = True, options: List[str] = []) -> SSHResult:
+        decode: bool = True, options: List[str] = [], multiplexing=True) -> SSHResult:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[True],
-        decode: bool = True, options: List[str] = []) -> None:
+        decode: bool = True, options: List[str] = [], multiplexing=True) -> None:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: Union[str, List[str]], *, check=True,
         simple_output: bool = True,
         suppress_fingerprint_warnings=True, background: bool = False,
-        decode: bool = True, options: List[str] = []) \
+        decode: bool = True, options: List[str] = [], multiplexing=True) \
         -> Union[str, bytes, SSHResult, None]:
     ...
 def ssh(hostname_or_ip, cmd, *, check=True, simple_output=True,
         suppress_fingerprint_warnings=True,
-        background=False, decode=True, options=[]):
+        background=False, decode=True, options=[], multiplexing=True):
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                         background, decode, options)
+                         background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
     else:
         return result_or_exc
 
 def ssh_with_result(hostname_or_ip, cmd, suppress_fingerprint_warnings=True,
-                    background=False, decode=True, options=[]) -> SSHResult:
+                    background=False, decode=True, options=[], multiplexing=True) -> SSHResult:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
-                         background, decode, options)
+                         background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
     elif isinstance(result_or_exc, SSHResult):
