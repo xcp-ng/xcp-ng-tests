@@ -88,6 +88,15 @@ class TestLinstorSR:
         finally:
             vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_resize_vdi(self, vm_on_linstor_sr):
+        vm = vm_on_linstor_sr
+        logging.info("VDI Resize started")
+        for vdi_uuid in vm.vdi_uuids():
+            vm.vdi_resize(vdi_uuid)
+        logging.info("VDI Resize completed")
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
