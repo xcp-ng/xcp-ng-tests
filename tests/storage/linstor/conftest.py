@@ -6,6 +6,7 @@ import functools
 import json
 import logging
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import lib.commands as commands
@@ -169,62 +170,25 @@ def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI]:
     yield vdi
     vdi.destroy()
 
-@pytest.fixture(scope='module')
-def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str):
+@contextmanager
+def _vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    """
+    Context manager to provide the fixture lifecycle on a VM on a Linstor SR
+    with different scopes without repeating the code.
+    """
     vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
-    yield vm
-    logging.info("<< Destroy VM")
-    vm.destroy(verify=True)
+    try:
+        yield vm
+    finally:
+        logging.info("<< Destroy VM")
+        vm.destroy(verify=True)
+
+@pytest.fixture(scope='module')
+def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
+        yield vm
 
 @pytest.fixture(scope='function')
-def host_and_corrupted_vdi_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str):
-    vm: VM = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
-    pool: Pool = host.pool
-    master: Host = pool.master
-
-    def get_vdi_volume_name_from_linstor() -> str:
-        result = master.ssh([
-            "linstor-kv-tool",
-            "--dump-volumes",
-            "-g",
-            f"xcp-sr-{GROUP_NAME}_thin_device"
-        ])
-        volumes = json.loads(result)
-        for k, v in volumes.items():
-            path = safe_split(k, "/")
-            if len(path) < 4:
-                continue
-            uuid = path[2]
-            data_type = path[3]
-            if uuid == vdi_uuid and data_type == "volume-name":
-                return v
-        raise FileNotFoundError(f"Could not find matching linstor volume for `{vdi_uuid}`")
-
-    def get_vdi_host(path: str) -> Host:
-        for h in pool.hosts:
-            result = h.ssh(["test", "-e", path], simple_output=False, check=False)
-            if result.returncode == 0:
-                return h
-        raise FileNotFoundError(f"Could not find matching host for `{vdi_uuid}`")
-
-    try:
-        vdi_uuid: str = next((
-            vdi.uuid for vdi in vm.vdis if vdi.sr.uuid == linstor_sr.uuid
-        ))
-
-        volume_name = get_vdi_volume_name_from_linstor()
-        lv_path = f"/dev/{GROUP_NAME}/{volume_name}_00000"
-        vdi_host = get_vdi_host(lv_path)
-        logging.info("[%s]: corrupting `%s`", host, lv_path)
-        vdi_host.ssh([
-            "dd",
-            "if=/dev/urandom",
-            f"of={lv_path}",
-            "bs=4096",
-            # Lower values seems to go undetected sometimes
-            "count=10000" # ~40MB
-        ])
-        yield vm, vdi_host, volume_name
-    finally:
-        logging.info("<< Destroy corrupted VDI")
-        vm.destroy(verify=True)
+def vm_on_linstor_sr_function(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
+        yield vm

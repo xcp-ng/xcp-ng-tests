@@ -5,12 +5,14 @@ import logging
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import safe_split, vm_image, wait_for
 from lib.host import Host
+from lib.pool import Pool
+from lib.sr import SR
 from lib.vm import VM
 from tests.storage import vdi_is_open
 
-from .conftest import LINSTOR_PACKAGE
+from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
 from typing import Tuple
 
@@ -80,6 +82,33 @@ def wait_drbd_sync(host: Host, resource: str):
     host.ssh(["drbdadm", "wait-sync", resource])
 
 
+def get_vdi_volume_name_from_linstor(master: Host, vdi_uuid: str) -> str:
+    result = master.ssh([
+        "linstor-kv-tool",
+        "--dump-volumes",
+        "-g",
+        f"xcp-sr-{GROUP_NAME}_thin_device"
+    ])
+    volumes = json.loads(result)
+    for k, v in volumes.items():
+        path = safe_split(k, "/")
+        if len(path) < 4:
+            continue
+        uuid = path[2]
+        data_type = path[3]
+        if uuid == vdi_uuid and data_type == "volume-name":
+            return v
+    raise FileNotFoundError(f"Could not find matching linstor volume for `{vdi_uuid}`")
+
+
+def get_vdi_host(pool: Pool, vdi_uuid: str, path: str) -> Host:
+    for h in pool.hosts:
+        result = h.ssh(["test", "-e", path], simple_output=False, check=False)
+        if result.returncode == 0:
+            return h
+    raise FileNotFoundError(f"Could not find matching host for `{vdi_uuid}`")
+
+
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
     @pytest.mark.quicktest
@@ -115,6 +144,34 @@ class TestLinstorSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.fixture(scope='function')
+    def host_and_corrupted_vdi_on_linstor_sr(self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM):
+        vm: VM = vm_on_linstor_sr_function
+        pool: Pool = host.pool
+        master: Host = pool.master
+
+        try:
+            vdi_uuid: str = next((
+                vdi.uuid for vdi in vm.vdis if vdi.sr.uuid == linstor_sr.uuid
+            ))
+
+            volume_name = get_vdi_volume_name_from_linstor(master, vdi_uuid)
+            lv_path = f"/dev/{GROUP_NAME}/{volume_name}_00000"
+            vdi_host = get_vdi_host(pool, vdi_uuid, lv_path)
+            logging.info("[%s]: corrupting `%s`", host, lv_path)
+            vdi_host.ssh([
+                "dd",
+                "if=/dev/urandom",
+                f"of={lv_path}",
+                "bs=4096",
+                # Lower values seem to go undetected sometimes
+                "count=10000"  # ~40MB
+            ])
+            yield vm, vdi_host, volume_name
+        finally:
+            logging.info("<< Destroy corrupted VDI")
+            vm.destroy(verify=True)
 
     @pytest.mark.small_vm
     def test_resynchronization(
