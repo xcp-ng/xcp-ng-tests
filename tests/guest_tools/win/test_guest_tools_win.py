@@ -73,15 +73,16 @@ class TestGuestToolsWindows:
 
     def test_vif_replug(self, vm_install_test_tools_per_test_class: VM):
         vm = vm_install_test_tools_per_test_class
-        vifs = vm.vifs()
-        for vif in vifs:
-            assert strtobool(vif.param_get("currently-attached"))
-            vif.unplug()
-            # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
-            assert not strtobool(vif.param_get("currently-attached"))
-            time.sleep(5)
-            vif.plug()
-        wait_for(vm.is_ssh_up, "Wait for SSH up")
+        for _iter in range(3):
+            vifs = vm.vifs()
+            for vif in vifs:
+                assert strtobool(vif.param_get("currently-attached"))
+                vif.unplug()
+                # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
+                assert not strtobool(vif.param_get("currently-attached"))
+                time.sleep(5)
+                vif.plug()
+            wait_for(vm.is_ssh_up, "Wait for SSH up")
 
     def test_rss(self, vm_install_test_tools_per_test_class: VM):
         """
