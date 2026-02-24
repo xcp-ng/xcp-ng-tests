@@ -52,6 +52,8 @@ VMS = {
         "uefi_windows": [],
         # Testsign UEFI Windows VMs
         "tools_windows": [],
+        # VMs for limit tests should cover BIOS and UEFI variants for Linux and Windows
+        "limits": [],
     }
 }
 
