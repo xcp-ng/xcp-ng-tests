@@ -19,6 +19,7 @@ VCPUS = '8'
 # We do ensure the processes are killed
 @pytest.mark.filterwarnings("ignore::ResourceWarning")
 @pytest.mark.debian_uefi_vm
+@pytest.mark.usefixtures("unix_vm")
 class TestVIFLimit:
     def test_vif_limit(self, host_with_saved_yum_state, imported_vm):
         host = host_with_saved_yum_state

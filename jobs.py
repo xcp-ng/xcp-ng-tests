@@ -450,13 +450,12 @@ JOBS = {
     "limit-tests": {
         "description": "Tests verifying we can hit our supported limits",
         "requirements": [
-            "1 XCP-ng host >= 8.2"
+            "1 XCP-ng host >= 8.2",
+            "A set of VMs covering BIOS/UEFI and Linux/Windows, as defined in vm_data.py.",
         ],
         "nb_pools": 1,
         "params": {
-            # The test does not work on Alpine because of how it handles
-            # multiple interfaces on the same network, so use Debian instead
-            "--vm": "single/debian_uefi_vm",
+            "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
     }
