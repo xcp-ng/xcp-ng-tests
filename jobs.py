@@ -450,7 +450,7 @@ JOBS = {
     "limit-tests": {
         "description": "Tests verifying we can hit our supported limits",
         "requirements": [
-            "1 XCP-ng host >= 8.2",
+            "1 XCP-ng host >= 8.3",
             "A set of VMs covering BIOS/UEFI and Linux/Windows, as defined in vm_data.py.",
         ],
         "nb_pools": 1,
