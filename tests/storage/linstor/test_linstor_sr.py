@@ -1,13 +1,20 @@
 import pytest
 
+import json
 import logging
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import safe_split, vm_image, wait_for
+from lib.host import Host
+from lib.pool import Pool
+from lib.sr import SR
+from lib.vm import VM
 from tests.storage import vdi_is_open
 
-from .conftest import LINSTOR_PACKAGE
+from .conftest import GROUP_NAME, LINSTOR_PACKAGE
+
+from typing import Tuple
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
@@ -52,6 +59,56 @@ class TestLinstorSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
+
+def get_drbd_status(host: Host, resource: str):
+    logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
+    return json.loads(host.ssh(["drbdsetup", "status", resource, "--json"]))
+
+def get_corrupted_resources(host: Host, resource: str):
+    return [
+        (
+            res.get("name", ""),
+            conn.get("name", ""),
+            peer.get("out-of-sync", 0),
+        )
+        for res in get_drbd_status(host, resource)
+        for conn in res.get("connections", [])
+        for peer in conn.get("peer_devices", [])
+        if peer.get("out-of-sync", 0) > 0
+    ]
+
+def wait_drbd_sync(host: Host, resource: str):
+    logging.info("[%s] Waiting for DRBD sync on resource `%s`...", host, resource)
+    host.ssh(["drbdadm", "wait-sync", resource])
+
+
+def get_vdi_volume_name_from_linstor(master: Host, vdi_uuid: str) -> str:
+    result = master.ssh([
+        "linstor-kv-tool",
+        "--dump-volumes",
+        "-g",
+        f"xcp-sr-{GROUP_NAME}_thin_device"
+    ])
+    volumes = json.loads(result)
+    for k, v in volumes.items():
+        path = safe_split(k, "/")
+        if len(path) < 4:
+            continue
+        uuid = path[2]
+        data_type = path[3]
+        if uuid == vdi_uuid and data_type == "volume-name":
+            return v
+    raise FileNotFoundError(f"Could not find matching linstor volume for `{vdi_uuid}`")
+
+
+def get_vdi_host(pool: Pool, vdi_uuid: str, path: str) -> Host:
+    for h in pool.hosts:
+        result = h.ssh(["test", "-e", path], simple_output=False, check=False)
+        if result.returncode == 0:
+            return h
+    raise FileNotFoundError(f"Could not find matching host for `{vdi_uuid}`")
+
+
 @pytest.mark.usefixtures("linstor_sr")
 class TestLinstorSR:
     @pytest.mark.quicktest
@@ -82,6 +139,91 @@ class TestLinstorSR:
     def test_snapshot(self, vm_on_linstor_sr):
         vm = vm_on_linstor_sr
         vm.start()
+        try:
+            vm.wait_for_os_booted()
+            vm.test_snapshot_on_running_vm()
+        finally:
+            vm.shutdown(verify=True)
+
+    @pytest.fixture(scope='function')
+    def host_and_corrupted_vdi_on_linstor_sr(self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM):
+        vm: VM = vm_on_linstor_sr_function
+        pool: Pool = host.pool
+        master: Host = pool.master
+
+        try:
+            vdi_uuid: str = next((
+                vdi.uuid for vdi in vm.vdis if vdi.sr.uuid == linstor_sr.uuid
+            ))
+
+            volume_name = get_vdi_volume_name_from_linstor(master, vdi_uuid)
+            lv_path = f"/dev/{GROUP_NAME}/{volume_name}_00000"
+            vdi_host = get_vdi_host(pool, vdi_uuid, lv_path)
+            logging.info("[%s]: corrupting `%s`", host, lv_path)
+            vdi_host.ssh([
+                "dd",
+                "if=/dev/urandom",
+                f"of={lv_path}",
+                "bs=4096",
+                # Lower values seem to go undetected sometimes
+                "count=10000"  # ~40MB
+            ])
+            yield vm, vdi_host, volume_name
+        finally:
+            logging.info("<< Destroy corrupted VDI")
+            vm.destroy(verify=True)
+
+    @pytest.mark.small_vm
+    def test_resynchronization(
+        self, host_and_corrupted_vdi_on_linstor_sr: Tuple[VM, Host, str]
+    ):
+        (vm, host, resource_name) = host_and_corrupted_vdi_on_linstor_sr
+        hostname = host.hostname()
+
+        try:
+            other_host = next(
+                next(h for h in host.pool.hosts if h.hostname() == conn.get("name", ""))
+                for res in get_drbd_status(host, resource_name)
+                for conn in res.get("connections", [])
+                for peer in conn.get("peer_devices", [])
+                if peer.get("peer-disk-state", "") == "UpToDate"
+            )
+            logging.info("Elected `%s` as peer for verification and repair", other_host)
+        except StopIteration:
+            pytest.fail("Could not find an UpToDate peer host")
+
+        corrupted = None
+        max_attempts = 3
+        # Attempting several times since testing revealed `drbdadm verify` can be flaky
+        for attempt in range(1, max_attempts + 1):
+            logging.info("`drbdadm verify` attempt %d/%d", attempt, max_attempts)
+            logging.info("[%s] Running DRBD verify for %s...", other_host, resource_name)
+            other_host.ssh(["drbdadm", "verify", f"{resource_name}:{hostname}/0"])
+            wait_drbd_sync(other_host, resource_name)
+
+            corrupted_resources = get_corrupted_resources(other_host, resource_name)
+            if not corrupted_resources:
+                logging.warning("No corrupted resources found on attempt #%d", attempt)
+                continue
+            for res_name, peer_name, out_of_sync in corrupted_resources:
+                if res_name == resource_name and peer_name == hostname:
+                    corrupted = (res_name, peer_name, out_of_sync)
+            if corrupted:
+                break
+        if not corrupted:
+            pytest.fail(f"Failed to identify corrupted resource after {max_attempts} attempts")
+
+        logging.info("Invalidating remote resource `%s`...", resource_name)
+        other_host.ssh([
+            "drbdadm", "invalidate-remote",
+            f"{resource_name}:{hostname}/0",
+            "--reset-bitmap=no"
+        ])
+        wait_drbd_sync(other_host, resource_name)
+        if get_corrupted_resources(other_host, resource_name):
+            pytest.fail("Corrupted resource did not get fixed")
+
+        vm.start(on=host.uuid)
         try:
             vm.wait_for_os_booted()
             vm.test_snapshot_on_running_vm()
