@@ -13,7 +13,7 @@ from pkgfixtures import host_with_saved_yum_state
 # - the first network on the host can be used to reach the host
 
 VIF_LIMIT = 16
-VCPUS = '8'
+VCPUS = 8
 
 # There is a ResourceWarning due to background=True on an ssh call
 # We do ensure the processes are killed
@@ -21,9 +21,10 @@ VCPUS = '8'
 @pytest.mark.debian_uefi_vm
 @pytest.mark.usefixtures("unix_vm")
 class TestVIFLimit:
-    def test_vif_limit(self, host_with_saved_yum_state, imported_vm):
+    @pytest.mark.parametrize('vm_with_vcpu_count', [VCPUS], indirect=True)
+    def test_vif_limit(self, host_with_saved_yum_state, vm_with_vcpu_count):
         host = host_with_saved_yum_state
-        vm = imported_vm
+        vm = vm_with_vcpu_count
         interface_name = "enX"
 
         if (vm.is_running()):
@@ -32,12 +33,6 @@ class TestVIFLimit:
 
         network_uuid = vm.vifs()[0].param_get('network-uuid')
         existing_vifs = len(vm.vifs())
-
-        logging.info(f'Get {VCPUS} vCPUs for the VM')
-        original_vcpus_max = vm.param_get('VCPUs-max')
-        original_vcpus_at_startup = vm.param_get('VCPUs-at-startup')
-        vm.param_set('VCPUs-max', VCPUS)
-        vm.param_set('VCPUs-at-startup', VCPUS)
 
         logging.info('Create VIFs before starting the VM')
         vifs = []
@@ -98,8 +93,6 @@ class TestVIFLimit:
         finally:
             vm.ssh(['pkill iperf3 || true'])
             vm.shutdown(verify=True)
-            vm.param_set('VCPUs-at-startup', original_vcpus_at_startup)
-            vm.param_set('VCPUs-max', original_vcpus_max)
             for vif in vifs:
                 vif.destroy()
             host.ssh('killall iperf3 || true')
