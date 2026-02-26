@@ -4,7 +4,15 @@ The main entrypoint for running xcpng infra script.
 """
 import argparse
 
+from infra import logger
 from lib.common import HostAddress
+
+def cmd_update(args: argparse.Namespace):
+    """Handles update command from args.
+    """
+    logger.info(f"Received host argument: '{args.host}'")
+    pass
+
 
 def cli():
     parser = argparse.ArgumentParser(description="Helpfully manages xcp-ng infrastructure resources.")
@@ -19,6 +27,7 @@ def cli():
                                       metavar="HOST",
                                       help="hostname or ip address of target.")
 
-    args = parser.parse_args()
+    update_cmd_subparser.set_defaults(func=cmd_update)
 
-    print(f"Received host argument: '{args.host}'")
+    args = parser.parse_args()
+    args.func(args)
