@@ -657,7 +657,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name: str | None = None) -> "VM":
+    def clone(self, *, name: str | None = None) -> VM:
         if name is None:
             name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")

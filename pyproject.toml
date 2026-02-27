@@ -58,6 +58,8 @@ select = [
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
   "ANN",  # flake8-annotations
+  "UP037",  # quoted-annotation
+  "FA",  # future-annotations
 ]
 # don't use some of the default D and SIM rules
 ignore = [
