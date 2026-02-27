@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from lib.commands import SSHCommandFailed
@@ -54,7 +56,7 @@ class TestLVMOISCSISR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
-    def test_coalesce(self, storage_test_vm: 'VM', vdi_on_lvmoiscsi_sr: 'VDI', vdi_op: CoalesceOperation,
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_lvmoiscsi_sr: VDI, vdi_op: CoalesceOperation,
                       defer: Defer) -> None:
         coalesce_integrity(storage_test_vm, vdi_on_lvmoiscsi_sr, vdi_op, defer)
 
