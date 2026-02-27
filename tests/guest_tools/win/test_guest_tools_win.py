@@ -117,6 +117,25 @@ class TestGuestToolsWindows:
             check_vm_distro(vm)
             check_vm_clipboard(vm)
 
+    def test_xenvbd_unmap(self, vm_install_test_tools_per_test_class: VM):
+        """Xenvbd must always advertise unmap to allow migration between backends with different discard support."""
+        vm = vm_install_test_tools_per_test_class
+        trim_supported = strtobool(
+            vm.execute_powershell_script(r'''$null -ne (fsutil fsinfo sectorInfo C: |
+Select-String "Trim Supported")''')
+        )
+        assert trim_supported
+
+    def test_xenvbd_ssd(self, vm_install_test_tools_per_test_class: VM):
+        """Xenvbd must always advertise as SSD to avoid unnecessary defragging by Windows."""
+        vm = vm_install_test_tools_per_test_class
+        is_ssd = strtobool(
+            vm.execute_powershell_script(
+                r'''(Get-PhysicalDisk -DeviceNumber (Get-Partition -DriveLetter C).DiskNumber).MediaType -eq "SSD"'''
+            )
+        )
+        assert is_ssd
+
 
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
