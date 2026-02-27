@@ -868,6 +868,36 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         logging.info(f"Marking VM {clone.uuid} as cached")
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
+    @overload
+    def xenstore_read(self, path: str, accept_unknown_key: Literal[False] = False) -> str:
+        ...
+
+    @overload
+    def xenstore_read(self, path: str, accept_unknown_key: Literal[True]) -> Optional[str]:
+        ...
+
+    def xenstore_read(self, path: str, accept_unknown_key: bool = False):
+        domid = self.param_get("dom-id")
+        try:
+            return self.get_residence_host().ssh(f"xenstore-read /local/domain/{domid}/{path}")
+        except commands.SSHCommandFailed as e:
+            if accept_unknown_key and "couldn't read path" in e.stdout:
+                return None
+            else:
+                raise
+
+    def xenstore_write(self, path: str, value: str):
+        domid = self.param_get("dom-id")
+        self.get_residence_host().ssh(f"xenstore-write /local/domain/{domid}/{path} {value}")
+
+    def xenstore_rm(self, path: str, accept_unknown_key: bool = False):
+        domid = self.param_get("dom-id")
+        try:
+            self.get_residence_host().ssh(f"xenstore-rm /local/domain/{domid}/{path}")
+        except commands.SSHCommandFailed as e:
+            if not (accept_unknown_key and "could not remove path" in e.stdout):
+                raise
+
 
 def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
     vm_name = vm_def["name"]

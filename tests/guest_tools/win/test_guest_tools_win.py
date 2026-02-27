@@ -9,6 +9,8 @@ from lib.vm import VM
 from lib.windows import (
     WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
+    check_vm_clipboard,
+    check_vm_distro,
     check_vm_dns,
     set_vm_dns,
     vif_has_rss,
@@ -73,15 +75,16 @@ class TestGuestToolsWindows:
 
     def test_vif_replug(self, vm_install_test_tools_per_test_class: VM):
         vm = vm_install_test_tools_per_test_class
-        vifs = vm.vifs()
-        for vif in vifs:
-            assert strtobool(vif.param_get("currently-attached"))
-            vif.unplug()
-            # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
-            assert not strtobool(vif.param_get("currently-attached"))
-            time.sleep(5)
-            vif.plug()
-        wait_for(vm.is_ssh_up, "Wait for SSH up")
+        for _iter in range(3):
+            vifs = vm.vifs()
+            for vif in vifs:
+                assert strtobool(vif.param_get("currently-attached"))
+                vif.unplug()
+                # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
+                assert not strtobool(vif.param_get("currently-attached"))
+                time.sleep(5)
+                vif.plug()
+            wait_for(vm.is_ssh_up, "Wait for SSH up")
 
     def test_rss(self, vm_install_test_tools_per_test_class: VM):
         """
@@ -93,6 +96,45 @@ class TestGuestToolsWindows:
         vifs = vm.vifs()
         for vif in vifs:
             assert vif_has_rss(vif)
+
+    def test_reporting_after_xeniface_disable(self, vm_install_test_tools_per_test_class: VM):
+        vm = vm_install_test_tools_per_test_class
+        for _iter in range(3):
+            logging.info("Disable Xeniface")
+            vm.execute_powershell_script(r'Disable-PnpDevice "XENBUS\VEN_XN&DEV_IFACE\_" -Confirm:$false')
+            vm.xenstore_rm("data/os_distro", accept_unknown_key=True)
+            logging.info("Enable Xeniface")
+            vm.execute_powershell_script(r'Enable-PnpDevice "XENBUS\VEN_XN&DEV_IFACE\_" -Confirm:$false')
+            check_vm_distro(vm)
+            check_vm_clipboard(vm)
+
+    def test_reporting_after_suspend(self, vm_install_test_tools_per_test_class: VM):
+        vm = vm_install_test_tools_per_test_class
+        for _iter in range(3):
+            vm.suspend(verify=True)
+            vm.resume()
+            wait_for_vm_running_and_ssh_up_without_tools(vm)
+            check_vm_distro(vm)
+            check_vm_clipboard(vm)
+
+    def test_xenvbd_unmap(self, vm_install_test_tools_per_test_class: VM):
+        """Xenvbd must always advertise unmap to allow migration between backends with different discard support."""
+        vm = vm_install_test_tools_per_test_class
+        trim_supported = strtobool(
+            vm.execute_powershell_script(r'''$null -ne (fsutil fsinfo sectorInfo C: |
+Select-String "Trim Supported")''')
+        )
+        assert trim_supported
+
+    def test_xenvbd_ssd(self, vm_install_test_tools_per_test_class: VM):
+        """Xenvbd must always advertise as SSD to avoid unnecessary defragging by Windows."""
+        vm = vm_install_test_tools_per_test_class
+        is_ssd = strtobool(
+            vm.execute_powershell_script(
+                r'''(Get-PhysicalDisk -DeviceNumber (Get-Partition -DriveLetter C).DiskNumber).MediaType -eq "SSD"'''
+            )
+        )
+        assert is_ssd
 
 
 @pytest.mark.multi_vms
