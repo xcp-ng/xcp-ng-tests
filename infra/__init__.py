@@ -7,5 +7,5 @@ xcp-ng VMs.
 import logging
 
 logger = logging.getLogger()
-logging.basicConfig(format='%(asctime)s > %(levelname)s > %(message)s',
+logging.basicConfig(style="{", format="{asctime} - {levelname:<8} - {module}.{funcName} - {message}",
                     level=logging.INFO)
