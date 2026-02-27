@@ -6,6 +6,6 @@ xcp-ng VMs.
 
 import logging
 
-logger = logging.getLogger("xcpng-infra")
+logger = logging.getLogger()
 logging.basicConfig(format='%(asctime)s > %(levelname)s > %(message)s',
                     level=logging.INFO)
