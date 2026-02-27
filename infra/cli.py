@@ -4,15 +4,24 @@ The main entrypoint for running xcpng infra script.
 """
 import argparse
 import logging
+import sys
 
 from infra import logger
 from lib.common import HostAddress
+from lib.pool import Pool
 
 def cmd_update(args: argparse.Namespace):
     """Handles update command from args.
     """
     logger.info(f"Received host argument: '{args.host}'")
-    pass
+    # init related pool
+    try:
+        pool = Pool(args.host)
+    except AssertionError as ae:
+        logger.critical(ae)
+        sys.exit(1)
+
+    print(pool)
 
 
 def cli():
