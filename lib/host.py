@@ -52,7 +52,7 @@ def host_data(hostname_or_ip: str) -> dict[str, str]:
 
 class Host:
     xe_prefix = "host"
-    pool: "Pool"
+    pool: Pool
 
     # Data extraction is automatic, no conversion from str is done.
     BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
