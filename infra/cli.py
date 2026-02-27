@@ -6,7 +6,7 @@ import argparse
 import logging
 import sys
 
-from infra import logger
+from infra import logger, task_update
 from lib.common import HostAddress
 from lib.pool import Pool
 
@@ -21,6 +21,10 @@ def cmd_update(args: argparse.Namespace):
         logger.critical(ae)
         sys.exit(1)
 
+    logger.info(f"> [{pool.master}] Begin updating target host")
+    task_update.update_target(pool.master)
+
+    logger.info(f"> [{pool.master}] Updated!")
     print(pool)
 
 
