@@ -20,7 +20,7 @@ def count_interfaces(vm: VM) -> int:
 
 @pytest.mark.small_vm
 class TestVIFManagement:
-    def test_vif_management(self, running_unix_vm: VM):
+    def test_vif_management(self, running_unix_vm: VM) -> None:
         vm = running_unix_vm
         host = vm.host
         network_uuid = host.management_network()
