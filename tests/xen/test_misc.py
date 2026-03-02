@@ -11,7 +11,7 @@ from lib.host import Host
 # - XCP-ng host
 
 # Check for a valid "Latest ChangeSet" trace in 'xl dmesg'
-def test_xen_changeset(host: Host):
+def test_xen_changeset(host: Host) -> None:
     changeset = host.ssh('xl dmesg | grep "Latest ChangeSet"')
     regexp = r'.*Latest ChangeSet:\s*(([^,]+),.*)'
 
