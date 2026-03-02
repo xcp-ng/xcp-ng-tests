@@ -8,7 +8,7 @@ from . import WINDOWS_SHUTDOWN_COMMAND, enable_testsign, insert_cd_safe, wait_fo
 
 from typing import Any, Dict
 
-def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]):
+def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]) -> None:
     if param.get("vendor_device"):
         assert not strtobool(vm.param_get("has-vendor-device"))
         vm.param_set("has-vendor-device", True)

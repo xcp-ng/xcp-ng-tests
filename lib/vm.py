@@ -4,6 +4,7 @@ import pytest
 
 import logging
 import os
+import subprocess
 import tempfile
 import uuid
 
@@ -21,19 +22,20 @@ from lib.common import (
     wait_for_not,
 )
 from lib.snapshot import Snapshot
+from lib.sr import SR
 from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, cast, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
 
 class VM(BaseVM):
-    def __init__(self, uuid: str, host: 'Host'):
+    def __init__(self, uuid: str, host: Host) -> None:
         super().__init__(uuid, host)
-        self.ip: Optional[str] = None
+        self.ip: str | None = None
         self.previous_host: Host | None = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
         self.is_uefi = self.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
@@ -42,28 +44,28 @@ class VM(BaseVM):
     def power_state(self) -> str:
         return self.param_get('power-state')
 
-    def is_running(self):
+    def is_running(self) -> bool:
         return self.power_state() == 'running'
 
-    def is_halted(self):
+    def is_halted(self) -> bool:
         return self.power_state() == 'halted'
 
-    def is_suspended(self):
+    def is_suspended(self) -> bool:
         return self.power_state() == 'suspended'
 
-    def is_paused(self):
+    def is_paused(self) -> bool:
         return self.power_state() == 'paused'
 
     # `on` can be an host name-label or UUID
     def start(self, on: str | None = None) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
-        args: dict[str, str | bool] = {'uuid': self.uuid}
+        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
         return self.host.xe('vm-start', args)
 
-    def shutdown(self, force=False, verify=False, force_if_fails=False):
+    def shutdown(self, force: bool = False, verify: bool = False, force_if_fails: bool = False) -> str:
         assert not (force and force_if_fails), "force and force_if_fails cannot be both True"
         logging.info("Shutdown VM" + (" (force)" if force else ""))
 
@@ -78,9 +80,9 @@ class VM(BaseVM):
             else:
                 raise
 
-        return ret
+        return str(ret) # Ensure return type matches hint, xe can return non-string
 
-    def reboot(self, force=False, verify=False):
+    def reboot(self, force: bool = False, verify: bool = False) -> str:
         logging.info("Reboot VM")
         ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': force})
         if verify:
@@ -88,9 +90,9 @@ class VM(BaseVM):
             # does that for us already (it only finishes once the reboot started).
             # So we just wait for the VM to be operational again
             self.wait_for_vm_running_and_ssh_up()
-        return ret
+        return str(ret) # Ensure return type matches hint, xe can return non-string
 
-    def try_get_and_store_ip(self):
+    def try_get_and_store_ip(self) -> bool:
         ip = self.param_get('networks', '0/ip', accept_unknown_key=True)
 
         # An IP that starts with 169.254. is not a real routable IP.
@@ -123,25 +125,28 @@ class VM(BaseVM):
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check=True, simple_output=True, background=False, decode=True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
+            decode: bool = True) -> str | bytes | commands.SSHResult | None:
         ...
 
-    def ssh(self, cmd: str, *, check=True, simple_output=True, background=False, decode=True):
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
+            decode: bool = True) -> str | bytes | commands.SSHResult | None:
         # raises by default for any nonzero return code
         assert self.ip is not None
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
                             decode=decode)
 
-    def ssh_with_result(self, cmd) -> commands.SSHResult:
+    def ssh_with_result(self, cmd: str) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         assert self.ip is not None
         return commands.ssh_with_result(self.ip, cmd)
 
-    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
+    def scp(self, src: str, dest: str, check: bool = True, suppress_fingerprint_warnings: bool = True,
+            local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
         # Stop execution if scp() is used on Windows VMs as some OpenSSH releases for Windows don't
         # have support for the scp legacy protocol. Callers must use vm.sftp_put() instead
         assert not self.is_windows, "You cannot use scp() on Windows VMs. Please use vm.sftp_put() instead"
+        assert self.ip is not None
 
         return commands.scp(
             self.ip, src, dest, check=check,
@@ -149,8 +154,10 @@ class VM(BaseVM):
             local_dest=local_dest
         )
 
-    def sftp_put(self, src, dest, check=True, suppress_fingerprint_warnings=True):
+    def sftp_put(self, src: str, dest: str, check: bool = True,
+                 suppress_fingerprint_warnings: bool = True) -> subprocess.CompletedProcess[bytes]:
         cmd = f"put {src} {dest}"
+        assert self.ip is not None
         return commands.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
 
     def is_ssh_up(self) -> bool:
@@ -178,7 +185,7 @@ class VM(BaseVM):
             )
         )
 
-    def wait_for_os_booted(self):
+    def wait_for_os_booted(self) -> None:
         wait_for(self.is_running, "Wait for VM running")
         # waiting for the IP:
         # - allows to make sure the OS actually started (on VMs that have the management agent)
@@ -187,11 +194,11 @@ class VM(BaseVM):
         # now wait also for the management agent to have started
         wait_for(self.is_management_agent_up, "Wait for management agent up")
 
-    def wait_for_vm_running_and_ssh_up(self):
+    def wait_for_vm_running_and_ssh_up(self) -> None:
         self.wait_for_os_booted()
         wait_for(self.is_ssh_up, "Wait for SSH up")
 
-    def ssh_touch_file(self, filepath):
+    def ssh_touch_file(self, filepath: str) -> None:
         logging.info("Create file on VM (%s)" % filepath)
         self.ssh(f'touch {filepath}')
         if not self.is_windows:
@@ -199,30 +206,30 @@ class VM(BaseVM):
         logging.info("Check file created")
         self.ssh(f'test -f {filepath}')
 
-    def suspend(self, verify=False):
+    def suspend(self, verify: bool = False) -> None:
         logging.info("Suspend VM")
         self.host.xe('vm-suspend', {'uuid': self.uuid})
         if verify:
             wait_for(self.is_suspended, "Wait for VM suspended")
 
-    def resume(self):
+    def resume(self) -> None:
         logging.info("Resume VM")
         self.host.xe('vm-resume', {'uuid': self.uuid})
 
-    def pause(self, verify=False):
+    def pause(self, verify: bool = False) -> None:
         logging.info("Pause VM")
         self.host.xe('vm-pause', {'uuid': self.uuid})
         if verify:
             wait_for(self.is_paused, "Wait for VM paused")
 
-    def unpause(self):
+    def unpause(self) -> None:
         logging.info("Unpause VM")
         self.host.xe('vm-unpause', {'uuid': self.uuid})
 
-    def _disk_list(self):
+    def _disk_list(self) -> str:
         return self.host.xe('vm-disk-list', {'uuid': self.uuid, 'vbd-params': ''}, minimal=True)
 
-    def destroy(self, verify=False):
+    def destroy(self, verify: bool = False) -> None:
         if not self.is_halted():
             self.shutdown(force=True)
 
@@ -242,9 +249,9 @@ class VM(BaseVM):
         assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host: Host, sr=None, network=None):
+    def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None) -> None:
         msg = "Migrate VM to host %s" % target_host
-        params = {
+        params: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
             'host-uuid': target_host.uuid,
             'live': self.is_running()
@@ -271,7 +278,7 @@ class VM(BaseVM):
                 sr_uuid = sr.uuid
             else:
                 sr_uuid = target_host.xe('pool-param-get', {'uuid': target_host.pool.uuid, 'param-name': 'default-SR'})
-            vdi_map = {}
+            vdi_map: dict[str, str] = {}
             for vdi_uuid in self.vdi_uuids():
                 vdi_map[vdi_uuid] = sr_uuid
             params['vdi'] = vdi_map
@@ -281,7 +288,7 @@ class VM(BaseVM):
                 if network is None:
                     network = remote_master.management_network()
 
-                vif_map = {}
+                vif_map: dict[str, str] = {}
                 for vif in self.vifs():
                     vif_map[vif.uuid] = network
                 params['vif'] = vif_map
@@ -292,9 +299,12 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis=None) -> Snapshot:
+    def snapshot(self, ignore_vdis: List[str] | None = None) -> Snapshot:
         logging.info("Snapshot VM")
-        args: dict[str, str | bool] = {'uuid': self.uuid, 'new-name-label': 'Snapshot of %s' % self.uuid}
+        args: dict[str, str | bool | dict[str, str]] = {
+            'uuid': self.uuid,
+            'new-name-label': 'Snapshot of %s' % self.uuid,
+        }
         if ignore_vdis:
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         snap_uuid = self.host.xe('vm-snapshot', args)
@@ -322,9 +332,9 @@ class VM(BaseVM):
 
         self.vdis.append(vdi)
 
-        return VBD(vbd_uuid, self, vdi)
+        return VBD(vbd_uuid, self, vdi.name())
 
-    def disconnect_vdi(self, vdi: VDI):
+    def disconnect_vdi(self, vdi: VDI) -> None:
         logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
         assert vdi in self.vdis, f"VDI {vdi.uuid} not in VM {self.uuid} VDI list"
         vbd_uuid = self.host.xe("vbd-list", {
@@ -375,7 +385,8 @@ class VM(BaseVM):
             _vifs.append(VIF(vif_uuid, self))
         return _vifs
 
-    def create_vif(self, vif_num: int, *, network_uuid=None, network_name=None) -> VIF:
+    def create_vif(self, vif_num: int, *, network_uuid: str | None = None,
+                   network_name: str | None = None) -> VIF:
         assert bool(network_uuid) != bool(network_name), \
             "create_vif needs network_uuid XOR network_name"
         if network_name:
@@ -426,12 +437,20 @@ class VM(BaseVM):
             pid = self.ssh(f'cat {pidfile}')
             self.ssh(f'rm -f {script}')
             self.ssh(f'rm -f {pidfile}')
-            return pid
+            return str(pid)
 
-    def pid_exists(self, pid) -> bool:
+    def pid_exists(self, pid: str) -> bool:
         return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
 
-    def execute_script(self, script_contents, simple_output=True):
+    @overload
+    def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
+        ...
+
+    @overload
+    def execute_script(self, script_contents: str, *, simple_output: Literal[False]) -> commands.SSHResult:
+        ...
+
+    def execute_script(self, script_contents: str, simple_output: bool = True) -> str | commands.SSHResult:
         with tempfile.NamedTemporaryFile('w') as f:
             f.write(script_contents)
             f.flush()
@@ -440,12 +459,12 @@ class VM(BaseVM):
                 logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
                 # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
                 # It is a documented requirement that bash is present on all test VMs.
-                res = self.ssh(f'bash {f.name}', simple_output=simple_output)
+                res = cast(str | commands.SSHResult, self.ssh(f'bash {f.name}', simple_output=simple_output))
                 return res
             finally:
                 self.ssh(f'rm -f {f.name}')
 
-    def distro(self):
+    def distro(self) -> str:
         """
         Returns the distro name as detected by the guest tools.
 
@@ -455,7 +474,7 @@ class VM(BaseVM):
         script += "echo $os_distro\n"
         return self.execute_script(script)
 
-    def tools_version_dict(self):
+    def tools_version_dict(self) -> dict[str, str]:
         """
         Returns the guest tools version as detected by the guest tools, as a {major:, minor:, micro:, build:} dict.
 
@@ -463,17 +482,17 @@ class VM(BaseVM):
         """
         return parse_xe_dict(self.param_get('PV-drivers-version'))
 
-    def tools_version(self):
+    def tools_version(self) -> str:
         """ Returns the tools version in the form major.minor.micro-build. """
         version_dict = self.tools_version_dict()
         return "{major}.{minor}.{micro}-{build}".format(**version_dict)
 
-    def file_exists(self, filepath, regular_file=True) -> bool:
+    def file_exists(self, filepath: str, regular_file: bool = True) -> bool:
         """Returns True if the file exists, otherwise returns False."""
         option = '-f' if regular_file else '-e'
-        return self.ssh_with_result(['test', option, filepath]).returncode == 0
+        return self.ssh_with_result(f'test {option} {filepath}').returncode == 0
 
-    def detect_package_manager(self):
+    def detect_package_manager(self) -> PackageManagerEnum:
         """ Heuristic to determine the package manager on a unix distro. """
         if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
             return PackageManagerEnum.RPM
@@ -482,19 +501,19 @@ class VM(BaseVM):
         else:
             return PackageManagerEnum.UNKNOWN
 
-    def insert_cd(self, vdi_name):
+    def insert_cd(self, vdi_name: str) -> None:
         logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
         self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': vdi_name})
 
-    def insert_guest_tools_iso(self):
+    def insert_guest_tools_iso(self) -> None:
         self.insert_cd('guest-tools.iso')
 
-    def eject_cd(self):
+    def eject_cd(self) -> None:
         logging.info("Ejecting CD from VM %s", self.uuid)
         self.host.xe('vm-cd-eject', {'uuid': self.uuid})
 
     # *** Common reusable test fragments
-    def test_snapshot_on_running_vm(self):
+    def test_snapshot_on_running_vm(self) -> None:
         self.wait_for_vm_running_and_ssh_up()
         snapshot = self.snapshot()
         try:
@@ -508,8 +527,8 @@ class VM(BaseVM):
         finally:
             snapshot.destroy(verify=True)
 
-    def get_messages(self, name):
-        args = {
+    def get_messages(self, name: str) -> List[str]:
+        args: dict[str, str | bool | dict[str, str]] = {
             'obj-uuid': self.uuid,
             'name': name,
             'params': 'uuid',
@@ -520,13 +539,13 @@ class VM(BaseVM):
         # Extracts uuids from lines of: "uuid ( RO) : <uuid>"
         return [e.split(':')[1].strip() for e in lines if e]
 
-    def rm_messages(self, name):
+    def rm_messages(self, name: str) -> None:
         msgs = self.get_messages(name)
 
         for msg in msgs:
             self.host.xe('message-destroy', {'uuid': msg})
 
-    def sign_efi_bins(self, db: efi.EFIAuth):
+    def sign_efi_bins(self, db: efi.EFIAuth) -> None:
         with tempfile.TemporaryDirectory() as directory:
             for remote_bin in self.get_all_efi_bins():
                 local_bin = os.path.join(directory, os.path.basename(remote_bin))
@@ -534,7 +553,7 @@ class VM(BaseVM):
                 signed = db.sign_image(local_bin)
                 self.scp(signed, remote_bin)
 
-    def set_efi_var(self, var: str, guid: efi.GUID, attrs: bytes, data: bytes):
+    def set_efi_var(self, var: str, guid: efi.GUID, attrs: bytes, data: bytes) -> None:
         """Sets the data and attrs for an EFI variable and GUID."""
         assert len(attrs) == 4
 
@@ -559,7 +578,7 @@ class VM(BaseVM):
         finally:
             self.ssh(f'rm -f {tmp_efivarfs}', check=False)
 
-    def get_efi_var(self, var, guid):
+    def get_efi_var(self, var: str, guid: efi.GUID) -> bytes:
         """Returns a 2-tuple of (attrs, data) for an EFI variable."""
         efivarfs = '/sys/firmware/efi/efivars/%s-%s' % (var, guid.as_str())
 
@@ -571,7 +590,7 @@ class VM(BaseVM):
         # The efivarfs file starts with the attributes, which are 4 bytes long
         return data[4:]
 
-    def clear_uefi_variables(self):
+    def clear_uefi_variables(self) -> None:
         """
         Remove all UEFI variables.
 
@@ -599,20 +618,20 @@ class VM(BaseVM):
 
         return binaries
 
-    def get_vtpm_uuid(self):
+    def get_vtpm_uuid(self) -> str:
         return self.host.xe('vtpm-list', {'vm-uuid': self.uuid}, minimal=True)
 
-    def create_vtpm(self):
+    def create_vtpm(self) -> str:
         logging.info("Creating vTPM for vm %s" % self.uuid)
         return self.host.xe('vtpm-create', {'vm-uuid': self.uuid})
 
-    def destroy_vtpm(self):
+    def destroy_vtpm(self) -> str:
         vtpm_uuid = self.get_vtpm_uuid()
         assert vtpm_uuid, "A vTPM must be present"
         logging.info("Destroying vTPM %s" % vtpm_uuid)
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
-    def create_vbd(self, device, vdi_uuid) -> VBD:
+    def create_vbd(self, device: str, vdi_uuid: str) -> VBD:
         logging.info("Create VBD %r for VDI %r on VM %s", device, vdi_uuid, self.uuid)
         vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
                                                'device': device,
@@ -621,7 +640,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return VBD(vbd_uuid, self, device)
 
-    def create_cd_vbd(self, device, userdevice) -> VBD:
+    def create_cd_vbd(self, device: str, userdevice: str) -> VBD:
         logging.info("Create CD VBD %r on VM %s", device, self.uuid)
         vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
                                                'device': device,
@@ -633,7 +652,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name=None) -> VM:
+    def clone(self, *, name: str | None = None) -> "VM":
         if name is None:
             name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
@@ -642,7 +661,7 @@ class VM(BaseVM):
 
     def set_variable_from_file(
         self, filepath: str, variable_guid: str | uuid.UUID, variable_name: str, attr: int | str
-    ):
+    ) -> None:
         dest = self.host.ssh('mktemp')
         try:
             self.host.scp(filepath, dest)
@@ -650,7 +669,7 @@ class VM(BaseVM):
         finally:
             self.host.ssh(f'rm -f {dest}')
 
-    def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]):
+    def install_uefi_certs(self, auths: Iterable[efi.EFIAuth]) -> None:
         """
         Install UEFI certs to the VM's NVRAM store.
 
@@ -665,7 +684,7 @@ class VM(BaseVM):
         for auth in auths:
             self.set_variable_from_file(auth.auth(), auth.guid.as_str(), auth.name, efi.EFI_AT_ATTRS)
 
-    def booted_with_secureboot(self):
+    def booted_with_secureboot(self) -> bool:
         """ Returns True if the VM is on and SecureBoot is confirmed to be on from within the VM. """
         if not self.is_uefi:
             return False
@@ -736,18 +755,18 @@ class VM(BaseVM):
             res_host.ssh(f'rm -f {tmp_file}', check=False)
         return ret
 
-    def set_uefi_setup_mode(self):
+    def set_uefi_setup_mode(self) -> None:
         # Note that in XCP-ng 8.2, the VM won't stay in setup mode, because uefistored
         # will add PK and other certs if available when the guest boots.
         logging.info(f"Set VM {self.uuid} to UEFI setup mode")
         self.host.ssh(f'varstore-sb-state {self.uuid} setup')
 
-    def set_uefi_user_mode(self):
+    def set_uefi_user_mode(self) -> None:
         # Setting user mode propagates the host's certificates to the VM
         logging.info(f"Set VM {self.uuid} to UEFI user mode")
         self.host.ssh(f'varstore-sb-state {self.uuid} user')
 
-    def is_uefi_var_present(self, varname):
+    def is_uefi_var_present(self, varname: str) -> bool:
         res = self.host.ssh(f'varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname}',
                             check=False, simple_output=False, decode=False)
         return res.returncode == 0
@@ -767,20 +786,20 @@ class VM(BaseVM):
     def execute_powershell_script(
             self,
             script_contents: str,
-            simple_output=True,
-            prepend="$ProgressPreference = 'SilentlyContinue';"):
+            simple_output: bool = True,
+            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str | commands.SSHResult:
         # ProgressPreference is needed to suppress any clixml progress output,
         # as it's not filtered away from stdout by default, and we're grabbing stdout.
         assert self.is_windows
         if prepend is not None:
             script_contents = prepend + script_contents
         cmd = commands.encode_powershell_command(script_contents)
-        return self.ssh(
+        return cast(str | commands.SSHResult, self.ssh(
             f"powershell.exe -nologo -noprofile -noninteractive -encodedcommand {cmd}",
             simple_output=simple_output,
-        )
+        ))
 
-    def run_powershell_command(self, program: str, args: str):
+    def run_powershell_command(self, program: str, args: str) -> int:
         """
         Run command under powershell to retrieve exit codes higher than 255.
 
@@ -791,7 +810,7 @@ class VM(BaseVM):
             f"Write-Output (Start-Process -Wait -PassThru {program} -ArgumentList '{args}').ExitCode")
         return int(output)
 
-    def start_background_powershell(self, cmd: str):
+    def start_background_powershell(self, cmd: str) -> None:
         """
         Run command under powershell in the background.
 
@@ -804,7 +823,7 @@ class VM(BaseVM):
             f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\'"
         )
 
-    def is_windows_pv_device_installed(self):
+    def is_windows_pv_device_installed(self) -> bool:
         """Checks for the install state of **any** Xen/XenServer PV devices."""
         output = self.execute_powershell_script(
             r"""Get-PnpDevice -PresentOnly |
@@ -824,14 +843,14 @@ Select-Object -ExpandProperty Problem"""
         else:
             raise Exception(f"Unknown problem status {statuses}")
 
-    def are_windows_services_present(self):
+    def are_windows_services_present(self) -> bool:
         """Checks for the presence of **any** Xen/XenServer PV services."""
         output = self.execute_powershell_script(
             r"""$null -ne (Get-Service xenagent,xenbus,xenbus_monitor,xencons,xencons_monitor,xendisk,xenfilt,xenhid,
 xeniface,XenInstall,xennet,XenSvc,xenvbd,xenvif,xenvkbd -ErrorAction SilentlyContinue)""")
         return strtobool(output)
 
-    def are_windows_drivers_present(self):
+    def are_windows_drivers_present(self) -> bool:
         """Checks for the presence of **any** installed PV drivers, activated or not."""
         output = self.execute_powershell_script(
             r"""$null -ne (Get-ChildItem $env:windir\INF\oem*.inf |
@@ -839,11 +858,11 @@ ForEach-Object {Get-Content $_} |
 Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet|xenvbd|xenvif|xenvkbd)")""")
         return strtobool(output)
 
-    def are_windows_tools_working(self):
+    def are_windows_tools_working(self) -> bool:
         assert self.is_windows
         return self.is_windows_pv_device_installed() and strtobool(self.param_get("PV-drivers-detected"))
 
-    def are_windows_tools_uninstalled(self):
+    def are_windows_tools_uninstalled(self) -> bool:
         assert self.is_windows
         return (
             not self.is_windows_pv_device_installed()
@@ -851,7 +870,7 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
             and not self.are_windows_drivers_present()
         )
 
-    def save_to_cache(self, cache_id):
+    def save_to_cache(self, cache_id: str) -> None:
         logging.info("Save VM %s to cache for %r as a clone" % (self.uuid, cache_id))
 
         while True:
@@ -866,7 +885,7 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
 
-def vm_cache_key_from_def(vm_def, ref_nodeid, test_gitref):
+def vm_cache_key_from_def(vm_def: dict[str, str], ref_nodeid: str, test_gitref: str) -> str:
     vm_name = vm_def["name"]
     image_test = vm_def["image_test"]
     image_vm = vm_def.get("image_vm", vm_name)
