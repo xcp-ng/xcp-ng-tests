@@ -26,7 +26,7 @@ class Pool:
         # wait for XAPI startup to be done, or we can get "Connection
         # refused (calling connect )" when calling self.hosts_uuids()
         wait_for(lambda: commands.ssh_with_result(master_hostname_or_ip,
-                                                  ['xapi-wait-init-complete', '60']).returncode == 0,
+                                                  'xapi-wait-init-complete 60').returncode == 0,
                  f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
                  timeout_secs=30 * 60)
 
@@ -137,8 +137,8 @@ class Pool:
         mountpoint = f"/run/sr-mount/{iso_sr.uuid}"
         if remote_filename is None:
             # needs only work on XCP-ng 8.2+
-            remote_filename = self.master.ssh(["mktemp --suffix=.iso -p", mountpoint])
-            self.master.ssh(["chmod 644", remote_filename])
+            remote_filename = self.master.ssh(f'mktemp --suffix=.iso -p {mountpoint}')
+            self.master.ssh(f'chmod 644 {remote_filename}')
 
         logging.info("Uploading to ISO-SR %s as %s", local_file, remote_filename)
         self.master.scp(local_file, remote_filename)
@@ -149,7 +149,7 @@ class Pool:
         iso_sr = self.get_iso_sr()
         fullpath = f"/run/sr-mount/{iso_sr.uuid}/{remote_filename}"
         logging.info("Removing %s from ISO-SR server", remote_filename)
-        self.master.ssh(["rm", fullpath])
+        self.master.ssh(f'rm {fullpath}')
 
     def save_uefi_certs(self) -> None:
         """
@@ -172,24 +172,24 @@ class Pool:
         assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
         logging.info('Saving pool UEFI certificates')
 
-        if int(self.master.ssh(["secureboot-certs", "--version"]).split(".")[0]) < 1:
+        if int(self.master.ssh("secureboot-certs --version").split(".")[0]) < 1:
             raise RuntimeError("The host must have secureboot-certs version >= 1.0.0")
 
         saved_certs = {
-            'PK': self.master.ssh(['mktemp']),
-            'KEK': self.master.ssh(['mktemp']),
-            'db': self.master.ssh(['mktemp']),
-            'dbx': self.master.ssh(['mktemp'])
+            'PK': self.master.ssh('mktemp'),
+            'KEK': self.master.ssh('mktemp'),
+            'db': self.master.ssh('mktemp'),
+            'dbx': self.master.ssh('mktemp')
         }
         # save the pool certs in temporary files on master host
         for cert in list(saved_certs.keys()):
             tmp_file = saved_certs[cert]
             try:
-                self.master.ssh(['secureboot-certs', 'extract', cert, tmp_file])
+                self.master.ssh(f'secureboot-certs extract {cert} {tmp_file}')
             except commands.SSHCommandFailed as e:
                 if "does not exist in XAPI pool DB" in e.stdout:
                     # there's no cert to save
-                    self.master.ssh(['rm', '-f', tmp_file])
+                    self.master.ssh(f'rm -f {tmp_file}')
                     del saved_certs[cert]
         # Either there are no certs at all, or there must be at least PK, KEK and db,
         # else we won't be able to restore the exact same state
@@ -199,7 +199,7 @@ class Pool:
                          % (' '.join(saved_certs.keys()) if saved_certs else 'no certs'))
         else:
             for tmp_file in saved_certs.values():
-                self.master.ssh(['rm', '-f', tmp_file])
+                self.master.ssh(f'rm -f {tmp_file}')
             raise Exception(
                 (
                     "Can't save pool UEFI certs. Only %s certs are defined, "
@@ -224,10 +224,10 @@ class Pool:
                 params.append(self.saved_uefi_certs['dbx'])
             else:
                 params.append('none')
-            self.master.ssh(['secureboot-certs', 'install'] + params)
+            self.master.ssh(' '.join(['secureboot-certs', 'install'] + params))
             # remove files from host
             for tmp_file in self.saved_uefi_certs.values():
-                self.master.ssh(['rm', '-f', tmp_file])
+                self.master.ssh(f'rm -f {tmp_file}')
             self.saved_uefi_certs = None
 
     def clear_uefi_certs(self):
@@ -243,16 +243,16 @@ class Pool:
         """
         assert self.master.xcp_version < version.parse("8.3"), "function only relevant on XCP-ng 8.2"
         logging.info('Clearing pool UEFI certificates in XAPI and on hosts disks')
-        self.master.ssh(['secureboot-certs', 'clear'])
+        self.master.ssh('secureboot-certs clear')
         # remove files on each host
         for host in self.hosts:
-            host.ssh(['rm', '-f', f'{host.varstore_dir()}/*'])
+            host.ssh(f'rm -f {host.varstore_dir()}/*')
 
     def clear_custom_uefi_certs(self):
         """ Clear Custom UEFI certificates on XCP-ng 8.3+. """
         assert self.master.xcp_version >= version.parse("8.3"), "function only relevant on XCP-ng 8.3+"
         logging.info('Clearing custom pool UEFI certificates')
-        self.master.ssh(['secureboot-certs', 'clear'])
+        self.master.ssh('secureboot-certs clear')
 
     def install_custom_uefi_certs(self, auths: Iterable[EFIAuth]):
         host = self.master
@@ -260,7 +260,7 @@ class Pool:
 
         try:
             for auth in auths:
-                tmp_file_on_host = host.ssh(['mktemp'])
+                tmp_file_on_host = host.ssh('mktemp')
                 host.scp(auth.auth(), tmp_file_on_host)
                 auths_dict[auth.name] = tmp_file_on_host
 
@@ -270,7 +270,7 @@ class Pool:
 
             logging.info('Installing auths to pool: %s' % list(auths_dict.keys()))
             for key in auths_dict:
-                value = host.ssh([f'md5sum {auths_dict[key]} | cut -d " " -f 1'])
+                value = host.ssh(f'md5sum {auths_dict[key]} | cut -d " " -f 1')
                 logging.debug('Key: %s, value: %s' % (key, value))
             params = [auths_dict['PK'], auths_dict['KEK'], auths_dict['db']]
             if 'dbx' in auths_dict:
@@ -278,9 +278,9 @@ class Pool:
             else:
                 params.append('none')
 
-            host.ssh(['secureboot-certs', 'install'] + params)
+            host.ssh(' '.join(['secureboot-certs', 'install'] + params))
         finally:
-            host.ssh(['rm', '-f'] + list(auths_dict.values()))
+            host.ssh('rm -f ' + ' '.join(auths_dict.values()))
 
     def eject_host(self, host: Host):
         master = self.master

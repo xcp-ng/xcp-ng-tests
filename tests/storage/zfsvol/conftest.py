@@ -4,6 +4,7 @@ import pytest
 
 import logging
 
+from lib.host import Host
 from lib.sr import SR
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
@@ -17,14 +18,14 @@ def host_with_zfsvol(host_with_saved_yum_state_toolstack_restart):
     yield host
 
 @pytest.fixture(scope='package')
-def zfsvol_sr(host, sr_disk_wiped, host_with_zfsvol):
+def zfsvol_sr(host: Host, sr_disk_wiped, host_with_zfsvol):
     """ A ZFS Volume SR on first host. """
     device = '/dev/' + sr_disk_wiped
     sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {'device': device})
     yield sr
     # teardown violently - we don't want to require manual recovery when a test fails
     sr.forget()
-    host.ssh(["wipefs", "-a", device])
+    host.ssh(f'wipefs -a {device}')
 
 @pytest.fixture(scope='module')
 def vdi_on_zfsvol_sr(zfsvol_sr: SR):
