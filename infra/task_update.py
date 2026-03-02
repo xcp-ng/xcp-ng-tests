@@ -17,3 +17,6 @@ def update_target(host: Host):
     #     to see whether operations are running or not
     host.clean_metadata()
     host.install_updates()
+
+    # if everything's ok, just reboot
+    host.reboot(verify=True)
