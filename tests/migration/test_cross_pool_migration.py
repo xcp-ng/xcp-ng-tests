@@ -3,10 +3,12 @@ import pytest
 import logging
 
 from lib.common import wait_for, wait_for_not
+from lib.host import Host
+from lib.vm import VM
 
 @pytest.mark.multi_vms # run on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
-def test_cross_pool_migration(hostB1, imported_vm):
+def test_cross_pool_migration(hostB1: Host, imported_vm: VM) -> None:
     vm = imported_vm.clone()
     try:
         vm.start()

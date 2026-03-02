@@ -1,5 +1,7 @@
 import pytest
 
+from lib.host import Host
+
 # Requirements:
 # From --hosts parameter:
 # - host(A1): first XCP-ng host >= 8.2.
@@ -7,7 +9,7 @@ import pytest
 #   This host will be joined and ejected from pool A, it means its state will be completely reinitialized from scratch
 
 @pytest.mark.reboot
-def test_pool_join(hostA1, hostB1):
+def test_pool_join(hostA1: Host, hostB1: Host) -> None:
     hostB1.join_pool(hostA1.pool)
     # FIXME: is this gymnastics necessary?
     # If no, fix TestPoolToDiskCertInheritanceOnPoolJoin too

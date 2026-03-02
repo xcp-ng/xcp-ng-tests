@@ -8,6 +8,8 @@ from lib.common import exec_nofail, raise_errors
 from lib.host import Host
 from lib.vm import VM
 
+from typing import Generator
+
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.2
 # - a VM (--vm)
@@ -15,7 +17,7 @@ from lib.vm import VM
 # - the default SR must be either shared or local on master host, so that VMs can all start on the same host
 
 @pytest.fixture(scope='module')
-def four_vms(imported_vm):
+def four_vms(imported_vm: VM) -> Generator[tuple[VM, VM, VM, VM], None, None]:
     vm1 = imported_vm
     vm2 = vm1.clone()
     vm3 = vm1.clone()
@@ -39,7 +41,7 @@ class TestIrqBalance:
     We want to avoid this to happen again, so this testcase runs several VMs
     and verifies that the IRQs are balanced on more than one CPU.
     """
-    def test_start_four_vms(self, host: Host, four_vms: tuple[VM, VM, VM, VM]):
+    def test_start_four_vms(self, host: Host, four_vms: tuple[VM, VM, VM, VM]) -> None:
         for vm in four_vms:
             vm.start(on=host.uuid)
 

@@ -3,8 +3,7 @@ import pytest
 import hashlib
 
 from lib import commands
-
-from typing import cast
+from lib.host import Host
 
 # This test is designed to verify the accessibility of the XOA deployment script
 #
@@ -17,7 +16,7 @@ from typing import cast
     "xcpng",
     "vates"
 ])
-def test_access_links(host, command_id, url_id):
+def test_access_links(host: Host, command_id: str, url_id: str) -> None:
     """
     Verifies that the specified URL responds correctly via the specified command
     and compares the checksum of the downloaded content between local and remote.
@@ -38,11 +37,12 @@ def test_access_links(host, command_id, url_id):
     # Verify the download worked by comparing with local download
     # This ensures the content is accessible and identical from both locations
     local_result = commands.local_cmd(COMMAND)
+    assert isinstance(local_result.stdout, str)
 
     assert local_result.returncode == 0, f"Failed to fetch URL locally: {local_result.stdout}"
 
     # Extract checksums
-    local_checksum = hashlib.sha256(cast(str, local_result.stdout).split()[0].encode('utf-8')).hexdigest()
+    local_checksum = hashlib.sha256(local_result.stdout.split()[0].encode('utf-8')).hexdigest()
     remote_checksum = hashlib.sha256(remote_result.split()[0].encode('utf-8')).hexdigest()
 
     assert local_checksum == remote_checksum, (
