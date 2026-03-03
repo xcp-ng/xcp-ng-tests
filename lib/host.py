@@ -431,6 +431,23 @@ class Host:
         logging.info(f"[{self}] Removing cache metadata")
         return self.ssh_with_result(["yum", "-q", "clean", "metadata"])
 
+    def yum_update_enablerepos(self, enablerepos: List[str] = []) -> commands.SSHResult:
+        """Updates packages on target.
+
+        Performs the following shell command::
+
+            yum update -y
+            # with enablerepos
+            yum update -y --enablerepo=extra1 --enablerepos=extra2
+        """
+        logging.info(f"[{self}] Updating packages...")
+        base_command = ['yum', 'update', '-y']
+        if enablerepos:
+            extra = [f"--enablerepo={r}" for r in enablerepos]
+            base_command.extend(extra)
+        logging.debug(f"[{self}] command: {base_command}")
+        return self.ssh_with_result(base_command)
+
     def install_updates(self):
         logging.info("Install updates on host %s" % self)
         return self.ssh(['yum', 'update', '-y'])
