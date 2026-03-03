@@ -123,8 +123,11 @@ def pytest_collection_modifyitems(items, config):
 
     markable_fixtures = [
         'uefi_vm',
+        'skip_if_not_uefi_vm',
         'unix_vm',
+        'skip_if_not_unix_vm',
         'windows_vm',
+        'skip_if_not_windows_vm',
         'hostA2',
         'hostB1',
         'unused_512B_disks',
@@ -660,7 +663,14 @@ def running_vm(started_vm):
 def unix_vm(imported_vm):
     vm = imported_vm
     if vm.is_windows:
-        pytest.skip("This test is only compatible with unix VMs.")
+        pytest.fail("This test requires a unix VM.")
+    yield vm
+
+@pytest.fixture(scope='module')
+def skip_if_not_unix_vm(imported_vm):
+    vm = imported_vm
+    if vm.is_windows:
+        pytest.skip("Skipping: this test is only compatible with unix VMs.")
     yield vm
 
 @pytest.fixture(scope="module")
@@ -672,14 +682,28 @@ def running_unix_vm(unix_vm, running_vm):
 def windows_vm(imported_vm):
     vm = imported_vm
     if not vm.is_windows:
-        pytest.skip("This test is only compatible with Windows VMs.")
+        pytest.fail("This test requires a Windows VM.")
+    yield vm
+
+@pytest.fixture(scope='module')
+def skip_if_not_windows_vm(imported_vm):
+    vm = imported_vm
+    if not vm.is_windows:
+        pytest.skip("Skipping: this test is only compatible with Windows VMs.")
     yield vm
 
 @pytest.fixture(scope='module')
 def uefi_vm(imported_vm):
     vm = imported_vm
     if not vm.is_uefi:
-        pytest.skip('This test requires an UEFI VM')
+        pytest.fail('This test requires a UEFI VM.')
+    yield vm
+
+@pytest.fixture(scope='module')
+def skip_if_not_uefi_vm(imported_vm):
+    vm = imported_vm
+    if not vm.is_uefi:
+        pytest.skip('Skipping: this test requires a UEFI VM.')
     yield vm
 
 @pytest.fixture(scope='session')
