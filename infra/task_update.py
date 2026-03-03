@@ -3,6 +3,7 @@
 This module contains helpful functions to update
 xcp-ng infrastructure.
 """
+from infra import logger
 from lib.host import Host
 
 def update_target(host: Host):
@@ -11,6 +12,7 @@ def update_target(host: Host):
     Performs several operations to clean and update
     remote target.
     """
+    logger.info(f"> [{host}] Begin updating target host")
     # TODO: performance and output improvements
     #     Following operations run for a long time
     #     Without 'debug mode', it is not possible
@@ -20,3 +22,5 @@ def update_target(host: Host):
 
     # if everything's ok, just reboot
     host.reboot(verify=True)
+
+    logger.info(f"> [{host}] Updated!")
