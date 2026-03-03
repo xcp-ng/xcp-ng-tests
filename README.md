@@ -366,7 +366,74 @@ ruff check lib/ tests/
 flake8
 ```
 
-The code checker diagnostics can also be shown directly in your IDE or text editor.
+The code checker diagnostics can also be shown directly in your IDE or text editor, by using plugins or language
+servers (LSP).
+
+These configurations are provided as optional suggestions for convenience and do not imply official support or a
+requirement to use specific tools.
+
+### [VSCodium](https://vscodium.com/)
+
+A few plugins are recommended to properly report the diagnostics during the development:
+* [BasedPyright](https://open-vsx.org/extension/detachhead/basedpyright)
+* [flake8](https://open-vsx.org/extension/ms-python/flake8)
+* [ruff](https://open-vsx.org/extension/charliermarsh/ruff)
+
+### [Helix](https://helix-editor.com/)
+
+Install the required language servers:
+* [BasedPyright](https://docs.basedpyright.com/latest/) with `uv tool install basedpyright`
+* [pylsp](https://github.com/python-lsp/python-lsp-server) with `uv tool install python-lsp-server[flake8] --with pylsp-rope`.
+  It's used to get immediate flake8 feedback in the text editor.
+
+[ruff](https://docs.astral.sh/ruff/), which is also used as a language server, is already installed as a dev dependency.
+
+Create a `.helix/language.toml` in the project. Make sure to exclude it in git,
+either in your user configuration (`~/.config/git/ignore`) or in the project
+configuration (`.git/info/exclude`).
+
+~~~toml
+[[language]]
+name = "python"
+language-servers = [
+  "basedpyright",
+  "pylsp",
+  "ruff",
+]
+auto-format = false
+
+[language-server.basedpyright]
+environment = { "LANG" = "en" }
+config.basedpyright.analysis = { typeCheckingMode = "standard", diagnosticMode = "workspace" }
+
+[language-server.pylsp.config.pylsp.plugins]
+autopep8.enabled = false
+flake8.enabled = true
+jedi.enabled = false
+mccabe.enabled = false
+preload.enabled = false
+pycodestyle.enabled = false
+pydocstyle.enabled = false
+pyflakes.enabled = false
+pylint.enabled = false
+yapf.enabled = false
+~~~
+
+### Other LSP-Compatible Editors
+
+Most modern editors use the Language Server Protocol (LSP) to enhance
+functionality. The following servers are generally suggested for this project:
+
+* basedpyright: Real-time type checking ('uv tool install basedpyright').
+* pylsp: Coding style feedback via flake8 (`uv tool install "python-lsp-server[flake8]"`).
+* ruff: Immediate linting (included as a dev dependency).
+
+Configuration is highly editor-specific; please consult your editor's
+documentation. Contributions to these docs via PR are always welcome!
+
+### Others
+
+Please add your configuration hints here!
 
 ## VM setup
 Many tests expect VMs with:
