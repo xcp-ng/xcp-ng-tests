@@ -14,7 +14,8 @@ from lib.pool import Pool
 def cmd_update(args: argparse.Namespace):
     """Handles update command from args.
     """
-    logger.info(f"Received host argument: '{args.hosts}'")
+    logger.debug(f"Received host argument: {args.hosts}")
+    logger.debug(f"Received enablerepo arguments: {args.repos}")
     # init related pools
     try:
         pools = [Pool(h) for h in args.hosts]
@@ -26,11 +27,11 @@ def cmd_update(args: argparse.Namespace):
     # Run in parallel
     if len(pools) > 1:
         logger.info("Multiple targets to update")
-        hosts = [p.master for p in pools]
+        thread_args = [(p.master, args.repos) for p in pools]
         with ThreadPoolExecutor() as executor:
-            executor.map(task_update.update_target, hosts)
+            executor.map(task_update.update_target, thread_args)
     else:
-        task_update.update_target(pools[0].master)
+        task_update.update_target(pools[0].master, args.repos)
 
     print(pools)
 
@@ -49,6 +50,13 @@ def cli():
                                       metavar="HOST",
                                       nargs="+",
                                       help="hostname(s) or ip address(es) of target(s).")
+
+    update_cmd_subparser.add_argument("--enablerepo",
+                                      metavar="REPO",
+                                      # nargs="?",
+                                      action="append",
+                                      dest="repos",
+                                      help="Enables one or more repositories.")
 
     update_cmd_subparser.set_defaults(func=cmd_update)
 
