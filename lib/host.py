@@ -420,7 +420,7 @@ class Host:
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
-    def clean_metadata(self) -> commands.SSHResult:
+    def yum_clean_metadata(self) -> commands.SSHResult:
         """Quietly removes cached metadata on target
 
         Performs the following shell command:
