@@ -81,6 +81,7 @@ class TestGuestToolsWindows:
                 assert strtobool(vif.param_get("currently-attached"))
                 vif.unplug()
                 # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
+                # TODO reference: XCPNG-1395
                 assert not strtobool(vif.param_get("currently-attached"))
                 time.sleep(5)
                 vif.plug()
