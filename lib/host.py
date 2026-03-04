@@ -430,9 +430,25 @@ class Host:
         logging.info(f"[{self}] Removing cache metadata...")
         return self.ssh(["yum", "clean", "metadata", "-q"])
 
-    def install_updates(self):
-        logging.info("Install updates on host %s" % self)
-        return self.ssh(['yum', 'update', '-y'])
+    def yum_update(self, enablerepos: List[str] = []):
+        """Updates packages on target.
+
+        Performs the following shell command::
+
+            yum update -y
+            # with enablerepos
+            yum update -y --enablerepo=extra1 --enablerepos=extra2
+
+        :param enablerepos: Enable one or more repositories (default: []).
+        """
+        base_command = ["yum", "update", "-y"]
+
+        logging.info(f"[{self}] Updating packages...")
+        if enablerepos:
+            extra = [f"--enablerepo={r}" for r in enablerepos]
+            base_command.extend(extra)
+
+        return self.ssh(base_command)
 
     def restart_toolstack(self, verify=False):
         logging.info("Restart toolstack on host %s" % self)
