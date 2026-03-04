@@ -420,6 +420,16 @@ class Host:
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
+    def yum_clean_metadata(self):
+        """Quietly removes cached metadata on target.
+
+        Performs the following shell command::
+
+            yum clean metadata -q
+        """
+        logging.info(f"[{self}] Removing cache metadata...")
+        return self.ssh(["yum", "clean", "metadata", "-q"])
+
     def install_updates(self):
         logging.info("Install updates on host %s" % self)
         return self.ssh(['yum', 'update', '-y'])
