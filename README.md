@@ -1,6 +1,6 @@
 # Test scripts for XCP-ng
 
-Note: this is a perpertual work in progress. If you encounter any obstacles or bugs, let us know!
+Note: this is a perpetual work in progress. If you encounter any obstacles or bugs, let us know!
 
 ## Main requirements
 
@@ -129,7 +129,7 @@ The lock file allows `uv` to install the dependencies at the exact same versions
 on all the environments.
 
 ## Other requirements
-* XCP-ng hosts that you can ssh to using a SSH key, non-interactively
+* XCP-ng hosts that you can ssh to using an SSH key, non-interactively
 * VM images suited to what the tests want. Some tests want a linux VM with SSH, available to import as an OVA over HTTP, for example.
 
 On XCP-ng's test lab, the CI SSH private key allows to connect to any host installed for CI via PXE, and to any linux VM imported from pre-made images (OVA).
@@ -167,9 +167,9 @@ The `--hosts` parameter can be specified several times. Then `pytest` will run t
 When a test requires a single pool of several hosts, only mention the master host in the `--hosts` option.
 
 Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those are tests that will import a VM before testing stuff on it:
-* `OVA_URL` is an URL to download an OVA. It can also be a simple a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
+* `OVA_URL` is a URL to download an OVA. It can also be simply a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
 * `VM_key` refers to a key in `data.py`'s `VM_IMAGES` dict. Example: `mini-linux-x86_64-uefi`.
-* `IP_address` allows to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
+* `IP_address` allows you to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
@@ -196,7 +196,7 @@ We defined various markers, that currently belong to the following conceptual fa
   * Automatically added based on the fixtures required by the tests: do they require a VM? Unix? Windows? UEFI? Do they need a free disk that they can format? Do they require a second host in the first pool? A second pool? /!\ Not all fixtures are automatically translated into markers! (this is handled by the `pytest_collection_modifyitems` hook in `conftest.py`)
   * Manually added to the tests by developers for easier test filtering: does the test reboot a host? Is it a flaky test? Does it have complex prerequisites?
 * Target markers, manually added, that hint about what kind of configuration is best appropriate with a given test:
-  * Tests that should be preferrably just run with a small and fast-booting VM, for faster execution.
+  * Tests that should preferably just run with a small and fast-booting VM, for faster execution.
   * Tests that should be run on the largest variety of VMs.
   * Tests that should be run at least once with a very big VM.
 * Markers used in the tests themselves to change their behaviour. Those won't be very useful to select tests with `-m`. We're just mentioning them for the sake of completeness.
@@ -275,7 +275,7 @@ $ ./jobs.py show sb-unix-multi
 }
 ```
 
-Here you get the requirements for the job and the test selection (`paths` and optionnaly `markers` and/or `name_filter`).
+Here you get the requirements for the job and the test selection (`paths` and optionally `markers` and/or `name_filter`).
 
 A very important information is also the `--vm` (single VM) or `--vm[]` (multiple VMs) parameter. The value is the key of a list of VMs that must be defined in `vm_data.py`, or the job won't execute (actually, you can still execute the job by passing one or more `--vm` parameters manually). Check the example `vm_data.py-dist` file. Inside XCP-ng's testing lab, a ready to use `vm_data.py` is available that lists the VMs available in the lab.
 
@@ -354,7 +354,7 @@ Check `./jobs.py --help` and `./jobs.py {command name} --help`.
 
 ## Development
 
-This projects uses multiple code checkers to ensure a high quality and coherence of the code.
+This project uses multiple code checkers to ensure a high quality and coherence of the code.
 The checkers are run in the CI on github and will report any failure in the PRs.
 
 To run the checkers locally, you need to install the dev dependencies, and run these commands:
