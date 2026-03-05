@@ -19,7 +19,6 @@ Install `uv` with one of these commands
 ~~~sh
 pip install uv                                      # for Fedora-based and older distros
 pipx install uv                                     # for newer distros
-curl -LsSf https://astral.sh/uv/install.sh | sh     # if you don't mind an installer modifying your environment
 ~~~
 
 You have two options to run the tests:
