@@ -29,6 +29,7 @@ dev = [
     "types-requests",
     "typing-extensions",
     "libarchive-c==5.3",
+    "XenAPI",
 ]
 
 [tool.pyright]
