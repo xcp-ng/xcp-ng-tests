@@ -176,3 +176,31 @@ def check_vm_dns(vm: VM):
         timeout_secs=300,
         retry_delay_secs=30,
     )
+
+
+def check_vm_distro(vm: VM):
+    # anything goes, as long as it's not empty
+    wait_for(
+        lambda: vm.xenstore_read("data/os_distro", accept_unknown_key=True) is not None,
+        "Wait for distro reporting",
+        30,
+    )
+
+
+def check_vm_clipboard(vm: VM):
+    # Key must not exist prior to our write. If it does, likely nothing is watching
+    assert vm.xenstore_read("data/set_clipboard", accept_unknown_key=True) is None
+    vm.xenstore_write("data/set_clipboard", "foobar")
+    # Now the guest agent should have erased it
+    wait_for(
+        lambda: vm.xenstore_read("data/set_clipboard", accept_unknown_key=True) is None,
+        "Wait for guest agent to receive data/set_clipboard",
+        30,
+    )
+    # Must terminate the clipboard string with an empty fragment
+    vm.xenstore_write("data/set_clipboard", '""')
+    wait_for(
+        lambda: vm.xenstore_read("data/set_clipboard", accept_unknown_key=True) is None,
+        "Wait for guest agent to receive data/set_clipboard",
+        30,
+    )
