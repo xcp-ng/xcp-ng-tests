@@ -157,7 +157,7 @@ def callable_marker(value: Union[T, Callable[..., T]], request: pytest.FixtureRe
     else:
         return value
 
-def wait_for(fn, msg=None, timeout_secs=2 * 60, retry_delay_secs=2, invert=False):
+def wait_for(fn: Callable[[], object], msg=None, timeout_secs=2 * 60, retry_delay_secs=2, invert=False):
     if msg is not None:
         logging.info(msg)
     start_time = time.perf_counter()
