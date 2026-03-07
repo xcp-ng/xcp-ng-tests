@@ -68,7 +68,7 @@ from typing import Any, Tuple
 
 
 @pytest.mark.multi_vms
-@pytest.mark.usefixtures("windows_vm")
+@pytest.mark.usefixtures("skip_if_not_windows_vm")
 class TestGuestToolsWindows:
     def test_drivers_detected(self, vm_install_test_tools_per_test_class: VM):
         pass
@@ -139,7 +139,7 @@ Select-String "Trim Supported")''')
 
 
 @pytest.mark.multi_vms
-@pytest.mark.usefixtures("windows_vm")
+@pytest.mark.usefixtures("skip_if_not_windows_vm")
 class TestGuestToolsWindowsDestructive:
     def test_uninstall_tools(self, vm_install_test_tools_no_reboot: VM):
         vm = vm_install_test_tools_no_reboot
@@ -173,7 +173,7 @@ class TestGuestToolsWindowsDestructive:
             exitcode = install_guest_tools(vm, guest_tools_iso, PowerAction.Nothing, check=False)
             assert exitcode == ERROR_INSTALL_FAILURE
 
-    @pytest.mark.usefixtures("uefi_vm")
+    @pytest.mark.usefixtures("skip_if_not_uefi_vm")
     def test_uefi_vm_suspend_refused_without_tools(self, running_unsealed_windows_vm: VM):
         vm = running_unsealed_windows_vm
         with pytest.raises(SSHCommandFailed, match="lacks the feature"):
