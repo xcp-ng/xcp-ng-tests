@@ -13,9 +13,11 @@ from .. import logger
 def update_pools(inventory: dict) -> None:
     """Updates hosts in pool(s).
 
-    .. note:: Host must be a master
+    .. note::
 
-        Every non-master hosts will be ignored
+        Every non-master hosts in inventory will be ignored
+
+    *Update master hosts declared in inventory first, then, update secondary hosts attached to each master.*
 
     :param dict inventory:
         Each host (key) holds its own config data (values, eg: `enablerepos`).
@@ -33,3 +35,12 @@ def update_pools(inventory: dict) -> None:
     with ThreadPoolExecutor() as executor:
         for p in pools:
             executor.submit(p.master.update, inventory[p.master.hostname_or_ip]["enablerepos"])
+
+    # secondary hosts
+    with ThreadPoolExecutor() as executor:
+        for p in pools:
+            # omit first item because it is a primary (master)
+            for h in p.hosts[1:]:
+                # repos are the same as the primary (master)
+                repos = inventory[p.master.hostname_or_ip]["enablerepos"]
+                executor.submit(h.update, repos)
