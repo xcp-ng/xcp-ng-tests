@@ -147,17 +147,24 @@ Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
     )
 
 
+def is_vm_offboarded_xenvif(vm: VM):
+    try:
+        val = vm.execute_powershell_script(
+            r'$null -eq (Get-ScheduledTask "Copy-XenVifSettings" -ErrorAction SilentlyContinue)', simple_output=True
+        )
+        # Sometimes, we may get an error like "invalid truth value 'mux_client_request_session: read from master failed:
+        # broken pipe'". If so, just retry.
+        if "broken pipe" in val.lower():
+            return False
+        return strtobool(val)
+    except SSHCommandFailed:
+        # This check itself can fail when Copy-XenVifSettings runs, so we have to tolerate its failure.
+        return False
+
+
 def wait_for_vm_xenvif_offboard(vm: VM):
     # Xenvif offboard will reset the NIC, so need to wait for it to disappear first
-    wait_for(
-        lambda: strtobool(
-            vm.execute_powershell_script(
-                r'$null -eq (Get-ScheduledTask "Copy-XenVifSettings" -ErrorAction SilentlyContinue)', simple_output=True
-            )
-        ),
-        timeout_secs=300,
-        retry_delay_secs=30,
-    )
+    wait_for(lambda: is_vm_offboarded_xenvif(vm), timeout_secs=180, retry_delay_secs=15)
 
 
 def set_vm_dns(vm: VM):
