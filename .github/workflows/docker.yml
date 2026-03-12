@@ -1,0 +1,56 @@
+name: Build and Push Docker Image to GHCR
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+
+jobs:
+  compat-kit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Required to push packages to GHCR
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+        with:
+          driver: docker-container
+      - uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }} # Uses the GitHub user/org name that triggered the workflow
+          password: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub
+      - name: Generate image tags
+        id: meta
+        env:
+          REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NUMBER: ${{ github.event.number }}
+        run: |
+          if [[ "$REF" == "refs/heads/master" ]]; then
+            echo "tags=ghcr.io/$REPOSITORY/compat-kit:latest" >> $GITHUB_OUTPUT
+            echo "push=true" >> $GITHUB_OUTPUT
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "tags=ghcr.io/$REPOSITORY/compat-kit:pr-$EVENT_NUMBER" >> $GITHUB_OUTPUT
+            echo "push=true" >> $GITHUB_OUTPUT
+          else
+            echo "push=false" >> $GITHUB_OUTPUT
+          fi
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: ./
+          file: ./compat_kit/Dockerfile
+          push: ${{ steps.meta.outputs.push }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          cache-from: type=gha,scope=${{ github.ref_name }}-compat-kit # Cache layers to speed up builds
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-compat-kit # Store layers in cache for future builds

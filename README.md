@@ -130,6 +130,10 @@ This command installs the dependency locally and update the `uv.lock` file.
 The lock file allows `uv` to install the dependencies at the exact same versions
 on all the environments.
 
+## Server Compatibility Testing Kit
+
+For automated testing of XCP-ng on new hardware, see the **Compatibility Test Kit** at [compat_kit/README.md](compat_kit/README.md).
+
 ## Other requirements
 * XCP-ng hosts that you can ssh to using an SSH key, non-interactively
 * VM images suited to what the tests want. Some tests want a linux VM with SSH, available to import as an OVA over HTTP, for example.
