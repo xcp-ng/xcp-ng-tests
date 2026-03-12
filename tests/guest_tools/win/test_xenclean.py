@@ -24,7 +24,10 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any]):
 
     logging.info("Run XenClean")
     xenclean_path = PureWindowsPath("D:\\") / guest_tools_iso["xenclean_path"]
-    xenclean_cmd = f"Set-Location C:\\; {xenclean_path} -NoReboot -Confirm:$false; {WINDOWS_SHUTDOWN_COMMAND}"
+    if guest_tools_iso["xenclean_path"].lower().endswith(".ps1"):
+        xenclean_cmd = f"Set-Location C:\\; {xenclean_path} -NoReboot -Confirm:$false; {WINDOWS_SHUTDOWN_COMMAND}"
+    else:
+        xenclean_cmd = f"Set-Location C:\\; {xenclean_path} -noReboot -noConfirm; {WINDOWS_SHUTDOWN_COMMAND}"
     vm.start_background_powershell(xenclean_cmd)
 
     # XenClean sometimes takes a bit long due to all the calls to the uninstallers. We need an extended timeout.
