@@ -555,3 +555,26 @@ INFO:root:Setting bridge to xenbr0
 ```
 
 For more details, see `xva_bridge.py --help`.
+
+## Tools
+
+Helper tools are available through the entrypoint `scripts/tools.py`:
+
+```bash
+uv run scripts/tools.py -h
+```
+
+### Update
+
+This command performs an update operation on remote targets.
+
+```bash
+uv run scripts/tools.py update primary1 primary2
+```
+
+For each primary target :
+
+1. Clean cached metadata
+2. Update with repository manager (yum): Optionally enables repositories
+3. Reboot
+4. Get attached secondary hosts and repeats three previous steps for each secondary
