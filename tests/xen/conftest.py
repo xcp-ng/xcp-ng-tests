@@ -10,7 +10,8 @@ from pkgfixtures import host_with_saved_yum_state
 @pytest.fixture(scope="package")
 def host_with_hvm_fep(host):
     logging.info("Checking for HVM FEP support")
-    if 'hvm_fep' not in host.ssh(['xl', 'info', 'xen_commandline']).split():
+    xen_args = host.ssh(['xl', 'info', 'xen_commandline']).split()
+    if 'hvm_fep' not in xen_args and 'hvm_fep=1' not in xen_args:
         pytest.fail("HVM FEP is required for some of the XTF tests")
     yield host
 
