@@ -268,7 +268,7 @@ JOBS = {
             "tests/uefi_sb/test_varstored_sb.py",
             "tests/uefi_sb/test_sb_state.py"
         ],
-        "markers": "not windows_vm",
+        "markers": "not windows_vm and not skip_if_not_windows_vm",
     },
     "sb-certificates": {
         "description": "tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored",
@@ -297,7 +297,7 @@ JOBS = {
             "--vm": "single/small_vm_windows",
         },
         "paths": ["tests/uefi_sb"],
-        "markers": "windows_vm",
+        "markers": "windows_vm or skip_if_not_windows_vm",
     },
     "sb-unix-multi": {
         "description": "checks basic Secure-Boot support on a variety of Unix VMs",
@@ -311,7 +311,7 @@ JOBS = {
             "--vm[]": "multi/uefi_unix",
         },
         "paths": ["tests/uefi_sb"],
-        "markers": "multi_vms and unix_vm",
+        "markers": "multi_vms and skip_if_not_unix_vm",
     },
     "sb-windows-multi": {
         "description": "checks basic Secure-Boot support on a variety of Windows VMs",
@@ -324,7 +324,7 @@ JOBS = {
             "--vm[]": "multi/uefi_windows",
         },
         "paths": ["tests/uefi_sb"],
-        "markers": "multi_vms and windows_vm",
+        "markers": "multi_vms and skip_if_not_windows_vm",
     },
     "tools-unix": {
         "description": "tests our unix guest tools on a single small VM",
