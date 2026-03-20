@@ -18,6 +18,7 @@ import atexit
 import getpass
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -351,8 +352,6 @@ def run_pytest(phase: int, test_args: list[str], log_file: str) -> None:
         '--color=yes',
         '--no-header',
         '--maxfail=0',
-        '--log-file-level=debug',
-        f'--log-file={log_path}',
         f'--log-cli-level={logging.getLevelName(state.log_level)}',
         f'--vm={state.vm_image_url}',
     ] + test_args
@@ -364,14 +363,41 @@ def run_pytest(phase: int, test_args: list[str], log_file: str) -> None:
 
     logging.debug(f"Running: {' '.join(cmd)}")
     try:
-        subprocess.run(cmd, check=True, timeout=3600)
-        logging.info(f"Phase {phase}: Tests completed successfully")
-    except subprocess.CalledProcessError as e:
-        logging.warning(f"Phase {phase}: Tests failed with exit code {e.returncode}")
-        state.tests_failed = True
-        # Don't raise, allow other phases to run
+        ansi_escape = re.compile(br'\x1b\[[0-9;]*[a-zA-Z]')
+
+        # Launch pytest. We force colors so the terminal output stays pretty.
+        # 'bufsize=1' and 'universal_newlines=False' allow us to process line by line.
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+
+        assert process.stdout is not None
+        with open(log_path, "wb") as f:
+            # Read from the pipe until the process finishes
+            for line in iter(process.stdout.readline, b''):
+                # 1. Write the original colorful line to the actual terminal
+                sys.stdout.buffer.write(line)
+                sys.stdout.buffer.flush()
+
+                # 2. Strip the codes and write the clean text to the file
+                clean_line = ansi_escape.sub(b'', line)
+                f.write(clean_line)
+                f.flush()
+
+        process.wait()
+        if process.returncode != 0:
+            logging.warning(f"Phase {phase}: Tests failed with exit code {process.returncode}")
+            state.tests_failed = True
+        else:
+            logging.info(f"Phase {phase}: Tests completed successfully")
     except subprocess.TimeoutExpired:
         logging.error(f"Phase {phase}: Tests timed out")
+        state.tests_failed = True
+        raise
+    except Exception as e:
+        logging.error(f"Phase {phase}: Tests failed: {e}")
         state.tests_failed = True
         raise
 
