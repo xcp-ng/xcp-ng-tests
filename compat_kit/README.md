@@ -7,7 +7,7 @@
   - At least one x86_64 server with XCP-ng installed (the release you want to test),
     [updated with the latest updates](https://xcp-ng.org/docs/updates.html).
   - A disk for the system, and a separate, empty disk for testing.
-  - Optionally, a second identical host. If provided, will be automatically
+  - Optionally, a second identical host. If provided, it will be automatically
     joined to the first to form a pool for storage migration and live migration
     tests. **Both hosts must have the same SSH root password.**
   - Internet access to download the test image.
@@ -17,6 +17,8 @@
 ## Security Notes
 
 The test VM is configured with a known access key and is **strictly reserved for testing purposes only**.
+
+Test VM should not be exposed to untrusted networks.
 
 ## Quick Start
 
