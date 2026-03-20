@@ -18,6 +18,7 @@ import atexit
 import getpass
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -267,9 +268,9 @@ def validate_pool_constraints(pool: Pool, second_host: str | None) -> None:
     if second_host is None:
         if num_hosts != 1:
             raise ValueError(
-                f"Pool constraint violated: Master host's pool contains {num_hosts} host(s), "
-                f"but only 1 host was provided. The pool must contain only the specified hosts. "
-                f"Please eject the extra hosts before running the compatibility kit."
+                f"Pool constraint violated: The master belongs to a pool with {num_hosts} host(s). "
+                f"All hosts in that pool must be provided to the compatibility kit, "
+                f"or the extra hosts must be ejected from the pool first."
             )
     else:  # second_host is provided
         second_in_pool = any(h.hostname_or_ip == second_host for h in pool.hosts)
@@ -278,17 +279,18 @@ def validate_pool_constraints(pool: Pool, second_host: str | None) -> None:
             # Second host already in pool - verify it's a 2-host pool
             if num_hosts != 2:
                 raise ValueError(
-                    f"Pool constraint violated: Second host is already in master's pool, "
-                    f"but the pool contains {num_hosts} host(s). Only 2 hosts are expected "
-                    f"(master and second). Please eject the extra hosts before running the compatibility kit."
+                    f"Pool constraint violated: The pool contains {num_hosts} host(s) "
+                    f"(including the second host you provided). "
+                    f"All hosts in that pool must be provided to the compatibility kit, "
+                    f"or the extra hosts must be ejected from the pool first."
                 )
         else:
             # Second host not in pool - master must be alone
             if num_hosts != 1:
                 raise ValueError(
-                    f"Pool constraint violated: Master host's pool contains {num_hosts} host(s), "
-                    f"but only the master host should be present before joining the second host. "
-                    f"Please eject the extra hosts before running the compatibility kit."
+                    f"Pool constraint violated: The master belongs to a pool with {num_hosts} host(s), "
+                    f"but you did not provide all of them to the compatibility kit. "
+                    f"Either provide all the pool hosts, or eject the extra hosts from the pool first."
                 )
 
 
@@ -350,8 +352,6 @@ def run_pytest(phase: int, test_args: list[str], log_file: str) -> None:
         '--color=yes',
         '--no-header',
         '--maxfail=0',
-        '--log-file-level=debug',
-        f'--log-file={log_path}',
         f'--log-cli-level={logging.getLevelName(state.log_level)}',
         f'--vm={state.vm_image_url}',
     ] + test_args
@@ -363,14 +363,41 @@ def run_pytest(phase: int, test_args: list[str], log_file: str) -> None:
 
     logging.debug(f"Running: {' '.join(cmd)}")
     try:
-        subprocess.run(cmd, check=True, timeout=3600)
-        logging.info(f"Phase {phase}: Tests completed successfully")
-    except subprocess.CalledProcessError as e:
-        logging.warning(f"Phase {phase}: Tests failed with exit code {e.returncode}")
-        state.tests_failed = True
-        # Don't raise, allow other phases to run
+        ansi_escape = re.compile(br'\x1b\[[0-9;]*[a-zA-Z]')
+
+        # Launch pytest. We force colors so the terminal output stays pretty.
+        # 'bufsize=1' and 'universal_newlines=False' allow us to process line by line.
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+
+        assert process.stdout is not None
+        with open(log_path, "wb") as f:
+            # Read from the pipe until the process finishes
+            for line in iter(process.stdout.readline, b''):
+                # 1. Write the original colorful line to the actual terminal
+                sys.stdout.buffer.write(line)
+                sys.stdout.buffer.flush()
+
+                # 2. Strip the codes and write the clean text to the file
+                clean_line = ansi_escape.sub(b'', line)
+                f.write(clean_line)
+                f.flush()
+
+        process.wait()
+        if process.returncode != 0:
+            logging.warning(f"Phase {phase}: Tests failed with exit code {process.returncode}")
+            state.tests_failed = True
+        else:
+            logging.info(f"Phase {phase}: Tests completed successfully")
     except subprocess.TimeoutExpired:
         logging.error(f"Phase {phase}: Tests timed out")
+        state.tests_failed = True
+        raise
+    except Exception as e:
+        logging.error(f"Phase {phase}: Tests failed: {e}")
         state.tests_failed = True
         raise
 
@@ -578,7 +605,7 @@ def run_workflow(
         print_summary()
     except KeyboardInterrupt:
         logging.error("Interrupted by user")
-        sys.exit(1)
+        sys.exit(130)
     except Exception as e:
         logging.error(f"Error: {e}", exc_info=True)
         sys.exit(1)
@@ -591,9 +618,7 @@ def main() -> None:
     parser.add_argument('--master-host', help="IP or hostname of the pool master")
     parser.add_argument("--second-host", help="IP or hostname of the second host (optional, for pool tests)")
     parser.add_argument("--password", help="SSH root password (if not provided, will be prompted)")
-    parser.add_argument("--log-dir", default="/app/logs",
-                        help="Directory where log files will be written (default: /app/logs)",
-                        )
+    parser.add_argument("--log-dir", default="./logs", help="Directory where log files will be written")
     parser.add_argument("--log-level", default="info",
                         choices=["debug", "info", "warning", "error", "critical"],
                         help="Logging level (default: INFO)")
