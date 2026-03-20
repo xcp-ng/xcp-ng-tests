@@ -14,13 +14,15 @@ Extra test-specific requirements are documented in the test file "Requirements" 
 
 ### Quick install
 
-Install `uv` with one of these commands
+Install `uv` with one of these commands. Using your system's native package
+manager is often the most reliable way to ensure `uv` is integrated with your OS
+and easily updatable.
 
-~~~sh
-pip install uv                                      # for Fedora-based and older distros
-pipx install uv                                     # for newer distros
-curl -LsSf https://astral.sh/uv/install.sh | sh     # if you don't mind an installer modifying your environment
-~~~
+| Method                     | Command                     | Note                                                                         |
+| -------------------------- | --------------------------- | ---------------------------------------------------------------------------- |
+| **System Package Manager** | `<your-pkg-mgr> install uv` | Use your distribution's manager (e.g., `apt`, `dnf`, `pacman`, or `zypper`). |
+| **pipx**                   | `pipx install uv`           | Recommended for installing Python tools in isolated environments.            |
+| **pip**                    | `pip install uv`            | A fallback if `pipx` is not available.                                       |
 
 You have two options to run the tests:
 
