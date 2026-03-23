@@ -4,6 +4,7 @@ The main entrypoint for running tools script.
 """
 import argparse
 import logging
+from pathlib import Path
 
 from lib.common import HostAddress
 from lib.tools import logger
@@ -27,9 +28,11 @@ def cli():
         description="Run update tasks on target(s)",
         help="Run update tasks on target(s)",
     )
-    subparser_cmd_update.add_argument(
-        "hosts", type=HostAddress, metavar="HOST", nargs="+", help="Hostname(s) or ip address(es) of target(s)"
+    cmd_update_excl_grp = subparser_cmd_update.add_mutually_exclusive_group(required=True)
+    cmd_update_excl_grp.add_argument(
+        "--hosts", type=HostAddress, metavar="HOST", nargs="+", help="Hostname(s) or ip address(es) of target(s)"
     )
+    cmd_update_excl_grp.add_argument("-i", "--inventory", type=Path, help="Use an hosts inventory file")
     subparser_cmd_update.add_argument(
         "--enablerepo",
         metavar="REPO",
