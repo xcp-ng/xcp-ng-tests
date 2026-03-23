@@ -30,11 +30,11 @@ def cli():
     )
     cmd_update_excl_grp = subparser_cmd_update.add_mutually_exclusive_group(required=True)
     cmd_update_excl_grp.add_argument(
-        "--hosts", type=HostAddress, metavar="HOST", nargs="+", help="Hostname(s) or ip address(es) of target(s)"
+        "-H", "--hosts", type=HostAddress, metavar="HOST", nargs="+", help="Hostname(s) or ip address(es) of target(s)"
     )
     cmd_update_excl_grp.add_argument("-i", "--inventory", type=Path, help="Use an hosts inventory file")
     subparser_cmd_update.add_argument(
-        "--enablerepo",
+        "-e", "--enablerepo",
         metavar="REPO",
         action="append",
         dest="repos",
