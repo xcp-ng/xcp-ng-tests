@@ -8,10 +8,16 @@ from pathlib import Path
 
 from lib.common import HostAddress
 from lib.tools import logger
+from lib.tools.inventory import into_inventory, load_inventory
 from lib.tools.tasks.update import update_all
 
 def _command_update(args):
-    update_all(args.hosts, args.repos)
+    if args.inventory:
+        inventory = load_inventory(args.inventory)
+    else:
+        inventory = into_inventory(args.hosts, args.repos)
+
+    update_all(inventory)
 
 
 def cli():
