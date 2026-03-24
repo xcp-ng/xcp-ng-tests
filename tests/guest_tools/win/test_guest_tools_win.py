@@ -131,8 +131,11 @@ Select-String "Trim Supported")''')
         """Xenvbd must always advertise as SSD to avoid unnecessary defragging by Windows."""
         vm = vm_install_test_tools_per_test_class
         is_ssd = strtobool(
+            # We have to filter Get-PhysicalDisk instead of piping directly from Get-Disk since direct Get-PhysicalDisk
+            # by ID doesn't work on Server 2016.
             vm.execute_powershell_script(
-                r'''(Get-PhysicalDisk -DeviceNumber (Get-Partition -DriveLetter C).DiskNumber).MediaType -eq "SSD"'''
+                r'''$disk = Get-Partition -DriveLetter ($Env:SystemDrive[0]) | Get-Disk;
+(Get-PhysicalDisk | Where-Object UniqueId -eq $disk.UniqueId).MediaType -eq "SSD"'''
             )
         )
         assert is_ssd
