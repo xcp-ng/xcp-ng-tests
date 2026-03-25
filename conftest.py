@@ -13,6 +13,7 @@ from packaging import version
 import lib.config as global_config
 from lib import pxe
 from lib.common import (
+    Defer,
     DiskDevName,
     HostAddress,
     callable_marker,
@@ -766,3 +767,36 @@ def cifs_iso_sr(host: Host, cifs_iso_device_config: dict[str, Any]) -> Generator
     yield sr
     # teardown
     sr.forget()
+
+@pytest.fixture()
+def defer(request: pytest.FixtureRequest) -> Defer:
+    """
+    A Go-inspired cleanup fixture that registers functions to be executed
+    after the test completes.
+
+    This fixture provides a functional alternative to 'yield' fixtures and
+    'try...finally' blocks. It is particularly useful for managing resources
+    that must remain 'alive' during post-mortem debugging (e.g., --pdb), as
+    registered finalizers only execute after the debugger session exits.
+
+    Execution Order:
+        Finalizers are executed in LIFO (Last-In, First-Out) order. The last
+        function deferred will be the first one executed during teardown.
+
+    Usage:
+        def test_example(defer):
+            resource = create_resource()
+            defer(lambda: resource.cleanup())
+
+            # If an assertion fails here, 'resource' is still available
+            # for inspection in --pdb.
+            assert resource.is_valid()
+
+    Args:
+        request: The internal pytest request object used to register finalizers.
+
+    Returns:
+        The 'request.addfinalizer' method, allowing for immediate registration
+        of teardown logic.
+    """
+    return request.addfinalizer
