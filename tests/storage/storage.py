@@ -181,25 +181,25 @@ def install_randstream(vm: VM) -> None:
 
 CoalesceOperation = Literal['snapshot', 'clone']
 
-def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation) -> None:
+def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
     vbd = vm.connect_vdi(vdi)
+    defer(lambda: vm.disconnect_vdi(vdi))
+
     dev = f'/dev/{vbd.param_get("device")}'
+    vm.ssh(f"randstream generate -v {dev}")
+    # default seed is 0
+    vm.ssh(f"randstream validate -v --expected-checksum 65280014 {dev}")
     new_vdi: VDI | None = None
-    try:
-        vm.ssh(f"randstream generate -v {dev}")
-        # default seed is 0
-        vm.ssh(f"randstream validate -v --expected-checksum 65280014 {dev}")
-        match vdi_op:
-            case 'clone': new_vdi = vdi.clone()
-            case 'snapshot': new_vdi = vdi.snapshot()
-        vm.ssh(f"randstream generate -v --seed 1 --size 128Mi {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
-        new_vdi = vdi.wait_for_coalesce(new_vdi.destroy)
-        vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
-    finally:
-        vm.disconnect_vdi(vdi)
-        if new_vdi is not None:
-            new_vdi.destroy()
+    match vdi_op:
+        case 'clone': new_vdi = vdi.clone()
+        case 'snapshot': new_vdi = vdi.snapshot()
+    defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
+    assert vdi is not None
+
+    vm.ssh(f"randstream generate -v --seed 1 --size 128Mi {dev}")
+    vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
+    new_vdi = vdi.wait_for_coalesce(new_vdi.destroy)
+    vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
@@ -229,33 +229,39 @@ def xva_export_import(vm: VM, compression: XVACompression, defer: Defer) -> None
     imported_vm.wait_for_vm_running_and_ssh_up()
     imported_vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
 
-def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat) -> None:
-    vdi: VDI | None = sr.create_vdi(image_format=image_format)
-    assert vdi is not None
-    image_path = f'/tmp/{vdi.uuid}.{image_format}'
-    try:
-        vbd = vm.connect_vdi(vdi)
-        dev = f'/dev/{vbd.param_get("device")}'
-        # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
-        vm.ssh(f"randstream generate -v --size 200MiB {dev}")
-        # use a different seed to not write the same data (default seed is 0)
-        vm.ssh(f"randstream generate -v --seed 1 --position 500MiB --size 200MiB {dev}")
-        vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
-        vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
-        vm.disconnect_vdi(vdi)
-        vm.host.xe('vdi-export', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
-        vdi.destroy()
-        vdi = None
-        # check that the zero blocks are not part of the result
-        size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
-        assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
-        vdi = sr.create_vdi(image_format=image_format)
-        vm.host.xe('vdi-import', {'uuid': vdi.uuid, 'filename': image_path, 'format': image_format})
-        vm.connect_vdi(vdi, 'xvdb')
-        vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
-        vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
-    finally:
-        if vdi is not None:
-            vm.disconnect_vdi(vdi)
-            vdi.destroy()
-        vm.host.ssh(f'rm -f {image_path}')
+def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, defer: Defer) -> None:
+    vdi_src: VDI | None = sr.create_vdi(image_format=image_format)
+    defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
+    assert vdi_src is not None
+
+    vbd = vm.connect_vdi(vdi_src)
+    defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
+    dev = f'/dev/{vbd.param_get("device")}'
+
+    # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
+    vm.ssh(f"randstream generate -v --size 200MiB {dev}")
+    # use a different seed to not write the same data (default seed is 0)
+    vm.ssh(f"randstream generate -v --seed 1 --position 500MiB --size 200MiB {dev}")
+    vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
+    vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+    vm.disconnect_vdi(vdi_src)
+
+    image_path = f'/tmp/{vdi_src.uuid}.{image_format}'
+    defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
+
+    vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})
+    vdi_src.destroy()
+    vdi_src = None
+
+    # check that the zero blocks are not part of the result
+    size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
+    assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
+    vdi_dest = sr.create_vdi(image_format=image_format)
+    defer(lambda: vdi_dest.destroy())
+
+    vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
+    vm.connect_vdi(vdi_dest, 'xvdb')
+    defer(lambda: vm.disconnect_vdi(vdi_dest))
+
+    vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
+    vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
