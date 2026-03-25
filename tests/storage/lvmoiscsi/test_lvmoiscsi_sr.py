@@ -1,6 +1,6 @@
 import pytest
 
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -74,8 +74,8 @@ class TestLVMOISCSISR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_lvmoiscsi_sr: VM, compression: XVACompression) -> None:
-        xva_export_import(vm_on_lvmoiscsi_sr, compression)
+    def test_xva_export_import(self, vm_on_lvmoiscsi_sr: VM, compression: XVACompression, defer: Defer) -> None:
+        xva_export_import(vm_on_lvmoiscsi_sr, compression, defer)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, lvmoiscsi_sr: SR, image_format: ImageFormat) -> None:
