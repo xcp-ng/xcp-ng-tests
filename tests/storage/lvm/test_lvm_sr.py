@@ -5,7 +5,7 @@ import pytest
 import logging
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.fistpoint import FistPoint
 from lib.host import Host
 from lib.sr import SR
@@ -149,8 +149,8 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression) -> None:
-        xva_export_import(vm_on_lvm_sr, compression)
+    def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression, defer: Defer) -> None:
+        xva_export_import(vm_on_lvm_sr, compression, defer)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, lvm_sr: SR, image_format: ImageFormat) -> None:
