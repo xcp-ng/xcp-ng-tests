@@ -309,8 +309,9 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     defer(lambda: vdi_dest.destroy())
 
     vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
-    vm.connect_vdi(vdi_dest, 'xvdb')
+    vbd = vm.connect_vdi(vdi_dest)
     defer(lambda: vm.disconnect_vdi(vdi_dest))
+    dev = f'/dev/{vbd.param_get("device")}'
 
     randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
     randstream(vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}')
