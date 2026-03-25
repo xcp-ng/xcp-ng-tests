@@ -44,6 +44,7 @@ T = TypeVar("T")
 
 HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
+Defer: TypeAlias = Callable[[Callable[[], object]], None]
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
