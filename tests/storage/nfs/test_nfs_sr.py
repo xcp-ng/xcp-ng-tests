@@ -116,8 +116,8 @@ class TestNFSSR:
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
-    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation) -> None:
-        coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op)
+    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
+        coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op, defer)
 
     @pytest.mark.small_vm
     # Make sure this fixture is called before the parametrized one
@@ -129,8 +129,9 @@ class TestNFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
-    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat) -> None:
-        vdi_export_import(storage_test_vm, dispatch_nfs, image_format)
+    def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat, defer: Defer) \
+            -> None:
+        vdi_export_import(storage_test_vm, dispatch_nfs, image_format, defer)
 
     # *** tests with reboots (longer tests).
 
