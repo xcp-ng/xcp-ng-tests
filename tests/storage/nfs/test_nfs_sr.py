@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
@@ -124,8 +124,8 @@ class TestNFSSR:
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression) -> None:
-        xva_export_import(dispatch_nfs, compression)
+    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, defer: Defer) -> None:
+        xva_export_import(dispatch_nfs, compression, defer)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
