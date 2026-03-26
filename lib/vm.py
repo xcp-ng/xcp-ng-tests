@@ -291,9 +291,11 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis=None) -> Snapshot:
+    def snapshot(self, ignore_vdis=None, name=None) -> Snapshot:
         logging.info("Snapshot VM")
-        args: dict[str, str | bool] = {'uuid': self.uuid, 'new-name-label': 'Snapshot of %s' % self.uuid}
+
+        name_label = name or f"Snapshot of {self.uuid}"
+        args: dict[str, str | bool] = {'uuid': self.uuid, 'new-name-label': name_label}
         if ignore_vdis:
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         snap_uuid = self.host.xe('vm-snapshot', args)
