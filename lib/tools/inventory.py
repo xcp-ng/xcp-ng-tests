@@ -11,6 +11,7 @@ from typing import TypeAlias, TypedDict
 
 class Server(TypedDict):
     enablerepos: list[str]
+    nested: bool
 
 
 Servers: TypeAlias = dict[HostAddress, Server]
@@ -29,8 +30,16 @@ def load_inventory(inventory_path: Path) -> Inventory:
 
     inventory_hosts: Servers = {}
     for server, config in servers.items():
+        nested = config.get("nested", None)
+        # We can't use 'False' as fallback value here, because 'False' is falsy...
+        if nested is None:
+            nested = all.get("nested", False)
+
         repos = config.get("enablerepos", [])
-        host: Server = {"enablerepos": repos or all.get("enablerepos", [])}
+        host: Server = {
+            "enablerepos": repos or all.get("enablerepos", []),
+            "nested": nested,
+        }
         inventory_hosts[server] = host
 
     return {
@@ -39,14 +48,19 @@ def load_inventory(inventory_path: Path) -> Inventory:
     }
 
 
-def into_inventory(hosts: list[HostAddress], enablerepos: list[str], parent: HostAddress) -> Inventory:
+def into_inventory(
+    hosts: list[HostAddress], enablerepos: list[str], parent: HostAddress, nested: bool
+) -> Inventory:
     """Create an inventory object from arguments.
 
     Basically, it is used as compatibility when we don't want inventory from file.
     """
     inventory_hosts: Servers = {}
     for h in hosts:
-        host: Server = {"enablerepos": enablerepos or []}
+        host: Server = {
+            "enablerepos": enablerepos or [],
+            "nested": nested or False,
+        }
         inventory_hosts[h] = host
 
     return {
