@@ -7,6 +7,7 @@ from lib import config
 from lib.commands import SSHCommandFailed
 from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
 from lib.host import Host
+from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
@@ -225,10 +226,15 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
+def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str,
+                      defer: Defer, *, with_snapshot=False) -> None:
     # clone the vm, so we can resize the disk without affecting the vm from the fixture
     vm: VM | None = source_vm.clone()
+    snap1: Snapshot | None = None
+    snap2: Snapshot | None = None
     defer(lambda: vm.destroy() if vm is not None else None)
+    defer(lambda: snap1.destroy() if snap1 is not None else None)
+    defer(lambda: snap2.destroy() if snap2 is not None else None)
     assert vm is not None
     host = vm.host
     sr = vm.vdis[0].sr
@@ -260,6 +266,17 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
 
     checksum = randstream(vm, f'generate --size {stream_size} /root/data')
     randstream(vm, f'validate --expected-checksum {checksum} /root/data')
+
+    if with_snapshot:
+        snap1 = vm.snapshot()
+        # Write new data to a particular sector after taking a snapshot
+        vm.ssh("randstream generate --seed 1 -v --position 300MiB --size 100MiB /root/data")
+        vm.ssh("randstream validate -v --expected-checksum f797ab33 /root/data")
+        snap2 = vm.snapshot()
+        vm.ssh("randstream generate --seed 2 -v --position 100MiB --size 100MiB /root/data")
+        vm.ssh("randstream validate -v --expected-checksum 60db5b9f /root/data")
+        checksum = '60db5b9f'
+
     vm.shutdown(verify=True)
 
     xva_path = f'{temp_large_dir}/{vm.uuid}.xva'
