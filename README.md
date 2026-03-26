@@ -584,6 +584,8 @@ For each pool target :
 2. Get attached secondary hosts of the pool
   * Repeat step `1.` for each secondary
 
+It is possible to mark target as *"nested"* (XCP-ng inside VM). *See inventory example below*
+
 **Inventory file**
 
 `update` command can read an inventory file in [TOML v1.0.0](https://toml.io/en/v1.0.0) format:
@@ -603,6 +605,7 @@ Take a look at an example inventory file:
 # my_inventory.toml
 
 [all]
+nested = true
 enablerepos = ["xcp-ng-base"]
 
 [servers]
