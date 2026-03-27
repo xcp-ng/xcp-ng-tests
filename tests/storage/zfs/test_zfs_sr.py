@@ -107,6 +107,7 @@ class TestZFSSR:
         coalesce_integrity(storage_test_vm, vdi_on_zfs_sr, vdi_op, defer)
 
     @pytest.mark.small_vm
+    @pytest.mark.disk_throughput_intensive
     def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, defer: Defer):
         full_vdi_write(storage_test_vm, vdi_on_zfs_sr, defer)
 

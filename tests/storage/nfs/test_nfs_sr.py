@@ -122,6 +122,7 @@ class TestNFSSR:
         coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op, defer)
 
     @pytest.mark.small_vm
+    @pytest.mark.disk_throughput_intensive
     def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_nfs_sr: VDI, defer: Defer):
         full_vdi_write(storage_test_vm, vdi_on_nfs_sr, defer)
 

@@ -101,6 +101,62 @@ JOBS: dict[str, JobData] = {
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks",
         "name_filter": "not migration and not linstor",
     },
+    "storage-main-large-thin": {
+        "description":
+            "same as storage-main with 3TiB VDIs, no large gzip XVAs creation and no test requiring 3TiB allocation",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "Configuration in data.py for each remote SR that will be tested.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--volume-size": "3TiB",
+        },
+        "paths": ["tests/storage"],
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
+                   " and not thick_provisioned and not disk_throughput_intensive",
+        "name_filter": "not migration and not linstor and not gzip",
+    },
+    "storage-main-large-thick": {
+        "description":
+            "same as storage-main with 3TiB VDIs, no gzip XVAs and tests requiring 3TiB allocation",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "Configuration in data.py for each remote SR that will be tested.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--volume-size": "3TiB",
+        },
+        "paths": ["tests/storage"],
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
+                   " and not disk_throughput_intensive and thick_provisioned",
+        "name_filter": "not migration and not linstor and not gzip",
+    },
+    "storage-main-large-full-write": {
+        "description": "storage tests actually writing the full 3TiB volumes",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "Configuration in data.py for each remote SR that will be tested.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+            "--volume-size": "3TiB",
+        },
+        "paths": ["tests/storage"],
+        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
+                   " and disk_throughput_intensive",
+        "name_filter": "not migration and not linstor and not gzip",
+    },
     "storage-migrations": {
         "description": "tests migrations with all storage drivers",
         "requirements": [
@@ -116,6 +172,42 @@ JOBS: dict[str, JobData] = {
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks",
+        "name_filter": "migration and not linstor",
+    },
+    "storage-migrations-large-thin": {
+        "description": "same as storage-migrations with 3TiB VDIs, and no test requiring 3TiB allocation",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "A second pool with at least 1 host and a SR to receive VMs.",
+            "Configuration in data.py for each remote SR that will be tested.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+            "--volume-size": "3TiB",
+        },
+        "paths": ["tests/storage"],
+        "markers": "not unused_4k_disks and not thick_provisioned",
+        "name_filter": "migration and not linstor",
+    },
+    "storage-migrations-large-thick": {
+        "description": "same as storage-migrations with 3TiB VDIs, and tests requiring 3TiB allocation",
+        "requirements": [
+            "A pool with at least 3 hosts.",
+            "An additional free disk on every host.",
+            "A second pool with at least 1 host and a SR to receive VMs.",
+            "Configuration in data.py for each remote SR that will be tested.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+            "--volume-size": "3TiB",
+        },
+        "paths": ["tests/storage"],
+        "markers": "not unused_4k_disks and thick_provisioned",
         "name_filter": "migration and not linstor",
     },
     "storage-reboots": {
