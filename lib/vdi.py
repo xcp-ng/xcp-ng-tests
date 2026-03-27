@@ -8,7 +8,7 @@ from lib.common import (
     _param_set,
     ensure_type,
     strtobool,
-    wait_for_not,
+    wait_for,
 )
 
 from typing import TYPE_CHECKING, Callable, Literal, Optional, TypeVar, overload
@@ -117,6 +117,6 @@ class VDI:
             ret = fn()
         # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.
         # And it is also necessary to allow a sufficiently long merge time which depends on the amount of data.
-        wait_for_not(lambda: self.get_parent() != previous_parent, msg="Waiting for coalesce", timeout_secs=10 * 60)
+        wait_for(lambda: self.get_parent() != previous_parent, msg="Waiting for coalesce", timeout_secs=10 * 60)
         logging.info("Coalesce done")
         return ret
