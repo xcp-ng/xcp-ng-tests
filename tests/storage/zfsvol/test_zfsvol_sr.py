@@ -63,6 +63,7 @@ class TestZfsvolVm:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot"])  # "clone" requires a snapshot
+    @pytest.mark.skip("zfsvol doesn't provide vhd-parent")
     def test_coalesce(self, storage_test_vm: VM, vdi_on_zfsvol_sr: VDI, vdi_op: CoalesceOperation):
         coalesce_integrity(storage_test_vm, vdi_on_zfsvol_sr, vdi_op)
 
