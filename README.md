@@ -569,7 +569,7 @@ uv run scripts/tools.py -h
 This command performs an update operation on remote targets.
 
 ```bash
-uv run scripts/tools.py update primary1 primary2
+uv run scripts/tools.py update -H primary1 primary2
 ```
 
 For each primary target :
@@ -578,3 +578,41 @@ For each primary target :
 2. Update with repository manager (yum): Optionally enables repositories
 3. Reboot
 4. Get attached secondary hosts and repeats three previous steps for each secondary
+
+**Inventory file**
+
+`update` command can read an inventory file in [TOML v1.0.0](https://toml.io/en/v1.0.0) format:
+
+```bash
+uv run scripts/tools.py update -i my_inventory.toml
+```
+
+> [!NOTE]
+> You can use either `-i/--inventory` or `-H/--hosts`.
+>
+> **Above flags can't be used together**
+
+Take a look at an example inventory file:
+
+```toml
+# my_inventory.toml
+
+[all]
+enablerepos = ["xcp-ng-base"]
+
+[servers]
+
+[servers."ip_or_hostname-1"]
+
+[servers."ip_or_hostname-2"]
+
+enablerepos = ["xcp-ng-updates"]
+```
+
+> [!IMPORTANT]
+> Config values under `servers` override values under `all`. For instance, the above inventory would produce
+> the following python dict:
+>
+> `{'ip_or_hostname-1': {'enablerepos': ['xcp-ng-base']}, 'ip_or_hostname-2': {'enablerepos': ['xcp-ng-updates']}}`
+>
+> Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
