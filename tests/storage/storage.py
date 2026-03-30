@@ -155,10 +155,10 @@ print(sr_ref)
 
 def install_randstream(vm: VM) -> None:
     BASE_URL = 'https://github.com/xcp-ng/randstream/releases/download'
-    VERSION = '0.4.1'
+    VERSION = '0.5.0'
     CHECKSUM = {
-        'Linux': '2a49ec6492a826cc9d4a69556041dad6dbea0051039f41f8de765bd4fb560e54',
-        'FreeBSD': '07362e6ced58f3dcf0676500775df401ed475b2e594a75a7949e4b2c1ca4775c',
+        'Linux': '31ece6ea8f605aa3046609b37c72bdc11b39ee5942e8a0a8e2a052c50df00026',
+        'FreeBSD': '12fcaad99d892963af84f2a3861a7b38a14e96cc6b3a3e45d78fb76a69b421f5',
     }
     TARGET_TRIPLE = {
         'Linux': 'x86_64-unknown-linux-musl',
