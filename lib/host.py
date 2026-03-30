@@ -662,9 +662,17 @@ class Host:
 
     def disks(self) -> list[Host.BlockDeviceInfo]:
         """ List of BlockDeviceInfo for all disks. """
+        # store the names of the parent devices to filter out the devices with children
+        pknames = set(disk['pkname'] for disk in self.block_devices_info if disk['pkname'])
         # filter out partitions from block_devices
-        return sorted((disk for disk in self.block_devices_info if not disk["pkname"]),
-                      key=lambda disk: disk["name"])
+        return sorted(
+            (
+                disk
+                for disk in self.block_devices_info
+                if (not disk["pkname"] or disk['type'] == 'raid0') and disk['kname'] not in pknames
+            ),
+            key=lambda disk: disk["name"],
+        )
 
     def disk_is_available(self, disk: DiskDevName) -> bool:
         """
