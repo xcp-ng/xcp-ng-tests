@@ -16,6 +16,7 @@ from tests.storage import (
     ImageFormat,
     XVACompression,
     coalesce_integrity,
+    full_vdi_write,
     try_to_create_sr_with_missing_device,
     vdi_export_import,
     vdi_is_open,
@@ -100,6 +101,10 @@ class TestEXTSR:
     def test_vdi_export_import(self, storage_test_vm: VM, ext_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
         vdi_export_import(storage_test_vm, ext_sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_ext_sr: VDI, defer: Defer):
+        full_vdi_write(storage_test_vm, vdi_on_ext_sr, defer)
 
     # *** tests with reboots (longer tests).
 
