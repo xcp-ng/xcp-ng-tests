@@ -12,6 +12,7 @@ from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import (
+    MAX_VDI_SIZE,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
@@ -111,6 +112,12 @@ class TestXFSSR:
     @pytest.mark.small_vm
     def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, defer: Defer):
         full_vdi_write(storage_test_vm, vdi_on_xfs_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_invalid_vdi_size(self, xfs_sr: SR, image_format: ImageFormat):
+        with pytest.raises(SSHCommandFailed) as excinfo:
+            xfs_sr.create_vdi(virtual_size=MAX_VDI_SIZE[image_format] + 1)
+        assert 'VDI Invalid size' in excinfo.value.stdout
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])

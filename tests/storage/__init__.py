@@ -1,4 +1,5 @@
 from .storage import (
+    MAX_VDI_SIZE,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
