@@ -53,7 +53,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
-    checksum = ""
+    checksums = ('', '', '')
 
     if integrity_check:
         # the vdi will be destroyed with the vm
@@ -64,10 +64,8 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
         vm.wait_for_vm_running_and_ssh_up()
         install_randstream(vm)
         dev = f'/dev/{vbd.param_get("device")}'
-        logging.info(f"Generate {dev} content")
-        checksum = randstream(vm, f'generate {dev}')
-        logging.info(f"Validate {dev}")
-        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+        checksums = partially_populate_device(vm, dev, config.volume_size)
+        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
         vm.shutdown(verify=True)
 
     assert vm.is_halted()
@@ -81,8 +79,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     vm.wait_for_os_booted()
     if integrity_check:
         vm.wait_for_vm_running_and_ssh_up()
-        logging.info(f"Validate {dev}")
-        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
     vm.shutdown(verify=True)
 
     # Migrate it back to the provenance SR
@@ -94,8 +91,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     vm.wait_for_os_booted()
     if integrity_check:
         vm.wait_for_vm_running_and_ssh_up()
-        logging.info(f"Validate {dev}")
-        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
     vm.shutdown(verify=True)
 
     if vdi_name is not None:
