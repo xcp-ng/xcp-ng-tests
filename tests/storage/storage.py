@@ -102,7 +102,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
-    checksum = ""
+    checksums = ('', '', '')
     vbd = None
 
     if integrity_check:
@@ -118,26 +118,22 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
         install_randstream(vm)
         assert vbd is not None
         dev = f'/dev/{vbd.param_get("device")}'
-        logging.info(f"Generate {dev} content")
-        randstream(vm, f'generate {dev}')
-        logging.info(f"Validate {dev}")
-        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+        checksums = partially_populate_device(vm, dev, config.volume_size)
+        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
 
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
     wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
     wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
     if integrity_check:
-        logging.info(f"Validate {dev}")
-        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
 
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
     wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
     wait_for(lambda: vm.is_running_on_host(prov_host), "Wait for VM to be running on provenance host")
     if integrity_check:
-        logging.info(f"Validate {dev}")
-        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
 
     vm.shutdown(verify=True)
 
