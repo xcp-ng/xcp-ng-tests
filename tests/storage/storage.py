@@ -197,16 +197,22 @@ CoalesceOperation = Literal['snapshot', 'clone']
 
 def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
     vdi_size = vdi.get_virtual_size()
-    # second stream is 1/8 of the full one, truncated to a multiple of 32KiB, in order to
-    # be validable in a single command
-    second_stream_size = (vdi_size // 8 // (32 * KiB)) * (32 * KiB)
+    # second stream is 1/16 of the full one, truncated to a multiple of 32KiB
+    stream_size = min((vdi_size // 16 // (32 * KiB)) * (32 * KiB), 2 * GiB)
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
-    checksum = randstream(vm, f'generate {dev}')
-    # default seed is 0
-    randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+    # generate at the start, in the middle and the end of the disk
+    checksum1 = randstream(vm, f'generate --size {stream_size} {dev}')
+    checksum2 = randstream(vm, f'generate --position {vdi_size // 2} --size {stream_size} {dev}')
+    checksum3 = randstream(vm, f'generate --position {vdi_size - stream_size} --size {stream_size} {dev}')
+    # make sure we can read that exact data before the snapshot/clone
+    randstream(vm, f'validate --expected-checksum {checksum1} --size {stream_size} {dev}')
+    randstream(vm, f'validate --expected-checksum {checksum2} --position {vdi_size // 2} --size {stream_size} {dev}')
+    randstream(
+        vm, f'validate --expected-checksum {checksum3} --position {vdi_size - stream_size} --size {stream_size} {dev}'
+    )
     new_vdi: VDI | None = None
     match vdi_op:
         case 'clone': new_vdi = vdi.clone()
@@ -214,11 +220,32 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
     defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
     assert vdi is not None
 
-    randstream(vm, f'generate --seed 1 --size {second_stream_size} {dev}')
-    checksum = randstream(vm, f"validate {dev}")
+    # add some data in a non-used place, and overwrite an already used one
+    checksum2bis = randstream(vm, f'generate --seed 1 --position {vdi_size // 2} --size {stream_size} {dev}')
+    checksum4 = randstream(vm, f'generate --position {stream_size} --size {stream_size} {dev}')
+    # make sure we can write that data before the coalesce
+    randstream(
+        vm, f'validate --expected-checksum {checksum2bis} --position {vdi_size // 2} --size {stream_size} {dev}',
+    )
+    randstream(
+        vm, f'validate --expected-checksum {checksum4} --position {stream_size} --size {stream_size} {dev}'
+    )
+
+    # trigger the coalesce
     vdi.wait_for_coalesce(new_vdi.destroy)
     new_vdi = None
-    randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+
+    # verify the data is still as expected
+    randstream(vm, f'validate --expected-checksum {checksum1} --size {stream_size} {dev}')
+    randstream(
+        vm, f'validate --expected-checksum {checksum2bis} --position {vdi_size // 2} --size {stream_size} {dev}',
+    )
+    randstream(
+        vm, f'validate --expected-checksum {checksum3} --position {vdi_size - stream_size} --size {stream_size} {dev}'
+    )
+    randstream(
+        vm, f'validate --expected-checksum {checksum4} --position {stream_size} --size {stream_size} {dev}'
+    )
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
