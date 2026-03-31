@@ -10,15 +10,15 @@ from lib.pool import Pool
 
 from .. import logger
 
-def update_all(inventory: dict[str, dict[str, list[str]]]) -> None:
-    """Updates all master (primary) hosts.
+def update_pools(inventory: dict) -> None:
+    """Updates hosts in pool(s).
 
     .. note:: Host must be a master
 
         Throws error if hosts are not master (primary).
 
     :param dict inventory:
-        Each host (key) holds its own config data (values).
+        Each host (key) holds its own config data (values, eg: `enablerepos`).
     """
     logger.debug(f"Inventory: {inventory}")
     # init related pools
