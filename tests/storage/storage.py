@@ -335,3 +335,14 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     dev = f'/dev/{vbd.param_get("device")}'
 
     validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+
+def full_vdi_write(vm: VM, vdi: VDI, defer: Defer):
+    vdi.get_virtual_size()
+    vbd = vm.connect_vdi(vdi)
+    defer(lambda: vm.disconnect_vdi(vdi))
+
+    dev = f'/dev/{vbd.param_get("device")}'
+    install_randstream(vm)
+
+    checksum = randstream(vm, f'generate {dev}')
+    randstream(vm, f'validate --expected-checksum {checksum} {dev}')

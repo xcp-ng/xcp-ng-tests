@@ -16,6 +16,7 @@ from tests.storage import (
     ImageFormat,
     XVACompression,
     coalesce_integrity,
+    full_vdi_write,
     vdi_export_import,
     vdi_is_open,
     xva_export_import,
@@ -103,6 +104,10 @@ class TestZFSSR:
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
     def test_coalesce(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
         coalesce_integrity(storage_test_vm, vdi_on_zfs_sr, vdi_op, defer)
+
+    @pytest.mark.small_vm
+    def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, defer: Defer):
+        full_vdi_write(storage_test_vm, vdi_on_zfs_sr, defer)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
