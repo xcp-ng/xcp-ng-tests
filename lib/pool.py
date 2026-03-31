@@ -15,11 +15,16 @@ from lib.sr import SR
 from typing import Any, Dict, Iterable, Optional
 
 class Pool:
+    """Pool
+
+    :raises NotAMasterHostError: if initial host is not a master
+    """
     xe_prefix = "pool"
 
     def __init__(self, master_hostname_or_ip: HostAddress) -> None:
         master = Host(self, master_hostname_or_ip)
-        assert master.is_master(), f"Host {master_hostname_or_ip} is not a master host. Aborting."
+        if not master.is_master():
+            raise NotAMasterHostError(f"Host {master_hostname_or_ip} is not a master host. Aborting.")
         self.master = master
         self.hosts = [master]
 
@@ -291,3 +296,6 @@ class Pool:
 
     def network_named(self, network_name):
         return self.master.xe('network-list', {'name-label': network_name}, minimal=True)
+
+class NotAMasterHostError(Exception):
+    """Host must be a master (primary)."""
