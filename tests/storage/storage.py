@@ -274,7 +274,7 @@ def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, 
         growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
         assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
         vm.ssh('resize2fs /dev/xvda3')
-        stream_size = volume_size // 2
+        stream_size = min(volume_size // 2, 2 * GiB)
     else:
         stream_size = 500 * MiB
 
