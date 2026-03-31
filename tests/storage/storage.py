@@ -14,6 +14,8 @@ from lib.vm import VM
 
 from typing import Literal, Tuple
 
+MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': 16 * TiB - 2561 * MiB, 'vhd': 2040 * GiB}
+
 def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
     try:
         host.sr_create(sr_type, label, {}, verify=True)
