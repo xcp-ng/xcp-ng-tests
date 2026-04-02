@@ -450,6 +450,26 @@ class Host:
 
         return self.ssh(base_command)
 
+    def update(self, enablerepos: list[str] = [], reboot: bool = True):
+        """Updates current host.
+
+        An helper function that wraps update tasks on current host.
+
+        :param list[str] enablerepos:
+            Repositories to enable when updating.
+        :param bool reboot:
+            Choose to reboot or not after update (default: True).
+        """
+        logging.info(f"[{self}] Updating...")
+
+        self.yum_clean_metadata()
+        self.yum_update(enablerepos=enablerepos)
+        if reboot:
+            # Everything's ok, just reboot
+            self.reboot(verify=True)
+
+        logging.info(f"[{self}] Updated successfully!")
+
     def restart_toolstack(self, verify=False):
         logging.info("Restart toolstack on host %s" % self)
         self.ssh(['xe-toolstack-restart'])
