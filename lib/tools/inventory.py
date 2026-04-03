@@ -13,25 +13,29 @@ class Server(TypedDict):
     enablerepos: list[str]
 
 
-Inventory: TypeAlias = dict[HostAddress, Server]
+Servers: TypeAlias = dict[HostAddress, Server]
+
+class Inventory(TypedDict):
+    hosts: Servers
 
 
 def load_inventory(inventory_path: Path) -> Inventory:
     """Create an inventory object from loaded inventory file."""
-    inventory: Inventory = {}
-
     with open(inventory_path, "rb") as f:
         data = tomllib.load(f)
 
     all = data.get("all", {})
     servers = data.get("servers", [])
 
+    inventory_hosts: Servers = {}
     for server, config in servers.items():
         repos = config.get("enablerepos", [])
         host: Server = {"enablerepos": repos or all.get("enablerepos", [])}
-        inventory[server] = host
+        inventory_hosts[server] = host
 
-    return inventory
+    return {
+        "hosts": inventory_hosts,
+    }
 
 
 def into_inventory(hosts: list[HostAddress], enablerepos: list[str]) -> Inventory:
@@ -39,10 +43,11 @@ def into_inventory(hosts: list[HostAddress], enablerepos: list[str]) -> Inventor
 
     Basically, it is used as compatibility when we don't want inventory from file.
     """
-    inventory: Inventory = {}
-
+    inventory_hosts: Servers = {}
     for h in hosts:
         host: Server = {"enablerepos": enablerepos or []}
-        inventory[h] = host
+        inventory_hosts[h] = host
 
-    return inventory
+    return {
+        "hosts": inventory_hosts,
+    }

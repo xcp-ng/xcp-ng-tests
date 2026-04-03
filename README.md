@@ -618,6 +618,6 @@ enablerepos = ["xcp-ng-updates"]
 > Config values under `servers` override values under `all`. For instance, the above inventory would produce
 > the following python dict:
 >
-> `{'ip_or_hostname-1': {'enablerepos': ['xcp-ng-base']}, 'ip_or_hostname-2': {'enablerepos': ['xcp-ng-updates']}}`
+> `{'hosts': {'ip_or_hostname-1': {'enablerepos': ['xcp-ng-base']}, 'ip_or_hostname-2': {'enablerepos': ['xcp-ng-updates']}}}`
 >
 > Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
