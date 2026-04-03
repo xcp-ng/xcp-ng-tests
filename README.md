@@ -673,6 +673,7 @@ Take a look at an example inventory file:
 
 [all]
 repositories = ["xcp-ng-base"]
+hosting_pool = "A"
 
 [hosts]
 
@@ -681,12 +682,13 @@ repositories = ["xcp-ng-base"]
 [hosts."ip_or_hostname-2"]
 
 repositories = ["xcp-ng-updates"]
+hosting_pool = "B"
 ```
 
 > [!IMPORTANT]
-> Config values under `servers` override values under `all`. For instance, the above inventory would produce
+> Config values under `hosts` override values under `all`. For instance, the above inventory would produce
 > the following python dict:
 >
-> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base']}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates']}}`
+> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
 >
 > Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
