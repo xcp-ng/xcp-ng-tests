@@ -449,6 +449,28 @@ class Host:
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
+    def get_system_uuid(self) -> str:
+        """Return system uuid of current host.
+
+        Intended for driving current host from its "parent host" in a **nested context**.
+
+        .. note::
+            If the current host is nested, it means it is not a physical host. It is a VM living inside a real host.::
+
+                [PH: Physical Host] -> [VM: emulation of an XCP-ng host] -> [vm: a vm inside nested host]
+                                       |      current working host     |
+
+            So we need system-uuid of current working host (`VM`) which is
+            the uuid seen in physical host's (`PH`) scope.
+
+        Performs the following command::
+
+            dmidecode -s system-uuid
+
+        ref: `dmidecode(8) <https://man.archlinux.org/man/dmidecode.8.en#s>__`
+        """
+        return self.ssh("dmidecode -s system-uuid").lower().strip()
+
     def yum_clean_metadata(self) -> str:
         """Quietly removes cached metadata on target.
 
