@@ -17,7 +17,7 @@ Servers: TypeAlias = dict[HostAddress, Server]
 
 class Inventory(TypedDict):
     hosts: Servers
-
+    parent: HostAddress | None
 
 def load_inventory(inventory_path: Path) -> Inventory:
     """Create an inventory object from loaded inventory file."""
@@ -35,10 +35,11 @@ def load_inventory(inventory_path: Path) -> Inventory:
 
     return {
         "hosts": inventory_hosts,
+        "parent": data.get("parent", None),
     }
 
 
-def into_inventory(hosts: list[HostAddress], enablerepos: list[str]) -> Inventory:
+def into_inventory(hosts: list[HostAddress], enablerepos: list[str], parent: HostAddress) -> Inventory:
     """Create an inventory object from arguments.
 
     Basically, it is used as compatibility when we don't want inventory from file.
@@ -50,4 +51,5 @@ def into_inventory(hosts: list[HostAddress], enablerepos: list[str]) -> Inventor
 
     return {
         "hosts": inventory_hosts,
+        "parent": parent,
     }
