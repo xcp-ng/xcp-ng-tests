@@ -368,6 +368,9 @@ ruff check lib/ tests/
 flake8
 ```
 
+> [!NOTE]
+> There is also a `Makefile` to run checks, just launch `make` command at root level project.
+
 The code checker diagnostics can also be shown directly in your IDE or text editor, by using plugins or language
 servers (LSP).
 
