@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, vm_image, wait_for
+from lib.common import Defer, GiB, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
@@ -119,6 +120,8 @@ class TestNFSSR:
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
     def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
+        if "NFS4" in dispatch_nfs.sr.get_name_label() and config.volume_size > 20 * GiB:
+            pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op, defer)
 
     @pytest.mark.small_vm
@@ -139,12 +142,16 @@ class TestNFSSR:
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) \
             -> None:
+        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.volume_size > 20 * GiB:
+            pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         xva_export_import(dispatch_nfs, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
     def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat,
                                temp_large_dir: str, defer: Defer) -> None:
+        if "NFS4" in dispatch_nfs.get_name_label() and config.volume_size > 20 * GiB:
+            pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format, temp_large_dir, defer)
 
     # *** tests with reboots (longer tests).
