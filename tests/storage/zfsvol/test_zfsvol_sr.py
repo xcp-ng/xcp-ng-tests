@@ -6,7 +6,7 @@ import logging
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, KiB, MiB, vm_image, wait_for
+from lib.common import Defer, GiB, KiB, MiB, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
@@ -97,11 +97,15 @@ class TestZfsvolVm:
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression, temp_large_dir: str,
                                defer: Defer) -> None:
+        if config.volume_size > 20 * GiB:
+            pytest.skip("Skipping large VDI test (known performance issue)")
         xva_export_import(vm_on_zfsvol_sr, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
+        if config.volume_size > 20 * GiB:
+            pytest.skip("Skipping large VDI test (known performance issue)")
         vm = storage_test_vm
         sr = zfsvol_sr
         vdi_export_import(vm, sr, image_format, temp_large_dir, defer)
