@@ -27,10 +27,14 @@ def update_pools(inventory: Inventory) -> None:
     inventory_hosts = inventory["hosts"]
     # init related pools
     pools: list[Pool] = []
+    nested_hosts = []
     for host in inventory_hosts:
         try:
             p = Pool(host)
             pools.append(p)
+            if inventory_hosts[host]["nested"]:
+                # we assume secondary are nested when master is nested
+                nested_hosts.extend(p.hosts)
         except NotAMasterHostError:
             logger.warning(f"[{host}] Skipping: not a master host")
 
