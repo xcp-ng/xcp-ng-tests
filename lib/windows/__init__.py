@@ -51,6 +51,12 @@ def try_get_and_store_vm_ip_serial(vm: VM, timeout: int):
     return True
 
 
+def vm_shutdown_without_tools(vm: VM):
+    if vm.is_running():
+        vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
+        wait_for(vm.is_halted, "Wait for VM halted")
+
+
 def wait_for_vm_running_and_ssh_up_without_tools(vm: VM):
     wait_for(vm.is_running, "Wait for VM running")
     wait_for(vm.is_ssh_up, "Wait for SSH up")
@@ -100,9 +106,7 @@ def insert_cd_safe(vm: VM, vdi_name: str, cd_path="D:/", retries=2):
             return
         except TimeoutError:
             logging.warning(f"Waiting for CD at {cd_path} failed, retrying by rebooting VM")
-            # There might be no VM tools so use SSH instead.
-            vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
-            wait_for(vm.is_halted, "Wait for VM halted")
+            vm_shutdown_without_tools(vm)
 
     raise TimeoutError(f"Waiting for CD at {cd_path} failed")
 

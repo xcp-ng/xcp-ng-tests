@@ -7,13 +7,13 @@ from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
 from lib.vm import VM
 from lib.windows import (
-    WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
     check_vm_clipboard,
     check_vm_distro,
     check_vm_dns,
     set_vm_dns,
     vif_has_rss,
+    vm_shutdown_without_tools,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
 from lib.windows.guest_tools import (
@@ -146,9 +146,7 @@ Select-String "Trim Supported")''')
 class TestGuestToolsWindowsDestructive:
     def test_uninstall_tools(self, vm_install_test_tools_no_reboot: VM):
         vm = vm_install_test_tools_no_reboot
-        vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
-        wait_for(vm.is_halted, "Shutdown VM")
-
+        vm_shutdown_without_tools(vm)
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
 
