@@ -2,7 +2,7 @@ import pytest
 
 from lib.common import vm_image, wait_for
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 from tests.storage import (
     CoalesceOperation,
@@ -25,15 +25,18 @@ class TestLVMOISCSISRCreateDestroy:
     and VM import.
     """
 
-    def test_create_and_destroy_sr(self, host, lvmoiscsi_device_config):
+    def test_create_and_destroy_sr(self, host, lvmoiscsi_device_config, image_format: ImageFormat):
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('lvmoiscsi', "lvmoiscsi-SR-test", lvmoiscsi_device_config, shared=True, verify=True)
+        sr = host.sr_create('lvmoiscsi', "lvmoiscsi-SR-test",
+                            lvmoiscsi_device_config | {'preferred-image-formats': image_format},
+                            shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
+@pytest.mark.usefixtures('image_format')
 @pytest.mark.usefixtures("lvmoiscsi_sr")
 class TestLVMOISCSISR:
     @pytest.mark.quicktest
