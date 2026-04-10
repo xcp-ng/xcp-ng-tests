@@ -63,6 +63,16 @@ def wait_for_vm_running_and_ssh_up_without_tools(vm: VM):
 
 
 def enable_testsign(vm: VM, rootcert: Union[str, None]):
+    assert vm.is_running()
+
+    if strtobool(vm.param_get("platform", "secureboot")):
+        logging.info("Disable secure boot on test image")
+
+        vm_shutdown_without_tools(vm)
+        vm.param_set('platform', False, key='secureboot')
+        vm.start()
+        wait_for_vm_running_and_ssh_up_without_tools(vm)
+
     if rootcert is not None:
         vm.execute_powershell_script(
             f"""certutil -addstore -f Root '{rootcert}';
