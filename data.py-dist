@@ -233,6 +233,10 @@ LVMOISCSI_DEVICE_CONFIG: dict[str, str] = {
 #    'SCSIid': 'id'
 }
 
+LVMOHBA_DEVICE_CONFIG: dict[str, str] = {
+#    'SCSIid': 'wwid'
+}
+
 BASE_ANSWERFILES = dict(
     INSTALL={
         "TAG": "installation",
