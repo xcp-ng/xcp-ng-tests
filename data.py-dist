@@ -72,6 +72,8 @@ WIN_GUEST_TOOLS_ISOS = {
         "xenclean_path": "package\\XenClean\\x64\\Invoke-XenClean.ps1",
         # ISO-relative path of root cert file to be installed before guest tools (optional)
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
+        # What's the onboard family of our tools? This is equal to the WinPV VENDOR_NAME value
+        "onboard_family": "XCP-ng",
     },
     # Add more guest tool ISOs here as needed
 }
@@ -100,6 +102,8 @@ OTHER_GUEST_TOOLS = {
 
         # Can we upgrade automatically from this guest tool to our tools?
         "upgradable": True,
+        # What is the expected onboarding phase after running XenClean when this tool is installed? (optional)
+        "onboarding_phase": "see test_xenclean.py ONBOARDING_PHASES",
     },
     "vendor": {
         "vendor_device": True,
