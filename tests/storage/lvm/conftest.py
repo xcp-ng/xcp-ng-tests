@@ -26,7 +26,7 @@ def lvm_sr(host: Host,
     # teardown
     sr.destroy()
 
-@pytest.fixture(scope='module')
+@pytest.fixture()
 def vdi_on_lvm_sr(lvm_sr: SR) -> Generator[VDI, None, None]:
     vdi = lvm_sr.create_vdi('LVM-local-VDI-test', virtual_size=config.volume_size)
     yield vdi

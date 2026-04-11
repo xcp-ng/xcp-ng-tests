@@ -24,7 +24,7 @@ def lvmoiscsi_sr(host: Host, lvmoiscsi_device_config: dict[str, str], image_form
     # teardown
     sr.destroy()
 
-@pytest.fixture(scope='module')
+@pytest.fixture()
 def vdi_on_lvmoiscsi_sr(lvmoiscsi_sr: SR) -> Generator[VDI, None, None]:
     vdi = lvmoiscsi_sr.create_vdi('lvmoiscsi-VDI-test', virtual_size=config.volume_size)
     yield vdi
