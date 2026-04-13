@@ -36,7 +36,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Dict, Generator, Iterable
+from typing import Dict, Generator, Iterable, List
 
 # Do we cache VMs?
 try:
@@ -47,7 +47,7 @@ assert CACHE_IMPORTED_VM in [True, False]
 
 # pytest hooks
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--nest",
         action="store",
@@ -100,11 +100,11 @@ def pytest_addoption(parser):
         "Example: vhd,qcow2"
     )
 
-def pytest_configure(config):
+def pytest_configure(config: pytest.Config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
-def pytest_generate_tests(metafunc):
+def pytest_generate_tests(metafunc: pytest.Metafunc):
     if "vm_ref" in metafunc.fixturenames:
         vms = metafunc.config.getoption("vm")
         if not vms:
@@ -117,7 +117,7 @@ def pytest_generate_tests(metafunc):
             image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
         metafunc.parametrize("image_format", image_format, scope="session")
 
-def pytest_collection_modifyitems(items, config):
+def pytest_collection_modifyitems(items: List[pytest.Item], config: pytest.Config):
     # Automatically mark tests based on fixtures they require.
     # Check pytest.ini or pytest --markers for marker descriptions.
 
