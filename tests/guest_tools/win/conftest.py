@@ -9,10 +9,10 @@ from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vm import VM
 from lib.windows import (
-    WINDOWS_SHUTDOWN_COMMAND,
     PowerAction,
     iso_create,
     try_get_and_store_vm_ip_serial,
+    vm_shutdown_without_tools,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
 from lib.windows.guest_tools import install_guest_tools
@@ -39,9 +39,7 @@ def running_windows_vm_without_tools(imported_vm: VM) -> VM:
 def unsealed_windows_vm_and_snapshot(running_windows_vm_without_tools: VM):
     """Unseal VM and get its IP, then shut it down. Cache the unsealed state in a snapshot to save time."""
     vm = running_windows_vm_without_tools
-    # vm.shutdown is not usable yet (there's no tools).
-    vm.ssh(WINDOWS_SHUTDOWN_COMMAND)
-    wait_for(vm.is_halted, "Shutdown VM")
+    vm_shutdown_without_tools(vm)
     snapshot = vm.snapshot()
     yield vm, snapshot
     snapshot.destroy(verify=True)
