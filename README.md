@@ -202,6 +202,7 @@ We defined various markers, that currently belong to the following conceptual fa
   * Tests that should be run on the largest variety of VMs.
   * Tests that should be run at least once with a very big VM.
 * Markers used in the tests themselves to change their behaviour. Those won't be very useful to select tests with `-m`. We're just mentioning them for the sake of completeness.
+* Some of the above markers are designated as *non-default markers* (see `pytest.ini`). These markers automatically cause the marked tests to be skipped, unless the matching `--enable-<marker>=true` argument is passed to pytest. They are useful for omitting disruptive tests (flaky, slow, require reboot) from the default test suite.
 
 Here's an example of selection we can do thanks to the markers:
 
@@ -217,6 +218,14 @@ Another example:
 pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=http://path/to/unix_vm_1.xva --vm=http://path/to/unix_vm_2.xva --vm=http://path/to/unix_vm_3.xva
 ```
 
+Example of running reboot tests, which are otherwise skipped by the non-default marker:
+
+```
+# Run the tests/xen suite, including tests that require a reboot
+pytest tests/xen --enable-reboot=true --hosts=ip_of_poolmaster --vm=http://path/to/a_small_vm.xva
+```
+
+Note the difference between `--enable-reboot=true` and `-m reboot`. The former allows the tests marked `reboot` to execute, while the latter specifically selects tests marked `reboot` to be executed. Note that `-m reboot` requires `--enable-reboot=true`.
 
 The `-k` option may also be used to select tests, but this time based on their name. To be used with caution as this can be a fragile filter.
 

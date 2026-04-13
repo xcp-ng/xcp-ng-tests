@@ -20,6 +20,7 @@ from lib.common import (
     prefix_object_name,
     setup_formatted_and_mounted_disk,
     shortened_nodeid,
+    strtobool,
     teardown_formatted_and_mounted_disk,
     vm_image,
     wait_for,
@@ -46,6 +47,8 @@ except ImportError:
 assert CACHE_IMPORTED_VM in [True, False]
 
 # pytest hooks
+
+NONDEFAULT_MARKERS = ["reboot", "flaky"]
 
 def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
@@ -99,6 +102,13 @@ def pytest_addoption(parser: pytest.Parser):
         help="Format of VDI to execute tests on."
         "Example: vhd,qcow2"
     )
+    # Markers
+    for marker in NONDEFAULT_MARKERS:
+        parser.addoption(
+            f"--enable-{marker}",
+            type=strtobool,
+            help=f"Enable tests with the {marker} marker"
+        )
 
 def pytest_configure(config: pytest.Config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -143,6 +153,15 @@ def pytest_collection_modifyitems(items: List[pytest.Item], config: pytest.Confi
         if item.get_closest_marker('multi_vms'):
             # multi_vms implies small_vm
             item.add_marker('small_vm')
+
+    # Disable marked tests if --enable-marker=true is not provided
+    for marker in NONDEFAULT_MARKERS:
+        if not config.getoption(f"--enable-{marker}"):
+            skip = pytest.mark.skip(reason=f"test disabled, pass `--enable-{marker}=true` to enable")
+            for item in items:
+                if marker in item.keywords:
+                    item.add_marker(skip)
+
 
 # BEGIN make test results visible from fixtures
 # from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
