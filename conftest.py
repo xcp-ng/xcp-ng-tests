@@ -48,7 +48,7 @@ assert CACHE_IMPORTED_VM in [True, False]
 
 # pytest hooks
 
-NONDEFAULT_MARKERS = ["reboot", "flaky"]
+NONDEFAULT_MARKERS = ["reboot", "flaky", "slow"]
 
 def pytest_addoption(parser: pytest.Parser):
     parser.addoption(

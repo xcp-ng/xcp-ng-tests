@@ -35,6 +35,12 @@ class TestNFSISOSRCreateDestroy:
         sr = host.sr_create('iso', "ISO-NFS-SR-test", nfs_iso_device_config, shared=True, verify=True)
         sr.forget()
 
+    @pytest.mark.slow
+    def test_create_and_destroy_sr_repeat(self, host, nfs_iso_device_config):
+        """Look for potential issues in the NFS subsystem by stress testing the connection and disconnection code."""
+        for _attempt in range(100):
+            self.test_create_and_destroy_sr(host, nfs_iso_device_config)
+
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("nfs_iso_sr")

@@ -65,6 +65,11 @@ VMS["multi"]["limits"] = [vm for vm in [
     VMS["single"]["small_vm_windows"],
 ] if vm]
 
+VMS["multi"]["slow"] = [vm for vm in [
+    VMS["single"]["small_vm"],
+    VMS["single"]["small_vm_windows"],
+] if vm]
+
 # Example of use for a common XVA_LOCATION
 #
 # XVA_LOCATION="http://somewhere/"

@@ -468,7 +468,22 @@ JOBS = {
             "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
-    }
+    },
+    "slow": {
+        "description": "tests that may take a long time",
+        "requirements": [
+            "Will vary depending on the tests included.",
+            "Use the collect command to get the list of tests "
+            + "and check the requirements written at the top of the test files.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--enable-slow": True,
+            "--vm[]": "multi/slow",
+        },
+        "paths": ["tests"],
+        "markers": "slow",
+    },
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
