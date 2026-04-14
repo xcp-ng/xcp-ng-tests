@@ -68,7 +68,7 @@ def _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warning
          background, decode, options, multiplexing) -> Union[SSHResult, SSHCommandFailed, str, bytes, None]:
     opts = list(options)
     opts.append('-o "BatchMode yes"')
-    opts.append('-o "PubkeyAcceptedAlgorithms +ssh-rsa"')
+    opts.append('-o "PubkeyAcceptedKeyTypes +ssh-rsa"')
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
