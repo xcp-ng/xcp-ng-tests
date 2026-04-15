@@ -139,7 +139,10 @@ def get_xapi_session():
     return session
 
 session = get_xapi_session()
-sr_ref = session.xenapi.SR.get_by_uuid(\"{sr.uuid}\")
+try:
+    sr_ref = session.xenapi.SR.get_by_uuid(\"{sr.uuid}\")
+finally:
+    session.xenapi.logout()
 print(sr_ref)
 """
 
