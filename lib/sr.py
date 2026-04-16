@@ -205,6 +205,9 @@ class SR:
             self._type = self.param_get('type')
         return self._type
 
+    def get_name_label(self) -> str:
+        return self.param_get('name-label')
+
     def create_vdi(
         self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
