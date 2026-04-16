@@ -109,11 +109,18 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default="1GiB",
         help="Default volume size for tests"
     )
+    parser.addoption(
+        "--write-volume-cap",
+        action="store",
+        default="2GiB",
+        help="Maximum amount of data written to a volume"
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
     global_config.volume_size = parse_size(config.getoption('--volume-size'))
+    global_config.write_volume_cap = parse_size(config.getoption('--write-volume-cap'))
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
