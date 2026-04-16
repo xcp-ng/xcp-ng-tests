@@ -32,7 +32,7 @@ JOBS = {
             "tests/xapi_plugins",
             "tests/install/test_fixtures.py",
         ],
-        "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
+        "markers": "(small_vm or no_vm) and not complex_prerequisites",
     },
     "main-multi-unix": {
         "description": "a group of tests that need to run on the largest variety of VMs - unix split",
@@ -47,7 +47,7 @@ JOBS = {
             "--vm[]": "multi/all_unix",
         },
         "paths": ["tests/misc", "tests/migration"],
-        "markers": "multi_vms and not flaky and not reboot",
+        "markers": "multi_vms"
     },
     "main-multi-windows": {
         "description": "a group of tests that need to run on the largest variety of VMs - windows split",
@@ -62,7 +62,7 @@ JOBS = {
             "--vm[]": "multi/all_windows",
         },
         "paths": ["tests/misc", "tests/migration"],
-        "markers": "multi_vms and not flaky and not reboot",
+        "markers": "multi_vms"
     },
     "packages": {
         "description": "tests that packages can be installed correctly",
@@ -87,7 +87,7 @@ JOBS = {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/storage"],
-        "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks",
+        "markers": "(small_vm or no_vm) and not quicktest and not unused_4k_disks",
         "name_filter": "not migration and not linstor",
     },
     "storage-migrations": {
@@ -117,10 +117,11 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
+            "--enable-reboot": True,
             "--vm": "single/small_vm",
         },
         "paths": ["tests/storage"],
-        "markers": "reboot and not flaky and not unused_4k_disks",
+        "markers": "reboot and not unused_4k_disks",
         "name_filter": "not linstor",
     },
     "storage-quicktest": {
@@ -149,7 +150,7 @@ JOBS = {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/storage/linstor"],
-        "markers": "(small_vm or no_vm) and not reboot and not quicktest",
+        "markers": "(small_vm or no_vm) and not quicktest",
         "name_filter": "not migration",
     },
     "linstor-migrations": {
@@ -177,6 +178,7 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
+            "--enable-reboot": True,
             "--vm": "single/small_vm",
         },
         "paths": ["tests/storage/linstor"],
@@ -206,7 +208,7 @@ JOBS = {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/storage"],
-        "markers": "(small_vm or no_vm) and unused_4k_disks and not reboot and not quicktest",
+        "markers": "(small_vm or no_vm) and unused_4k_disks and not quicktest",
         "name_filter": "not migration",
     },
     "largeblock-migrations": {
@@ -234,6 +236,7 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
+            "--enable-reboot": True,
             "--vm": "single/small_vm",
         },
         "paths": ["tests/storage"],
@@ -376,6 +379,7 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
+            "--enable-reboot": True,
             "--vm": "single/small_vm",
         },
         "paths": ["tests/xen"],
@@ -403,6 +407,8 @@ JOBS = {
         ],
         "nb_pools": 1,
         "params": {
+            "--enable-reboot": True,
+            "--enable-flaky": True,
             "--vm": "single/small_vm",
         },
         "paths": ["tests"],
@@ -425,7 +431,9 @@ JOBS = {
             "The host will be rebooted by the tests."
         ],
         "nb_pools": 1,
-        "params": {},
+        "params": {
+            "--enable-reboot": True,
+        },
         "paths": ["tests/pci_passthrough"],
     },
     "fs-diff": {
@@ -444,7 +452,9 @@ JOBS = {
             "1 XCP-ng pool and an additionnal host >= 8.2"
         ],
         "nb_pools": 2,
-        "params": {},
+        "params": {
+            "--enable-reboot": True,
+        },
         "paths": ["tests/misc/test_pool.py"],
     },
     "limit-tests": {
@@ -458,7 +468,22 @@ JOBS = {
             "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
-    }
+    },
+    "slow": {
+        "description": "tests that may take a long time",
+        "requirements": [
+            "Will vary depending on the tests included.",
+            "Use the collect command to get the list of tests "
+            + "and check the requirements written at the top of the test files.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--enable-slow": True,
+            "--vm[]": "multi/slow",
+        },
+        "paths": ["tests"],
+        "markers": "slow",
+    },
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error

@@ -19,6 +19,19 @@ class Test:
         vm.resume()
         vm.wait_for_vm_running_and_ssh_up()
 
+    @pytest.mark.slow
+    def test_migrate_repeat(self, running_vm: VM):
+        """
+        Perform a "fast" stress test of the suspend mechanism by repeatedly migrating onto the same host.
+
+        We don't use the usual suspend call, but use local migrations to avoid hitting the disk and/or network.
+        """
+        vm = running_vm
+        residence = vm.get_residence_host()
+        for _attempt in range(100):
+            vm.migrate(residence)
+            vm.wait_for_vm_running_and_ssh_up()
+
     def test_snapshot(self, running_vm: VM):
         vm = running_vm
         vm.test_snapshot_on_running_vm()

@@ -20,6 +20,7 @@ from lib.common import (
     prefix_object_name,
     setup_formatted_and_mounted_disk,
     shortened_nodeid,
+    strtobool,
     teardown_formatted_and_mounted_disk,
     vm_image,
     wait_for,
@@ -36,7 +37,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Dict, Generator, Iterable
+from typing import Dict, Generator, Iterable, List
 
 # Do we cache VMs?
 try:
@@ -47,7 +48,9 @@ assert CACHE_IMPORTED_VM in [True, False]
 
 # pytest hooks
 
-def pytest_addoption(parser):
+NONDEFAULT_MARKERS = ["reboot", "flaky", "slow"]
+
+def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--nest",
         action="store",
@@ -99,12 +102,19 @@ def pytest_addoption(parser):
         help="Format of VDI to execute tests on."
         "Example: vhd,qcow2"
     )
+    # Markers
+    for marker in NONDEFAULT_MARKERS:
+        parser.addoption(
+            f"--enable-{marker}",
+            type=strtobool,
+            help=f"Enable tests with the {marker} marker"
+        )
 
-def pytest_configure(config):
+def pytest_configure(config: pytest.Config):
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
-def pytest_generate_tests(metafunc):
+def pytest_generate_tests(metafunc: pytest.Metafunc):
     if "vm_ref" in metafunc.fixturenames:
         vms = metafunc.config.getoption("vm")
         if not vms:
@@ -117,7 +127,7 @@ def pytest_generate_tests(metafunc):
             image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
         metafunc.parametrize("image_format", image_format, scope="session")
 
-def pytest_collection_modifyitems(items, config):
+def pytest_collection_modifyitems(items: List[pytest.Item], config: pytest.Config):
     # Automatically mark tests based on fixtures they require.
     # Check pytest.ini or pytest --markers for marker descriptions.
 
@@ -143,6 +153,15 @@ def pytest_collection_modifyitems(items, config):
         if item.get_closest_marker('multi_vms'):
             # multi_vms implies small_vm
             item.add_marker('small_vm')
+
+    # Disable marked tests if --enable-marker=true is not provided
+    for marker in NONDEFAULT_MARKERS:
+        if not config.getoption(f"--enable-{marker}"):
+            skip = pytest.mark.skip(reason=f"test disabled, pass `--enable-{marker}=true` to enable")
+            for item in items:
+                if marker in item.keywords:
+                    item.add_marker(skip)
+
 
 # BEGIN make test results visible from fixtures
 # from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
