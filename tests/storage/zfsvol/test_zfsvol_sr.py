@@ -97,14 +97,14 @@ class TestZfsvolVm:
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression, temp_large_dir: str,
                                defer: Defer) -> None:
-        if config.volume_size > 20 * GiB:
+        if config.write_volume_cap > 20 * GiB:
             pytest.skip("Skipping large VDI test (known performance issue)")
         xva_export_import(vm_on_zfsvol_sr, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
-        if config.volume_size > 20 * GiB:
+        if config.write_volume_cap > 20 * GiB:
             pytest.skip("Skipping large VDI test (known performance issue)")
         vm = storage_test_vm
         sr = zfsvol_sr
