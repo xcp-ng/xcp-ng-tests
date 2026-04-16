@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import pytest
-
 import logging
+from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, GiB, KiB, MiB, TiB, strtobool, wait_for, wait_for_not
+from lib.common import Defer, GiB, MiB, TiB, strtobool, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
-from typing import Literal, Tuple
+from typing import Literal
 
 MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': 16 * TiB, 'vhd': 2040 * GiB}
 
@@ -27,35 +26,13 @@ def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
         return
     assert False, 'SR creation should not have succeeded!'
 
-def partial_stream_size(vdi_size: int) -> int:
-    return min((vdi_size // 16 // (32 * KiB)) * (32 * KiB), 2 * GiB)
-
-def partially_populate_device(vm: VM, dev_path: str, dev_size: int) -> Tuple[str, str, str]:
-    logging.info(f"Generate {dev_path} content")
-    size = partial_stream_size(dev_size)
-    # generate at the start, in the middle and the end of the disk
-    # use seeds unlikely to collide with other usages
-    checksum1 = randstream(vm, f'generate --seed 10 --size {size} {dev_path}')
-    checksum2 = randstream(vm, f'generate --seed 11 --position {dev_size // 2} --size {size} {dev_path}')
-    checksum3 = randstream(vm, f'generate --seed 12 --position {dev_size - size} --size {size} {dev_path}')
-    return (checksum1, checksum2, checksum3)
-
-def validate_partially_populated_device(vm: VM, dev_path: str, dev_size: int, checksums: Tuple[str, str, str]) -> None:
-    logging.info(f"Validate {dev_path} content")
-    size = partial_stream_size(dev_size)
-    checksum1, checksum2, checksum3 = checksums
-    randstream(vm, f'validate --expected-checksum {checksum1} --size {size} {dev_path}')
-    randstream(vm, f'validate --expected-checksum {checksum2} --position {dev_size // 2} --size {size} {dev_path}')
-    randstream(vm, f'validate --expected-checksum {checksum3} --position {dev_size - size} --size {size} {dev_path}')
-
-
 def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     """ Storage migration of a shutdown VM, then migrate it back. """
     prov_sr = vm.get_sr()
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
-    checksums = ('', '', '')
+    spans: list[StreamSpan] = []
 
     if integrity_check:
         # the vdi will be destroyed with the vm
@@ -66,8 +43,8 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
         vm.wait_for_vm_running_and_ssh_up()
         install_randstream(vm)
         dev = f'/dev/{vbd.param_get("device")}'
-        checksums = partially_populate_device(vm, dev, config.volume_size)
-        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+        spans = partially_populate_device(vm, dev, config.volume_size)
+        validate_partially_populated_device(vm, dev, spans)
         vm.shutdown(verify=True)
 
     assert vm.is_halted()
@@ -81,7 +58,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     vm.wait_for_os_booted()
     if integrity_check:
         vm.wait_for_vm_running_and_ssh_up()
-        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+        validate_partially_populated_device(vm, dev, spans)
     vm.shutdown(verify=True)
 
     # Migrate it back to the provenance SR
@@ -93,7 +70,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     vm.wait_for_os_booted()
     if integrity_check:
         vm.wait_for_vm_running_and_ssh_up()
-        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+        validate_partially_populated_device(vm, dev, spans)
     vm.shutdown(verify=True)
 
     if vdi_name is not None:
@@ -104,7 +81,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
-    checksums = ('', '', '')
+    spans: list[StreamSpan] = []
     vbd = None
 
     if integrity_check:
@@ -120,22 +97,22 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
         install_randstream(vm)
         assert vbd is not None
         dev = f'/dev/{vbd.param_get("device")}'
-        checksums = partially_populate_device(vm, dev, config.volume_size)
-        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+        spans = partially_populate_device(vm, dev, config.volume_size)
+        validate_partially_populated_device(vm, dev, spans)
 
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
     wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
     wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
     if integrity_check:
-        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+        validate_partially_populated_device(vm, dev, spans)
 
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
     wait_for(lambda: vm.all_vdis_on_sr(prov_sr), "Wait for all VDIs back on provenance SR")
     wait_for(lambda: vm.is_running_on_host(prov_host), "Wait for VM to be running on provenance host")
     if integrity_check:
-        validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+        validate_partially_populated_device(vm, dev, spans)
 
     vm.shutdown(verify=True)
 
@@ -171,10 +148,10 @@ print(sr_ref)
 
 def install_randstream(vm: VM) -> None:
     BASE_URL = 'https://github.com/xcp-ng/randstream/releases/download'
-    VERSION = '0.5.0'
+    VERSION = '0.6.1'
     CHECKSUM = {
-        'Linux': '31ece6ea8f605aa3046609b37c72bdc11b39ee5942e8a0a8e2a052c50df00026',
-        'FreeBSD': '12fcaad99d892963af84f2a3861a7b38a14e96cc6b3a3e45d78fb76a69b421f5',
+        'Linux': '2aef357cfdfed09d6492cfb60ab145f304abd7ccda9b77d47e15a9048c1a6eee',
+        'FreeBSD': '645c007393be939d75d95388b1d0e41e0e1217e8a88057284916b638a61c690d',
     }
     TARGET_TRIPLE = {
         'Linux': 'x86_64-unknown-linux-musl',
@@ -213,15 +190,14 @@ CoalesceOperation = Literal['snapshot', 'clone']
 
 def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
     vdi_size = vdi.get_virtual_size()
-    stream_size = partial_stream_size(vdi_size)
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
     # generate at the start, in the middle and the end of the disk
-    checksum1, checksum2, checksum3 = partially_populate_device(vm, dev, vdi_size)
+    spans = partially_populate_device(vm, dev, vdi_size, 4, skip_spans=[1])
     # make sure we can read that exact data before the snapshot/clone
-    validate_partially_populated_device(vm, dev, vdi_size, (checksum1, checksum2, checksum3))
+    validate_partially_populated_device(vm, dev, spans)
     new_vdi: VDI | None = None
     match vdi_op:
         case 'clone': new_vdi = vdi.clone()
@@ -229,26 +205,20 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
     defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
     assert vdi is not None
 
-    # add some data in a non-used place, and overwrite an already used one
-    checksum2bis = randstream(vm, f'generate --seed 0 --position {vdi_size // 2} --size {stream_size} {dev}')
-    checksum4 = randstream(vm, f'generate --seed 1 --position {stream_size} --size {stream_size} {dev}')
-    # make sure we can write that data before the coalesce
-    randstream(
-        vm, f'validate --expected-checksum {checksum2bis} --position {vdi_size // 2} --size {stream_size} {dev}',
-    )
-    randstream(
-        vm, f'validate --expected-checksum {checksum4} --position {stream_size} --size {stream_size} {dev}'
-    )
+    # add some data in a non-used place (span 1), and overwrite an already used one (span 2)
+    spans[1].generate(vm, dev, seed=1)
+    spans[2].generate(vm, dev, seed=2)
+
+    # make sure we can validate that data before the coalesce
+    spans[1].validate(vm, dev)
+    spans[2].validate(vm, dev)
 
     # trigger the coalesce
     vdi.wait_for_coalesce(new_vdi.destroy)
     new_vdi = None
 
     # verify the data is still as expected
-    validate_partially_populated_device(vm, dev, vdi_size, (checksum1, checksum2bis, checksum3))
-    randstream(
-        vm, f'validate --expected-checksum {checksum4} --position {stream_size} --size {stream_size} {dev}'
-    )
+    validate_partially_populated_device(vm, dev, spans)
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
@@ -282,7 +252,7 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
         growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
         assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
         vm.ssh('resize2fs /dev/xvda3')
-        stream_size = min(volume_size // 2, 2 * GiB)
+        stream_size = min(volume_size // 2, config.write_volume_cap)
     else:
         stream_size = 500 * MiB
 
@@ -323,8 +293,8 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
     dev = f'/dev/{vbd.param_get("device")}'
 
-    checksums = partially_populate_device(vm, dev, config.volume_size)
-    validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+    spans = partially_populate_device(vm, dev, config.volume_size)
+    validate_partially_populated_device(vm, dev, spans)
     vm.disconnect_vdi(vdi_src)
 
     image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
@@ -336,8 +306,8 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
 
     # check that the zero blocks are not part of the result
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
-    stream_size = partial_stream_size(config.volume_size)
-    assert stream_size // MiB * 3 < size_mb < stream_size // MiB * 3.1, f"unexpected image size: {size_mb}"
+    total_span_size_mib = sum(span.size for span in spans) // MiB
+    assert total_span_size_mib < size_mb < total_span_size_mib * 1.1, f"unexpected image size: {size_mb}"
     vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
     defer(lambda: vdi_dest.destroy())
 
@@ -346,7 +316,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     defer(lambda: vm.disconnect_vdi(vdi_dest))
     dev = f'/dev/{vbd.param_get("device")}'
 
-    validate_partially_populated_device(vm, dev, config.volume_size, checksums)
+    validate_partially_populated_device(vm, dev, spans)
 
 def full_vdi_write(vm: VM, vdi: VDI, defer: Defer):
     vdi.get_virtual_size()
@@ -358,3 +328,134 @@ def full_vdi_write(vm: VM, vdi: VDI, defer: Defer):
 
     checksum = randstream(vm, f'generate {dev}')
     randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+
+@dataclass
+class StreamSpan:
+    position: int
+    size: int
+    checksum: str | None = None
+
+    def generate(self, vm: VM, dev: str, seed: int | None = None) -> str:
+        """
+        Generate random data for this span and return its checksum.
+
+        Args:
+            vm: Virtual machine to run randstream on
+            dev: Device path (e.g., '/dev/xvdb')
+            seed: Optional seed for deterministic generation. If not provided,
+                  caller must ensure seed is passed explicitly.
+
+        Returns:
+            Checksum of generated data as string
+        """
+        seed_str = f'--seed {seed}' if seed is not None else ''
+        self.checksum = randstream(
+            vm, f'generate {seed_str} --position {self.position} --size {self.size} {dev}'.strip()
+        )
+        return self.checksum
+
+    def validate(self, vm: VM, dev: str) -> None:
+        """
+        Validate random data for this span.
+
+        Args:
+            vm: Virtual machine to run randstream on
+            dev: Device path (e.g., '/dev/xvdb')
+
+        If checksum is set, validates against the expected checksum.
+        Otherwise, the stream itself contains checksums for each chunk
+        and will be validated using those internal checksums.
+        """
+        expected_flags = f'--expected-checksum {self.checksum}' if self.checksum is not None else ''
+        randstream(vm, f'validate {expected_flags} --position {self.position} --size {self.size} {dev}')
+
+def partially_populate_device(vm: VM, dev_path: str, dev_size: int, num_spans: int = 3, skip_spans: list[int] = []) \
+        -> list[StreamSpan]:
+    """
+    Generate random data in multiple spans across a device.
+
+    Creates num_spans spans of random data distributed across the device.
+    Spans are positioned such that first span starts at 0 and last span
+    ends at dev_size, with middle spans evenly distributed in between.
+
+    ASCII visualization of span distribution:
+
+    For num_spans=3:
+        Device:  [======================================]
+        Span 0:  [****]
+        Span 1:                  [****]
+        Span 2:                                    [****]
+        Gap:     gap1            gap2                gap3
+
+    For num_spans=4 with skip_spans=[1]:
+        Device:  [================================================]
+        Span 0:  [**]
+        Span 1:               [  ]
+        Span 2:                              [**]
+        Span 3:                                                [**]
+
+    Args:
+        vm: Virtual machine to run randstream on
+        dev_path: Device path (e.g., '/dev/xvdb')
+        dev_size: Total device size in bytes
+        num_spans: Number of spans to create (default: 3)
+        skip_spans: List of span indices to skip (no data generated).
+                   Skipped spans still exist in returned list with checksum=None.
+                   (default: [])
+
+    Returns:
+        List of StreamSpan objects representing the generated spans.
+        Spans are guaranteed to:
+        - Not overlap
+        - Have first span at position 0
+        - Have last span ending at dev_size
+        - Be evenly distributed across device
+    """
+    logging.info(f"Generate {dev_path} content")
+    stream_size = min(dev_size, config.write_volume_cap) // num_spans
+
+    # Validate skip_spans
+    assert all(0 <= i < num_spans for i in skip_spans), \
+        f"Invalid span index in skip_spans: must be 0 <= i < {num_spans}"
+
+    spans: list[StreamSpan] = []
+
+    # Calculate positions for regularly distributed spans
+    # First span always at position 0, last span always ends at dev_size
+    if num_spans == 1:
+        positions = [0]
+    elif num_spans == 2:
+        positions = [0, dev_size - stream_size]
+    else:
+        # For 3+ spans: distribute evenly across available space
+        # Available space is dev_size - size (last span can't extend past dev_size)
+        available_space = dev_size - stream_size
+        positions = [0]  # First span always at 0
+        # Distribute middle spans evenly
+        for i in range(1, num_spans - 1):
+            position = (available_space * i) // (num_spans - 1)
+            positions.append(position)
+        positions.append(dev_size - stream_size)  # Last span always ends at dev_size
+
+    # Generate spans with consistency checks
+    prev_end = -1
+    for i, position in enumerate(positions):
+        # Assert no overlap
+        assert position >= prev_end, f"Span {i} at position {position} overlaps with previous span ending at {prev_end}"
+        span = StreamSpan(position=position, size=stream_size)
+        if i not in skip_spans:
+            span.generate(vm, dev_path, seed=1000 + i)
+        spans.append(span)
+        prev_end = position + stream_size
+
+    # Final assert: last span must not extend past dev_size
+    assert spans[-1].position + spans[-1].size <= dev_size, \
+        f"Last span extends past device: position={spans[-1].position}, size={spans[-1].size}, dev_size={dev_size}"
+
+    return spans
+
+def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan]) -> None:
+    logging.info(f"Validate {dev} content")
+    for span in spans:
+        if span.checksum is not None:
+            span.validate(vm, dev)
