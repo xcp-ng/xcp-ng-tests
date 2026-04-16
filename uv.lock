@@ -894,6 +894,7 @@ dev = [
     { name = "ruff" },
     { name = "types-requests" },
     { name = "typing-extensions" },
+    { name = "xenapi" },
     { name = "zizmor" },
 ]
 
@@ -923,7 +924,17 @@ dev = [
     { name = "ruff" },
     { name = "types-requests" },
     { name = "typing-extensions" },
+    { name = "xenapi" },
     { name = "zizmor" },
+]
+
+[[package]]
+name = "xenapi"
+version = "26.8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/31/35a2304f30f7fc92a4a054d3f45a358f73daa68856779cede1a9240bc39b/xenapi-26.8.0.tar.gz", hash = "sha256:3c66a149a3bf4a234db04e4cd223138e004c029bacbae83fab0fc4d3282bb3fb", size = 6737, upload-time = "2026-03-31T02:49:25.673Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/3f/b00f171eee096a4cbeeb70d7f7b30904f282a9173b88cc01846c87202b6a/xenapi-26.8.0-py3-none-any.whl", hash = "sha256:5eab8d396e0696a31b494b25fe3d2eb64630c5b111f25f14d869c1d8d2a2132a", size = 5947, upload-time = "2026-03-31T02:49:24.398Z" },
 ]
 
 [[package]]
