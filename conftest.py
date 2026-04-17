@@ -28,6 +28,8 @@ from lib.host import Host
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
+from lib.vbd import VBD
+from lib.vdi import VDI
 from lib.vm import VM, vm_cache_key_from_def
 from lib.xo import xo_cli
 
@@ -36,7 +38,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Dict, Generator, Iterable
+from typing import Any, Dict, Generator, Iterable
 
 # Do we cache VMs?
 try:
@@ -47,7 +49,7 @@ assert CACHE_IMPORTED_VM in [True, False]
 
 # pytest hooks
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--nest",
         action="store",
@@ -100,11 +102,11 @@ def pytest_addoption(parser):
         "Example: vhd,qcow2"
     )
 
-def pytest_configure(config):
+def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
 
-def pytest_generate_tests(metafunc):
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
         vms = metafunc.config.getoption("vm")
         if not vms:
@@ -117,7 +119,7 @@ def pytest_generate_tests(metafunc):
             image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
         metafunc.parametrize("image_format", image_format, scope="session")
 
-def pytest_collection_modifyitems(items, config):
+def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Config) -> None:
     # Automatically mark tests based on fixtures they require.
     # Check pytest.ini or pytest --markers for marker descriptions.
 
@@ -150,9 +152,11 @@ def pytest_collection_modifyitems(items, config):
 # FIXME we may have to move this into lib/ if fixtures in sub-packages
 # want to make use of this feature
 
-PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.CollectReport]]()
+PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.TestReport]]()
 @pytest.hookimpl(wrapper=True, tryfirst=True)
-def pytest_runtest_makereport(item, call):
+def pytest_runtest_makereport(
+    item: pytest.Item, call: pytest.CallInfo[Any]
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     # execute all other hooks to obtain the report object
     rep = yield
 
@@ -168,10 +172,10 @@ def pytest_runtest_makereport(item, call):
 # fixtures
 
 @pytest.fixture(scope='session')
-def hosts(pytestconfig) -> Generator[list[Host]]:
+def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
     nested_list = []
 
-    def setup_host(hostname_or_ip, *, config=None):
+    def setup_host(hostname_or_ip: str, *, config: pytest.Config | None = None) -> Host:
         host_vm = None
         if hostname_or_ip.startswith("cache://"):
             if config is None:
@@ -211,7 +215,7 @@ def hosts(pytestconfig) -> Generator[list[Host]]:
         h = pool.master
         return h
 
-    def cleanup_hosts():
+    def cleanup_hosts() -> None:
         for vm in nested_list:
             logging.info("Destroying nested host VM %s", vm.uuid)
             vm.destroy(verify=True)
@@ -235,7 +239,7 @@ def hosts(pytestconfig) -> Generator[list[Host]]:
     cleanup_hosts()
 
 @pytest.fixture(scope='session')
-def pools_hosts_by_name_or_ip(hosts: list[Host]) -> Generator[dict[HostAddress, Host]]:
+def pools_hosts_by_name_or_ip(hosts: list[Host]) -> Generator[dict[HostAddress, Host], None, None]:
     """All hosts of all pools, each indexed by their hostname_or_ip."""
     yield {host.hostname_or_ip: host
            for pool_master in hosts
@@ -243,7 +247,7 @@ def pools_hosts_by_name_or_ip(hosts: list[Host]) -> Generator[dict[HostAddress, 
            }
 
 @pytest.fixture(scope='session')
-def registered_xo_cli():
+def registered_xo_cli() -> None:
     # The fixture is not responsible for establishing the connection.
     # We just check that xo-cli is currently registered
     try:
@@ -252,7 +256,7 @@ def registered_xo_cli():
         raise Exception(f"Check for registered xo_cli failed: {e}")
 
 @pytest.fixture(scope='session')
-def hosts_with_xo(hosts, registered_xo_cli):
+def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[Host], None, None]:
     for h in hosts:
         logging.info(">>> Connect host %s" % h)
         if not h.skip_xo_config:
@@ -268,17 +272,17 @@ def hosts_with_xo(hosts, registered_xo_cli):
             h.xo_server_remove()
 
 @pytest.fixture(scope='session')
-def hostA1(hosts):
+def hostA1(hosts: list[Host]) -> Generator[Host, None, None]:
     """ Master of first pool (pool A). """
     yield hosts[0]
 
 @pytest.fixture(scope='session')
-def host(hostA1):
+def host(hostA1: Host) -> Generator[Host, None, None]:
     """ Convenience fixture for hostA1. """
     yield hostA1
 
 @pytest.fixture(scope='session')
-def hostA2(hostA1):
+def hostA2(hostA1: Host) -> Generator[Host, None, None]:
     """ Second host of pool A. """
     assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
     _hostA2 = hostA1.pool.hosts[1]
@@ -286,7 +290,7 @@ def hostA2(hostA1):
     yield _hostA2
 
 @pytest.fixture(scope='session')
-def hostB1(hosts):
+def hostB1(hosts: list[Host]) -> Generator[Host, None, None]:
     """ Master of second pool (pool B). """
     assert len(hosts) > 1, "A second pool is required"
     assert hosts[0].pool.uuid != hosts[1].pool.uuid
@@ -295,43 +299,43 @@ def hostB1(hosts):
     yield _hostB1
 
 @pytest.fixture(scope='session')
-def host_at_least_8_3(host):
+def host_at_least_8_3(host: Host) -> None:
     version_str = "8.3"
     if not host.xcp_version >= version.parse(version_str):
         pytest.skip(f"This test requires an XCP-ng >= {version_str} host")
 
 @pytest.fixture(scope='session')
-def host_less_than_8_3(host):
+def host_less_than_8_3(host: Host) -> None:
     version_str = "8.3"
     if not host.xcp_version < version.parse(version_str):
         pytest.skip(f"This test requires an XCP-ng < {version_str} host")
 
 @pytest.fixture(scope='session')
-def host_with_hsts(host):
+def host_with_hsts(host: Host) -> Generator[Host, None, None]:
     host.enable_hsts_header()
     yield host
     host.disable_hsts_header()
 
 @pytest.fixture(scope='function')
-def xfail_on_xcpng_8_3(host, request):
+def xfail_on_xcpng_8_3(host: Host, request: pytest.FixtureRequest) -> None:
     """ Test that is relevant but expected to fail in current state of XCP-ng 8.3. """
     if host.xcp_version >= version.parse("8.3"):
         request.node.add_marker(pytest.mark.xfail)
 
 @pytest.fixture(scope='session')
-def host_no_ipv6(host):
+def host_no_ipv6(host: Host) -> None:
     if is_ipv6(host.hostname_or_ip):
         pytest.skip("This test requires an IPv4 XCP-ng")
 
 @pytest.fixture(scope="session")
-def shared_sr(host):
+def shared_sr(host: Host) -> Generator[SR, None, None]:
     sr = host.pool.first_shared_sr()
     assert sr, "No shared SR available on hosts"
     logging.info(">> Shared SR on host present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
-def local_sr_on_hostA1(hostA1):
+def local_sr_on_hostA1(hostA1: Host) -> Generator[SR, None, None]:
     """ A local SR on the pool's master. """
     srs = hostA1.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the pool's master"
@@ -341,7 +345,7 @@ def local_sr_on_hostA1(hostA1):
     yield sr
 
 @pytest.fixture(scope='session')
-def local_sr_on_hostA2(hostA2):
+def local_sr_on_hostA2(hostA2: Host) -> Generator[SR, None, None]:
     """ A local SR on the pool's second host. """
     srs = hostA2.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the pool's second host"
@@ -351,7 +355,7 @@ def local_sr_on_hostA2(hostA2):
     yield sr
 
 @pytest.fixture(scope='session')
-def local_sr_on_hostB1(hostB1):
+def local_sr_on_hostB1(hostB1: Host) -> Generator[SR, None, None]:
     """ A local SR on the second pool's master. """
     srs = hostB1.local_vm_srs()
     assert len(srs) > 0, "a local SR is required on the second pool's master"
@@ -361,7 +365,7 @@ def local_sr_on_hostB1(hostB1):
     yield sr
 
 @pytest.fixture(scope='session')
-def disks(pytestconfig, pools_hosts_by_name_or_ip: dict[HostAddress, Host]
+def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddress, Host]
           ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all disks for on all hosts of first pool."""
     def _parse_disk_option(option_text: str) -> tuple[HostAddress, list[DiskDevName]]:
@@ -428,7 +432,7 @@ def pool_with_unused_512B_disk(host: Host, unused_512B_disks: dict[Host, list[Ho
     return host.pool
 
 @pytest.fixture(scope='module')
-def vm_ref(request):
+def vm_ref(request: pytest.FixtureRequest) -> str:
     ref = request.param
 
     if ref is None:
@@ -448,7 +452,7 @@ def vm_ref(request):
         return vm_image(ref)
 
 @pytest.fixture(scope="module")
-def imported_vm(host, vm_ref):
+def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
     if is_uuid(vm_ref):
         vm_orig = VM(vm_ref, host)
         name = vm_orig.name()
@@ -472,7 +476,7 @@ def imported_vm(host, vm_ref):
         vm.destroy(verify=True)
 
 @pytest.fixture(scope="session")
-def tests_git_revision():
+def tests_git_revision() -> Generator[str, None, None]:
     """
     Get the git revision string for this tests repo.
 
@@ -484,7 +488,7 @@ def tests_git_revision():
     yield test_repo.head.commit.hexsha
 
 @pytest.fixture(scope="function")
-def create_vms(request, host, tests_git_revision):
+def create_vms(request: pytest.FixtureRequest, host: Host, tests_git_revision: str) -> Generator[list[VM], None, None]:
     """
     Returns list of VM objects created from `vm_definitions` marker.
 
@@ -533,7 +537,7 @@ def create_vms(request, host, tests_git_revision):
     if marker is None:
         raise Exception("No vm_definitions marker specified.")
 
-    vm_defs = []
+    vm_defs: list[dict[str, Any]] = []
     for vm_def in marker.args:
         vm_def = callable_marker(vm_def, request)
         assert "name" in vm_def
@@ -544,9 +548,9 @@ def create_vms(request, host, tests_git_revision):
         # FIXME should check for extra args
         vm_defs.append(vm_def)
 
-    vms = []
-    vdis = []
-    vbds = []
+    vms: list[VM] = []
+    vdis: list[VDI] = []
+    vbds: list[VBD] = []
     try:
         for vm_def in vm_defs:
             if "template" in vm_def:
@@ -585,10 +589,12 @@ def create_vms(request, host, tests_git_revision):
             logging.info("<< Destroy VM %s", vm.uuid)
             vm.destroy(verify=True)
 
-def _vm_name(request, vm_def):
+def _vm_name(request: pytest.FixtureRequest, vm_def: dict[str, Any]) -> str:
     return f"{vm_def['name']} in {request.node.nodeid}"
 
-def _create_vm(request, vm_def, host, vms, vdis, vbds):
+def _create_vm(
+    request: pytest.FixtureRequest, vm_def: dict[str, Any], host: Host, vms: list[VM], vdis: list[VDI], vbds: list[VBD]
+) -> None:
     vm_name = _vm_name(request, vm_def)
     vm_template = vm_def["template"]
 
@@ -623,7 +629,9 @@ def _create_vm(request, vm_def, host, vms, vdis, vbds):
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
 
-def _vm_from_cache(request, vm_def, host, vms, tests_hexsha):
+def _vm_from_cache(
+    request: pytest.FixtureRequest, vm_def: dict[str, Any], host: Host, vms: list[VM], tests_hexsha: str
+) -> None:
     base_vm = host.cached_vm(vm_cache_key_from_def(vm_def, request.node.nodeid, tests_hexsha),
                              sr_uuid=host.main_sr_uuid())
     if base_vm is None:
@@ -638,7 +646,7 @@ def _vm_from_cache(request, vm_def, host, vms, tests_hexsha):
     vms.append(vm)
 
 @pytest.fixture(scope="module")
-def started_vm(imported_vm):
+def started_vm(imported_vm: VM) -> VM:
     vm = imported_vm
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
@@ -649,39 +657,39 @@ def started_vm(imported_vm):
     # no teardown
 
 @pytest.fixture(scope="module")
-def running_vm(started_vm):
+def running_vm(started_vm: VM) -> VM:
     vm = started_vm
     wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
     return vm
 
 @pytest.fixture(scope='module')
-def unix_vm(imported_vm):
+def unix_vm(imported_vm: VM) -> Generator[VM, None, None]:
     vm = imported_vm
     if vm.is_windows:
         pytest.skip("This test is only compatible with unix VMs.")
     yield vm
 
 @pytest.fixture(scope="module")
-def running_unix_vm(unix_vm, running_vm):
+def running_unix_vm(unix_vm: VM, running_vm: VM) -> VM:
     return running_vm
     # no teardown
 
 @pytest.fixture(scope='module')
-def windows_vm(imported_vm):
+def windows_vm(imported_vm: VM) -> Generator[VM, None, None]:
     vm = imported_vm
     if not vm.is_windows:
         pytest.skip("This test is only compatible with Windows VMs.")
     yield vm
 
 @pytest.fixture(scope='module')
-def uefi_vm(imported_vm):
+def uefi_vm(imported_vm: VM) -> Generator[VM, None, None]:
     vm = imported_vm
     if not vm.is_uefi:
         pytest.skip('This test requires an UEFI VM')
     yield vm
 
 @pytest.fixture(scope='session')
-def additional_repos(request, hosts: list[Host]):
+def additional_repos(request: pytest.FixtureRequest, hosts: list[Host]) -> Generator[list[str], None, None]:
     if request.param is None:
         yield []
         return
@@ -710,7 +718,7 @@ gpgcheck=0
             host_.ssh('rm -f {repo_file}')
 
 @pytest.fixture(scope='session')
-def second_network(pytestconfig, host):
+def second_network(pytestconfig: pytest.Config, host: Host) -> str:
     network_uuids = pytestconfig.getoption("second_network")
     if len(network_uuids) != 1:
         pytest.fail("This test requires exactly one --second-network parameter!")
@@ -727,15 +735,15 @@ def second_network(pytestconfig, host):
     return network_uuid
 
 @pytest.fixture(scope='module')
-def nfs_iso_device_config():
+def nfs_iso_device_config() -> dict[str, Any]:
     return global_config.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=['location'])
 
 @pytest.fixture(scope='module')
-def cifs_iso_device_config():
+def cifs_iso_device_config() -> dict[str, Any]:
     return global_config.sr_device_config("CIFS_ISO_DEVICE_CONFIG")
 
 @pytest.fixture(scope='module')
-def nfs_iso_sr(host, nfs_iso_device_config):
+def nfs_iso_sr(host: Host, nfs_iso_device_config: dict[str, Any]) -> Generator[SR, None, None]:
     """ A NFS ISO SR. """
     sr = host.sr_create('iso', "ISO-NFS-SR-test", nfs_iso_device_config, shared=True, verify=True)
     yield sr
@@ -743,7 +751,7 @@ def nfs_iso_sr(host, nfs_iso_device_config):
     sr.forget()
 
 @pytest.fixture(scope='function')
-def exit_on_fistpoint(host):
+def exit_on_fistpoint(host: Host) -> Generator[None, None, None]:
     from lib.fistpoint import FistPoint
     logging.info(">> Enabling exit on fistpoint")
     FistPoint.enable_exit_on_fistpoint(host)
@@ -752,7 +760,7 @@ def exit_on_fistpoint(host):
     FistPoint.disable_exit_on_fistpoint(host)
 
 @pytest.fixture(scope='module')
-def cifs_iso_sr(host, cifs_iso_device_config):
+def cifs_iso_sr(host: Host, cifs_iso_device_config: dict[str, Any]) -> Generator[SR, None, None]:
     """ A Samba/CIFS SR. """
     sr = host.sr_create('iso', "ISO-CIFS-SR-test", cifs_iso_device_config, shared=True, verify=True)
     yield sr

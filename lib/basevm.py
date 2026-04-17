@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Any, List, Literal, Optional, overload
+from typing import TYPE_CHECKING, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -22,29 +22,29 @@ class BaseVM:
         self.host = host
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None,
-                  accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None,
+                  accept_unknown_key: bool = False) -> str | None:
         return _param_get(self.host, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name: str, value: Any, key: Optional[str] = None) -> None:
+    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
         _param_set(self.host, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
-    def param_remove(self, param_name: str, key: str, accept_unknown_key=False) -> None:
+    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
         _param_remove(self.host, self.xe_prefix, self.uuid,
                       param_name, key, accept_unknown_key)
 
-    def param_add(self, param_name: str, value: str, key=None) -> None:
+    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
         _param_add(self.host, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
@@ -58,10 +58,10 @@ class BaseVM:
         return n
 
     # @abstractmethod
-    def _disk_list(self):
+    def _disk_list(self) -> str:
         raise NotImplementedError()
 
-    def vdi_uuids(self, sr_uuid: Optional[str] = None) -> List[str]:
+    def vdi_uuids(self, sr_uuid: str | None = None) -> List[str]:
         output = self._disk_list()
         if output == '':
             return []
@@ -95,9 +95,9 @@ class BaseVM:
         assert sr.attached_to_host(self.host)
         return sr
 
-    def export(self, filepath, compress='none', use_cache=False) -> None:
+    def export(self, filepath: str, compress: str = 'none', use_cache: bool = False) -> None:
         logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
-        params = {
+        params: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
             'compress': compress,
             'filename': filepath

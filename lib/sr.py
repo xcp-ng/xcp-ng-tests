@@ -3,12 +3,6 @@ from __future__ import annotations
 import logging
 import time
 
-from typing import TYPE_CHECKING, Optional
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.pool import Pool
-
 import lib.commands as commands
 from lib.common import (
     GiB,
@@ -21,25 +15,31 @@ from lib.common import (
 )
 from lib.vdi import VDI, ImageFormat
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.pool import Pool
+
 class SR:
-    def __init__(self, uuid, pool: Pool):
+    def __init__(self, uuid: str, pool: Pool):
         self.uuid = uuid
         self.pool = pool
-        self._is_shared: Optional[bool] = None # cached value for is_shared()
-        self._main_host: Optional[Host] = None # cached value for main_host()
-        self._type: Optional[str] = None # cache value for get_type()
+        self._is_shared: bool | None = None # cached value for is_shared()
+        self._main_host: Host | None = None # cached value for main_host()
+        self._type: str | None = None # cache value for get_type()
 
-    def pbd_uuids(self):
+    def pbd_uuids(self) -> list[str]:
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
 
-    def pbd_for_host(self, host):
+    def pbd_for_host(self, host: Host) -> str:
         return safe_split(self.pool.master.xe(
             'pbd-list',
             {'sr-uuid': self.uuid, 'host-uuid': host.uuid},
             minimal=True
         ))[0]
 
-    def unplug_pbd(self, pbd_uuid, force=False):
+    def unplug_pbd(self, pbd_uuid: str, force: bool = False) -> None:
         try:
             self.pool.master.xe('pbd-unplug', {'uuid': pbd_uuid})
         except commands.SSHCommandFailed as e:
@@ -49,12 +49,12 @@ class SR:
                 raise
             logging.warning('Ignore exception during PBD unplug: {}'.format(e))
 
-    def unplug_pbds(self, force=False):
+    def unplug_pbds(self, force: bool = False) -> None:
         logging.info(f"Unplug PBDs for SR {self.uuid}")
         for pbd_uuid in self.pbd_uuids():
             self.unplug_pbd(pbd_uuid, force=force)
 
-    def all_pbds_attached(self):
+    def all_pbds_attached(self) -> bool:
         all_attached = True
         for pbd_uuid in self.pbd_uuids():
             all_attached = all_attached and strtobool(self.pool.master.xe('pbd-param-get',
@@ -63,18 +63,18 @@ class SR:
                                                                            }))
         return all_attached
 
-    def plug_pbd(self, pbd_uuid):
+    def plug_pbd(self, pbd_uuid: str) -> None:
         self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
 
-    def plug_pbds(self, verify=True):
+    def plug_pbds(self, verify: bool = True) -> None:
         logging.info("Attach PBDs")
         for pbd_uuid in self.pbd_uuids():
             self.plug_pbd(pbd_uuid)
         if verify:
             wait_for(self.all_pbds_attached, "Wait for PBDs attached")
 
-    def vdi_uuids(self, managed=False, name_label=None):
-        args = {
+    def vdi_uuids(self, managed: bool = False, name_label: str | None = None) -> list[str]:
+        args: dict[str, str | bool | dict[str, str]] = {
             'sr-uuid': self.uuid,
             'managed': managed
         }
@@ -82,7 +82,7 @@ class SR:
             args['name-label'] = name_label
         return safe_split(self.pool.master.xe('vdi-list', args, minimal=True))
 
-    def destroy(self, verify=False, force=False):
+    def destroy(self, verify: bool = False, force: bool = False) -> None:
         logging.info(f"Will attempt SR destroy on {self.uuid}...")
         # Rescan SR to improve the chances of the forced GC run triggered by sr-destroy
         # remove all VDIs in one pass and such have sr-destroy working on first try.
@@ -133,22 +133,22 @@ class SR:
             # Everything apparently went fine. Get out of the retry loop.
             break
 
-    def forget(self, force=False):
+    def forget(self, force: bool = False) -> None:
         self.unplug_pbds(force)
         logging.info("Forget SR " + self.uuid)
         self.pool.master.xe('sr-forget', {'uuid': self.uuid})
 
-    def exists(self):
+    def exists(self) -> bool:
         return self.pool.master.xe('sr-list', {'uuid': self.uuid}, minimal=True) == self.uuid
 
-    def scan(self):
+    def scan(self) -> None:
         logging.info("Scan SR " + self.uuid)
         self.pool.master.xe('sr-scan', {'uuid': self.uuid})
 
-    def hosts_uuids(self):
+    def hosts_uuids(self) -> list[str]:
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid, 'params': 'host-uuid'}, minimal=True))
 
-    def attached_to_host(self, host):
+    def attached_to_host(self, host: Host) -> bool:
         return host.uuid in self.hosts_uuids()
 
     def main_host(self) -> Host:
@@ -160,7 +160,7 @@ class SR:
                 self._main_host = self.pool.get_host_by_uuid(self.hosts_uuids()[0])
         return self._main_host
 
-    def content_type(self):
+    def content_type(self) -> str:
         return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
 
     def is_shared(self) -> bool:
@@ -179,7 +179,7 @@ class SR:
     ) -> VDI:
         name_label = name_label or f'test-vdi-{randid()}'
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
-        args = {
+        args: dict[str, str | bool | dict[str, str]] = {
             'name-label': prefix_object_name(name_label),
             'virtual-size': str(virtual_size),
             'sr-uuid': self.uuid,
@@ -189,7 +189,7 @@ class SR:
         vdi_uuid = self.pool.master.xe('vdi-create', args)
         return VDI(vdi_uuid, sr=self)
 
-    def run_quicktest(self):
+    def run_quicktest(self) -> None:
         logging.info(f"Run quicktest on SR {self.uuid}")
         # Always display the output of quicktest, failed or not.
         # This will duplicate the output in some cases, but it ensures we always have it for failure analysis,

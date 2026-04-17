@@ -2,13 +2,15 @@
 
 This module is intended for performing update actions on existing remote targets.
 """
+from __future__ import annotations
+
 from concurrent.futures import ThreadPoolExecutor
 
 from lib.pool import Pool
 
 from .. import logger
 
-def update_all(inventory: dict) -> None:
+def update_all(inventory: dict[str, dict[str, list[str]]]) -> None:
     """Updates all master (primary) hosts.
 
     .. note:: Host must be a master

@@ -9,7 +9,7 @@ import subprocess
 import lib.config as config
 from lib.netutil import wrap_ip
 
-from typing import TYPE_CHECKING, List, Literal, Union, overload
+from typing import TYPE_CHECKING, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.common import HostAddress
@@ -17,14 +17,14 @@ if TYPE_CHECKING:
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
 
-    def __init__(self, returncode, stdout, cmd, exception_msg):
+    def __init__(self, returncode: int, stdout: str, cmd: str | list[str], exception_msg: str):
         super(BaseCommandFailed, self).__init__(exception_msg)
         self.returncode = returncode
         self.stdout = stdout
         self.cmd = cmd
 
 class SSHCommandFailed(BaseCommandFailed):
-    def __init__(self, returncode, stdout, cmd):
+    def __init__(self, returncode: int, stdout: str, cmd: str):
         msg_end = f": {stdout}" if stdout else "."
         super(SSHCommandFailed, self).__init__(
             returncode, stdout, cmd,
@@ -32,7 +32,7 @@ class SSHCommandFailed(BaseCommandFailed):
         )
 
 class LocalCommandFailed(BaseCommandFailed):
-    def __init__(self, returncode, stdout, cmd):
+    def __init__(self, returncode: int, stdout: str, cmd: str | list[str]):
         msg_end = f": {stdout}" if stdout else "."
         super(LocalCommandFailed, self).__init__(
             returncode, stdout, cmd,
@@ -42,19 +42,19 @@ class LocalCommandFailed(BaseCommandFailed):
 class BaseCmdResult:
     __slots__ = 'returncode', 'stdout'
 
-    def __init__(self, returncode, stdout):
+    def __init__(self, returncode: int, stdout: str | bytes):
         self.returncode = returncode
         self.stdout = stdout
 
 class SSHResult(BaseCmdResult):
-    def __init__(self, returncode, stdout):
+    def __init__(self, returncode: int, stdout: str | bytes):
         super(SSHResult, self).__init__(returncode, stdout)
 
 class LocalCommandResult(BaseCmdResult):
-    def __init__(self, returncode, stdout):
+    def __init__(self, returncode: int, stdout: str | bytes):
         super(LocalCommandResult, self).__init__(returncode, stdout)
 
-def _ellide_log_lines(log):
+def _ellide_log_lines(log: str) -> str:
     if log == '':
         return log
 
@@ -137,7 +137,7 @@ def _ssh(
     if res.returncode == 255:
         return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, cmd)
 
-    output: Union[bytes, str] = res.stdout
+    output: str | bytes = res.stdout
     if banner_res:
         if banner_res.returncode == 255:
             return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), cmd)
@@ -161,36 +161,37 @@ def _ssh(
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[True] = True, options: List[str] = [], multiplexing=True) -> str:
+        decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True) -> str:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[False], options: List[str] = [], multiplexing=True) -> bytes:
+        decode: Literal[False], options: List[str] = [], multiplexing: bool = True) -> bytes:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: bool = True, options: List[str] = [], multiplexing=True) -> SSHResult:
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> SSHResult:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[True],
-        decode: bool = True, options: List[str] = [], multiplexing=True) -> None:
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> None:
     ...
 @overload
-def ssh(hostname_or_ip: HostAddress, cmd: str, *, check=True,
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: bool = True,
-        suppress_fingerprint_warnings=True, background: bool = False,
-        decode: bool = True, options: List[str] = [], multiplexing=True) \
-        -> Union[str, bytes, SSHResult, None]:
+        suppress_fingerprint_warnings: bool = True, background: bool = False,
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
+        -> str | bytes | SSHResult | None:
     ...
-def ssh(hostname_or_ip: HostAddress, cmd: str, *, check=True, simple_output=True,
-        suppress_fingerprint_warnings=True,
-        background=False, decode=True, options=[], multiplexing=True):
+def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
+        suppress_fingerprint_warnings: bool = True,
+        background: bool = False, decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
+        -> str | bytes | SSHResult | None:
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
                          background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
@@ -198,8 +199,9 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check=True, simple_output=True
     else:
         return result_or_exc
 
-def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings=True,
-                    background=False, decode=True, options=[], multiplexing=True) -> SSHResult:
+def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings: bool = True,
+                    background: bool = False, decode: bool = True, options: List[str] = [],
+                    multiplexing: bool = True) -> SSHResult:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
                          background, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
@@ -208,7 +210,8 @@ def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_
         return result_or_exc
     assert False, "unexpected type"
 
-def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
+def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
+        suppress_fingerprint_warnings: bool = True, local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
     opts = ['-o', 'BatchMode=yes']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
@@ -234,11 +237,13 @@ def scp(hostname_or_ip, src, dest, check=True, suppress_fingerprint_warnings=Tru
     logging.debug(f"[{hostname_or_ip}] scp: {src} => {dest}{errorcode_msg}")
 
     if check and res.returncode:
-        raise SSHCommandFailed(res.returncode, res.stdout.decode(), command)
+        raise SSHCommandFailed(res.returncode, res.stdout.decode(), ' '.join(command))
 
     return res
 
-def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
+def sftp(
+    hostname_or_ip: HostAddress, cmds: List[str], check: bool = True, suppress_fingerprint_warnings: bool = True
+) -> subprocess.CompletedProcess[bytes]:
     opts = ''
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
@@ -247,10 +252,10 @@ def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
         opts = '-o "StrictHostKeyChecking no" -o "LogLevel ERROR" -o "UserKnownHostsFile /dev/null"'
 
     args = "sftp {} -b - root@{}".format(opts, hostname_or_ip)
-    input = bytes("\n".join(cmds), 'utf-8')
+    input_bytes = bytes("\n".join(cmds), 'utf-8')
     res = subprocess.run(
         args,
-        input=input,
+        input=input_bytes,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -262,7 +267,7 @@ def sftp(hostname_or_ip, cmds, check=True, suppress_fingerprint_warnings=True):
 
     return res
 
-def local_cmd(cmd, check=True, decode=True):
+def local_cmd(cmd: List[str], check: bool = True, decode: bool = True) -> LocalCommandResult:
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
@@ -275,9 +280,9 @@ def local_cmd(cmd, check=True, decode=True):
     # get a decoded version of the output in any case, replacing potential errors
     output_for_logs = res.stdout.decode(errors='replace').strip()
 
-    output = res.stdout
+    output: str | bytes = res.stdout
     if decode:
-        output = output.decode()
+        output = res.stdout.decode()
 
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
@@ -288,5 +293,5 @@ def local_cmd(cmd, check=True, decode=True):
 
     return LocalCommandResult(res.returncode, output)
 
-def encode_powershell_command(cmd: str):
+def encode_powershell_command(cmd: str) -> str:
     return base64.b64encode(cmd.encode("utf-16-le")).decode("ascii")
