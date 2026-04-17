@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
+#!/usr/bin/env python3
 import argparse
 import atexit
 import logging
@@ -25,7 +26,8 @@ from lib.vm import VM
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
-def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
+def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, target_hostname: str | None, action: str,
+                        hdd: str, netinstall_gpg_check: str) -> None:
     password = host_data(hostname_or_ip)['password']
     cmd = ['openssl', 'passwd', '-6', password]
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
@@ -69,10 +71,10 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
         else:
             raise Exception(f"Unknown action: `{action}`")
 
-def is_ip_active(ip):
+def is_ip_active(ip: str) -> bool:
     return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
 
-def is_ssh_up(ip):
+def is_ssh_up(ip: str) -> bool:
     try:
         ssh(ip, 'true', options=['-o', 'ConnectTimeout 10'])
         return True
@@ -80,7 +82,7 @@ def is_ssh_up(ip):
         # probably not up yet
         return False
 
-def get_new_host_ip(mac_address):
+def get_new_host_ip(mac_address: str) -> str | None:
     candidate_ips = pxe.arp_addresses_for(mac_address)
     logging.debug("Candidate IPs: " + ", ".join(candidate_ips))
     for ip in candidate_ips:
@@ -88,14 +90,14 @@ def get_new_host_ip(mac_address):
             return ip
     return None
 
-def is_new_host_ready(ip_address):
+def is_new_host_ready(ip_address: str) -> bool:
     try:
         output = ssh(ip_address, 'xe host-list enabled=true --minimal')
         return is_uuid(output)
     except Exception:
         return False
 
-def check_mac_address(host: Host, mac_address):
+def check_mac_address(host: Host, mac_address: str) -> None:
     bridge = host.inventory['MANAGEMENT_INTERFACE']
     host_mac_address = host.ssh(f'cat /sys/class/net/{bridge}/address')
     if mac_address != host_mac_address:
@@ -104,7 +106,7 @@ def check_mac_address(host: Host, mac_address):
             f"Expected: `{mac_address}`"
         )
 
-def url_checker(url):
+def url_checker(url: str) -> None:
     try:
         response = requests.get(url)
         if not response:
@@ -112,7 +114,7 @@ def url_checker(url):
     except requests.exceptions.RequestException as e:
         raise SystemExit(f"{url}: URL is not reachable\nErr: {e}")
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "host",

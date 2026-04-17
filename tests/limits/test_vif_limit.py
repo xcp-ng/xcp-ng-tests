@@ -5,6 +5,8 @@ import logging
 import os
 import tempfile
 
+from lib.host import Host
+from lib.vm import VM
 from pkgfixtures import host_with_saved_yum_state
 
 # Requirements:
@@ -22,7 +24,7 @@ VCPUS = 8
 @pytest.mark.usefixtures("unix_vm")
 class TestVIFLimit:
     @pytest.mark.parametrize('vm_with_vcpu_count', [VCPUS], indirect=True)
-    def test_vif_limit(self, host_with_saved_yum_state, vm_with_vcpu_count):
+    def test_vif_limit(self, host_with_saved_yum_state: Host, vm_with_vcpu_count: VM) -> None:
         host = host_with_saved_yum_state
         vm = vm_with_vcpu_count
         interface_name = "enX"

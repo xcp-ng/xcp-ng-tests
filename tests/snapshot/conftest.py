@@ -3,10 +3,15 @@ import pytest
 import logging
 
 from lib.common import exec_nofail, raise_errors
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
+
+from typing import Generator
 
 @pytest.fixture(scope='module')
-def vdis(host, local_sr_on_hostA1):
-    def _make_vdi(name):
+def vdis(host: Host, local_sr_on_hostA1: SR) -> Generator[tuple[str, str, str], None, None]:
+    def _make_vdi(name: str) -> str:
         return local_sr_on_hostA1.create_vdi(name).uuid
 
     logging.info('> Creating VDIs')
@@ -21,7 +26,7 @@ def vdis(host, local_sr_on_hostA1):
     raise_errors(errors)
 
 @pytest.fixture(scope='module')
-def vm_with_vbds(host, vdis, imported_vm):
+def vm_with_vbds(host: Host, vdis: tuple[str, str, str], imported_vm: VM) -> Generator[VM, None, None]:
     vbds = []
     vm = imported_vm
     vdi_A, vdi_B, vdi_C = vdis
