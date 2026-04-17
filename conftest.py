@@ -681,7 +681,7 @@ def uefi_vm(imported_vm):
     yield vm
 
 @pytest.fixture(scope='session')
-def additional_repos(request, hosts):
+def additional_repos(request, hosts: list[Host]):
     if request.param is None:
         yield []
         return
@@ -707,7 +707,7 @@ gpgcheck=0
 
     for host in hosts:
         for host_ in host.pool.hosts:
-            host_.ssh(['rm', '-f', repo_file])
+            host_.ssh('rm -f {repo_file}')
 
 @pytest.fixture(scope='session')
 def second_network(pytestconfig, host):

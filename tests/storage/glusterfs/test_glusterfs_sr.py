@@ -4,6 +4,7 @@ import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
 from tests.storage import vdi_is_open
 
 # Requirements:
@@ -67,24 +68,24 @@ class TestGlusterFSSR:
         finally:
             vm.shutdown(verify=True)
 
-    def test_volume_stopped(self, host, glusterfs_sr):
+    def test_volume_stopped(self, host: Host, glusterfs_sr):
         sr = glusterfs_sr
         volume_running = True
         try:
-            host.ssh(['gluster', '--mode=script', 'volume', 'stop', 'vol0'])
+            host.ssh('gluster --mode=script volume stop vol0')
             volume_running = False
             try:
                 sr.scan()
                 assert False, "SR scan should have failed"
             except SSHCommandFailed:
                 logging.info("SR scan failed as expected.")
-            host.ssh(['gluster', '--mode=script', 'volume', 'start', 'vol0'])
+            host.ssh('gluster --mode=script volume start vol0')
             volume_running = True
             sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not volume_running:
-                host.ssh(['gluster', '--mode=script', 'volume', 'start', 'vol0'])
+                host.ssh('gluster --mode=script volume start vol0')
 
     # *** tests with reboots (longer tests).
 
