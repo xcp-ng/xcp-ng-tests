@@ -11,7 +11,7 @@ from lib.host import Host
 
 @pytest.mark.usefixtures("host_with_dom0_tests")
 class TestXenDom0Tests:
-    def test_dom0(self, host: Host):
+    def test_dom0(self, host: Host) -> None:
         metadata = host.ssh('cat /usr/share/xen-dom0-tests-metadata.json')
         tests = json.loads(metadata)["tests"]
         assert tests, "Test list must not be empty"

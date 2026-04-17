@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import logging
@@ -41,7 +43,7 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any], onboard: Literal[True]
     ...
 
 
-def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any], onboard: bool = False):
+def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any], onboard: bool = False) -> str | None:
     """
     Run XenClean from the provided guest tools.
 
@@ -80,10 +82,12 @@ def run_xenclean(vm: VM, guest_tools_iso: Dict[str, Any], onboard: bool = False)
         onboarding_phase = ONBOARDING_PHASES[int(exitcode)]
         logging.info(f"Onboarding phase: {onboarding_phase}")
         return onboarding_phase
+    else:
+        return None
 
 
 @pytest.fixture(scope="module")
-def onboarding_guest_tools_iso(guest_tools_iso):
+def onboarding_guest_tools_iso(guest_tools_iso: Dict[str, Any]) -> Dict[str, Any]:
     if not guest_tools_iso.get("onboard_family"):
         pytest.skip("Onboarding info not declared in data.py")
     return guest_tools_iso
@@ -92,24 +96,30 @@ def onboarding_guest_tools_iso(guest_tools_iso):
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestXenClean:
-    def test_xenclean_without_tools(self, running_unsealed_windows_vm: VM, guest_tools_iso):
+    def test_xenclean_without_tools(
+        self, running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm = running_unsealed_windows_vm
         logging.info("XenClean with empty VM")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_onboard_without_tools(self, running_unsealed_windows_vm: VM, onboarding_guest_tools_iso):
+    def test_xenclean_onboard_without_tools(self, running_unsealed_windows_vm: VM,
+                                            onboarding_guest_tools_iso: Dict[str, Any]) -> None:
         vm = running_unsealed_windows_vm
         logging.info("XenClean onboard with empty VM")
         assert run_xenclean(vm, onboarding_guest_tools_iso, onboard=True) == "ReadyForOnboard"
 
-    def test_xenclean_with_test_tools_early(self, vm_install_test_tools_no_reboot: VM, guest_tools_iso):
+    def test_xenclean_with_test_tools_early(
+        self, vm_install_test_tools_no_reboot: VM, guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm = vm_install_test_tools_no_reboot
         logging.info("XenClean with test tools (without reboot)")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_with_test_tools(self, vm_install_test_tools_no_reboot: VM, guest_tools_iso):
+    def test_xenclean_with_test_tools(self, vm_install_test_tools_no_reboot: VM,
+                                      guest_tools_iso: Dict[str, Any]) -> None:
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         # HACK: In some cases, vm.reboot(verify=False) followed by vm.insert_cd() (as called by run_xenclean)
@@ -123,7 +133,8 @@ class TestXenClean:
         assert vm.are_windows_tools_uninstalled()
         check_vm_dns(vm)
 
-    def test_xenclean_onboard_with_test_tools(self, vm_install_test_tools_no_reboot: VM, onboarding_guest_tools_iso):
+    def test_xenclean_onboard_with_test_tools(self, vm_install_test_tools_no_reboot: VM,
+                                              onboarding_guest_tools_iso: Dict[str, Any]) -> None:
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -133,7 +144,9 @@ class TestXenClean:
         logging.info("Check tools still working")
         assert vm.are_windows_tools_working()
 
-    def test_xenclean_with_other_tools(self, vm_install_other_drivers: Tuple[VM, Dict], guest_tools_iso):
+    def test_xenclean_with_other_tools(
+        self, vm_install_other_drivers: Tuple[VM, Dict[str, Any]], guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm, param = vm_install_other_drivers
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
@@ -146,8 +159,8 @@ class TestXenClean:
         check_vm_dns(vm)
 
     def test_xenclean_onboard_with_other_tools(
-        self, vm_install_other_drivers: Tuple[VM, Dict], onboarding_guest_tools_iso
-    ):
+        self, vm_install_other_drivers: Tuple[VM, Dict[str, Any]], onboarding_guest_tools_iso: Dict[str, Any]
+    ) -> None:
         vm, param = vm_install_other_drivers
         onboarding_phase = param.get("onboarding_phase")
         if not param.get("onboarding_phase"):
