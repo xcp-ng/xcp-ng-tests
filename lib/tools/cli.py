@@ -13,6 +13,7 @@ from lib.tools import logger
 from lib.tools.inventory import into_inventory, load_inventory
 from lib.tools.tasks.clean import clean_pools
 from lib.tools.tasks.exec import exec_pools
+from lib.tools.tasks.migrate import migrate_data_py
 from lib.tools.tasks.update import update_pools
 
 def _command_update(args: argparse.Namespace) -> None:
@@ -41,6 +42,10 @@ def _command_exec(args: argparse.Namespace) -> int:
 
     command = " ".join(args.command)
     return exec_pools(inventory, command, parallel=args.parallel, dry_run=args.dry_run, reboot=args.reboot)
+
+
+def _command_migrate(args: argparse.Namespace) -> int:
+    return migrate_data_py(data_py=args.data_py, output=args.output, force=args.force)
 
 
 def cli() -> None:
@@ -170,6 +175,32 @@ def cli() -> None:
         help="Command to run on every host",
     )
     subparser_cmd_exec.set_defaults(func=_command_exec)
+
+    # subparser - command: migrate-data-py
+    subparser_cmd_migrate = subparsers.add_parser(
+        name="migrate-data-py",
+        description="Convert a legacy data.py file to a TOML config file",
+        help="Convert a legacy data.py file to a TOML config file",
+    )
+    subparser_cmd_migrate.add_argument(
+        "data_py",
+        metavar="DATA_PY",
+        nargs="?",
+        default=None,
+        help="Path to the legacy data.py file (default: data.py in the repo root)",
+    )
+    subparser_cmd_migrate.add_argument(
+        "--output",
+        default="config.default.toml",
+        help="Output file name (default: config.default.toml in the repo root)",
+    )
+    subparser_cmd_migrate.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite the output file if it already exists",
+    )
+    subparser_cmd_migrate.set_defaults(func=_command_migrate)
 
     args = parser.parse_args()
 
