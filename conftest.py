@@ -14,7 +14,6 @@ import git
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
 from packaging import version
 
-import lib.config as global_config
 from lib import pxe
 from lib.common import (
     Defer,
@@ -30,6 +29,7 @@ from lib.common import (
     vm_image,
     wait_for,
 )
+from lib.config_loader import apply_override, config, warn_legacy_data_py
 from lib.host import Host
 from lib.netutil import is_ipv6
 from lib.pool import Pool
@@ -46,13 +46,6 @@ from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
 from typing import Any, Dict, Generator, Iterable, Sequence
 
-# Do we cache VMs?
-try:
-    from data import CACHE_IMPORTED_VM
-except ImportError:
-    CACHE_IMPORTED_VM = False
-assert CACHE_IMPORTED_VM in [True, False]
-
 class SplitCommaAction(Action):
     def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[str] | None,
                  option_string: str | None = None) -> None:
@@ -66,6 +59,12 @@ class SplitCommaAction(Action):
 # pytest hooks
 
 def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--config",
+        action="store",
+        default=None,
+        help="Config file name to load (e.g., 'prod' → config.prod.toml)",
+    )
     parser.addoption(
         "--nest",
         action="store",
@@ -93,13 +92,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--ignore-ssh-banner",
         action="store_true",
-        default=False,
+        default=None,
         help="Ignore SSH banners when SSH commands are executed"
     )
     parser.addoption(
         "--ssh-output-max-lines",
         action="store",
-        default=20,
+        default=None,
         help="Max lines to output in a ssh log (0 if no limit)"
     )
     parser.addoption(
@@ -120,39 +119,46 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--volume-size",
         action="store",
-        default="1GiB",
+        default=None,
         help="Default volume size for tests."
              " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
     )
     parser.addoption(
         "--write-volume-cap",
         action="store",
-        default="2GiB",
+        default=None,
         help="Maximum amount of data written to a volume."
              " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
     )
     parser.addoption(
         "--write-volume-align",
         action="store",
-        default="1",
+        default=None,
         help="Block size to align span positions to when writing in volumes."
              " Accepts sizes like '512', '4KiB', '1MiB'. A value of 1 is equivalent to no alignment."
     )
 
 def pytest_configure(config: pytest.Config) -> None:
-    global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
+    warn_legacy_data_py()
+    config_name = config.getoption("--config")
+    if config_name:
+        apply_override(config_name)
+    from lib.config_loader import config as global_config
+    ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
+    if ignore_ssh_banner is not None:
+        global_config.ssh.ignore_banner = bool(ignore_ssh_banner)
     ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
-    assert ssh_output_max_lines is not None
-    global_config.ssh_output_max_lines = int(ssh_output_max_lines)
+    if ssh_output_max_lines is not None:
+        global_config.ssh.output_max_lines = int(ssh_output_max_lines)
     volume_size = config.getoption('--volume-size')
-    assert volume_size is not None
-    global_config.volume_size = parse_size(volume_size)
+    if volume_size is not None:
+        global_config.volume_size = parse_size(volume_size)
     write_volume_cap = config.getoption('--write-volume-cap')
-    assert write_volume_cap is not None
-    global_config.write_volume_cap = parse_size(write_volume_cap)
+    if write_volume_cap is not None:
+        global_config.write_volume_cap = parse_size(write_volume_cap)
     write_volume_align = config.getoption('--write-volume-align')
-    assert write_volume_align is not None
-    global_config.write_volume_align = parse_size(write_volume_align)
+    if write_volume_align is not None:
+        global_config.write_volume_align = parse_size(write_volume_align)
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
@@ -549,16 +555,12 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
     # LUNs reserved for lvmohba/lvmoiscsi: sort them to the end so they are
     # only picked if no other disk is available.
     reserved_wwns: set[str] = set()
-    try:
-        import data
-        for key in ('LVMOHBA_DEVICE_CONFIG', 'LVMOISCSI_DEVICE_CONFIG'):
-            cfg = getattr(data, key, None)
-            if isinstance(cfg, dict):
-                scsiid = cfg.get('SCSIid', '').lower().removeprefix('0x')
-                if len(scsiid) >= 16:
-                    reserved_wwns.add(scsiid[:16])
-    except ImportError:
-        pass
+    for cfg_name in ('lvmohba', 'lvmoiscsi'):
+        cfg = getattr(config.storage, cfg_name, None)
+        if cfg is not None:
+            scsiid = (cfg.SCSIid or '').lower().removeprefix('0x')
+            if len(scsiid) >= 16:
+                reserved_wwns.add(scsiid[:16])
     if reserved_wwns:
         logging.debug("reserved WWNs (lvmohba/lvmoiscsi): %s", reserved_wwns)
         ret = {
@@ -625,9 +627,9 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
         name = vm_orig.name()
         logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
     else:
-        vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=CACHE_IMPORTED_VM)
+        vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=config.vm.cache_imported)
 
-    if CACHE_IMPORTED_VM:
+    if config.vm.cache_imported:
         # Clone the VM before running tests, so that the original VM remains untouched
         logging.info(">> Clone cached VM before running tests")
         vm = vm_orig.clone()
@@ -638,7 +640,7 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
 
     yield vm
     # teardown
-    if CACHE_IMPORTED_VM or not is_uuid(vm_ref):
+    if config.vm.cache_imported or not is_uuid(vm_ref):
         logging.info("<< Destroy VM")
         vm.destroy(verify=True)
 
@@ -904,11 +906,11 @@ def second_network(pytestconfig: pytest.Config, host: Host) -> str:
 
 @pytest.fixture(scope='module')
 def nfs_iso_device_config() -> dict[str, Any]:
-    return global_config.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=['location'])
+    return config.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=['location'])
 
 @pytest.fixture(scope='module')
 def cifs_iso_device_config() -> dict[str, Any]:
-    return global_config.sr_device_config("CIFS_ISO_DEVICE_CONFIG")
+    return config.sr_device_config("CIFS_ISO_DEVICE_CONFIG")
 
 @pytest.fixture(scope='module')
 def nfs_iso_sr(host: Host, nfs_iso_device_config: dict[str, Any]) -> Generator[SR, None, None]:

@@ -4,7 +4,7 @@ import pytest
 
 import logging
 
-from data import HOST_FREE_NICS
+from lib import config
 from lib.bond import Bond
 from lib.common import PackageManagerEnum
 from lib.host import Host
@@ -66,13 +66,13 @@ def empty_network(host: Host) -> Generator[Network, None, None]:
 
 @pytest.fixture(scope='function')
 def bond_lacp(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
-    if len(HOST_FREE_NICS) < 2:
+    if len(config.network.free_nics) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
     pifs = []
     logging.info(f"bond: resolve PIFs on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
-    for name in HOST_FREE_NICS[0:2]:
+    for name in config.network.free_nics[0:2]:
         [pif] = host.pifs(device=name)
         pifs.append(pif)
 
@@ -82,13 +82,13 @@ def bond_lacp(host: Host, empty_network: Network) -> Generator[Bond, None, None]
 
 @pytest.fixture(scope='function')
 def bond_activebackup(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
-    if len(HOST_FREE_NICS) < 2:
+    if len(config.network.free_nics) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
     pifs = []
     logging.info(f"bond: resolve PIFs on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
-    for name in HOST_FREE_NICS[0:2]:
+    for name in config.network.free_nics[0:2]:
         [pif] = host.pifs(device=name)
         pifs.append(pif)
 
@@ -98,13 +98,13 @@ def bond_activebackup(host: Host, empty_network: Network) -> Generator[Bond, Non
 
 @pytest.fixture(scope='function')
 def bond_balanceslb(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
-    if len(HOST_FREE_NICS) < 2:
+    if len(config.network.free_nics) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
     pifs = []
     logging.info(f"bond: resolve PIFs on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
-    for name in HOST_FREE_NICS[0:2]:
+    for name in config.network.free_nics[0:2]:
         [pif] = host.pifs(device=name)
         pifs.append(pif)
 
