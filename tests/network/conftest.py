@@ -7,7 +7,7 @@ import logging
 
 from rpm_version import Evr  # type: ignore[import-untyped]
 
-from data import HOST_FREE_NICS
+from lib import config
 from lib.bond import Bond
 from lib.common import PackageManagerEnum, safe_split
 from lib.host import Host
@@ -155,13 +155,13 @@ def vm_with_tcpdump_scope_function(vm_with_tcpdump_scope_module: VM) -> Generato
 # ---- Bond ----
 @pytest.fixture(scope='function')
 def bond_lacp(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
-    if len(HOST_FREE_NICS) < 2:
+    if len(config.network.free_nics) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
     pifs = []
     logging.info(f"bond: resolve PIFs on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
-    for name in HOST_FREE_NICS[0:2]:
+    for name in config.network.free_nics[0:2]:
         [pif] = host.pifs(device=name)
         pifs.append(pif)
 
@@ -171,13 +171,13 @@ def bond_lacp(host: Host, empty_network: Network) -> Generator[Bond, None, None]
 
 @pytest.fixture(scope='function')
 def bond_activebackup(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
-    if len(HOST_FREE_NICS) < 2:
+    if len(config.network.free_nics) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
     pifs = []
     logging.info(f"bond: resolve PIFs on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
-    for name in HOST_FREE_NICS[0:2]:
+    for name in config.network.free_nics[0:2]:
         [pif] = host.pifs(device=name)
         pifs.append(pif)
 
@@ -187,13 +187,13 @@ def bond_activebackup(host: Host, empty_network: Network) -> Generator[Bond, Non
 
 @pytest.fixture(scope='function')
 def bond_balanceslb(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
-    if len(HOST_FREE_NICS) < 2:
+    if len(config.network.free_nics) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
     pifs = []
     logging.info(f"bond: resolve PIFs on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
-    for name in HOST_FREE_NICS[0:2]:
+    for name in config.network.free_nics[0:2]:
         [pif] = host.pifs(device=name)
         pifs.append(pif)
 
@@ -309,13 +309,13 @@ def vlan(host: Host, empty_network: Network) -> Generator[VLAN, None, None]:
     logging.info(f"vlan: resolve PIF on {host.hostname_or_ip} using \
         {[(pif.network_uuid(), pif.param_get('device')) for pif in host.pifs()]}")
 
-    if len(HOST_FREE_NICS) < 1:
+    if len(config.network.free_nics) < 1:
         pytest.fail("This fixture needs at least 1 free NICs")
 
     # randomly chosen tag
     vlan_tag = 42
 
-    [pif] = host.pifs(device=HOST_FREE_NICS[0])
+    [pif] = host.pifs(device=config.network.free_nics[0])
     vlan = host.create_vlan(empty_network, pif, vlan_tag)
     yield vlan
     vlan.destroy()

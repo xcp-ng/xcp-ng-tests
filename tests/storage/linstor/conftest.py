@@ -11,17 +11,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import lib.commands as commands
-from lib import config
+from lib.config_loader import config
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-
-try:
-    from data import LINSTOR_REDUNDANCY  # type: ignore
-except ImportError:
-    LINSTOR_REDUNDANCY = 2
 
 # explicit import for package-scope fixtures
 from pkgfixtures import (
@@ -175,7 +170,7 @@ def pool_with_linstor(
 
 @pytest.fixture(scope='package')
 def linstor_redundancy(linstor_hosts_with_lvm_disks: list[Host]) -> int:
-    return min(len(linstor_hosts_with_lvm_disks), LINSTOR_REDUNDANCY)
+    return min(len(linstor_hosts_with_lvm_disks), config.storage.linstor.redundancy)
 
 def _linstor_sr(
     pool_with_linstor: Pool,

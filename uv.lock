@@ -976,6 +976,7 @@ dependencies = [
     { name = "pytest-dependency" },
     { name = "requests" },
     { name = "rpm-version" },
+    { name = "typing-extensions" },
 ]
 
 [package.dev-dependencies]
@@ -992,7 +993,6 @@ dev = [
     { name = "pyright" },
     { name = "ruff" },
     { name = "types-passlib" },
-    { name = "typing-extensions" },
     { name = "zizmor" },
 ]
 
@@ -1010,6 +1010,7 @@ requires-dist = [
     { name = "pytest-dependency" },
     { name = "requests" },
     { name = "rpm-version", specifier = ">=0.5.1" },
+    { name = "typing-extensions" },
 ]
 
 [package.metadata.requires-dev]
@@ -1026,7 +1027,6 @@ dev = [
     { name = "pyright" },
     { name = "ruff" },
     { name = "types-passlib" },
-    { name = "typing-extensions" },
     { name = "zizmor" },
 ]
 
