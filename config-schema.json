@@ -1,0 +1,312 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "XCP-ng Tests Configuration Schema",
+  "description": "JSON Schema for validating config.toml, config.default.toml, and config.NAME.toml files",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference (for editor support)"
+    },
+    "objects_name_prefix": {
+      "type": ["string", "null"],
+      "description": "Prefix added to name-label of all XAPI objects created by tests (VMs, SRs, etc.). Empty string means use the current username."
+    },
+    "dns_server": {
+      "type": "string",
+      "description": "A working DNS server not used by any VM images, used in Windows VM DNS tests"
+    },
+    "host": {
+      "type": "object",
+      "description": "Default credentials for connecting to hosts via XAPI (not SSH)",
+      "properties": {
+        "default_user": {
+          "type": "string",
+          "description": "Default user for host XAPI access"
+        },
+        "default_password": {
+          "type": "string",
+          "description": "Default password for host XAPI access"
+        },
+        "default_password_hash": {
+          "type": "string",
+          "description": "SHA512 hash of default_password (auto-computed if not provided)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "hosts": {
+      "type": "object",
+      "description": "Per-host configuration overrides (keyed by hostname or IP)",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "user": { "type": "string" },
+          "password": { "type": "string" },
+          "skip_xo_config": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "network": {
+      "type": "object",
+      "description": "Network configuration",
+      "properties": {
+        "mgmt": {
+          "type": "string",
+          "description": "Name of the pool-wide management network",
+          "default": "Pool-wide network associated with eth0"
+        }
+      },
+      "additionalProperties": false
+    },
+    "pxe": {
+      "type": "object",
+      "description": "PXE boot configuration for automated XCP-ng installation",
+      "properties": {
+        "config_server": {
+          "type": "string",
+          "description": "PXE configuration server hostname or IP"
+        },
+        "arp_server": {
+          "type": "string",
+          "description": "Server on MGMT network where ARP tables can reveal MACs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "vm": {
+      "type": "object",
+      "description": "Virtual machine configuration",
+      "properties": {
+        "def_url": {
+          "type": "string",
+          "description": "Default base URL for VM images; relative image paths are appended to this"
+        },
+        "cache_imported": {
+          "type": "boolean",
+          "description": "Cache imported VMs in the target SR; clones VM at start of each test module"
+        },
+        "default_sr": {
+          "type": "string",
+          "description": "SR to use for test VM disks: 'default', 'local', or a SR UUID"
+        },
+        "images": {
+          "type": "object",
+          "description": "VM image name to filename/URL mappings",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "equivalents": {
+          "type": "object",
+          "description": "Image equivalence mappings for caching/deduplication",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "install": {
+      "type": "object",
+      "description": "Installation test configuration",
+      "properties": {
+        "answerfiles": {
+          "type": "object",
+          "description": "Base answerfile definitions (INSTALL, UPGRADE, RESTORE)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "iso_remaster": {
+          "type": "string",
+          "description": "Path to the iso-remaster utility script used to build custom installer ISOs"
+        },
+        "isos": {
+          "type": "object",
+          "description": "XCP-ng installer ISO configuration",
+          "properties": {
+            "base_url": {
+              "type": "string",
+              "description": "Base URL for XCP-ng installer ISOs"
+            },
+            "cache_dir": {
+              "type": "string",
+              "description": "Local directory to cache downloaded ISOs"
+            },
+            "definitions": {
+              "type": "object",
+              "description": "ISO version definitions keyed by version name",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "path": { "type": "string" },
+                  "net-url": { "type": "string" },
+                  "net-only": { "type": "boolean" },
+                  "unsigned": { "type": "boolean" }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "guest_tools": {
+      "type": "object",
+      "description": "Guest tools ISO and installation configuration",
+      "properties": {
+        "download_url": {
+          "type": "string",
+          "description": "Base URL for downloading guest tool ISOs"
+        },
+        "win": {
+          "type": "object",
+          "description": "Windows guest tool ISO definitions keyed by label (e.g. 'stable')",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "ISO name on SR or subpath of download_url" },
+              "download": { "type": "boolean", "description": "Whether to download from download_url" },
+              "package": { "type": "string", "description": "ISO-relative path of MSI file" },
+              "xenclean_path": { "type": "string", "description": "ISO-relative path of XenClean script" },
+              "testsign_cert": { "type": "string", "description": "ISO-relative path of root cert file (optional)" },
+              "onboard_family": { "type": "string", "description": "WinPV VENDOR_NAME value for onboard tools" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "other": {
+          "type": "object",
+          "description": "ISO containing other (non-Windows-native) guest tools to test",
+          "properties": {
+            "name": { "type": "string", "description": "ISO name on SR or subpath of download_url" },
+            "download": { "type": "boolean", "description": "Whether to download from download_url" }
+          },
+          "additionalProperties": true
+        },
+        "installed": {
+          "type": "object",
+          "description": "Other guest tool definitions contained in guest_tools.other ISO",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "description": "Installation type: 'msi', 'inf', or absent for Windows Update" },
+              "path": { "type": "string", "description": "ISO-relative path of this guest tool" },
+              "package": { "type": "string", "description": "Path-relative path of MSI or driver files" },
+              "testsign_cert": { "type": "string", "description": "Relative path of root cert file (optional)" },
+              "vendor_device": { "type": "boolean", "description": "Whether vendor device should be activated" },
+              "upgradable": { "type": "boolean", "description": "Whether auto-upgrade from this tool is supported" },
+              "onboarding_phase": { "type": "string", "description": "Expected onboarding phase after XenClean (optional)" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ssh": {
+      "type": "object",
+      "description": "SSH configuration for the test runner",
+      "properties": {
+        "pubkey": {
+          "type": "string",
+          "description": "Public SSH key(s) injected into installed hosts' authorized_keys"
+        },
+        "output_max_lines": {
+          "type": "integer",
+          "description": "Maximum SSH output lines to log before truncating",
+          "default": 20,
+          "minimum": 0
+        },
+        "ignore_banner": {
+          "type": "boolean",
+          "description": "Strip SSH banners from command output",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "storage": {
+      "type": "object",
+      "description": "Storage backend device configurations",
+      "properties": {
+        "nfs": {
+          "type": "object",
+          "description": "NFS storage configuration",
+          "additionalProperties": { "type": "string" }
+        },
+        "nfs4": {
+          "type": "object",
+          "description": "NFSv4 storage configuration",
+          "additionalProperties": { "type": "string" }
+        },
+        "nfs_iso": {
+          "type": "object",
+          "description": "NFS ISO storage configuration",
+          "additionalProperties": { "type": "string" }
+        },
+        "cifs_iso": {
+          "type": "object",
+          "description": "CIFS ISO storage configuration",
+          "additionalProperties": { "type": "string" }
+        },
+        "cephfs": {
+          "type": "object",
+          "description": "CephFS storage configuration",
+          "additionalProperties": { "type": "string" }
+        },
+        "moosefs": {
+          "type": "object",
+          "description": "MooseFS storage configuration",
+          "additionalProperties": { "type": "string" }
+        },
+        "lvmoiscsi": {
+          "type": "object",
+          "description": "LVM over iSCSI storage configuration",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "objects_name_prefix": "[TEST]",
+      "dns_server": "1.1.1.1",
+      "host": {
+        "default_user": "root",
+        "default_password": ""
+      },
+      "hosts": {
+        "10.0.0.1": { "user": "root", "password": "secret" }
+      },
+      "pxe": {
+        "config_server": "pxe",
+        "arp_server": "pxe"
+      },
+      "vm": {
+        "def_url": "http://pxe/images/",
+        "cache_imported": false,
+        "default_sr": "default"
+      },
+      "install": {
+        "isos": {
+          "base_url": "https://updates.xcp-ng.org/isos/",
+          "cache_dir": "/home/user/iso"
+        }
+      },
+      "guest_tools": {
+        "download_url": "http://pxe/isos/"
+      },
+      "ssh": {
+        "pubkey": "ssh-ed25519 AAAA..."
+      }
+    }
+  ]
+}
