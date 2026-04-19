@@ -274,7 +274,7 @@ def warn_legacy_data_py() -> None:
         logging.warning(
             f"Legacy {data_py_path} file found but is NOT used anymore. "
             "Configuration is now loaded from TOML files. "
-            "Please run: uv run scripts/migrate_data_py.py\n"
+            "Please run: uv run scripts/tools.py migrate-data-py\n"
             f"And then remove {data_py_path}",
         )
 
