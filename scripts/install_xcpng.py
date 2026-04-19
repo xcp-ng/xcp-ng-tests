@@ -17,7 +17,7 @@ from packaging import version
 
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
-from lib import pxe
+from lib import config, pxe
 from lib.commands import SSHCommandFailed, ssh
 from lib.common import is_uuid, wait_for
 from lib.host import Host, host_data
@@ -49,7 +49,7 @@ def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, tar
     <timezone>Europe/Paris</timezone>
     <hostname>{target_hostname}</hostname>
     <script stage="filesystem-populated" type="url">
-        http://{pxe.PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
+        http://{config.pxe.config_server}/configs/presets/scripts/filesystem-populated.py
     </script>
 </installation>
         """)
@@ -59,7 +59,7 @@ def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, tar
     <existing-installation>{hdd}</existing-installation>
     <source type="url">{installer}</source>
     <script stage="filesystem-populated" type="url">
-        http://{pxe.PXE_CONFIG_SERVER}/configs/presets/scripts/filesystem-populated.py
+        http://{config.pxe.config_server}/configs/presets/scripts/filesystem-populated.py
     </script>
 </installation>
         """)
@@ -168,7 +168,7 @@ def main() -> None:
     assert host.is_enabled()
 
     if not args.installer:
-        installer = f"http://{pxe.PXE_CONFIG_SERVER}/installers/xcp-ng/{xcp_version}/"
+        installer = f"http://{config.pxe.config_server}/installers/xcp-ng/{xcp_version}/"
     else:
         installer = args.installer
 

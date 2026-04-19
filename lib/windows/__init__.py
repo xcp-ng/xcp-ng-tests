@@ -4,7 +4,7 @@ import re
 import time
 from pathlib import PureWindowsPath
 
-from data import ISO_DOWNLOAD_URL, TEST_DNS_SERVER
+from lib import config
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
 from lib.host import Host
@@ -27,7 +27,7 @@ class PowerAction(enum.Enum):
 
 def iso_create(host: Host, sr: SR, param: Dict[str, Any]) -> Generator[dict[str, Any], None, None]:
     if param["download"]:
-        vdi = host.import_iso(ISO_DOWNLOAD_URL + param["name"], sr)
+        vdi = host.import_iso(config.guest_tools.download_url + param["name"], sr)
         new_param = param.copy()
         new_param["name"] = vdi.name()
         yield new_param
@@ -183,18 +183,18 @@ def wait_for_vm_xenvif_offboard(vm: VM) -> None:
 
 
 def set_vm_dns(vm: VM) -> None:
-    logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
+    logging.info(f"Set VM DNS to {config.dns_server}")
     vif = vm.vifs()[0]
-    assert TEST_DNS_SERVER not in vif_get_dns(vif)
-    vif_set_dns(vif, [TEST_DNS_SERVER])
+    assert config.dns_server not in vif_get_dns(vif)
+    vif_set_dns(vif, [config.dns_server])
 
 
 def check_vm_dns(vm: VM) -> None:
     # The restore task takes time to fire so wait for it
     vif = vm.vifs()[0]
     wait_for(
-        lambda: TEST_DNS_SERVER in vif_get_dns(vif),
-        f"Check VM DNS contains {TEST_DNS_SERVER}",
+        lambda: config.dns_server in vif_get_dns(vif),
+        f"Check VM DNS contains {config.dns_server}",
         timeout_secs=300,
         retry_delay_secs=30,
     )

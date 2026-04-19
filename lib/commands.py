@@ -7,7 +7,7 @@ import platform
 import subprocess
 import tempfile
 
-import lib.config as config
+from lib import config
 from lib.netutil import wrap_ip
 
 from typing import TYPE_CHECKING, Generic, List, Literal, TypeVar, overload
@@ -67,12 +67,12 @@ def _ellide_log_lines(log: str) -> str:
     if log == '':
         return log
 
-    if config.ssh_output_max_lines < 1:
+    if config.ssh.output_max_lines < 1:
         return "\n{}".format(log)
 
     reduced_message = log.split("\n")
-    if len(reduced_message) > config.ssh_output_max_lines:
-        reduced_message = reduced_message[:config.ssh_output_max_lines - 1]
+    if len(reduced_message) > config.ssh.output_max_lines:
+        reduced_message = reduced_message[:config.ssh.output_max_lines - 1]
         reduced_message.append("(...)")
     return "\n{}".format("\n".join(reduced_message))
 
@@ -111,7 +111,7 @@ def _ssh(
 
     # Fetch banner and remove it to avoid stdout/stderr pollution.
     banner_res = None
-    if config.ignore_ssh_banner:
+    if config.ssh.ignore_banner:
         with tempfile.NamedTemporaryFile(suffix='.log', prefix='ssh_err_banner_', mode='r') as banner_log_file:
             banner_res = subprocess.run(
                 ['ssh', f'root@{hostname_or_ip}'] + opts + ['-E', banner_log_file.name] + ['\n'],
