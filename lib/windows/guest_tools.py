@@ -2,6 +2,7 @@ import logging
 from pathlib import PureWindowsPath
 
 from lib.common import wait_for
+from lib.config_loader import WinGuestToolDef
 from lib.vm import VM
 
 from . import (
@@ -13,8 +14,6 @@ from . import (
     wait_for_vm_xenvif_offboard,
 )
 
-from typing import Any
-
 ERROR_SUCCESS = 0
 ERROR_INSTALL_FAILURE = 1603
 ERROR_SUCCESS_REBOOT_INITIATED = 1641
@@ -23,23 +22,23 @@ ERROR_SUCCESS_REBOOT_REQUIRED = 3010
 GUEST_TOOLS_COPY_PATH = "C:\\package.msi"
 
 
-def install_guest_tools(vm: VM, guest_tools_iso: dict[str, Any], action: PowerAction,
+def install_guest_tools(vm: VM, guest_tools_iso: WinGuestToolDef, action: PowerAction,
                         check: bool = True) -> int | None:
-    insert_cd_safe(vm, guest_tools_iso["name"])
+    insert_cd_safe(vm, guest_tools_iso.name)
 
-    if guest_tools_iso.get("testsign_cert"):
+    if guest_tools_iso.testsign_cert:
         logging.info("Enable testsigning")
-        rootcert = PureWindowsPath("D:\\") / guest_tools_iso["testsign_cert"]
+        rootcert = PureWindowsPath("D:\\") / guest_tools_iso.testsign_cert
         enable_testsign(vm, rootcert)
 
         # HACK: Sometimes after rebooting the CD drive just vanishes. Check for it again and
         # reboot/reinsert CD if needed.
         if not vm.file_exists("D:/", regular_file=False):
             logging.warning("CD drive not detected, retrying")
-            insert_cd_safe(vm, guest_tools_iso["name"])
+            insert_cd_safe(vm, guest_tools_iso.name)
 
     logging.info("Copy Windows PV drivers to VM")
-    package_path = PureWindowsPath("D:\\") / guest_tools_iso["package"]
+    package_path = PureWindowsPath("D:\\") / guest_tools_iso.package
     vm.execute_powershell_script(f"Copy-Item -Force '{package_path}' '{GUEST_TOOLS_COPY_PATH}'")
 
     vm.eject_cd()

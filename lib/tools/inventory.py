@@ -51,7 +51,7 @@ def into_inventory(
     hosts: list[HostAddress],
     repositories: list[str],
     hosting_pool: HostAddress | None,
-    disabled_repositories: list[str] = [],
+    disabled_repositories: list[str] | None = None,
 ) -> Inventory:
     """Create an inventory object from arguments.
 
