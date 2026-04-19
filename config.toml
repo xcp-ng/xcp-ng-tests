@@ -1,3 +1,4 @@
+"$schema" = "./config-schema.json"
 # Configuration file for XCP-ng tests
 # To be customized for your environment
 
