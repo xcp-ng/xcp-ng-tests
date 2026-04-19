@@ -25,6 +25,7 @@ from lib.common import (
     to_xapi_bool,
     wait_for,
 )
+from lib.config_loader import config
 from lib.netutil import wrap_ip
 from lib.pif import PIF
 from lib.sr import SR
@@ -42,13 +43,12 @@ XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
 def host_data(hostname_or_ip: str) -> dict[str, str]:
-    # read from data.py
-    from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER, HOSTS
-    if hostname_or_ip in HOSTS:
-        h_data = HOSTS[hostname_or_ip]
+    # read from config loader
+    if hostname_or_ip in config.hosts:
+        h_data = config.hosts[hostname_or_ip]
         return h_data
     else:
-        return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
+        return {'user': config.host.default_user, 'password': config.host.default_password}
 
 class Host:
     xe_prefix = "host"
@@ -722,11 +722,8 @@ class Host:
         return srs
 
     def main_sr_uuid(self) -> str:
-        """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
-        try:
-            from data import DEFAULT_SR
-        except ImportError:
-            DEFAULT_SR = 'default'
+        """ Main SR is the default SR, the first local SR, or a specific SR depending on config. """
+        DEFAULT_SR = config.vm.default_sr
 
         sr_uuid = None
         if DEFAULT_SR == 'local':

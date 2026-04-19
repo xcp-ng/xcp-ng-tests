@@ -8,8 +8,7 @@ import os
 import tempfile
 import xml.etree.ElementTree as ET
 
-from data import ARP_SERVER, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE, TEST_SSH_PUBKEY, TOOLS
-from lib import installer, pxe
+from lib import config, installer, pxe
 from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
@@ -24,11 +23,11 @@ if TYPE_CHECKING:
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
 # package_source values for each ISO.
 def skip_package_source(version: str, package_source: str) -> tuple[bool, str]:
-    if version not in ISO_IMAGES:
+    if version not in config.install.isos.definitions:
         return True, "version of ISO {} is unknown".format(version)
 
     if package_source == "iso":
-        if ISO_IMAGES[version].get('net-only', False):
+        if config.install.isos.definitions[version].get('net-only', False):
             return True, "ISO image is net-only while package_source is local"
 
         return False, "do not skip"
@@ -36,7 +35,7 @@ def skip_package_source(version: str, package_source: str) -> tuple[bool, str]:
     if package_source == "net":
         # Net install is not valid if there is no netinstall URL
         # FIXME: ISO includes a default URL so we should be able to omit net-url
-        if 'net-url' not in ISO_IMAGES[version]:
+        if 'net-url' not in config.install.isos.definitions[version]:
             return True, "net-url required for netinstall was not found for {}".format(version)
 
         return False, "do not skip"
@@ -85,21 +84,21 @@ def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
     skip, reason = skip_package_source(iso_key, package_source)
     if skip:
         pytest.skip(reason)
-    assert iso_key in ISO_IMAGES, f"ISO_IMAGES does not have a value for {iso_key}"
-    iso = ISO_IMAGES[iso_key]['path']
+    assert iso_key in config.install.isos.definitions, f"install.isos.definitions does not have a value for {iso_key}"
+    iso = config.install.isos.definitions[iso_key]['path']
     if iso.startswith("/"):
         assert os.path.exists(iso), f"file not found: {iso}"
         local_iso = iso
     else:
-        cached_iso = os.path.join(ISO_IMAGES_CACHE, os.path.basename(iso))
+        cached_iso = os.path.join(config.install.isos.cache_dir, os.path.basename(iso))
         if not os.path.exists(cached_iso):
-            url = iso if ":/" in iso else (ISO_IMAGES_BASE + iso)
+            url = iso if ":/" in iso else (config.install.isos.base_url + iso)
             logging.info("installer_iso: downloading %r into %r", url, cached_iso)
             url_download(url, cached_iso)
         local_iso = cached_iso
     logging.info("installer_iso: using %r", local_iso)
     return dict(iso=local_iso,
-                unsigned=ISO_IMAGES[iso_key].get('unsigned', False),
+                unsigned=config.install.isos.definitions[iso_key].get('unsigned', False),
                 )
 
 @pytest.fixture(scope='function')
@@ -124,9 +123,8 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
     iso_file = str(installer_iso['iso'])
     unsigned = installer_iso['unsigned']
 
-    assert "iso-remaster" in TOOLS
-    iso_remaster = TOOLS["iso-remaster"]
-    assert os.access(iso_remaster, os.X_OK)
+    assert config.install.iso_remaster, "install.iso_remaster is not configured"
+    assert os.access(config.install.iso_remaster, os.X_OK)
 
     with tempfile.TemporaryDirectory() as isotmp:
         remastered_iso = os.path.join(isotmp, "image.iso")
@@ -155,7 +153,7 @@ set -ex
 INSTALLIMG="$1"
 
 mkdir -p "$INSTALLIMG/root/.ssh"
-echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+echo "{config.ssh.pubkey}" > "$INSTALLIMG/root/.ssh/authorized_keys"
 
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
@@ -197,7 +195,7 @@ Description=Ping pxe server to populate its ARP table
 After=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{ARP_SERVER}"; do sleep 1 ; done'
+ExecStart=/bin/sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{config.pxe.arp_server}"; do sleep 1 ; done'
 [Install]
 WantedBy=default.target
 EOF
@@ -208,7 +206,7 @@ else # sysv scripts for before XS 7.x
 #!/bin/sh
 case "$1" in
   start)
-    sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{ARP_SERVER}"; do sleep 1 ; done' & ;;
+    sh -c 'while ! /usr/local/sbin/test-pingpxe.sh "{config.pxe.arp_server}"; do sleep 1 ; done' & ;;
   stop) ;;
 esac
 EOF
@@ -233,7 +231,7 @@ else
 fi
 
 mkdir -p "$ROOT/root/.ssh"
-echo "{TEST_SSH_PUBKEY}" >> "$ROOT/root/.ssh/authorized_keys"
+echo "{config.ssh.pubkey}" >> "$ROOT/root/.ssh/authorized_keys"
 EOF
 """
             print(script_contents, file=patcher_fd)
@@ -262,7 +260,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
             os.chmod(patcher_fd.fileno(), 0o755)
 
         # do remaster
-        local_cmd([iso_remaster,
+        local_cmd([config.install.iso_remaster,
                    "--install-patcher", img_patcher_script,
                    "--iso-patcher", iso_patcher_script,
                    iso_file, remastered_iso

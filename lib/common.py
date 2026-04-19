@@ -18,8 +18,10 @@ from functools import lru_cache
 from uuid import UUID
 
 import requests
-from passlib.hash import sha512_crypt
 from pydantic import TypeAdapter
+
+from lib.config_loader import config
+from lib.config_loader import hash_password as hash_password
 
 from typing import (
     TYPE_CHECKING,
@@ -53,21 +55,15 @@ class PackageManagerEnum(Enum):
 
 # Common VM images used in tests
 def vm_image(vm_key: str) -> str:
-    from data import DEF_VM_URL, VM_IMAGES
-    url = VM_IMAGES[vm_key]
+    url = config.vm.images.model_extra.get(vm_key) if config.vm.images.model_extra else None
+    if url is None:
+        raise KeyError(f"VM image key {vm_key} not found")
     if not url.startswith('http'):
-        url = DEF_VM_URL + url
+        url = config.vm.def_url + url
     return url
 
 def prefix_object_name(label: str) -> str:
-    name_prefix = None
-    try:
-        from data import OBJECTS_NAME_PREFIX
-        name_prefix = OBJECTS_NAME_PREFIX
-    except ImportError:
-        pass
-    if name_prefix is None:
-        name_prefix = f"[{getpass.getuser()}]"
+    name_prefix = config.objects_name_prefix or f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
 
 def shortened_nodeid(nodeid: str) -> str:
@@ -367,7 +363,3 @@ def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None
     """ Common implementation for param_clear. """
     args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)
-
-def hash_password(password: str) -> str:
-    """Hash password for /etc/password."""
-    return sha512_crypt.using(rounds=5000).hash(password)

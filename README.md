@@ -147,10 +147,68 @@ For Guest UEFI Secure Boot tests, the requirements are:
     * `efitools` for uefistored (in 8.2) or varstored (in 8.3+) auth var tests
     * `util-linux` for uefistored (in 8.2) or varstored (in 8.3+) auth var tests in Alpine VMs
 
-Many tests have specific requirements, detailed in a comment at the top of the test file: minimal number of hosts in a pool, number of pools, VMs with specific characteristics (OS, BIOS vs UEFI, additional tools installed in the VM, additional networks in the pool, presence of an unused disk on one host or every host...). Markers, jobs defined in `jobs.py` (`./jobs.py show JOBNAME` will display the requirements and the reference to a VM or VM group), VMs and VM groups defined in `vm-data.py-dist` may all help understanding what tests can run with what VMs.
+Many tests have specific requirements, detailed in a comment at the top of the test file: minimal number of hosts in a pool, number of pools, VMs with specific characteristics (OS, BIOS vs UEFI, additional tools installed in the VM, additional networks in the pool, presence of an unused disk on one host or every host...). Markers, jobs defined in `jobs.py` (`./jobs.py show JOBNAME` will display the requirements and the reference to a VM or VM group), VMs and VM groups defined in `vm_data.py` may all help understanding what tests can run with what VMs.
 
 ## Configuration
-The main configuration file is data.py. Copy data.py-dist to data.py and modify it if needed.
+
+### Using config.toml
+
+Test configuration is managed via TOML files. The project includes a `config.toml` file with all default settings.
+
+#### Default configuration
+
+The `config.toml` file in the repository contains all default settings for:
+- Host SSH credentials and per-host overrides
+- Network definitions
+- PXE server configuration
+- VM images and ISO definitions
+- Storage device configurations (NFS, CIFS, CephFS, MooseFS, LVM iSCSI)
+- Guest tools (Windows, other)
+- Test utilities and SSH keys
+
+#### Custom configuration
+
+To customize settings for your environment:
+
+1. **Create a custom config file** (e.g., `config.local.toml`):
+   ```toml
+   [host]
+   default_user = "root"
+   default_password = "your-password"
+
+   [host.per_host]
+   "192.168.1.10" = { user = "custom_user", password = "custom_pass" }
+
+   [pxe]
+   config_server = "pxe.example.com"
+   arp_server = "pxe.example.com"
+
+   [storage.nfs]
+   server = "10.0.0.2"
+   serverpath = "/mnt/shared"
+   ```
+
+2. **Run tests with custom config**:
+   ```bash
+   pytest --config=local --hosts=10.0.0.1
+   ```
+
+   This loads `config.toml` first, then merges `config.local.toml` on top.
+
+#### Configuration file paths
+
+- `config.toml` — default config (always loaded)
+- `config.default.toml` — local defaults (auto-loaded if exists and no `--config` specified)
+- `config.NAME.toml` — environment-specific overrides (loaded with `--config=NAME`)
+
+The `--config` flag is optional. If not specified:
+1. `config.toml` is loaded first
+2. If `config.default.toml` exists, it is merged on top (auto-detected)
+
+This allows you to:
+- Commit `config.toml` with project defaults to version control
+- Create `config.default.toml` locally (ignored by git) for your standard environment
+- Create `config.prod.toml`, `config.ci.toml`, etc. for other environments and select with `--config=prod`
 
 ## Running tests
 
@@ -169,8 +227,8 @@ The `--hosts` parameter can be specified several times. Then `pytest` will run t
 When a test requires a single pool of several hosts, only mention the master host in the `--hosts` option.
 
 Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those are tests that will import a VM before testing stuff on it:
-* `OVA_URL` is a URL to download an OVA. It can also be simply a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
-* `VM_key` refers to a key in `data.py`'s `VM_IMAGES` dict. Example: `mini-linux-x86_64-uefi`.
+* `OVA_URL` is a URL to download an OVA. It can also be simply a filename, if your `config.toml`'s `vm.def_url` is correctly defined.
+* `VM_key` refers to a key in `config.toml`'s `vm.images` section. Example: `mini-linux-x86_64-uefi`.
 * `IP_address` allows you to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
@@ -231,8 +289,6 @@ Options `-m` and `-k` are heavily used in `jobs.py`.
 We wanted the job definitions to be in this git repository, that's why the job definitions are in the `jobs.py` file itself (plus `vm_data.py` for VM selection).
 
 To use `./jobs.py`, you also need to populate `vm_data.py` to define the VM groups that are necessary to run jobs (unless `--vm` is provided on the command line to override the defaults).
-
-The output of commands below is given as example and may not reflect the current state of the jobs definitions.
 
 #### List jobs
 ```
@@ -527,10 +583,10 @@ python scripts/test_install_xcpng.py 10.0.0.2 f0f5f010-80c6-25ae-44a2-1fb154e32d
 ```
 Note: in case of restore, the version must be that of the installer (here 8.2.1), not the version of XCP-ng that will be restored.
 
-The script requires the addressable name or IP of the PXE config server to be defined in `data.py`:
-```
-# PXE config server for automated XCP-ng installation
-PXE_CONFIG_SERVER = 'pxe'
+The script requires the addressable name or IP of the PXE config server to be defined in `config.toml`:
+```toml
+[pxe]
+config_server = "pxe"
 ```
 
 The `installer` parameter is optional. If you leave it empty it will be automatically defined as `http://<PXE_CONFIG_SERVER>/installers/xcp-ng/<version>/`.
