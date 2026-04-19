@@ -3,6 +3,7 @@ import pytest
 import logging
 
 from lib.commands import SSHCommandFailed
+from lib.config_loader import InstalledGuestToolDef, WinGuestToolDef
 from lib.vm import VM
 from lib.windows import (
     PowerAction,
@@ -12,8 +13,6 @@ from lib.windows import (
     wait_for_vm_running_and_ssh_up_without_tools,
 )
 from lib.windows.guest_tools import ERROR_INSTALL_FAILURE, install_guest_tools, uninstall_guest_tools
-
-from typing import Any
 
 # Requirements:
 # - Same as TestGuestToolsWindowsNondestructive.
@@ -42,10 +41,10 @@ class TestGuestToolsWindowsDestructive:
         assert vm.are_windows_tools_uninstalled()
 
     def test_install_with_other_tools(
-        self, vm_install_other_drivers: tuple[VM, dict[str, Any]], guest_tools_iso: dict[str, Any]
+        self, vm_install_other_drivers: tuple[VM, InstalledGuestToolDef], guest_tools_iso: WinGuestToolDef
     ) -> None:
         vm, param = vm_install_other_drivers
-        if param["upgradable"]:
+        if param.upgradable:
             install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
             assert vm.are_windows_tools_working()
         else:
@@ -61,7 +60,7 @@ class TestGuestToolsWindowsDestructive:
 
     # Test of the unplug rework, where the driver must remain activated even if the device ID changes.
     # Also serves as a "close-enough" test of vendor device toggling.
-    def test_toggle_device_id(self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]) -> None:
+    def test_toggle_device_id(self, running_unsealed_windows_vm: VM, guest_tools_iso: WinGuestToolDef) -> None:
         vm = running_unsealed_windows_vm
         assert vm.param_get("platform", "device_id") == "0002"
         install_guest_tools(vm, guest_tools_iso, PowerAction.Shutdown, check=False)
