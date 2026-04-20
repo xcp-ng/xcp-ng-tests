@@ -14,8 +14,6 @@ jobs:
       - uses: ./.github/actions/uv-setup/
         with:
           dev: false
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
       - name: jobs-check
         run: |
           FAILURES=""
