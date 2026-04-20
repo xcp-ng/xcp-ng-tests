@@ -15,8 +15,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
       - name: Create a dummy vm_data.py
         run: cp vm_data.py-dist vm_data.py
       - run: prek -a mypy
@@ -28,8 +26,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
       - name: Create a dummy vm_data.py
         run: cp vm_data.py-dist vm_data.py
       - run: prek -a pyright
@@ -43,8 +39,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
       - run: prek -a ruff
 
   flake8:
