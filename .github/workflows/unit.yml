@@ -12,7 +12,5 @@ jobs:
         with:
           persist-credentials: false
       - uses: $/.github/actions/uv-setup/
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
       - run: pytest tests/unit/
       - run: pytest flake8_plugins/
