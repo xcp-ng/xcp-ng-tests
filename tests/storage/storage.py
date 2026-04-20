@@ -211,6 +211,7 @@ def xva_export_import(vm: VM, compression: XVACompression, with_snapshot: bool) 
     vm.ssh("randstream generate -v --size 500MiB /root/data")
     vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
 
+    snap1, snap2 = None, None
     if with_snapshot:
         snap1 = vm.snapshot()
         # Write new data to a particular sector after taking a snapshot
@@ -238,8 +239,9 @@ def xva_export_import(vm: VM, compression: XVACompression, with_snapshot: bool) 
         if imported_vm is not None:
             imported_vm.destroy()
         vm.host.ssh(f'rm -f {xva_path}')
-        if with_snapshot:
+        if snap1:
             snap1.destroy()
+        if snap2:
             snap2.destroy()
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat) -> None:
