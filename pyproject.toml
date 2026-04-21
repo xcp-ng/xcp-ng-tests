@@ -19,18 +19,19 @@ dependencies = [
 [dependency-groups]
 dev = [
     "bs4>=0.0.1",
-    "mypy",
     "flake8",
     "flake8-pyproject",
+    "libarchive-c==5.3",
+    "mypy",
     "pydocstyle",
     "pyright",
     "ruff",
-    "types-requests",
-    "typing-extensions",
-    "libarchive-c==5.3",
-    "types-pygments",
+    "ty",
     "types-colorama",
     "types-pexpect",
+    "types-pygments",
+    "types-requests",
+    "typing-extensions",
     "zizmor",
 ]
 
@@ -38,6 +39,9 @@ dev = [
 typeCheckingMode = "standard"
 reportMissingParameterType = "error"
 reportUnknownParameterType = "error"
+
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
 
 [tool.ruff]
 preview = true
@@ -49,6 +53,7 @@ quote-style = "preserve"
 
 [tool.ruff.lint]
 select = [
+  "ANN",  # flake8-annotations
   "D",  # pydocstyle
   "FA",  # future-annotations
   "F",  # Pyflakes
@@ -61,6 +66,7 @@ select = [
 ]
 # don't use some of the default D and SIM rules
 ignore = [
+  "ANN401",  # missing-return-type-special-method. Might be removed later.
   "D100",  # undocumented-public-module
   "D101",  # undocumented-public-class
   "D102",  # undocumented-public-method
@@ -81,6 +87,7 @@ ignore = [
   "SIM105",  # suppressible-exception
   "SIM108",  # if-else-block-instead-of-if-exp
 ]
+flake8-annotations.mypy-init-return = true
 
 # restrict to the PEP 257 rules
 pydocstyle.convention = "pep257"

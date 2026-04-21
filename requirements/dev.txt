@@ -1,16 +1,17 @@
 # generated with update_requirements.py, do not edit manually
 bs4>=0.0.1
-mypy
 flake8
 flake8-pyproject
+libarchive-c==5.3
+mypy
 pydocstyle
 pyright
 ruff
-types-requests
-typing-extensions
-libarchive-c==5.3
-types-pygments
+ty
 types-colorama
 types-pexpect
+types-pygments
+types-requests
+typing-extensions
 zizmor
 -r base.txt
