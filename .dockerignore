@@ -1,0 +1,5 @@
+.venv
+.git
+.jj
+.*cache
+__pycache__

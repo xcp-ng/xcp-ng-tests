@@ -384,26 +384,38 @@ class Host:
 
         params: dict[str, str | bool | dict[str, str]] = {}
         msg = "Import VM %s" % uri
-        if '://' in uri:
-            params['url'] = uri
-        else:
-            params['filename'] = uri
-        if sr_uuid is not None:
-            msg += " (SR: %s)" % sr_uuid
-            params['sr-uuid'] = sr_uuid
-        logging.info(msg)
-        vm_uuid = self.xe('vm-import', params)
-        vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
-        vm = VM(vm_uuid, self)
-        vm.param_set('name-label', vm_name)
-        # Set VM VIF networks to the host's management network
-        for vif in vm.vifs():
-            vif.move(self.management_network())
-        if use_cache:
-            cache_key = self.vm_cache_key(uri)
-            logging.info(f"Marking VM {vm.uuid} as cached")
-            vm.param_set('name-description', cache_key)
-        return vm
+        download_path = None
+
+        try:
+            if uri.startswith('https://'):
+                # Direct import from https is broken in xapi. Download HTTPS URL to temporary file on host
+                download_path = f'/tmp/{uuid.uuid4()}'
+                logging.info(f"Download VM from {uri}")
+                self.ssh(f"curl -sSL -o '{download_path}' '{uri}'")
+                params['filename'] = download_path
+            elif '://' in uri:
+                params['url'] = uri
+            else:
+                params['filename'] = uri
+            if sr_uuid is not None:
+                msg += " (SR: %s)" % sr_uuid
+                params['sr-uuid'] = sr_uuid
+            logging.info(msg)
+            vm_uuid = self.xe('vm-import', params)
+            vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
+            vm = VM(vm_uuid, self)
+            vm.param_set('name-label', vm_name)
+            # Set VM VIF networks to the host's management network
+            for vif in vm.vifs():
+                vif.move(self.management_network())
+            if use_cache:
+                cache_key = self.vm_cache_key(uri)
+                logging.info(f"Marking VM {vm.uuid} as cached")
+                vm.param_set('name-description', cache_key)
+            return vm
+        finally:
+            if download_path:
+                self.ssh(f'rm -f {download_path}')
 
     def import_iso(self, uri: str, sr: SR) -> VDI:
         random_name = str(uuid.uuid4())

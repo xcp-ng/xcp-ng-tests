@@ -18,9 +18,7 @@ from lib.common import (
     callable_marker,
     is_uuid,
     prefix_object_name,
-    setup_formatted_and_mounted_disk,
     shortened_nodeid,
-    teardown_formatted_and_mounted_disk,
     vm_image,
     wait_for,
 )

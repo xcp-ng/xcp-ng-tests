@@ -13,4 +13,5 @@ types-pygments
 types-colorama
 types-pexpect
 zizmor
+types-passlib
 -r base.txt
