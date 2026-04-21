@@ -3,8 +3,7 @@ import pytest
 import logging
 from uuid import uuid4
 
-from data import ISO_IMAGES, NETWORKS
-from lib import commands, installer, pxe
+from lib import commands, config, installer, pxe
 from lib.common import safe_split, wait_for
 from lib.installer import AnswerFile
 from lib.pif import PIF
@@ -13,8 +12,6 @@ from lib.vdi import VDI
 from lib.vm import VM
 
 from typing import Generator
-
-assert "MGMT" in NETWORKS
 
 # Requirements:
 # - one XCP-ng host capable of nested virt, with an ISO SR, and a default SR
@@ -80,7 +77,7 @@ class TestNested:
             }[firmware],
             vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
             cd_vbd=dict(device="xvdd", userdevice="3"),
-            vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
+            vifs=[dict(index=0, network_name=config.network.mgmt)],
         ))
     @pytest.mark.answerfile.with_args(
         lambda system_disks_names, local_sr, package_source, iso_version: AnswerFile("INSTALL")
@@ -88,7 +85,7 @@ class TestNested:
         .top_append(
             {"iso": {"TAG": "source", "type": "local"},
              "net": {"TAG": "source", "type": "url",
-                     "CONTENTS": ISO_IMAGES[iso_version]['net-url']},  # type: ignore
+                     "CONTENTS": config.install.isos.definitions[iso_version]['net-url']},  # type: ignore
              }[package_source],
             {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
@@ -345,7 +342,7 @@ class TestNested:
         lambda system_disks_names, package_source, iso_version: AnswerFile("UPGRADE").top_append(
             {"iso": {"TAG": "source", "type": "local"},
              "net": {"TAG": "source", "type": "url",
-                     "CONTENTS": ISO_IMAGES[iso_version]['net-url']},  # type: ignore
+                     "CONTENTS": config.install.isos.definitions[iso_version]['net-url']},  # type: ignore
              }[package_source],
             {"TAG": "existing-installation",
              "CONTENTS": system_disks_names[0]},

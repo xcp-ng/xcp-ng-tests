@@ -1,0 +1,235 @@
+"$schema" = "./config-schema.json"
+# Configuration file for XCP-ng tests
+# To be customized for your environment
+
+# The following prefix will be added to the `name-label` parameter of XAPI objects
+# that the tests will create or import, such as VMs and SRs.
+# Default value: [your login/user]
+# Prefix for test-created objects in XAPI (empty = use username)
+objects_name_prefix = ""
+
+# This should be a working DNS server that's not used by any VM images.
+dns_server = "1.1.1.1"
+
+[host]
+# Default user and password to connect to a host through XAPI
+# Note: this won't be used for SSH.
+# You need to have an SSH key into the hosts' /root/.ssh/authorized_keys.
+default_user = "root"
+default_password = ""
+
+[hosts]
+# Override settings for specific hosts
+# skip_xo_config allows to not touch XO's configuration regarding the host
+# Else the default behaviour is to add the host to XO servers at the beginning
+# of the testing session and remove it at the end.
+# "10.0.0.1" = { user = "root", password = "" }
+# "testhost1" = { user = "root", password = "", skip_xo_config = true }
+
+[network]
+# Network names and descriptions
+mgmt = "Pool-wide network associated with eth0"
+
+[pxe]
+# PXE configuration server for automated XCP-ng installation
+config_server = "pxe"
+# Server on MGMT network, where ARP tables can reveal the MACs
+arp_server = "pxe"
+
+[vm]
+# Default VM images location
+# Values can be either full URLs or only partial URLs that will be automatically appended to def_url
+def_url = "http://pxe/images/"
+
+# Whether to cache VMs on the test host, that is import them only if not already
+# present in the target SR. This also causes the VM to be cloned at the beginning
+# of each test module, so that the original VM remains untouched.
+# /!\ The VM identifier in cache is simply the URL where it was imported from.
+# No checksum or date is checked.
+# A cached VM is just a VM which has a special description.
+# Example description: "[Cache for http://example.com/images/filename.xva]"
+# Delete the VM to remove it from cache.
+# This setting affects VMs managed by the `imported_vm` fixture.
+cache_imported = false
+
+# In some cases, we may prefer to favour a local SR to store test VM disks,
+# to avoid latency or unstabilities related to network or shared file servers.
+# However it's not good practice to make a local SR the default SR for a pool of several hosts.
+# Hence this configuration value that you can set to `local` so that our tests use this SR by default.
+# This setting affects VMs managed by the `imported_vm` fixture.
+# Possible values:
+# - 'default': keep using the pool's default SR
+# - 'local': use the first local SR found instead
+# - A UUID of the SR to be used
+default_sr = "default"
+
+[vm.images]
+# VM image definitions: name -> filename or URL
+# Values can be either full URLs or only partial URLs appended to vm.def_url
+"mini-linux-x86_64-bios" = "alpine-minimal-3.12.0.xva"
+"mini-linux-x86_64-uefi" = "alpine-uefi-minimal-3.12.0.xva"
+
+[vm.equivalents]
+# Image equivalences for caching/deduplication
+# Maps test image IDs to other IDs they can be substituted with
+# "test_id_1" = "test_id_2"
+
+[install]
+# Installation configuration
+# Path to the iso-remaster utility script
+# iso_remaster = "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh"
+
+[install.answerfiles]
+# Base answer files for installation
+# Password hash is computed from host.default_password at config load time
+# When used, <PASSWORD_HASH> placeholder will be replaced with the actual hash
+INSTALL = { TAG = "installation", CONTENTS = [
+    { TAG = "root-password", type = "hash", CONTENTS = "<PASSWORD_HASH>" },
+    { TAG = "timezone", CONTENTS = "Europe/Paris" },
+    { TAG = "keymap", CONTENTS = "us" }
+] }
+UPGRADE = { TAG = "installation", mode = "upgrade" }
+RESTORE = { TAG = "restore" }
+
+[install.isos]
+# Base URL for XCP-ng installer ISOs
+base_url = "https://updates.xcp-ng.org/isos/"
+# Local cache directory for downloaded ISOs
+cache_dir = "/home/user/iso"
+
+[install.isos.definitions]
+# XCP-ng installer ISO definitions
+# path can be:
+# - absolute filename
+# - absolute URL
+# - path relative to base_url
+# Note the dirname part is ignored when looking in cache_dir, abuse this
+# for local-only ISO with things like "locally-built/my.iso" or "xs/8.3.iso".
+# If 'net-only' is set to 'True' only source of type URL will be possible.
+# By default the parameter is set to False.
+"83nightly" = { path = "http://unconfigured.iso", unsigned = true }
+"830" = { path = "8.3/xcp-ng-8.3.0.iso" }
+"82nightly" = { path = "http://unconfigured.iso", unsigned = true }
+"821.1" = { path = "8.2/xcp-ng-8.2.1-20231130.iso" }
+"821" = { path = "8.2/xcp-ng-8.2.1.iso" }
+"820" = { path = "8.2/xcp-ng-8.2.0.iso" }
+"81" = { path = "8.1/xcp-ng-8.1.0-2.iso" }
+"80" = { path = "8.0/xcp-ng-8.0.0.iso" }
+"76" = { path = "7.6/xcp-ng-7.6.0.iso" }
+"75" = { path = "7.5/xcp-ng-7.5.0-2.iso" }
+"xs8" = { path = "XenServer8_2024-03-18.iso" }
+"ch821.1" = { path = "CitrixHypervisor-8.2.1-2306-install-cd.iso" }
+"ch821" = { path = "CitrixHypervisor-8.2.1-install-cd.iso" }
+
+[guest_tools]
+# Guest tools ISO download location
+download_url = "http://pxe/isos/"
+
+[guest_tools.win]
+# Definitions of Windows guest tool ISOs to be tested
+
+[guest_tools.win.stable]
+# ISO name on SR or subpath of download_url
+name = "guest-tools-win.iso"
+# Whether ISO should be downloaded from download_url
+download = true
+# ISO-relative path of MSI file to be installed
+package = "package\\XenDrivers-x64.msi"
+# ISO-relative path of XenClean script
+xenclean_path = "package\\XenClean\\x64\\Invoke-XenClean.ps1"
+# ISO-relative path of root cert file to be installed before guest tools (optional)
+testsign_cert = "testsign\\XCP-ng_Test_Signer.crt"
+# What's the onboard family of our tools? This is equal to the WinPV VENDOR_NAME value
+onboard_family = "XCP-ng"
+
+[guest_tools.other]
+# Definition of ISO containing other guest tools to be tested
+# ISO name on SR or subpath of download_url
+name = "other-guest-tools-win.iso"
+# Whether ISO should be downloaded from download_url
+download = false
+
+[guest_tools.installed]
+# Definitions of other guest tools contained in guest_tools.other ISO
+
+[guest_tools.installed."xcp-ng-9.0.9000"]
+# Whether we are installing MSI files ("msi"), bare .inf drivers ("inf")
+# or nothing in case of Windows Update (absent or null)
+type = "msi"
+# ISO-relative path of this guest tool
+path = "xcp-ng-9.0.9000"
+# "path"-relative path of MSI or driver files to be installed
+package = "package\\XenDrivers-x64.msi"
+# Relative path of root cert file (optional)
+testsign_cert = "testsign\\XCP-ng_Test_Signer.crt"
+# Whether this guest tool version wants vendor device to be activated (optional, defaults to False)
+# Note: other guest tools may not install correctly with this setting enabled
+vendor_device = false
+# Can we upgrade automatically from this guest tool to our tools?
+upgradable = true
+# What is the expected onboarding phase after running XenClean when this tool is installed? (optional)
+# See test_xenclean.py ONBOARDING_PHASES for details
+onboarding_phase = "see test_xenclean.py ONBOARDING_PHASES"
+
+[guest_tools.installed.vendor]
+# Vendor device-specific guest tools
+vendor_device = true
+upgradable = false
+
+[ssh]
+# Public keys for a private key available to the test runner
+pubkey = """ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMnN/wVdQqHA8KsndfrLS7fktH/IEgxoa533efuXR6rw XCP-ng CI
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKz9uQOoxq6Q0SQ0XTzQHhDolvuo/7EyrDZsYQbRELhcPJG8MT/o5u3HyJFhIP2+HqBSXXgmqRPJUkwz9wUwb2sUwf44qZm/pyPUWOoxyVtrDXzokU/uiaNKUMhbnfaXMz6Ogovtjua63qld2+ZRXnIgrVtYKtYBeu/qKGVSnf4FTOUKl1w3uKkr59IUwwAO8ay3wVnxXIHI/iJgq6JBgQNHbn3C/SpYU++nqL9G7dMyqGD36QPFuqH/cayL8TjNZ67TgAzsPX8OvmRSqjrv3KFbeSlpS/R4enHkSemhgfc8Z2f49tE7qxWZ6x4Uyp5E6ur37FsRf/tEtKIUJGMRXN XCP-ng CI"""
+# Maximum number of SSH output lines to log before truncating
+output_max_lines = 20
+# If true, strips SSH banners from output
+ignore_banner = false
+
+[storage]
+# Storage device configurations (all optional, leave empty if not used)
+
+[storage.nfs]
+# Default NFS device config:
+# URL/Hostname of NFS server
+# server = "10.0.0.2"
+# Path to shared mountpoint
+# serverpath = "/path/to/shared/mount"
+
+[storage.nfs4]
+# Default NFS4+ only device config:
+# URL/Hostname of NFS server
+# server = "10.0.0.2"
+# Path to shared mountpoint
+# serverpath = "/path_to_shared_mount"
+# nfsversion = "4.1"
+
+[storage.nfs_iso]
+# Default NFS ISO device config:
+# URL/Hostname of NFS server and path to shared mountpoint
+# location = "10.0.0.2:/path/to/shared/mount"
+
+[storage.cifs_iso]
+# Default CIFS ISO device config:
+# location = r"\\10.0.0.2\<shared folder name>"
+# username = "<user>"
+# cifspassword = "<password>"
+# type = "cifs"
+# vers = "<1.0> or <3.0>"
+
+[storage.cephfs]
+# CephFS storage configuration
+# server = "10.0.0.2"
+# serverpath = "/vms"
+
+[storage.moosefs]
+# MooseFS storage configuration
+# masterhost = "mfsmaster"
+# masterport = "9421"
+# rootpath = "/vms"
+
+[storage.lvmoiscsi]
+# LVM over iSCSI storage configuration
+# target = "192.168.1.1"
+# port = "3260"
+# targetIQN = "target.example"
+# SCSIid = "id"

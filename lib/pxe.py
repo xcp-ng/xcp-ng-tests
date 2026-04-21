@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data import ARP_SERVER, PXE_CONFIG_SERVER
+from lib import config
 from lib.commands import scp, ssh
 
 PXE_CONFIG_DIR = "/pxe/configs/custom"
@@ -21,23 +21,23 @@ def server_push_config(mac_address: str, tmp_local_path: str) -> None:
     assert mac_address
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
     server_remove_config(mac_address)
-    ssh(PXE_CONFIG_SERVER, f'mkdir -p {remote_dir}')
-    scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/boot.conf', remote_dir)
-    scp(PXE_CONFIG_SERVER, f'{tmp_local_path}/answerfile.xml', remote_dir)
+    ssh(config.pxe.config_server, f'mkdir -p {remote_dir}')
+    scp(config.pxe.config_server, f'{tmp_local_path}/boot.conf', remote_dir)
+    scp(config.pxe.config_server, f'{tmp_local_path}/answerfile.xml', remote_dir)
 
 def server_remove_config(mac_address: str) -> None:
     assert mac_address # protection against deleting the whole parent dir!
     remote_dir = f'{PXE_CONFIG_DIR}/{mac_address}/'
-    ssh(PXE_CONFIG_SERVER, f'rm -rf {remote_dir}')
+    ssh(config.pxe.config_server, f'rm -rf {remote_dir}')
 
 def server_remove_bootconf(mac_address: str) -> None:
     assert mac_address
     distant_file = f'{PXE_CONFIG_DIR}/{mac_address}/boot.conf'
-    ssh(PXE_CONFIG_SERVER, f'rm -rf {distant_file}')
+    ssh(config.pxe.config_server, f'rm -rf {distant_file}')
 
 def arp_addresses_for(mac_address: str) -> list[str]:
     output = ssh(
-        ARP_SERVER,
+        config.pxe.arp_server,
         f"ip neigh show nud reachable | grep {mac_address} | awk '{{ print $1 }}'"
     )
     candidate_ips = output.splitlines()

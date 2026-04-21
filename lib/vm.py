@@ -21,6 +21,7 @@ from lib.common import (
     wait_for,
     wait_for_not,
 )
+from lib.config_loader import config
 from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vbd import VBD
@@ -922,5 +923,4 @@ def vm_cache_key_from_def(vm_def: dict[str, str], ref_nodeid: str, test_gitref: 
     nodeid = shortened_nodeid(expand_scope_relative_nodeid(image_test, image_scope, ref_nodeid))
     image_key = f"{nodeid}-{image_vm}-{test_gitref}"
 
-    from data import IMAGE_EQUIVS
-    return IMAGE_EQUIVS.get(image_key, image_key)
+    return config.vm.equivalents.get(image_key, image_key)
