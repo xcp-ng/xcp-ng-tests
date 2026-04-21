@@ -27,7 +27,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, cast, overload
+from typing import TYPE_CHECKING, Iterable, Literal, cast, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -105,33 +105,33 @@ class VM(BaseVM):
             return True
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[False]) -> bytes:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[False]) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[True] = True) -> commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[False]) -> commands.SSHResult[bytes]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[False]) -> commands.SSHResult[bytes]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[True], decode: bool = True) -> None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            background: Literal[True], decode: bool = ...) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ..., background: bool = ...,
+            decode: bool = ...) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
@@ -304,7 +304,7 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis: List[str] | None = None, name: str | None = None) -> Snapshot:
+    def snapshot(self, ignore_vdis: list[str] | None = None, name: str | None = None) -> Snapshot:
         logging.info("Snapshot VM")
 
         name_label = name or f"Snapshot of {self.uuid}"
@@ -531,7 +531,7 @@ class VM(BaseVM):
         finally:
             snapshot.destroy(verify=True)
 
-    def get_messages(self, name: str) -> List[str]:
+    def get_messages(self, name: str) -> list[str]:
         args: dict[str, str | bool | dict[str, str]] = {
             'obj-uuid': self.uuid,
             'name': name,
@@ -605,14 +605,14 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def get_all_efi_bins(self) -> List[str]:
+    def get_all_efi_bins(self) -> list[str]:
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
             f'for file in $(find /boot -type f); do echo $file $(head -c {magicsz} $file); done', decode=False
         ).split(b'\n')
 
         magic = efi.EFI_HEADER_MAGIC.encode('ascii')
-        binaries: List[str] = []
+        binaries: list[str] = []
         for f in files:
             if magic in f:
                 # Avoid decoding an unsplit f, as some headers are not utf8
@@ -656,7 +656,7 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name: str | None = None) -> "VM":
+    def clone(self, *, name: str | None = None) -> VM:
         if name is None:
             name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
