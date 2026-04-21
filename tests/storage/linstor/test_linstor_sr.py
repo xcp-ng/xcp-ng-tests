@@ -187,7 +187,12 @@ def _ensure_resource_remain_diskless(
 
 class TestLinstorDisklessResource:
     @pytest.mark.small_vm
-    def test_diskless_kept(self, host: Host, linstor_sr: SR, vm_on_linstor_sr: VM, storage_pool_name: str) -> None:
+    def test_diskless_kept(
+        self, host: Host, linstor_sr: SR, linstor_redundancy: int, vm_on_linstor_sr: VM, storage_pool_name: str
+    ) -> None:
+        if len(linstor_sr.pool.hosts) <= linstor_redundancy:
+            pytest.skip("This test requires at least one DRBD diskless")
+
         vm = vm_on_linstor_sr
         vdi_uuids = vm.vdi_uuids(sr_uuid=linstor_sr.uuid)
         vdi_uuid = vdi_uuids[0]
