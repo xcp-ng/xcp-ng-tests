@@ -11,7 +11,7 @@ from pathlib import Path
 from lib.common import HostAddress
 from lib.tools import logger
 from lib.tools.inventory import into_inventory, load_inventory
-from lib.tools.tasks.update import update_all
+from lib.tools.tasks.update import update_pools
 
 def _command_update(args: argparse.Namespace) -> None:
     if args.inventory:
@@ -19,7 +19,7 @@ def _command_update(args: argparse.Namespace) -> None:
     else:
         inventory = into_inventory(args.hosts, args.repos)
 
-    update_all(inventory)
+    update_pools(inventory)
 
 
 def cli() -> None:
@@ -33,12 +33,17 @@ def cli() -> None:
     # subparser - command: update
     subparser_cmd_update = subparsers.add_parser(
         name="update",
-        description="Run update tasks on target(s)",
-        help="Run update tasks on target(s)",
+        description="Run update tasks on target pools",
+        help="Run update tasks on target pools",
     )
     cmd_update_excl_grp = subparser_cmd_update.add_mutually_exclusive_group(required=True)
     cmd_update_excl_grp.add_argument(
-        "-H", "--hosts", type=HostAddress, metavar="HOST", nargs="+", help="Hostname(s) or ip address(es) of target(s)"
+        "-H",
+        "--hosts",
+        type=HostAddress,
+        metavar="HOST",
+        nargs="+",
+        help="Address (hostname|ip) of the master host in pool",
     )
     cmd_update_excl_grp.add_argument("-i", "--inventory", type=Path, help="Use an hosts inventory file")
     subparser_cmd_update.add_argument(

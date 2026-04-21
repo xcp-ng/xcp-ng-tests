@@ -6,24 +6,41 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
-from lib.pool import Pool
+from lib.pool import NotAMasterHostError, Pool
 
 from .. import logger
 
-def update_all(inventory: dict[str, dict[str, list[str]]]) -> None:
-    """Updates all master (primary) hosts.
+def update_pools(inventory: dict) -> None:
+    """Updates hosts in pool(s).
 
-    .. note:: Host must be a master
+    .. note::
 
-        Throws error if hosts are not master (primary).
+        Every non-master hosts in inventory will be ignored
+
+    *Update master hosts declared in inventory first, then, update secondary hosts attached to each master.*
 
     :param dict inventory:
-        Each host (key) holds its own config data (values).
+        Each host (key) holds its own config data (values, eg: `enablerepos`).
     """
     logger.debug(f"Inventory: {inventory}")
     # init related pools
-    pools = [Pool(h) for h in inventory]
+    pools = []
+    for h in inventory:
+        try:
+            p = Pool(h)
+            pools.append(p)
+        except NotAMasterHostError:
+            logger.warning(f"[{h}] Skipping: not a master host")
 
     with ThreadPoolExecutor() as executor:
         for p in pools:
             executor.submit(p.master.update, inventory[p.master.hostname_or_ip]["enablerepos"])
+
+    # secondary hosts
+    with ThreadPoolExecutor() as executor:
+        for p in pools:
+            # omit first item because it is a primary (master)
+            for h in p.hosts[1:]:
+                # repos are the same as the primary (master)
+                repos = inventory[p.master.hostname_or_ip]["enablerepos"]
+                executor.submit(h.update, repos)

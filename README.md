@@ -575,12 +575,14 @@ This command performs an update operation on remote targets.
 uv run scripts/tools.py update -H primary1 primary2
 ```
 
-For each primary target :
+For each pool target :
 
-1. Clean cached metadata
-2. Update with repository manager (yum): Optionally enables repositories
-3. Reboot
-4. Get attached secondary hosts and repeats three previous steps for each secondary
+1. Update master (primary) host of the pool:
+  * Clean cached metadata
+  * Update with repository manager (yum): Optionally enables repositories
+  * Reboot
+2. Get attached secondary hosts of the pool
+  * Repeat step `1.` for each secondary
 
 **Inventory file**
 
