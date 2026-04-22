@@ -3,10 +3,13 @@ from __future__ import annotations
 import pytest
 
 import logging
+from dataclasses import dataclass
 
 from lib import config
 from lib.common import randid
 from lib.host import Host
+from lib.sr import SR
+from lib.vdi import ImageFormat
 from lib.vm import VM
 from tests.storage import install_randstream
 
@@ -46,3 +49,48 @@ def temp_large_dir(host: Host) -> Generator[str, None, None]:
         host.ssh(f'mkdir {path}')
         yield path
         host.ssh(f'rm -rf {path}')
+
+
+@dataclass
+class XfsConfig:
+    uninstall_xfs: bool = True
+
+@pytest.fixture(scope='package')
+def _xfs_config_on_hostA2() -> XfsConfig:
+    return XfsConfig()
+
+# NOTE: @pytest.mark.usefixtures does not parametrize this fixture.
+# To recreate host_with_xfsprogs for each image_format value, accept
+# image_format in the fixture arguments.
+# ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
+@pytest.fixture(scope='package')
+def hostA2_with_xfsprogs(hostA2: Host, image_format: ImageFormat, _xfs_config_on_hostA2: XfsConfig) \
+        -> Generator[Host, None, None]:
+    assert not hostA2.file_exists('/usr/sbin/mkfs.xfs'), \
+        "xfsprogs must not be installed on the host at the beginning of the tests"
+    hostA2.yum_save_state()
+    hostA2.yum_install(['xfsprogs'])
+    yield hostA2
+    # teardown
+    if _xfs_config_on_hostA2.uninstall_xfs:
+        hostA2.yum_restore_saved_state()
+
+@pytest.fixture(scope='package')
+def xfs_sr_on_hostA2(
+    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+    hostA2_with_xfsprogs: Host,
+    image_format: ImageFormat,
+    _xfs_config_on_hostA2: XfsConfig,
+) -> Generator[SR, None, None]:
+    """ A XFS SR on first host. """
+    sr_disk = unused_512B_disks[hostA2_with_xfsprogs][0]["name"]
+    sr = hostA2_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
+                                        {'device': '/dev/' + sr_disk,
+                                         'preferred-image-formats': image_format})
+    yield sr
+    # teardown
+    try:
+        sr.destroy()
+    except Exception as e:
+        _xfs_config_on_hostA2.uninstall_xfs = False
+        raise pytest.fail("Could not destroy xfs SR, leaving packages in place for manual cleanup") from e
