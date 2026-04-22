@@ -183,7 +183,7 @@ def _ensure_resource_remain_diskless(
 ) -> None:
     diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid)
     for diskless_host in diskless:
-        assert diskless_host.param_get("name-label").lower() not in diskfuls
+        assert diskless_host.name().lower() not in diskfuls
 
 class TestLinstorDisklessResource:
     @pytest.mark.small_vm
@@ -193,27 +193,38 @@ class TestLinstorDisklessResource:
         if len(linstor_sr.pool.hosts) <= linstor_redundancy:
             pytest.skip("This test requires at least one DRBD diskless")
 
-        vm = vm_on_linstor_sr
-        vdi_uuids = vm.vdi_uuids(sr_uuid=linstor_sr.uuid)
-        vdi_uuid = vdi_uuids[0]
-        assert vdi_uuid is not None
-
+        # 1. Prepare options.
         controller_option = "--controllers="
         for member in host.pool.hosts:
             controller_option += f"{member.hostname_or_ip},"
 
         sr_group_name = "xcp-sr-" + storage_pool_name.replace("/", "_")
-        diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid)
-        diskless = []
-        for member in host.pool.hosts:
-            if member.param_get("name-label").lower() not in diskfuls:
-                diskless += [member]
-        assert diskless
 
-        # Start VM on host with diskless resource
-        vm.start(on=diskless[0].uuid)
-        vm.wait_for_os_booted()
-        _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi_uuid, diskless)
+        # 2. Get VM VDI.
+        vm = vm_on_linstor_sr
+        vdi = vm.vdis[0]
 
-        vm.shutdown(verify=True)
-        _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi_uuid, diskless)
+        # 3. Create a snap to ensure VDI cannot be coalesced during diskless checks.
+        # To be more clear: if a coalesce is executed on the leaf, the VDI path is modified,
+        # and we must prevent this situation otherwise we can't compare diskless state
+        # between VM running and stopped.
+        snap = vdi.snapshot()
+
+        try:
+            # 4. Fetch DRBD diskless.
+            diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi.uuid)
+            diskless = []
+            for member in host.pool.hosts:
+                if member.name().lower() not in diskfuls:
+                    diskless += [member]
+            assert diskless
+
+            # 5. Verify diskless state after VM boot and shutdown.
+            vm.start(on=diskless[0].uuid)
+            vm.wait_for_os_booted()
+            _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi.uuid, diskless)
+
+            vm.shutdown(verify=True)
+            _ensure_resource_remain_diskless(host, controller_option, sr_group_name, vdi.uuid, diskless)
+        finally:
+            snap.destroy()
