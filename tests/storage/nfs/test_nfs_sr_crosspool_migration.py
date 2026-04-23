@@ -14,7 +14,6 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
-@pytest.mark.usefixtures("hostB1", "xfs_sr_on_hostB1")
 # Make sure these fixtures are called before the parametrized one
 @pytest.mark.usefixtures('vm_ref')
 @pytest.mark.usefixtures('image_format')
