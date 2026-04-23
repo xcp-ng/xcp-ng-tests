@@ -7,12 +7,12 @@ import shlex
 import subprocess
 import tempfile
 import uuid
+from dataclasses import dataclass
 
 from packaging import version
 
 import lib.commands as commands
 from lib.common import (
-    DiskDevName,
     _param_add,
     _param_clear,
     _param_get,
@@ -31,7 +31,7 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, TypedDict, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -55,14 +55,15 @@ class Host:
     pool: "Pool"
 
     # Data extraction is automatic, no conversion from str is done.
-    BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
-                                                    "kname": str,
-                                                    "pkname": str,
-                                                    "size": str,
-                                                    "log-sec": str,
-                                                    "type": str,
-                                                    })
-    BLOCK_DEVICES_FIELDS = ','.join(k.upper() for k in BlockDeviceInfo.__annotations__)
+    @dataclass
+    class BlockDeviceInfo:
+        name: str       # short kernel name: "sda", "md0", "dm-3"
+        path: str       # full device path: "/dev/sda", "/dev/md/myarray", "/dev/mapper/mpathb"
+        size: int       # bytes
+        log_sec: int    # logical sector size
+        type: str       # "disk", "md", "mpath"
+        available: bool # not mounted, not member of md/lvm/mpath/zfs
+        wwn: str = ''   # LUN WWN (hex, no 0x prefix); same LUN has same WWN across hosts
 
     block_devices_info: list[BlockDeviceInfo]
 
@@ -669,48 +670,126 @@ class Host:
 
     def rescan_block_devices_info(self) -> None:
         """
-        Initalize static informations about the disks.
+        Initialize information about block devices: local disks, mdadm arrays, and multipath devices.
 
-        Despite those being static, it can be necessary to rescan,
+        Despite those being mostly static, it can be necessary to rescan,
         when we test how XCP-ng reacts to changes of hardware (or
         reconfiguration of device blocksize), or after a reboot.
-        """
-        output_string = self.ssh(
-            f'lsblk --pairs --bytes -I 8,259 --output {Host.BLOCK_DEVICES_FIELDS}'
-        )  # limit to: sd, blkext
 
-        self.block_devices_info = [
-            Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore[misc]
-                                  for key, value in re.findall(r'(\S+)=(".*?"|\S+)', line)})
-            for line in output_string.strip().splitlines()
+        Handled device scenarios and their effect on `available`:
+
+        - Plain disk, no children: available unless the disk itself has a
+          mountpoint.
+        - Partitioned disk: available if no partition is mounted and no partition
+          has a used child (lvm, md, mpath, crypt); unavailable otherwise.
+        - Disk member of an mdadm array: the disk itself is unavailable; the md
+          array is added as a separate entry (type 'md'), deduplicated across
+          member appearances, and available if it has no mountpoint and no used
+          children.
+        - LUN with multipath configured: each path appears as a 'disk' entry and
+          a shared 'mpath' entry as its child. The path disks are unavailable
+          (mpath child); the mpath device is added once (type 'mpath'),
+          deduplicated by kname across path appearances.
+        - LUN accessible through multiple paths without multipath configured:
+          multiple 'disk' entries with no children but sharing the same WWN.
+          Deduplicated to a single entry (first path seen) based on WWN.
+        """
+        RAID_TYPES = {'raid0', 'raid1', 'raid4', 'raid5', 'raid6', 'raid10', 'linear'}
+        USED_TYPES = RAID_TYPES | {'lvm', 'mpath', 'crypt'}
+        LSBLK_FIELDS = 'NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN'
+
+        devices: list[Host.BlockDeviceInfo] = []
+
+        raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS}')
+
+        def _split_keys(line: str) -> list[tuple[str, str]]:
+            return re.findall(r'(\S+)=(".*?"|\S+)', line)
+
+        rows = [
+            {key.lower(): val.strip('"') for key, val in _split_keys(line)}
+            for line in raw.strip().splitlines()
         ]
-        logging.debug("blockdevs found: %s", [disk["name"] for disk in self.block_devices_info])
+
+        # build children map: kname -> list of child knames
+        children: dict[str, list[str]] = {}
+        for r in rows:
+            if r['pkname']:
+                children.setdefault(r['pkname'], []).append(r['kname'])
+
+        # availability from lsblk fields: no mountpoint, not a "used" type, all descendants also free
+        def _row_by_kname(kname: str) -> dict[str, str] | None:
+            for r in rows:
+                if r['kname'] == kname:
+                    return r
+            return None
+
+        def _all_available(kname: str) -> bool:
+            r = _row_by_kname(kname)
+            if r is None:
+                return False
+            if r['mountpoint'] or r['type'] in USED_TYPES:
+                return False
+            return all(_all_available(c) for c in children.get(kname, []))
+
+        seen_knames: set[str] = set()
+        seen_wwns: set[str] = set()
+
+        for r in rows:
+            # --- local disks ---
+            if r['type'] == 'disk' and not r['pkname']:
+                wwn = r['wwn']
+                if wwn:
+                    if wwn in seen_wwns:
+                        continue
+                    seen_wwns.add(wwn)
+                devices.append(Host.BlockDeviceInfo(
+                    name=r['name'],
+                    path=f'/dev/{r["name"]}',
+                    size=int(r['size']),
+                    log_sec=int(r['log-sec']),
+                    type='disk',
+                    available=_all_available(r['kname']),
+                    wwn=wwn.removeprefix('0x'),
+                ))
+
+            # --- mdadm arrays (may appear once per member, deduplicate) ---
+            elif r['type'] in RAID_TYPES:
+                if r['kname'] in seen_knames:
+                    continue
+                seen_knames.add(r['kname'])
+                available = not r['mountpoint'] and all(_all_available(c) for c in children.get(r['kname'], []))
+                devices.append(Host.BlockDeviceInfo(
+                    name=r['name'],
+                    path=f'/dev/{r["name"]}',
+                    size=int(r['size']),
+                    log_sec=int(r['log-sec']),
+                    type='md',
+                    available=available,
+                ))
+
+            # --- multipath devices (may appear once per path, deduplicate) ---
+            elif r['type'] == 'mpath':
+                if r['kname'] in seen_knames:
+                    continue
+                seen_knames.add(r['kname'])
+                available = not r['mountpoint'] and all(_all_available(c) for c in children.get(r['kname'], []))
+                wwn = r['name'][1:17] if re.fullmatch(r'3[0-9a-f]{32}', r['name']) else ''
+                devices.append(Host.BlockDeviceInfo(
+                    name=r['kname'],
+                    path=f'/dev/mapper/{r["name"]}',
+                    size=int(r['size']),
+                    log_sec=int(r['log-sec']),
+                    type='mpath',
+                    available=available,
+                    wwn=wwn,
+                ))
+
+        self.block_devices_info = sorted(devices, key=lambda d: d.size, reverse=True)
+        logging.debug("blockdevs found: %s", [d.name for d in self.block_devices_info])
 
     def disks(self) -> list[Host.BlockDeviceInfo]:
-        """ List of BlockDeviceInfo for all disks. """
-        # store the names of the parent devices to filter out the devices with children
-        pknames = set(disk['pkname'] for disk in self.block_devices_info if disk['pkname'])
-        # filter out partitions from block_devices
-        return sorted(
-            (
-                disk
-                for disk in self.block_devices_info
-                if (not disk["pkname"] or disk['type'] == 'raid0') and disk['kname'] not in pknames
-            ),
-            key=lambda disk: disk["name"],
-        )
-
-    def disk_is_available(self, disk: DiskDevName) -> bool:
-        """
-        Check if a disk is unmounted and appears available for use.
-
-        It may or may not contain identifiable filesystem or partition label.
-        If there are no mountpoints, it is assumed that the disk is not in use.
-
-        Warn: This function may misclassify LVM_member disks (e.g. in XOSTOR, RAID, ZFS) as "available".
-        Such disks may not have mountpoints but still be in use.
-        """
-        return len(self.ssh(f'lsblk --noheadings -o MOUNTPOINT /dev/{disk}').strip()) == 0
+        """ List of all block devices (local disks, mdadm arrays, multipath devices). """
+        return list(self.block_devices_info)
 
     def file_exists(self, filepath: str, regular_file: bool = True) -> bool:
         option = '-f' if regular_file else '-e'

@@ -18,7 +18,7 @@ def lvm_sr(host: Host,
            image_format: ImageFormat
            ) -> Generator[SR, None, None]:
     """ An LVM SR on first host. """
-    sr_disk = unused_512B_disks[host][0]["name"]
+    sr_disk = unused_512B_disks[host][0].name
     sr = host.sr_create('lvm', "LVM-local-SR-test",
                         {'device': '/dev/' + sr_disk,
                          'preferred-image-formats': image_format})
