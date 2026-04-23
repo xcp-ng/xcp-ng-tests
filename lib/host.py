@@ -63,6 +63,7 @@ class Host:
         log_sec: int    # logical sector size; 0 for md/mpath
         type: str       # "disk", "md", "mpath"
         available: bool # not mounted, not member of md/lvm/mpath/zfs
+        wwn: str = ''   # LUN WWN (hex, no 0x prefix); same LUN has same WWN across hosts
 
     block_devices_info: list[BlockDeviceInfo]
 
@@ -651,7 +652,7 @@ class Host:
         """
         # Majors: 8=SCSI/SATA, 65-71,128-135=SCSI extended, 259=NVMe/blkext
         LOCAL_MAJORS = '8,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,259'
-        LSBLK_FIELDS = 'NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE'
+        LSBLK_FIELDS = 'NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,WWN'
 
         devices: list[Host.BlockDeviceInfo] = []
 
@@ -672,6 +673,8 @@ class Host:
             disk_name = r['name']
             dev = f'/dev/{disk_name}'
             available = self._disk_is_available_local(disk_name)
+            raw_wwn = r.get('wwn', '').strip()
+            wwn = raw_wwn[2:] if raw_wwn.startswith('0x') else raw_wwn
             devices.append(Host.BlockDeviceInfo(
                 name=disk_name,
                 path=dev,
@@ -679,6 +682,7 @@ class Host:
                 log_sec=int(r['log-sec']),
                 type='disk',
                 available=available,
+                wwn=wwn,
             ))
 
         # --- mdadm arrays ---
@@ -722,9 +726,11 @@ class Host:
             if not r or r.get('type') != 'mpath':
                 continue
             dm_name = r['name']     # e.g. "dm-3"
-            dm_alias = r.get('dm-name', '').strip()  # e.g. "mpathb"
+            dm_alias = r.get('dm-name', '').strip()  # e.g. "mpathb" or "3600507681381022548000000000001ec"
             path = f'/dev/mapper/{dm_alias}' if dm_alias else f'/dev/{dm_name}'
             mountpoint = self.ssh(f'lsblk --noheadings -o MOUNTPOINT /dev/{dm_name} 2>/dev/null || true').strip()
+            # DM alias is the LUN WWN when multipath names the device after it (all-hex, ≥16 chars)
+            wwn = dm_alias if re.fullmatch(r'[0-9a-f]{16,}', dm_alias) else ''
             devices.append(Host.BlockDeviceInfo(
                 name=dm_name,
                 path=path,
@@ -732,6 +738,7 @@ class Host:
                 log_sec=int(r.get('log-sec', '0') or '0'),
                 type='mpath',
                 available=len(mountpoint) == 0,
+                wwn=wwn,
             ))
 
         self.block_devices_info = sorted(devices, key=lambda d: d.name)
