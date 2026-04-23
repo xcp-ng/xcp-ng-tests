@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, strtobool
+import logging
+
+from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set, safe_split
+from lib.pif import PIF
 
 from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
 
-class PIF:
-    xe_prefix = "pif"
+class Bond:
+    xe_prefix = "bond"
 
-    def __init__(self, uuid: str, host: Host):
-        self.uuid = uuid
+    def __init__(self, host: Host, uuid: str):
         self.host = host
+        self.uuid = uuid
 
     @overload
     def param_get(self, param_name: str, key: str | None = ...,
@@ -44,36 +47,17 @@ class PIF:
         _param_clear(self.host, self.xe_prefix, self.uuid,
                      param_name)
 
-    def is_managed(self) -> bool:
-        return strtobool(self.param_get("managed"))
+    def destroy(self):
+        logging.info(f"Destroying bond: {self.uuid}")
+        self.host.xe('bond-destroy', {'uuid': self.uuid})
 
-    def is_physical(self) -> bool:
-        return strtobool(self.param_get("physical"))
+    def master(self) -> PIF:
+        uuid = self.param_get('master')
+        assert uuid is not None, "no master on Bond"
+        return PIF(uuid, self.host)
 
-    def is_currently_attached(self) -> bool:
-        return strtobool(self.param_get("currently-attached"))
+    def slaves(self) -> list[str]:
+        return safe_split(self.param_get('slaves'), sep='; ')
 
-    def is_management(self) -> bool:
-        return strtobool(self.param_get("management"))
-
-    def device(self) -> str:
-        device = self.param_get("device")
-        assert device is not None
-        return device
-
-    def network_uuid(self) -> str:
-        uuid = self.param_get("network-uuid")
-        assert uuid is not None, "unexpected PIF without network-uuid"
-        return uuid
-
-    def reconfigure_ip(self, mode: str) -> None:
-        self.host.xe("pif-reconfigure-ip", {
-            "uuid": self.uuid,
-            "mode": mode,
-        })
-
-    def reconfigure_ipv6(self, mode: str) -> None:
-        self.host.xe("pif-reconfigure-ipv6", {
-            "uuid": self.uuid,
-            "mode": mode,
-        })
+    def mode(self) -> str | None:
+        return self.param_get("mode")

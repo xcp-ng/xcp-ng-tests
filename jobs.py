@@ -75,6 +75,20 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/misc", "tests/migration"],
         "markers": "multi_vms and not flaky and not reboot",
     },
+    "network-advanced": {
+        "description": "a group of network tests with complex prerequisites",
+        "requirements": [
+            "A pool with at least 1 host.",
+            "At least 2 free NICs on every host.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/network"],
+        "markers": "complex_prerequisites",
+    },
     "packages": {
         "description": "tests that packages can be installed correctly",
         "requirements": [

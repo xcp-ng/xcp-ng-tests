@@ -497,6 +497,8 @@ class VM(BaseVM):
             return PackageManagerEnum.RPM
         elif self.file_exists('/usr/bin/apt-get'):
             return PackageManagerEnum.APT_GET
+        elif self.file_exists('/sbin/apk'):
+            return PackageManagerEnum.APK
         else:
             return PackageManagerEnum.UNKNOWN
 
