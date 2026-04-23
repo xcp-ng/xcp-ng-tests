@@ -404,12 +404,12 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
         # check all disks in --disks=host:... exist
         for cli_disk in hosts_cli_disks:
             for disk in host_disks:
-                if disk['name'] == cli_disk:
+                if disk.name == cli_disk:
                     yield disk
                     break # names are unique, don't expect another one
             else:
                 raise Exception(f"no {cli_disk!r} disk on host {host.hostname_or_ip}, "
-                                f"has {','.join(disk['name'] for disk in host_disks)}")
+                                f"has {','.join(disk.name for disk in host_disks)}")
 
     ret = {host: list(_host_disks(host, cli_disks.get(host.hostname_or_ip)))
            for host in pools_hosts_by_name_or_ip.values()
@@ -422,7 +422,7 @@ def unused_512B_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
                       ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all 512-bytes-blocks disks for on all hosts of first pool."""
     ret = {host: [disk for disk in host_disks
-                  if disk["log-sec"] == "512" and host.disk_is_available(disk["name"])]
+                  if disk.log_sec == 512 and disk.available]
            for host, host_disks in disks.items()
            }
     logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
@@ -433,7 +433,7 @@ def unused_4k_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
                     ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all 4K-blocks disks for on all hosts of first pool."""
     ret = {host: [disk for disk in host_disks
-                  if disk["log-sec"] == "4096" and host.disk_is_available(disk["name"])]
+                  if disk.log_sec == 4096 and disk.available]
            for host, host_disks in disks.items()
            }
     logging.debug("available 4k disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})

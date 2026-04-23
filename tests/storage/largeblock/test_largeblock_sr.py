@@ -31,7 +31,7 @@ class TestLARGEBLOCKSRCreateDestroy:
                                    unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
                                    image_format: ImageFormat) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr_disk = unused_4k_disks[host][0]["name"]
+        sr_disk = unused_4k_disks[host][0].name
         sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
                             {'device': '/dev/' + sr_disk,
                              'preferred-image-formats': image_format}, verify=True)
