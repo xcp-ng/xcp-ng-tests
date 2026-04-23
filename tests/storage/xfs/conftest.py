@@ -44,7 +44,7 @@ def xfs_sr(
     _xfs_config: XfsConfig,
 ) -> Generator[SR, None, None]:
     """ A XFS SR on first host. """
-    sr_disk = unused_512B_disks[host_with_xfsprogs][0]["name"]
+    sr_disk = unused_512B_disks[host_with_xfsprogs][0].name
     sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
                                       {'device': '/dev/' + sr_disk,
                                        'preferred-image-formats': image_format})
