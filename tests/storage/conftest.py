@@ -94,3 +94,43 @@ def xfs_sr_on_hostA2(
     except Exception as e:
         _xfs_config_on_hostA2.uninstall_xfs = False
         raise pytest.fail("Could not destroy xfs SR, leaving packages in place for manual cleanup") from e
+
+@pytest.fixture(scope='package')
+def _xfs_config_on_hostB1() -> XfsConfig:
+    return XfsConfig()
+
+# NOTE: @pytest.mark.usefixtures does not parametrize this fixture.
+# To recreate host_with_xfsprogs for each image_format value, accept
+# image_format in the fixture arguments.
+# ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
+@pytest.fixture(scope='package')
+def hostB1_with_xfsprogs(hostB1: Host, image_format: ImageFormat, _xfs_config_on_hostB1: XfsConfig) \
+        -> Generator[Host, None, None]:
+    assert not hostB1.file_exists('/usr/sbin/mkfs.xfs'), \
+        "xfsprogs must not be installed on the host at the beginning of the tests"
+    hostB1.yum_save_state()
+    hostB1.yum_install(['xfsprogs'])
+    yield hostB1
+    # teardown
+    if _xfs_config_on_hostB1.uninstall_xfs:
+        hostB1.yum_restore_saved_state()
+
+@pytest.fixture(scope='package')
+def xfs_sr_on_hostB1(
+    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+    hostB1_with_xfsprogs: Host,
+    image_format: ImageFormat,
+    _xfs_config_on_hostB1: XfsConfig,
+) -> Generator[SR, None, None]:
+    """ A XFS SR on first host. """
+    sr_disk = unused_512B_disks[hostB1_with_xfsprogs][0]["name"]
+    sr = hostB1_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
+                                        {'device': '/dev/' + sr_disk,
+                                         'preferred-image-formats': image_format})
+    yield sr
+    # teardown
+    try:
+        sr.destroy()
+    except Exception as e:
+        _xfs_config_on_hostB1.uninstall_xfs = False
+        raise pytest.fail("Could not destroy xfs SR, leaving packages in place for manual cleanup") from e
