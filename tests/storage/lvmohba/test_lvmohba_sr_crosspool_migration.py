@@ -11,11 +11,11 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
-@pytest.mark.usefixtures("hostB1", "local_sr_on_hostB1")
+@pytest.mark.usefixtures("hostB1", "xfs_sr_on_hostB1")
 @pytest.mark.thick_provisioned
 class Test:
-    def test_cold_crosspool_migration(self, host, hostB1, vm_on_lvmohba_sr, local_sr_on_hostB1):
-        cold_migration_then_come_back(vm_on_lvmohba_sr, host, hostB1, local_sr_on_hostB1)
+    def test_cold_crosspool_migration(self, host, hostB1, vm_on_lvmohba_sr, xfs_sr_on_hostB1):
+        cold_migration_then_come_back(vm_on_lvmohba_sr, host, hostB1, xfs_sr_on_hostB1)
 
-    def test_live_crosspool_migration(self, host, hostB1, vm_on_lvmohba_sr, local_sr_on_hostB1):
-        live_storage_migration_then_come_back(vm_on_lvmohba_sr, host, hostB1, local_sr_on_hostB1)
+    def test_live_crosspool_migration(self, host, hostB1, vm_on_lvmohba_sr, xfs_sr_on_hostB1):
+        live_storage_migration_then_come_back(vm_on_lvmohba_sr, host, hostB1, xfs_sr_on_hostB1)
