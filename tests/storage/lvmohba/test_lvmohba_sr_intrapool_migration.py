@@ -11,7 +11,6 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
-@pytest.mark.usefixtures("hostA2", "xfs_sr_on_hostA2")
 @pytest.mark.thick_provisioned
 class Test:
     def test_live_intrapool_shared_migration(self, host, hostA2, vm_on_lvmohba_sr):
