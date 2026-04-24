@@ -43,8 +43,8 @@ def cephfs_sr(host: Host, cephfs_device_config: dict[str, str], pool_with_ceph: 
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_cephfs_sr(cephfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = cephfs_sr.create_vdi('CephFS-VDI-test')
+def vdi_on_cephfs_sr(cephfs_sr) -> Generator[VDI, None, None]:
+    vdi = cephfs_sr.create_vdi('CephFS-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
