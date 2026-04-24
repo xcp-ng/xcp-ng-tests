@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, GiB, MiB, TiB, strtobool, wait_for
+from lib.common import QCOW2_MAX, VHD_MAX, Defer, GiB, MiB, TiB, strtobool, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -13,7 +13,7 @@ from lib.vm import VM
 
 from typing import Literal
 
-MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': 16 * TiB - 2561 * MiB, 'vhd': 2040 * GiB}
+MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
 def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
     try:
