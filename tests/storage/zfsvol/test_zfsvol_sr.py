@@ -15,7 +15,7 @@ from tests.storage import (
     ImageFormat,
     XVACompression,
     coalesce_integrity,
-    randstream,
+    vdi_export_import,
     xva_export_import,
 )
 
@@ -89,53 +89,7 @@ class TestZfsvolVm:
                                defer: Defer) -> None:
         vm = storage_test_vm
         sr = zfsvol_sr
-        vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
-        defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
-        assert vdi_src is not None
-
-        vbd = vm.connect_vdi(vdi_src)
-        defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
-        dev = f'/dev/{vbd.param_get("device")}'
-
-        # the stream is 1/5 of the full one, truncated to a multiple of 32KiB, in order to
-        # be validable in a single command
-        stream_size = (config.volume_size // 5 // (32 * KiB)) * (32 * KiB)
-        stream_position = (config.volume_size // 2)
-
-        checksum1 = randstream(vm, f'generate --size {stream_size} {dev}')
-        # use a different seed to not write the same data (default seed is 0)
-        checksum2 = randstream(vm, f'generate --seed 1 --position {stream_position} --size {stream_size} {dev}')
-        randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
-        randstream(
-            vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}'
-        )
-        vm.disconnect_vdi(vdi_src)
-
-        image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
-        defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
-
-        vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})
-        vdi_src.destroy()
-        vdi_src = None
-
-        # check that the zero blocks are not part of the result
-        size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
-        if image_format == 'vhd':
-            logging.warning(f"FIXME: this is broken with vhd, skip for now (XCPNG-2631). File size is {size_mb}MB")
-        else:
-            assert stream_size // MiB * 2 < size_mb < stream_size // MiB * 2.1, f"unexpected image size: {size_mb}"
-        vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
-        defer(lambda: vdi_dest.destroy())
-
-        vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
-        vbd = vm.connect_vdi(vdi_dest)
-        defer(lambda: vm.disconnect_vdi(vdi_dest))
-        dev = f'/dev/{vbd.param_get("device")}'
-
-        randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
-        randstream(
-            vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}'
-        )
+        vdi_export_import(vm, sr, image_format, temp_large_dir, defer)
 
     # *** tests with reboots (longer tests).
 

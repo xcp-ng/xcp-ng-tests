@@ -274,7 +274,7 @@ def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, 
         growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
         assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
         vm.ssh('resize2fs /dev/xvda3')
-        stream_size = volume_size // 2
+        stream_size = min(volume_size // 2, 2 * GiB)
     else:
         stream_size = 500 * MiB
 
@@ -311,16 +311,8 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
     dev = f'/dev/{vbd.param_get("device")}'
 
-    # the stream is 1/5 of the full one, truncated to a multiple of 32KiB, in order to
-    # be validable in a single command
-    stream_size = (config.volume_size // 5 // (32 * KiB)) * (32 * KiB)
-    stream_position = (config.volume_size // 2)
-
-    checksum1 = randstream(vm, f'generate --size {stream_size} {dev}')
-    # use a different seed to not write the same data (default seed is 0)
-    checksum2 = randstream(vm, f'generate --seed 1 --position {stream_position} --size {stream_size} {dev}')
-    randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
-    randstream(vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}')
+    checksums = partially_populate_device(vm, dev, config.volume_size)
+    validate_partially_populated_device(vm, dev, config.volume_size, checksums)
     vm.disconnect_vdi(vdi_src)
 
     image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
@@ -332,7 +324,8 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
 
     # check that the zero blocks are not part of the result
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
-    assert stream_size // MiB * 2 < size_mb < stream_size // MiB * 2.1, f"unexpected image size: {size_mb}"
+    stream_size = partial_stream_size(config.volume_size)
+    assert stream_size // MiB * 3 < size_mb < stream_size // MiB * 3.1, f"unexpected image size: {size_mb}"
     vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
     defer(lambda: vdi_dest.destroy())
 
@@ -341,5 +334,4 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     defer(lambda: vm.disconnect_vdi(vdi_dest))
     dev = f'/dev/{vbd.param_get("device")}'
 
-    randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
-    randstream(vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}')
+    validate_partially_populated_device(vm, dev, config.volume_size, checksums)
