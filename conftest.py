@@ -108,13 +108,15 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--volume-size",
         action="store",
         default="1GiB",
-        help="Default volume size for tests"
+        help="Default volume size for tests."
+             " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
     )
     parser.addoption(
         "--write-volume-cap",
         action="store",
         default="2GiB",
-        help="Maximum amount of data written to a volume"
+        help="Maximum amount of data written to a volume."
+             " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
     )
 
 def pytest_configure(config: pytest.Config) -> None:
