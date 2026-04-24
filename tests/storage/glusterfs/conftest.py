@@ -122,7 +122,7 @@ def gluster_disk(
     pool = pool_with_unused_512B_disk
     mountpoint = '/mnt/sr_disk'
     for h in pool.hosts:
-        sr_disk = unused_512B_disks[h][0]["name"]
+        sr_disk = unused_512B_disks[h][0].name
         setup_formatted_and_mounted_disk(h, sr_disk, 'xfs', mountpoint)
 
     yield

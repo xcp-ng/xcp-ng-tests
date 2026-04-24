@@ -42,7 +42,7 @@ class TestEXTSRCreateDestroy:
                                    image_format: ImageFormat
                                    ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr_disk = unused_512B_disks[host][0]["name"]
+        sr_disk = unused_512B_disks[host][0].name
         sr = host.sr_create('ext', "EXT-local-SR-test",
                             {'device': '/dev/' + sr_disk,
                              'preferred-image-formats': image_format}, verify=True)

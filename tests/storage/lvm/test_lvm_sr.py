@@ -41,7 +41,7 @@ class TestLVMSRCreateDestroy:
                                    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
                                    image_format: ImageFormat
                                    ) -> None:
-        sr_disk = unused_512B_disks[host][0]["name"]
+        sr_disk = unused_512B_disks[host][0].name
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('lvm', "LVM-local-SR-test", {
             'device': '/dev/' + sr_disk,
