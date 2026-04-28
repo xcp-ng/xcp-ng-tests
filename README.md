@@ -601,6 +601,7 @@ Take a look at an example inventory file:
 
 ```toml
 # my_inventory.toml
+parent = "ip_or_hostname" # master host
 
 [all]
 enablerepos = ["xcp-ng-base"]
@@ -618,6 +619,6 @@ enablerepos = ["xcp-ng-updates"]
 > Config values under `servers` override values under `all`. For instance, the above inventory would produce
 > the following python dict:
 >
-> `{'ip_or_hostname-1': {'enablerepos': ['xcp-ng-base']}, 'ip_or_hostname-2': {'enablerepos': ['xcp-ng-updates']}}`
+> `{'parent': 'ip_or_hostname', 'hosts': {'ip_or_hostname-1': {'enablerepos': ['xcp-ng-base']}, 'ip_or_hostname-2': {'enablerepos': ['xcp-ng-updates']}}}`
 >
 > Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.

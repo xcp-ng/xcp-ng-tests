@@ -17,7 +17,7 @@ def _command_update(args: argparse.Namespace) -> None:
     if args.inventory:
         inventory = load_inventory(args.inventory)
     else:
-        inventory = into_inventory(args.hosts, args.repos)
+        inventory = into_inventory(args.hosts, args.repos, args.parent_host)
 
     update_pools(inventory)
 
@@ -52,6 +52,12 @@ def cli() -> None:
         action="append",
         dest="repos",
         help="repositories to enable when updating",
+    )
+    subparser_cmd_update.add_argument(
+        "-P",
+        "--parent-host",
+        type=HostAddress,
+        help="Address (hostname|ip) of the parent master host (works with '--nested')",
     )
     subparser_cmd_update.set_defaults(func=_command_update)
 
