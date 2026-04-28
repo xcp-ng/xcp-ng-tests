@@ -2,7 +2,7 @@ import pytest
 
 import logging
 
-from lib.common import wait_for
+from lib.common import Defer, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vm import VM
@@ -59,25 +59,21 @@ class TestBasicNoSSH:
         vm.resume()
         vm.wait_for_os_booted()
 
-    def test_snapshot(self, imported_vm: VM) -> None:
+    def test_snapshot(self, imported_vm: VM, defer: Defer) -> None:
         vm = imported_vm
         snapshot = vm.snapshot()
-        try:
-            snapshot.revert()
-            vm.start()
-            vm.wait_for_os_booted()
-        finally:
-            snapshot.destroy(verify=True)
+        defer(lambda: snapshot.destroy(verify=True))
+        snapshot.revert()
+        vm.start()
+        vm.wait_for_os_booted()
 
-    def test_checkpoint(self, imported_vm: VM) -> None:
+    def test_checkpoint(self, imported_vm: VM, defer: Defer) -> None:
         vm = imported_vm
         snapshot = vm.checkpoint()
-        try:
-            snapshot.revert()
-            vm.resume()
-            vm.wait_for_os_booted()
-        finally:
-            snapshot.destroy(verify=True)
+        defer(lambda: snapshot.destroy(verify=True))
+        snapshot.revert()
+        vm.resume()
+        vm.wait_for_os_booted()
 
     # Live migration tests
     # We want to test storage migration (memory+disks) and live migration without storage migration (memory only).

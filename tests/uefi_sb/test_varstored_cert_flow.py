@@ -2,7 +2,7 @@ import pytest
 
 import logging
 
-from lib.common import wait_for
+from lib.common import Defer, wait_for
 from lib.efi import EFIAuth
 from lib.host import Host
 from lib.snapshot import Snapshot
@@ -70,40 +70,31 @@ class TestVMCertMisc:
         # Revert the VM, which has the interesting effect of also shutting it down instantly
         revert_vm_state(vm, snapshot)
 
-    def test_snapshot_revert_restores_certs(self, uefi_vm: VM) -> None:
+    def test_snapshot_revert_restores_certs(self, uefi_vm: VM, defer: Defer) -> None:
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
         snapshot = vm.snapshot()
-        try:
-            # clear all certs
-            vm.set_uefi_setup_mode()
-            snapshot.revert()
-            logging.info("Check that the VM certs were restored")
-            for key in ['PK', 'KEK', 'db', 'dbx']:
-                check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
-        finally:
-            snapshot.destroy()
+        defer(lambda: snapshot.destroy())
+        # clear all certs
+        vm.set_uefi_setup_mode()
+        snapshot.revert()
+        logging.info("Check that the VM certs were restored")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
-    def test_vm_import_restores_certs(self, uefi_vm: VM, formatted_and_mounted_ext4_disk: str) -> None:
+    def test_vm_import_restores_certs(self, uefi_vm: VM, formatted_and_mounted_ext4_disk: str, defer: Defer) -> None:
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
         filepath = formatted_and_mounted_ext4_disk + '/test-export-with-uefi-certs.xva'
         vm.export(filepath, 'zstd')
-        vm2 = None
-        try:
-            vm2 = vm.host.import_vm(filepath)
-            logging.info("Check that the VM certs were imported with the VM")
-            for key in ['PK', 'KEK', 'db', 'dbx']:
-                check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())
-        finally:
-            try:
-                if vm2 is not None:
-                    logging.info(f"Destroy VM {vm2.uuid}")
-                    vm2.destroy(verify=True)
-            finally:
-                vm.host.ssh('rm -f {filepath}', check=False)
+        defer(lambda: vm.host.ssh('rm -f {filepath}', check=False))
+        vm2 = vm.host.import_vm(filepath)
+        defer(lambda: vm2.destroy())
+        logging.info("Check that the VM certs were imported with the VM")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
