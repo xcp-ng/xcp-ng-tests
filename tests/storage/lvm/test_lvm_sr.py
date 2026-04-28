@@ -149,8 +149,9 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression) -> None:
-        xva_export_import(vm_on_lvm_sr, compression)
+    @pytest.mark.parametrize("with_snapshot", [True, False])
+    def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression, with_snapshot: bool) -> None:
+        xva_export_import(vm_on_lvm_sr, compression, with_snapshot)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, lvm_sr: SR, image_format: ImageFormat) -> None:

@@ -201,7 +201,7 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation) -> None:
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(vm: VM, compression: XVACompression) -> None:
+def xva_export_import(vm: VM, compression: XVACompression, with_snapshot: bool) -> None:
     # The tests using this function are using specific fixtures to create the VM on the expected SR
     # In consequence, we can't use the storage_test_vm, so we have to start the VM explicitly and install randstream
     vm.start()
@@ -210,6 +210,17 @@ def xva_export_import(vm: VM, compression: XVACompression) -> None:
     # 500MiB, so we have some data to check and some empty spaces in the exported image
     vm.ssh("randstream generate -v --size 500MiB /root/data")
     vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+
+    snap1, snap2 = None, None
+    if with_snapshot:
+        snap1 = vm.snapshot()
+        # Write new data to a particular sector after taking a snapshot
+        vm.ssh("randstream generate --seed 1 -v --position 300MiB --size 100MiB /root/data")
+        vm.ssh("randstream validate -v --expected-checksum 67ee1057 /root/data")
+        snap2 = vm.snapshot()
+        vm.ssh("randstream generate --seed 2 -v --position 100MiB --size 100MiB /root/data")
+        vm.ssh("randstream validate -v --expected-checksum f6c6abc1 /root/data")
+
     vm.shutdown(verify=True)
     xva_path = f'/tmp/{vm.uuid}.xva'
     imported_vm = None
@@ -222,11 +233,16 @@ def xva_export_import(vm: VM, compression: XVACompression) -> None:
         imported_vm = vm.host.import_vm(xva_path, vm.vdis[0].sr.uuid)
         imported_vm.start()
         imported_vm.wait_for_vm_running_and_ssh_up()
-        imported_vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+        expected_checksum = 'f6c6abc1' if with_snapshot else '24e905d6'
+        imported_vm.ssh(f"randstream validate -v --expected-checksum {expected_checksum} /root/data")
     finally:
         if imported_vm is not None:
             imported_vm.destroy()
         vm.host.ssh(f'rm -f {xva_path}')
+        if snap1:
+            snap1.destroy()
+        if snap2:
+            snap2.destroy()
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat) -> None:
     vdi: VDI | None = sr.create_vdi(image_format=image_format)
