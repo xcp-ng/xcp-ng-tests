@@ -11,6 +11,7 @@ import uuid
 from packaging import version
 
 import lib.commands as commands
+from lib.bond import Bond
 from lib.common import (
     DiskDevName,
     _param_add,
@@ -26,8 +27,12 @@ from lib.common import (
     wait_for,
 )
 from lib.netutil import wrap_ip
+from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
+from lib.tunnel import Tunnel
+from lib.vdi import VDI
+from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
@@ -838,3 +843,76 @@ class Host:
                 continue
             ret.append(line.strip())
         return ret
+
+    def pifs(self, device: str | None = None) -> list[PIF]:
+        args: dict[str, str | bool | dict[str, str]] = {
+            "host-uuid": self.uuid,
+        }
+
+        if device is not None:
+            args["device"] = device
+
+        return [PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
+
+    def tunnels(self) -> list[Tunnel]:
+        return [Tunnel(self, uuid) for uuid in safe_split(self.xe("tunnel-list", {}, minimal=True))]
+
+    def create_bond(self, network: Network, pifs: list[PIF], mode: str | None = None) -> Bond:
+        args: dict[str, str | bool | dict[str, str]] = {
+            'network-uuid': network.uuid,
+            'pif-uuids': ','.join([pif.uuid for pif in pifs]),
+        }
+
+        if mode is not None:
+            args['mode'] = mode
+
+        uuid = self.xe("bond-create", args, minimal=True)
+        logging.info(f"New Bond: {uuid}")
+
+        return Bond(self, uuid)
+
+    def create_network(self, label: str, description: str | None = None) -> Network:
+        args: dict[str, str | bool | dict[str, str]] = {
+            'name-label': label,
+        }
+
+        if description is not None:
+            args['name-description'] = description
+
+        logging.info(f"Creating network '{label}'")
+        uuid = self.xe("network-create", args, minimal=True)
+        logging.info(f"New Network: {uuid}")
+
+        return Network(self, uuid)
+
+    def create_vlan(self, network: Network, pif: PIF, vlan: int) -> VLAN:
+        args: dict[str, str | bool | dict[str, str]] = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'vlan': str(vlan),
+        }
+
+        untagged_pif_uuid = self.xe("vlan-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": untagged_pif_uuid,
+            "param-name": "vlan-master-of",
+        })
+        logging.info(f"New VLAN: {uuid} (untagged-pif: {untagged_pif_uuid})")
+
+        return VLAN(self, uuid)
+
+    def create_tunnel(self, network: Network, pif: PIF, protocol: str) -> Tunnel:
+        args: dict[str, str | bool | dict[str, str]] = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'protocol': protocol,
+        }
+
+        access_pif_uuid = self.xe("tunnel-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": access_pif_uuid,
+            "param-name": "tunnel-access-PIF-of",
+        })
+        logging.info(f"New Tunnel: {uuid} (access-pif: {access_pif_uuid})")
+
+        return Tunnel(self, uuid)
