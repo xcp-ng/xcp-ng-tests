@@ -26,7 +26,7 @@ class Pool:
         if not master.is_master():
             raise NotAMasterHostError(f"Host {master_hostname_or_ip} is not a master host. Pool not created.")
         self.master = master
-        self.hosts = [master]
+        self.hosts: list[Host] = [master]
 
         # wait for XAPI startup to be done, or we can get "Connection
         # refused (calling connect )" when calling self.hosts_uuids()
