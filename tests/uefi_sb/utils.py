@@ -190,11 +190,8 @@ def check_disk_cert_md5sum(host: Host, key: str, reference_file: str, do_assert:
 
 
 def check_vm_cert_md5sum(vm: VM, key: str, reference_file: str) -> None:
-    res = vm.host.ssh(
+    res = vm.host.ssh_with_result(
         f'varstore-get {vm.uuid} {get_secure_boot_guid(key)} {key}',
-        check=False,
-        simple_output=False,
-        decode=False,
     )
     assert res.returncode == 0, f"Cert {key} must be present"
     reference_md5 = get_md5sum_from_auth(reference_file)

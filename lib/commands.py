@@ -193,7 +193,8 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_out
     assert result_or_exc is not None, "not in background mode"
     return result_or_exc
 
-def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings: bool = True,
+def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *,
+                    suppress_fingerprint_warnings: bool = True,
                     decode: bool = True, options: List[str] = [],
                     multiplexing: bool = True) -> SSHResult:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,

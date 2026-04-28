@@ -770,8 +770,8 @@ class VM(BaseVM):
         self.host.ssh(f'varstore-sb-state {self.uuid} user')
 
     def is_uefi_var_present(self, varname: str) -> bool:
-        res = self.host.ssh(f'varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname}',
-                            check=False, simple_output=False, decode=False)
+        res = self.host.ssh_with_result(f'varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname}',
+                            )
         return res.returncode == 0
 
     @overload
