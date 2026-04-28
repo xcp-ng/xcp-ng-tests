@@ -25,7 +25,7 @@ def test_access_links(host: Host, command_id: str, url_id: str) -> None:
                "wget": ["wget", "-qO-"]}[command_id]
     url = {
         "xoa": "https://xoa.io/deploy",
-        "xcpng": "https://updates.xcp-ng.org/trace",
+        "xcpng": "https://updates.xcp-ng.org/README.txt",
         "vates": "https://repo.vates.tech/README.txt"
     }[url_id]
     COMMAND = command + [url]
