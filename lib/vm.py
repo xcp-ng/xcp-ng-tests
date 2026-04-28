@@ -105,32 +105,20 @@ class VM(BaseVM):
             return True
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True,
             decode: Literal[True] = True) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True,
             decode: Literal[False]) -> bytes:
         ...
 
-    @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            decode: bool = True) -> commands.SSHResult:
-        ...
-
-    # This overloads is redundant but necessary for mypy
-    @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            decode: Literal[True] = True) -> commands.SSHResult | str:
-        ...
-
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            decode: bool = True) -> str | bytes | commands.SSHResult:
+    def ssh(self, cmd: str, *, check: bool = True,
+            decode: bool = True) -> str | bytes:
         # raises by default for any nonzero return code
         assert self.ip is not None
-        return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output,
-                            decode=decode)
+        return commands.ssh(self.ip, cmd, check=check, decode=decode)
 
     def ssh_with_result(self, cmd: str) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
@@ -445,15 +433,7 @@ class VM(BaseVM):
     def pid_exists(self, pid: str) -> bool:
         return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
 
-    @overload
-    def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
-        ...
-
-    @overload
-    def execute_script(self, script_contents: str, *, simple_output: Literal[False]) -> commands.SSHResult:
-        ...
-
-    def execute_script(self, script_contents: str, simple_output: bool = True) -> str | commands.SSHResult:
+    def execute_script(self, script_contents: str) -> str:
         with tempfile.NamedTemporaryFile('w') as f:
             f.write(script_contents)
             f.flush()
@@ -462,7 +442,7 @@ class VM(BaseVM):
                 logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
                 # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
                 # It is a documented requirement that bash is present on all test VMs.
-                res = self.ssh(f'bash {f.name}', simple_output=simple_output)
+                res = self.ssh(f'bash {f.name}')
                 return res
             finally:
                 self.ssh(f'rm -f {f.name}')
@@ -774,23 +754,10 @@ class VM(BaseVM):
                             )
         return res.returncode == 0
 
-    @overload
-    def execute_powershell_script(self, script_contents: str,
-                                  simple_output: Literal[True] = True,
-                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str:
-        ...
-
-    @overload
-    def execute_powershell_script(self, script_contents: str,
-                                  simple_output: Literal[False],
-                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> commands.SSHResult:
-        ...
-
     def execute_powershell_script(
             self,
             script_contents: str,
-            simple_output: bool = True,
-            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str | commands.SSHResult:
+            prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str:
         # ProgressPreference is needed to suppress any clixml progress output,
         # as it's not filtered away from stdout by default, and we're grabbing stdout.
         assert self.is_windows
@@ -799,7 +766,6 @@ class VM(BaseVM):
         cmd = commands.encode_powershell_command(script_contents)
         return self.ssh(
             f"powershell.exe -nologo -noprofile -noninteractive -encodedcommand {cmd}",
-            simple_output=simple_output,
         )
 
     def run_powershell_command(self, program: str, args: str) -> int:

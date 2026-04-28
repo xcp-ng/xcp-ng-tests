@@ -165,7 +165,7 @@ Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
 def is_vm_offboarded_xenvif(vm: VM) -> bool:
     try:
         val = vm.execute_powershell_script(
-            r'$null -eq (Get-ScheduledTask "Copy-XenVifSettings" -ErrorAction SilentlyContinue)', simple_output=True
+            r'$null -eq (Get-ScheduledTask "Copy-XenVifSettings" -ErrorAction SilentlyContinue)'
         )
         # Sometimes, we may get an error like "invalid truth value 'mux_client_request_session: read from master failed:
         # broken pipe'". If so, just retry.

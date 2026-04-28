@@ -159,38 +159,29 @@ def _ssh(
 # as pytest prints the whole function definition that raised the SSHCommandFailed exception
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
-        simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True,
         decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True) -> str:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
-        simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True,
         decode: Literal[False], options: List[str] = [], multiplexing: bool = True) -> bytes:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
-        simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True,
-        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> SSHResult:
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> str | bytes:
     ...
-@overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
-        simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True,
         decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> str | bytes | SSHResult:
-    ...
-def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
-        suppress_fingerprint_warnings: bool = True,
-        decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> str | bytes | SSHResult:
-    result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
+        -> str | bytes:
+    result_or_exc = _ssh(hostname_or_ip, cmd, check, False, suppress_fingerprint_warnings,
                          False, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
     assert result_or_exc is not None, "not in background mode"
+    assert not isinstance(result_or_exc, SSHResult), "not in simple_output mode"
     return result_or_exc
 
 def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *,

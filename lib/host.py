@@ -90,34 +90,22 @@ class Host:
         return self.hostname_or_ip
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True,
             suppress_fingerprint_warnings: bool = True,
             decode: Literal[True] = True, multiplexing: bool = True) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True,
             suppress_fingerprint_warnings: bool = True,
             decode: Literal[False], multiplexing: bool = True) -> bytes:
         ...
 
-    @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            suppress_fingerprint_warnings: bool = True,
-            decode: bool = True, multiplexing: bool = True) -> commands.SSHResult:
-        ...
 
-    # This overloads is redundant but necessary for mypy
-    @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True,
-            decode: Literal[True] = True, multiplexing: bool = True) -> commands.SSHResult | str:
-        ...
-
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
+    def ssh(self, cmd: str, *, check: bool = True,
             suppress_fingerprint_warnings: bool = True, decode: bool = True,
-            multiplexing: bool = True) -> str | bytes | commands.SSHResult:
-        return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
+            multiplexing: bool = True) -> str | bytes:
+        return commands.ssh(self.hostname_or_ip, cmd, check=check,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
                             decode=decode, multiplexing=multiplexing)
 
@@ -138,19 +126,9 @@ class Host:
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
-    @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
-           simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
-        ...
-
-    @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
-           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult:
-        ...
-
     def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
-           simple_output: bool = True, minimal: bool = False, force: bool = False) \
-            -> str | commands.SSHResult:
+           minimal: bool = False, force: bool = False) \
+            -> str:
         maybe_param_minimal = '--minimal' if minimal else ''
         maybe_param_force = '--force' if force else ''
 
@@ -169,7 +147,6 @@ class Host:
         result = self.ssh(
             command,
             check=check,
-            simple_output=simple_output
         )
         assert isinstance(result, (str, commands.SSHResult))
 
@@ -229,18 +206,7 @@ class Host:
     def remove_xcpng_repo(self, name: str) -> None:
         self.ssh(f'rm -f /etc/yum.repos.d/xcp-ng-{name}.repo')
 
-    @overload
-    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = True) -> str:
-        ...
-
-    @overload
-    def execute_script(
-        self, script_contents: str, *, shebang: str = ..., simple_output: Literal[False]
-    ) -> commands.SSHResult:
-        ...
-
-    def execute_script(self, script_contents: str, shebang: str = 'sh',
-                       simple_output: bool = True) -> str | commands.SSHResult:
+    def execute_script(self, script_contents: str, shebang: str = 'sh') -> str:
         with tempfile.NamedTemporaryFile('w') as script:
             os.chmod(script.name, 0o775)
             script.write('#!/usr/bin/env ' + shebang + '\n')
@@ -256,7 +222,7 @@ class Host:
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh(remote_path, simple_output=simple_output)
+                return self.ssh(remote_path)
             finally:
                 self.ssh(f'rm -f {remote_path}')
 
