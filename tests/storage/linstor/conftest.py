@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass
 
 import lib.commands as commands
+from data import LINSTOR_REDUNDANCY
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
@@ -142,8 +143,13 @@ def pool_with_linstor(
         executor.map(remove_linstor, pool.hosts)
 
 @pytest.fixture(scope='package')
+def linstor_redundancy(pool_with_linstor: Pool) -> int:
+    return min(len(pool_with_linstor.hosts), LINSTOR_REDUNDANCY)
+
+@pytest.fixture(scope='package')
 def linstor_sr(
     pool_with_linstor: Pool,
+    linstor_redundancy: int,
     provisioning_type: str,
     storage_pool_name: str,
     lvm_disks: None,
@@ -151,7 +157,7 @@ def linstor_sr(
 ) -> Generator[SR, None, None]:
     sr = pool_with_linstor.master.sr_create('linstor', 'LINSTOR-SR-test', {
         'group-name': storage_pool_name,
-        'redundancy': str(min(len(pool_with_linstor.hosts), 3)),
+        'redundancy': str(linstor_redundancy),
         'provisioning': provisioning_type
     }, shared=True)
     yield sr
