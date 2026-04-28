@@ -91,45 +91,44 @@ class Host:
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            suppress_fingerprint_warnings: bool = True,
             decode: Literal[True] = True, multiplexing: bool = True) -> str:
         ...
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            suppress_fingerprint_warnings: bool = True,
             decode: Literal[False], multiplexing: bool = True) -> bytes:
         ...
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            suppress_fingerprint_warnings: bool = True,
             decode: bool = True, multiplexing: bool = True) -> commands.SSHResult:
         ...
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[True],
-            decode: bool = True, multiplexing: bool = True) -> None:
-        ...
-
-    @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
-            multiplexing: bool = True) \
-            -> str | bytes | commands.SSHResult | None:
+            suppress_fingerprint_warnings: bool = True,
+            decode: bool = True, multiplexing: bool = True) -> commands.SSHResult | str | bytes:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
-            multiplexing: bool = True) -> str | bytes | commands.SSHResult | None:
+            suppress_fingerprint_warnings: bool = True, decode: bool = True,
+            multiplexing: bool = True) -> str | bytes | commands.SSHResult:
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
-                            background=background, decode=decode, multiplexing=multiplexing)
+                            decode=decode, multiplexing=multiplexing)
 
     def ssh_with_result(self, cmd: str) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return commands.ssh_with_result(self.hostname_or_ip, cmd)
+
+    def ssh_in_background(self, cmd: str, *, suppress_fingerprint_warnings: bool = True,
+                          multiplexing: bool = True) -> None:
+        return commands.ssh_in_background(self.hostname_or_ip, cmd,
+                                          suppress_fingerprint_warnings=suppress_fingerprint_warnings,
+                                          multiplexing=multiplexing)
 
     def scp(self, src: str, dest: str, check: bool = True, suppress_fingerprint_warnings: bool = True,
             local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:

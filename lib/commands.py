@@ -160,55 +160,54 @@ def _ssh(
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
-        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        suppress_fingerprint_warnings: bool = True,
         decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True) -> str:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
-        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        suppress_fingerprint_warnings: bool = True,
         decode: Literal[False], options: List[str] = [], multiplexing: bool = True) -> bytes:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
-        suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+        suppress_fingerprint_warnings: bool = True,
         decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> SSHResult:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
-        simple_output: Literal[False],
-        suppress_fingerprint_warnings: bool = True, background: Literal[True],
-        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> None:
-    ...
-@overload
-def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: bool = True,
-        suppress_fingerprint_warnings: bool = True, background: bool = False,
+        suppress_fingerprint_warnings: bool = True,
         decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> str | bytes | SSHResult | None:
+        -> str | bytes | SSHResult:
     ...
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True,
-        background: bool = False, decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
-        -> str | bytes | SSHResult | None:
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
+        -> str | bytes | SSHResult:
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                         background, decode, options, multiplexing)
+                         False, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
-    else:
-        return result_or_exc
+    assert result_or_exc is not None, "not in background mode"
+    return result_or_exc
 
 def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings: bool = True,
-                    background: bool = False, decode: bool = True, options: List[str] = [],
+                    decode: bool = True, options: List[str] = [],
                     multiplexing: bool = True) -> SSHResult:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
-                         background, decode, options, multiplexing)
+                         False, decode, options, multiplexing)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
     elif isinstance(result_or_exc, SSHResult):
         return result_or_exc
     assert False, "unexpected type"
+
+def ssh_in_background(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings: bool = True,
+                      options: List[str] = [], multiplexing: bool = True) -> None:
+    result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings, True, False, options, multiplexing)
+    assert result_or_exc is None, "unexpected type"
 
 def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         suppress_fingerprint_warnings: bool = True, local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:

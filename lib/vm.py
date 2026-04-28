@@ -106,40 +106,43 @@ class VM(BaseVM):
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str:
+            decode: Literal[True] = True) -> str:
         ...
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[False]) -> bytes:
+            decode: Literal[False]) -> bytes:
         ...
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: bool = True) -> commands.SSHResult:
+            decode: bool = True) -> commands.SSHResult:
         ...
 
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[True], decode: bool = True) -> None:
+            decode: bool = True) -> str | bytes | commands.SSHResult:
         ...
 
-    @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> str | bytes | commands.SSHResult | None:
-        ...
-
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
-            decode: bool = True) -> str | bytes | commands.SSHResult | None:
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
+            decode: bool = True) -> str | bytes | commands.SSHResult:
         # raises by default for any nonzero return code
         assert self.ip is not None
-        return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
+        return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output,
                             decode=decode)
 
     def ssh_with_result(self, cmd: str) -> commands.SSHResult:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         assert self.ip is not None
         return commands.ssh_with_result(self.ip, cmd)
+
+
+    def ssh_in_background(self, cmd: str, *, suppress_fingerprint_warnings: bool = True,
+                          multiplexing: bool = True) -> None:
+        assert self.ip is not None
+        return commands.ssh_in_background(self.ip, cmd,
+                                          suppress_fingerprint_warnings=suppress_fingerprint_warnings,
+                                          multiplexing=multiplexing)
 
     def scp(self, src: str, dest: str, check: bool = True, suppress_fingerprint_warnings: bool = True,
             local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
@@ -429,7 +432,7 @@ class VM(BaseVM):
             remote_cmd = f"bash {script}"
             if not self.is_windows:
                 remote_cmd = f'nohup bash -c "{remote_cmd} &>/dev/null &"'
-            self.ssh(remote_cmd, background=True)
+            self.ssh_in_background(remote_cmd)
 
             wait_for(lambda: self.ssh_with_result(f'test -f {pidfile}').returncode == 0,
                      "wait for pid file %s to exist" % pidfile)

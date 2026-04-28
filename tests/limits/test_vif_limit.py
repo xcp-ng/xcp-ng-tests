@@ -76,8 +76,7 @@ class TestVIFLimit:
                 host_script.write('\n'.join(iperf_configs))
                 host_script.flush()
                 host.scp(host_script.name, host_script.name)
-                host.ssh(f'nohup bash -c "bash {host_script.name}" < /dev/null &>/dev/null &',
-                         background=True)
+                host.ssh_in_background(f'nohup bash -c "bash {host_script.name}" < /dev/null &>/dev/null &')
 
             logging.info('Start multiple iperfs on separate interfaces on the VM')
             with tempfile.NamedTemporaryFile('w') as vm_script:
