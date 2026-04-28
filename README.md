@@ -390,6 +390,8 @@ Install the required language servers:
 * [BasedPyright](https://docs.basedpyright.com/latest/) with `uv tool install basedpyright`
 * [pylsp](https://github.com/python-lsp/python-lsp-server) with `uv tool install python-lsp-server[flake8] --with pylsp-rope`.
   It's used to get immediate flake8 feedback in the text editor.
+* [pytest-language-server](https://github.com/bellini666/pytest-language-server) with
+  `uv tool install pytest-language-server`. It allows to navigate in pytest fixtures.
 
 [ruff](https://docs.astral.sh/ruff/), which is also used as a language server, is already installed as a dev dependency.
 
@@ -403,6 +405,7 @@ name = "python"
 language-servers = [
   "basedpyright",
   "pylsp",
+  "pytest-language-server",
   "ruff",
 ]
 auto-format = false
