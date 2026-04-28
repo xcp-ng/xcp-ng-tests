@@ -31,7 +31,7 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, TypedDict, cast, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -107,10 +107,11 @@ class Host:
             decode: bool = True, multiplexing: bool = True) -> commands.SSHResult:
         ...
 
+    # This overloads is redundant but necessary for mypy
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True,
-            decode: bool = True, multiplexing: bool = True) -> commands.SSHResult | str | bytes:
+            decode: Literal[True] = True, multiplexing: bool = True) -> commands.SSHResult | str:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
@@ -255,7 +256,7 @@ class Host:
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return cast(str | commands.SSHResult, self.ssh(remote_path, simple_output=simple_output))
+                return self.ssh(remote_path, simple_output=simple_output)
             finally:
                 self.ssh(f'rm -f {remote_path}')
 

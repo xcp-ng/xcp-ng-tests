@@ -27,7 +27,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, cast, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -119,9 +119,10 @@ class VM(BaseVM):
             decode: bool = True) -> commands.SSHResult:
         ...
 
+    # This overloads is redundant but necessary for mypy
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            decode: bool = True) -> str | bytes | commands.SSHResult:
+            decode: Literal[True] = True) -> commands.SSHResult | str:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
@@ -461,7 +462,7 @@ class VM(BaseVM):
                 logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
                 # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
                 # It is a documented requirement that bash is present on all test VMs.
-                res = cast(str | commands.SSHResult, self.ssh(f'bash {f.name}', simple_output=simple_output))
+                res = self.ssh(f'bash {f.name}', simple_output=simple_output)
                 return res
             finally:
                 self.ssh(f'rm -f {f.name}')
@@ -796,10 +797,10 @@ class VM(BaseVM):
         if prepend is not None:
             script_contents = prepend + script_contents
         cmd = commands.encode_powershell_command(script_contents)
-        return cast(str | commands.SSHResult, self.ssh(
+        return self.ssh(
             f"powershell.exe -nologo -noprofile -noninteractive -encodedcommand {cmd}",
             simple_output=simple_output,
-        ))
+        )
 
     def run_powershell_command(self, program: str, args: str) -> int:
         """
