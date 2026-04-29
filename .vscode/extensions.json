@@ -1,0 +1,10 @@
+{
+	"recommendations": [
+	  "detachhead.basedpyright",
+	  "ms-python.flake8",
+	  "charliermarsh.ruff",
+	  "bellini666.pytest-language-server"
+	],
+	"unwantedRecommendations": [
+	]
+}
