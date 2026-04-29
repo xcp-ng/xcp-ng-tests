@@ -605,11 +605,11 @@ Take a look at an example inventory file:
 [all]
 repositories = ["xcp-ng-base"]
 
-[servers]
+[hosts]
 
-[servers."ip_or_hostname-1"]
+[hosts."ip_or_hostname-1"]
 
-[servers."ip_or_hostname-2"]
+[hosts."ip_or_hostname-2"]
 
 repositories = ["xcp-ng-updates"]
 ```
