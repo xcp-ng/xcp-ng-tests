@@ -83,7 +83,7 @@ def xfs_sr_on_hostA2(
     _xfs_config_on_hostA2: XfsConfig,
 ) -> Generator[SR, None, None]:
     """ A XFS SR on first host. """
-    sr_disk = unused_512B_disks[hostA2_with_xfsprogs][0]["name"]
+    sr_disk = unused_512B_disks[hostA2_with_xfsprogs][0].name
     sr = hostA2_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
                                         {'device': '/dev/' + sr_disk,
                                          'preferred-image-formats': image_format})
@@ -123,7 +123,7 @@ def xfs_sr_on_hostB1(
     _xfs_config_on_hostB1: XfsConfig,
 ) -> Generator[SR, None, None]:
     """ A XFS SR on first host. """
-    sr_disk = unused_512B_disks[hostB1_with_xfsprogs][0]["name"]
+    sr_disk = unused_512B_disks[hostB1_with_xfsprogs][0].name
     sr = hostB1_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
                                         {'device': '/dev/' + sr_disk,
                                          'preferred-image-formats': image_format})

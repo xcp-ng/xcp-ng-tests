@@ -55,7 +55,7 @@ def lvm_disks(
 
     @functools.cache
     def host_devices(host: Host) -> list[str]:
-        return [os.path.join("/dev", disk["name"]) for disk in unused_512B_disks[host][0:1]]
+        return [disk.path for disk in unused_512B_disks[host][0:1]]
 
     for host in hosts:
         devices = host_devices(host)

@@ -42,7 +42,7 @@ class TestXFSSRCreateDestroy:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
             "xfsprogs must not be installed on the host at the beginning of the tests"
-        sr_disk = unused_512B_disks[host][0]["name"]
+        sr_disk = unused_512B_disks[host][0].name
         sr: SR | None = None
         try:
             sr = host.sr_create('xfs', "XFS-local-SR-test", {
@@ -61,7 +61,7 @@ class TestXFSSRCreateDestroy:
                                    ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         host = host_with_xfsprogs
-        sr_disk = unused_512B_disks[host][0]["name"]
+        sr_disk = unused_512B_disks[host][0].name
         sr = host.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs fixture used in
         # the next tests, because errors in fixtures break teardown

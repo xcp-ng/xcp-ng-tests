@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import dataclasses
 import itertools
 import logging
 import os
@@ -404,16 +405,52 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
         # check all disks in --disks=host:... exist
         for cli_disk in hosts_cli_disks:
             for disk in host_disks:
-                if disk['name'] == cli_disk:
+                if disk.name == cli_disk:
                     yield disk
                     break # names are unique, don't expect another one
             else:
                 raise Exception(f"no {cli_disk!r} disk on host {host.hostname_or_ip}, "
-                                f"has {','.join(disk['name'] for disk in host_disks)}")
+                                f"has {','.join(disk.name for disk in host_disks)}")
 
     ret = {host: list(_host_disks(host, cli_disks.get(host.hostname_or_ip)))
            for host in pools_hosts_by_name_or_ip.values()
            }
+    # Cross-host deduplication: a LUN in use on any host (same WWN) is unavailable on all hosts.
+    # This matters for shared FC/iSCSI LUNs visible on multiple hosts simultaneously.
+    used_wwns = {
+        disk.wwn
+        for host_disks in ret.values()
+        for disk in host_disks
+        if disk.wwn and not disk.available
+    }
+    if used_wwns:
+        logging.debug("cross-host used WWNs: %s", used_wwns)
+        ret = {
+            host: [
+                dataclasses.replace(disk, available=False) if (disk.wwn and disk.wwn in used_wwns) else disk
+                for disk in host_disks
+            ]
+            for host, host_disks in ret.items()
+        }
+    # LUNs reserved for lvmohba/lvmoiscsi: sort them to the end so they are
+    # only picked if no other disk is available.
+    reserved_wwns: set[str] = set()
+    try:
+        import data
+        for key in ('LVMOHBA_DEVICE_CONFIG', 'LVMOISCSI_DEVICE_CONFIG'):
+            cfg = getattr(data, key, None)
+            if isinstance(cfg, dict):
+                scsiid = cfg.get('SCSIid', '').lower().lstrip('0x')
+                if scsiid:
+                    reserved_wwns.add(scsiid)
+    except ImportError:
+        pass
+    if reserved_wwns:
+        logging.debug("reserved WWNs (lvmohba/lvmoiscsi): %s", reserved_wwns)
+        ret = {
+            host: sorted(host_disks, key=lambda d: d.wwn in reserved_wwns)
+            for host, host_disks in ret.items()
+        }
     logging.debug("disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
     return ret
 
@@ -422,7 +459,7 @@ def unused_512B_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
                       ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all 512-bytes-blocks disks for on all hosts of first pool."""
     ret = {host: [disk for disk in host_disks
-                  if disk["log-sec"] == "512" and host.disk_is_available(disk["name"])]
+                  if disk.log_sec == 512 and disk.available]
            for host, host_disks in disks.items()
            }
     logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
@@ -433,7 +470,7 @@ def unused_4k_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
                     ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all 4K-blocks disks for on all hosts of first pool."""
     ret = {host: [disk for disk in host_disks
-                  if disk["log-sec"] == "4096" and host.disk_is_available(disk["name"])]
+                  if disk.log_sec == 4096 and disk.available]
            for host, host_disks in disks.items()
            }
     logging.debug("available 4k disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
