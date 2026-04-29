@@ -94,65 +94,134 @@ def poweroff(ip: str) -> None:
 
 def monitor_install(*, ip: str) -> None:
     # wait for "yum install" phase to finish
-    wait_for(lambda: ssh_with_result(ip, "grep 'DISPATCH: NEW PHASE: Completing installation' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for rpm installation to succeed",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'DISPATCH: NEW PHASE: Completing installation' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for rpm installation to succeed",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
     # wait for install to finish
-    wait_for(lambda: ssh_with_result(ip, "grep 'The installation completed successfully' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for system installation to succeed",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'The installation completed successfully' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for system installation to succeed",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
-    wait_for(lambda: ssh_with_result(ip, "ps a|grep '[0-9]. python /opt/xensource/installer/init'",
-
-                         ).returncode == 1,
-             "Wait for installer to terminate")
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "ps a|grep '[0-9]. python /opt/xensource/installer/init'",
+            ).returncode
+            == 1
+        ),
+        "Wait for installer to terminate",
+    )
 
 def monitor_upgrade(*, ip: str) -> None:
     # wait for "yum install" phase to start
-    wait_for(lambda: ssh_with_result(ip, "grep 'DISPATCH: NEW PHASE: Reading package information' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for upgrade preparations to finish",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'DISPATCH: NEW PHASE: Reading package information' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for upgrade preparations to finish",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
     # wait for "yum install" phase to finish
-    wait_for(lambda: ssh_with_result(ip, "grep 'DISPATCH: NEW PHASE: Completing installation' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for rpm installation to succeed",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'DISPATCH: NEW PHASE: Completing installation' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for rpm installation to succeed",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
     # wait for install to finish
-    wait_for(lambda: ssh_with_result(ip, "grep 'The installation completed successfully' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for system installation to succeed",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'The installation completed successfully' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for system installation to succeed",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
-    wait_for(lambda: ssh_with_result(ip, "ps a|grep '[0-9]. python /opt/xensource/installer/init'",
-                         ).returncode == 1,
-             "Wait for installer to terminate")
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "ps a|grep '[0-9]. python /opt/xensource/installer/init'",
+            ).returncode
+            == 1
+        ),
+        "Wait for installer to terminate",
+    )
 
 def monitor_restore(*, ip: str) -> None:
     # wait for "yum install" phase to start
-    wait_for(lambda: ssh_with_result(ip, "grep 'Restoring backup' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for data restoration to start",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'Restoring backup' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for data restoration to start",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
     # wait for "yum install" phase to finish
-    wait_for(lambda: ssh_with_result(ip, "grep 'Data restoration complete.  About to re-install bootloader.' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for data restoration to complete",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'Data restoration complete.  About to re-install bootloader.' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for data restoration to complete",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
     # The installer will not terminate in restore mode, it
     # requires human interaction and does not even log it, so
     # wait for last known action log (tested with 8.3b2)
-    wait_for(lambda: ssh_with_result(ip, "grep 'ran .*swaplabel.*rc 0' /tmp/install-log",
-                         ).returncode == 0,
-             "Wait for installer to hopefully finish",
-             timeout_secs=40 * 60) # FIXME too big
+    wait_for(
+        lambda: (
+            ssh_with_result(
+                ip,
+                "grep 'ran .*swaplabel.*rc 0' /tmp/install-log",
+            ).returncode
+            == 0
+        ),
+        "Wait for installer to hopefully finish",
+        timeout_secs=40 * 60,
+    ) # FIXME too big
 
     # "wait a bit to be extra sure".  Yuck.
     time.sleep(30)

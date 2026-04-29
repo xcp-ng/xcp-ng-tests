@@ -125,7 +125,6 @@ class VM(BaseVM):
         assert self.ip is not None
         return commands.ssh_with_result(self.ip, cmd)
 
-
     def ssh_in_background(self, cmd: str, *, suppress_fingerprint_warnings: bool = True,
                           multiplexing: bool = True) -> None:
         assert self.ip is not None
@@ -750,8 +749,9 @@ class VM(BaseVM):
         self.host.ssh(f'varstore-sb-state {self.uuid} user')
 
     def is_uefi_var_present(self, varname: str) -> bool:
-        res = self.host.ssh_with_result(f'varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname}',
-                            )
+        res = self.host.ssh_with_result(
+            f'varstore-get {self.uuid} {efi.get_secure_boot_guid(varname).as_str()} {varname}',
+        )
         return res.returncode == 0
 
     def execute_powershell_script(

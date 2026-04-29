@@ -198,7 +198,9 @@ def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *,
 
 def ssh_in_background(hostname_or_ip: HostAddress, cmd: str, suppress_fingerprint_warnings: bool = True,
                       options: List[str] = [], multiplexing: bool = True) -> None:
-    result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings, True, False, options, multiplexing)
+    result_or_exc = _ssh(
+        hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings, True, False, options, multiplexing
+    )
     assert result_or_exc is None, "unexpected type"
 
 def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,

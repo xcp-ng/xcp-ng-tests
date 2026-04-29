@@ -255,9 +255,15 @@ class TestNested:
             stamp = ''
             try:
                 for stamp in sorted(STAMPS):
-                    wait_for(lambda: pool.master.ssh_with_result(f'test -e {STAMPS_DIR}/{stamp}',
-                                                     ).returncode == 0,
-                             f"Wait for {stamp} stamp")
+                    wait_for(
+                        lambda: (
+                            pool.master.ssh_with_result(
+                                f'test -e {STAMPS_DIR}/{stamp}',
+                            ).returncode
+                            == 0
+                        ),
+                        f"Wait for {stamp} stamp",
+                    )
             except TimeoutError:
                 logging.warning("investigating lack of %s service stamp", stamp)
                 for service in SERVICES:

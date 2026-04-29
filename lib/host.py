@@ -101,7 +101,6 @@ class Host:
             decode: Literal[False], multiplexing: bool = True) -> bytes:
         ...
 
-
     def ssh(self, cmd: str, *, check: bool = True,
             suppress_fingerprint_warnings: bool = True, decode: bool = True,
             multiplexing: bool = True) -> str | bytes:
