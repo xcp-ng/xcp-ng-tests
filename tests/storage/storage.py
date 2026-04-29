@@ -4,8 +4,9 @@ import pytest
 
 import logging
 
+from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, GiB, strtobool, wait_for, wait_for_not
+from lib.common import Defer, GiB, KiB, MiB, TiB, strtobool, wait_for, wait_for_not
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -13,9 +14,7 @@ from lib.vm import VM
 
 from typing import Literal
 
-RANDSTREAM_1GIB_CHECKSUM = '65280014'
-
-def try_to_create_sr_with_missing_device(sr_type: str, label: str, host: Host) -> None:
+def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
     try:
         host.sr_create(sr_type, label, {}, verify=True)
     except SSHCommandFailed as e:
@@ -32,10 +31,11 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
+    checksum = ""
 
     if integrity_check:
         # the vdi will be destroyed with the vm
-        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi = prov_sr.create_vdi(virtual_size=config.volume_size)
         vdi_name = vdi.name()
         vbd = vm.connect_vdi(vdi)
         vm.start()
@@ -43,9 +43,9 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
         install_randstream(vm)
         dev = f'/dev/{vbd.param_get("device")}'
         logging.info(f"Generate {dev} content")
-        vm.ssh(f"randstream generate -v {dev}")
+        checksum = randstream(vm, f'generate {dev}')
         logging.info(f"Validate {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
         vm.shutdown(verify=True)
 
     assert vm.is_halted()
@@ -60,7 +60,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     if integrity_check:
         vm.wait_for_vm_running_and_ssh_up()
         logging.info(f"Validate {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
     vm.shutdown(verify=True)
 
     # Migrate it back to the provenance SR
@@ -73,7 +73,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     if integrity_check:
         vm.wait_for_vm_running_and_ssh_up()
         logging.info(f"Validate {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
     vm.shutdown(verify=True)
 
     if vdi_name is not None:
@@ -84,10 +84,11 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
     dev = ""
+    checksum = ""
     vbd = None
 
     if integrity_check:
-        vdi = prov_sr.create_vdi(virtual_size=1 * GiB)
+        vdi = prov_sr.create_vdi(virtual_size=config.volume_size)
         vdi_name = vdi.name()
         vbd = vm.connect_vdi(vdi)
 
@@ -100,9 +101,9 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
         assert vbd is not None
         dev = f'/dev/{vbd.param_get("device")}'
         logging.info(f"Generate {dev} content")
-        vm.ssh(f"randstream generate -v {dev}")
+        randstream(vm, f'generate {dev}')
         logging.info(f"Validate {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
 
     # Move the VM to another host of the pool
     vm.migrate(dest_host, dest_sr)
@@ -110,7 +111,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
     if integrity_check:
         logging.info(f"Validate {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
 
     # Migrate it back to the provenance SR
     vm.migrate(prov_host, prov_sr)
@@ -118,7 +119,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     wait_for(lambda: vm.is_running_on_host(prov_host), "Wait for VM to be running on provenance host")
     if integrity_check:
         logging.info(f"Validate {dev}")
-        vm.ssh(f"randstream validate -v --expected-checksum {RANDSTREAM_1GIB_CHECKSUM} {dev}")
+        randstream(vm, f'validate --expected-checksum {checksum} {dev}')
 
     vm.shutdown(verify=True)
 
@@ -179,16 +180,33 @@ def install_randstream(vm: VM) -> None:
         vm.ssh(f"echo '{cs}  -' > {fn}.sum && wget -nv {BASE_URL}/{VERSION}/randstream-{VERSION}-{tt}.tar.gz -O - | tee {fn} | sha256sum -c {fn}.sum && tar -xzf {fn} -C /usr/bin/ ./randstream")  # noqa: E501
         vm.ssh(f"rm -f {fn} {fn}.sum")
 
+def randstream(vm: VM, args: str) -> str:
+    """
+    Run randstream on the VM and return the checksum.
+
+    The args string should contain the command and arguments to pass to randstream,
+    e.g. "generate /dev/xvdb".
+    """
+    output = vm.ssh(f'randstream -v {args}')
+    for line in output.splitlines():
+        if line.startswith('checksum: '):
+            return line.split(": ")[1].strip()
+    raise Exception(f"Could not find the checksum in the randstream output:\n{output}")
+
 CoalesceOperation = Literal['snapshot', 'clone']
 
 def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
+    vdi_size = vdi.get_virtual_size()
+    # second stream is 1/8 of the full one, truncated to a multiple of 32KiB, in order to
+    # be validable in a single command
+    second_stream_size = (vdi_size // 8 // (32 * KiB)) * (32 * KiB)
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
-    vm.ssh(f"randstream generate -v {dev}")
+    checksum = randstream(vm, f'generate {dev}')
     # default seed is 0
-    vm.ssh(f"randstream validate -v --expected-checksum 65280014 {dev}")
+    randstream(vm, f'validate --expected-checksum {checksum} {dev}')
     new_vdi: VDI | None = None
     match vdi_op:
         case 'clone': new_vdi = vdi.clone()
@@ -196,41 +214,68 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
     defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
     assert vdi is not None
 
-    vm.ssh(f"randstream generate -v --seed 1 --size 128Mi {dev}")
-    vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
-    new_vdi = vdi.wait_for_coalesce(new_vdi.destroy)
-    vm.ssh(f"randstream validate -v --expected-checksum ad2ca9af {dev}")
+    randstream(vm, f'generate --seed 1 --size {second_stream_size} {dev}')
+    checksum = randstream(vm, f"validate {dev}")
+    vdi.wait_for_coalesce(new_vdi.destroy)
+    new_vdi = None
+    randstream(vm, f'validate --expected-checksum {checksum} {dev}')
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(vm: VM, compression: XVACompression, defer: Defer) -> None:
+def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
+    # we can't shrink a volume
+    volume_size = max(vm.vdis[0].get_virtual_size(), config.volume_size)
+    vm.vdis[0].resize(volume_size)
+    # The resulting volume size is a multiple of the block size. Store the actual VDI size, so we can make comparisons
+    # later in the test
+    volume_size = vm.vdis[0].get_virtual_size()
     # The tests using this function are using specific fixtures to create the VM on the expected SR
     # In consequence, we can't use the storage_test_vm, so we have to start the VM explicitly and install randstream
     vm.start()
     vm.wait_for_vm_running_and_ssh_up()
     install_randstream(vm)
 
-    # 500MiB, so we have some data to check and some empty spaces in the exported image
-    vm.ssh("randstream generate -v --size 500MiB /root/data")
-    vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+    is_alpine = vm.ssh_with_result('apk --version').returncode == 0
+    if is_alpine:
+        # growpart is not available in alpine 3.12
+        # vm.ssh('apk add cloud-utils-growpart e2fsprogs-extra')
+        vm.ssh('apk add gawk util-linux e2fsprogs-extra')
+        vm.ssh('wget https://raw.githubusercontent.com/canonical/cloud-utils/main/bin/growpart -O /usr/bin/growpart')
+        vm.ssh('chmod +x /usr/bin/growpart')
+        # TODO: maybe use `findmnt -no SOURCE /` from util-linux to get the blockdevice mounted on /
+        growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
+        assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
+        vm.ssh('resize2fs /dev/xvda3')
+        stream_size = volume_size // 2
+    else:
+        stream_size = 500 * MiB
+
+    checksum = randstream(vm, f'generate --size {stream_size} /root/data')
+    randstream(vm, f'validate --expected-checksum {checksum} /root/data')
     vm.shutdown(verify=True)
 
-    xva_path = f'/tmp/{vm.uuid}.xva'
+    xva_path = f'{temp_large_dir}/{vm.uuid}.xva'
     defer(lambda: vm.host.ssh(f'rm -f {xva_path}'))
     vm.export(xva_path, compression)
     # check that the zero blocks are not part of the result. Most of the data is from the random stream, so
-    # compression has little effect. We just check the result is between 500 and 700 MiB
+    # compression has little effect. We just take into account the system size
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {xva_path}').split()[0])
-    assert 500 < size_mb < 700, f"unexpected xva size: {size_mb}"
+    min_size = stream_size / MiB
+    max_size = (stream_size + volume_size / 1000) * 1.1 / MiB + 200
+    assert min_size < size_mb < max_size, (
+        f"unexpected xva size {size_mb}MiB, was expected to be between {min_size}MiB and {max_size}MiB"
+    )
 
     imported_vm = vm.host.import_vm(xva_path, vm.vdis[0].sr.uuid)
     defer(lambda: imported_vm.destroy())
+    assert vm.vdis[0].get_virtual_size() == volume_size
+
     imported_vm.start()
     imported_vm.wait_for_vm_running_and_ssh_up()
-    imported_vm.ssh("randstream validate -v --expected-checksum 24e905d6 /root/data")
+    randstream(imported_vm, f'validate --expected-checksum {checksum} /root/data')
 
-def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, defer: Defer) -> None:
-    vdi_src: VDI | None = sr.create_vdi(image_format=image_format)
+def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
+    vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
     defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
     assert vdi_src is not None
 
@@ -238,15 +283,19 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, defer: Defer) -
     defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
     dev = f'/dev/{vbd.param_get("device")}'
 
-    # generate 2 blocks of data of 200MiB, at position 0 and at position 500MiB
-    vm.ssh(f"randstream generate -v --size 200MiB {dev}")
+    # the stream is 1/5 of the full one, truncated to a multiple of 32KiB, in order to
+    # be validable in a single command
+    stream_size = (config.volume_size // 5 // (32 * KiB)) * (32 * KiB)
+    stream_position = (config.volume_size // 2)
+
+    checksum1 = randstream(vm, f'generate --size {stream_size} {dev}')
     # use a different seed to not write the same data (default seed is 0)
-    vm.ssh(f"randstream generate -v --seed 1 --position 500MiB --size 200MiB {dev}")
-    vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
-    vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+    checksum2 = randstream(vm, f'generate --seed 1 --position {stream_position} --size {stream_size} {dev}')
+    randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
+    randstream(vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}')
     vm.disconnect_vdi(vdi_src)
 
-    image_path = f'/tmp/{vdi_src.uuid}.{image_format}'
+    image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
     defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
 
     vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})
@@ -255,13 +304,14 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, defer: Defer) -
 
     # check that the zero blocks are not part of the result
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
-    assert 400 < size_mb < 410, f"unexpected image size: {size_mb}"
-    vdi_dest = sr.create_vdi(image_format=image_format)
+    assert stream_size // MiB * 2 < size_mb < stream_size // MiB * 2.1, f"unexpected image size: {size_mb}"
+    vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
     defer(lambda: vdi_dest.destroy())
 
     vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
-    vm.connect_vdi(vdi_dest, 'xvdb')
+    vbd = vm.connect_vdi(vdi_dest)
     defer(lambda: vm.disconnect_vdi(vdi_dest))
+    dev = f'/dev/{vbd.param_get("device")}'
 
-    vm.ssh(f"randstream validate -v --size 200MiB --expected-checksum c6310c52 {dev}")
-    vm.ssh(f"randstream validate -v --position 500MiB --size 200MiB --expected-checksum 1cb4218e {dev}")
+    randstream(vm, f'validate --size {stream_size} --expected-checksum {checksum1} {dev}')
+    randstream(vm, f'validate --position {stream_position} --size {stream_size} --expected-checksum {checksum2} {dev}')

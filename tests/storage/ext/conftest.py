@@ -4,6 +4,7 @@ import pytest
 
 import logging
 
+from lib import config
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -27,7 +28,7 @@ def ext_sr(host: Host,
 
 @pytest.fixture(scope='module')
 def vdi_on_ext_sr(ext_sr: SR) -> Generator[VDI, None, None]:
-    vdi = ext_sr.create_vdi('EXT-local-VDI-test')
+    vdi = ext_sr.create_vdi('EXT-local-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 

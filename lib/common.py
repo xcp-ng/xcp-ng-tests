@@ -40,6 +40,25 @@ MiB = KiB**2
 GiB = KiB**3
 TiB = KiB**4
 
+def parse_size(size_str: str) -> int:
+    """
+    Parse a size string like "2.5TiB", "1GiB" or "1024".
+    """
+    try:
+        return int(size_str)
+    except ValueError:
+        pass
+
+    size_str = size_str.strip()
+    for unit, multiplier in [('TiB', TiB), ('GiB', GiB), ('MiB', MiB), ('KiB', KiB)]:
+        if size_str.endswith(unit):
+            try:
+                return int(float(size_str[:-len(unit)].strip()) * multiplier)
+            except ValueError:
+                pass
+
+    raise ValueError(f"Cannot parse size: {size_str}")
+
 T = TypeVar("T")
 
 HostAddress: TypeAlias = str
