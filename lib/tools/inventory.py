@@ -1,5 +1,5 @@
-"""Inventory for tools scripts.
-"""
+"""Inventory for tools scripts."""
+
 from __future__ import annotations
 
 import tomllib
@@ -7,36 +7,42 @@ from pathlib import Path
 
 from lib.common import HostAddress
 
-def load_inventory(inventory_path: Path) -> dict[str, dict[str, list[str]]]:
+from typing import TypeAlias, TypedDict
+
+class HostConfig(TypedDict):
+    repositories: list[str]
+
+
+Inventory: TypeAlias = dict[HostAddress, HostConfig]
+
+
+def load_inventory(inventory_path: Path) -> Inventory:
     """Create an inventory object from loaded inventory file."""
-    inventory: dict[str, dict[str, list[str]]] = {}
+    inventory: Inventory = {}
 
     with open(inventory_path, "rb") as f:
         data = tomllib.load(f)
 
     all = data.get("all", {})
-    servers = data.get("servers", [])
+    hosts = data.get("hosts", [])
 
-    for server, config in servers.items():
-        repos = config.get("enablerepos", [])
-        host = {
-            "enablerepos": repos or all.get("enablerepos", [])
-        }
+    for server, config in hosts.items():
+        repos = config.get("repositories", [])
+        host: HostConfig = {"repositories": repos or all.get("repositories", [])}
         inventory[server] = host
 
     return inventory
 
-def into_inventory(hosts: list[HostAddress], enablerepos: list[str]) -> dict[HostAddress, dict[str, list[str]]]:
+
+def into_inventory(hosts: list[HostAddress], repositories: list[str]) -> Inventory:
     """Create an inventory object from arguments.
 
     Basically, it is used as compatibility when we don't want inventory from file.
     """
-    inventory: dict[HostAddress, dict[str, list[str]]] = {}
+    inventory: Inventory = {}
 
     for h in hosts:
-        host = {
-            "enablerepos": enablerepos or [],
-        }
+        host: HostConfig = {"repositories": repositories or []}
         inventory[h] = host
 
     return inventory
