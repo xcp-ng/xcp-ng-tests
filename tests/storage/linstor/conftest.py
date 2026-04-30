@@ -8,7 +8,11 @@ import os
 from dataclasses import dataclass
 
 import lib.commands as commands
-from data import LINSTOR_REDUNDANCY
+
+try:
+    from data import LINSTOR_REDUNDANCY  # type: ignore
+except ImportError:
+    LINSTOR_REDUNDANCY = 2
 
 # explicit import for package-scope fixtures
 from pkgfixtures import pool_with_saved_yum_state
