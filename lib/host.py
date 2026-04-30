@@ -89,6 +89,9 @@ class Host:
     def __str__(self) -> str:
         return self.hostname_or_ip
 
+    def name(self) -> str:
+        return self.param_get('name-label')
+
     @overload
     def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,

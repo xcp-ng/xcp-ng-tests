@@ -188,6 +188,9 @@ DEFAULT_SR = 'default'
 # This setting affects VMs managed by the `imported_vm` fixture.
 CACHE_IMPORTED_VM = False
 
+# Default LINSTOR redundancy configuration for creating SRs.
+LINSTOR_REDUNDANCY = 2
+
 # Default NFS device config:
 NFS_DEVICE_CONFIG: dict[str, str] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
