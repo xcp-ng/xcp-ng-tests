@@ -377,49 +377,55 @@ servers (LSP).
 These configurations are provided as optional suggestions for convenience and do not imply official support or a
 requirement to use specific tools.
 
-### Pre commit
+### Pre-commit hook
 
 #### General
 
-Checks can be done while committing with [pre-commit](https://pre-commit.com/). For installing, run:
+The repository has a [prek](https://prek.j178.dev/) configuration, which allows for making sure that each commit created is compliant with the [code checking implemented in the CI](./.github/workflows/code-checkers.yml). This feature is **opt-in** and can be run manually.
 
-```bash
-~/xcp-ng-tests $ prek|pre-commit install
+This tool is configured via the [`.pre-commit-config.yaml`](./.pre-commit-config.yaml) file.
+
+In order to run all the checks that the CI performs, you can simply run:
+```shell
+$ uv run prek -a
+ruff.....................................................................Passed
+flake8...................................................................Passed
+mypy.....................................................................Passed
+pyright..................................................................Passed
 ```
 
-This repository provides a pre-commit config `.pre-commit-config.yaml`.
+#### Install git hooks
 
-> [!NOTE]
-> For those who use [prek](https://prek.j178.dev/) instead, the `.pre-commit-config.yaml` is compatible.
-
-**Useful commands to run locally**
+[prek](https://prek.j178.dev/) really shines once you start to run it automatically before each commit.
+For this, we need to tell [prek](https://prek.j178.dev/) to install a [git hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) in our local repository:
 
 ```bash
-# run all checks before committing
-$ uvx prek|pre-commit run -a
-
-# run only mypy before committing
-$ uvx prek|pre-commit run mypy -a
+$ uv run prek install
 ```
 
-#### Is there a hurry? Skip pre-commit
-
-*While under development, you may want to skip pre-commit behaviour to speed up your workflow.*
+Note that you can easily remove this hook by running:
 
 ```bash
-# run all checks before committing
-$ uvx prek run -a # with prek
-$ uvx pre-commit run -a # with pre-commit
-
-# run only mypy before committing
-$ uvx prek run mypy -a # with prek
-$ uvx pre-commit run mypy -a # with pre-commit
+$ uv run prek uninstall
 ```
 
-You can even bypass when committing by adding git option `--no-verify`:
+Once the hooks are in place, `git commit` will automatically:
+- stash the changes that are not staged for this commit
+- perform the `ruff`, `mypy`, `flake8` and `pyright` checks (unless the staged changes do not affect any python files, in which case the checks are skipped)
+- re-apply the changes that were stashed
+
+If the checks happen to fail, the commit is cancelled.
+
+If for some reason, you are fine with a specific check failing, you can simply skip it with the `SKIP` environment variable.
+You can also bypass all the hooks by adding the git option `--no-verify`, or the environment variable `GIT_NO_HOOKS=1`:
 
 ```bash
-$ git commit -m "wip: tmp commit" --no-verify
+# Only skip the `flake8` hook
+$ SKIP=flake8 git commit -m "my message"
+# Do not run any hook before commit
+$ git commit -m "my message" --no-verify
+# Same thing, using an environment variable instead
+$ GIT_NO_HOOKS=1 git commit -m "my message"
 ```
 
 ### [VSCodium](https://vscodium.com/)
