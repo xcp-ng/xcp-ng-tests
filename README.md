@@ -377,6 +377,51 @@ servers (LSP).
 These configurations are provided as optional suggestions for convenience and do not imply official support or a
 requirement to use specific tools.
 
+### Pre commit
+
+#### General
+
+Checks can be done while committing with [pre-commit](https://pre-commit.com/). For installing, run:
+
+```bash
+~/xcp-ng-tests $ prek|pre-commit install
+```
+
+This repository provides a pre-commit config `.pre-commit-config.yaml`.
+
+> [!NOTE]
+> For those who use [prek](https://prek.j178.dev/) instead, the `.pre-commit-config.yaml` is compatible.
+
+**Useful commands to run locally**
+
+```bash
+# run all checks before committing
+$ uvx prek|pre-commit run -a
+
+# run only mypy before committing
+$ uvx prek|pre-commit run mypy -a
+```
+
+#### Is there a hurry? Skip pre-commit
+
+*While under development, you may want to skip pre-commit behaviour to speed up your workflow.*
+
+```bash
+# run all checks before committing
+$ uvx prek run -a # with prek
+$ uvx pre-commit run -a # with pre-commit
+
+# run only mypy before committing
+$ uvx prek run mypy -a # with prek
+$ uvx pre-commit run mypy -a # with pre-commit
+```
+
+You can even bypass when committing by adding git option `--no-verify`:
+
+```bash
+$ git commit -m "wip: tmp commit" --no-verify
+```
+
 ### [VSCodium](https://vscodium.com/)
 
 A few plugins are recommended to properly report the diagnostics during the development:
