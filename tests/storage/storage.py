@@ -369,6 +369,64 @@ class StreamSpan:
         expected_flags = f'--expected-checksum {self.checksum}' if self.checksum is not None else ''
         randstream(vm, f'validate {expected_flags} --position {self.position} --size {self.size} {dev}')
 
+def compute_span_layout(dev_size: int, total_size: int, num_spans: int, align: int) -> list[tuple[int, int]]:
+    """
+    Compute the positions and sizes of spans across a device.
+
+    Spans are distributed such that the first span starts at 0 and the last
+    span ends at dev_size. Positions are computed right-to-left: each span's
+    start is rounded UP to the nearest multiple of align so the span sits
+    entirely within its slot. Bytes skipped by rounding are carried leftward
+    to the previous span, which absorbs them in its budget.
+
+    When total_size equals dev_size, spans are contiguous and cover the full
+    device with no gaps. When total_size is less than dev_size, spans are
+    evenly spread across the device with gaps between them.
+
+    Args:
+        dev_size: Total device size in bytes
+        total_size: Total number of bytes to write across all spans.
+                    Use dev_size for full device coverage, or a smaller value
+                    to leave gaps between spans.
+        num_spans: Number of spans to create
+        align: Block size in bytes to align span starts to.
+               All span starts are rounded up to the nearest multiple of align.
+               Bytes skipped by the rounding are carried to the previous span.
+
+    Returns:
+        List of (position, size) tuples, one per span.
+        Spans are guaranteed to:
+        - Not overlap
+        - Have first span starting at position 0
+        - Have last span ending at dev_size
+        - Sum of span sizes equals total_size
+    """
+    per_span = total_size // num_spans
+    result: list[tuple[int, int]] = []
+    # Seed the remainder into the last span so it is distributed via carry
+    carry = total_size % num_spans
+    end = dev_size
+    for i in range(num_spans - 1, -1, -1):
+        budget = per_span + carry
+        if i == 0:
+            # First span always starts at 0; any leftover space before the
+            # next span becomes a gap (partial coverage only)
+            start = 0
+            size = min(budget, end)
+        else:
+            # Round start UP: this may shrink the span relative to budget;
+            # the trimmed bytes are carried left to the previous span
+            ideal_start = end - budget
+            start = ((ideal_start + align - 1) // align) * align
+            size = end - start
+        carry = budget - size
+        result.append((start, size))
+        end = start
+    result.reverse()
+    assert sum(s for _, s in result) == total_size
+    return result
+
+
 def partially_populate_device(vm: VM, dev_path: str, dev_size: int, num_spans: int = 3, skip_spans: list[int] = []) \
         -> list[StreamSpan]:
     """
@@ -402,55 +460,25 @@ def partially_populate_device(vm: VM, dev_path: str, dev_size: int, num_spans: i
         skip_spans: List of span indices to skip (no data generated).
                    Skipped spans still exist in returned list with checksum=None.
                    (default: [])
+               Span alignment is controlled by the --write-volume-align pytest option.
 
     Returns:
         List of StreamSpan objects representing the generated spans.
-        Spans are guaranteed to:
-        - Not overlap
-        - Have first span at position 0
-        - Have last span ending at dev_size
-        - Be evenly distributed across device
     """
     logging.info(f"Generate {dev_path} content")
-    stream_size = min(dev_size, config.write_volume_cap) // num_spans
+    total_size = min(dev_size, config.write_volume_cap)
 
     # Validate skip_spans
     assert all(0 <= i < num_spans for i in skip_spans), \
         f"Invalid span index in skip_spans: must be 0 <= i < {num_spans}"
 
+    layout = compute_span_layout(dev_size, total_size, num_spans, config.write_volume_align)
     spans: list[StreamSpan] = []
-
-    # Calculate positions for regularly distributed spans
-    # First span always at position 0, last span always ends at dev_size
-    if num_spans == 1:
-        positions = [0]
-    elif num_spans == 2:
-        positions = [0, dev_size - stream_size]
-    else:
-        # For 3+ spans: distribute evenly across available space
-        # Available space is dev_size - size (last span can't extend past dev_size)
-        available_space = dev_size - stream_size
-        positions = [0]  # First span always at 0
-        # Distribute middle spans evenly
-        for i in range(1, num_spans - 1):
-            position = (available_space * i) // (num_spans - 1)
-            positions.append(position)
-        positions.append(dev_size - stream_size)  # Last span always ends at dev_size
-
-    # Generate spans with consistency checks
-    prev_end = -1
-    for i, position in enumerate(positions):
-        # Assert no overlap
-        assert position >= prev_end, f"Span {i} at position {position} overlaps with previous span ending at {prev_end}"
-        span = StreamSpan(position=position, size=stream_size)
+    for i, (position, size) in enumerate(layout):
+        span = StreamSpan(position=position, size=size)
         if i not in skip_spans:
             span.generate(vm, dev_path, seed=1000 + i)
         spans.append(span)
-        prev_end = position + stream_size
-
-    # Final assert: last span must not extend past dev_size
-    assert spans[-1].position + spans[-1].size <= dev_size, \
-        f"Last span extends past device: position={spans[-1].position}, size={spans[-1].size}, dev_size={dev_size}"
 
     return spans
 

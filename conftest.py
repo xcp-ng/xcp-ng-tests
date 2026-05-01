@@ -118,12 +118,20 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Maximum amount of data written to a volume."
              " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
     )
+    parser.addoption(
+        "--write-volume-align",
+        action="store",
+        default="4KiB",
+        help="Block size to align span positions to in partially_populate_device."
+             " Accepts sizes like '512', '4KiB', '1MiB'."
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
     global_config.volume_size = parse_size(config.getoption('--volume-size'))
     global_config.write_volume_cap = parse_size(config.getoption('--write-volume-cap'))
+    global_config.write_volume_align = parse_size(config.getoption('--write-volume-align'))
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
