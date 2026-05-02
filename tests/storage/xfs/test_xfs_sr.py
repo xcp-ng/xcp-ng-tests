@@ -6,7 +6,7 @@ import logging
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
@@ -104,17 +104,17 @@ class TestXFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
-    def test_coalesce(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, vdi_op: CoalesceOperation) -> None:
-        coalesce_integrity(storage_test_vm, vdi_on_xfs_sr, vdi_op)
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_xfs_sr: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
+        coalesce_integrity(storage_test_vm, vdi_on_xfs_sr, vdi_op, defer)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_xfs_sr: VM, compression: XVACompression) -> None:
-        xva_export_import(vm_on_xfs_sr, compression)
+    def test_xva_export_import(self, vm_on_xfs_sr: VM, compression: XVACompression, defer: Defer) -> None:
+        xva_export_import(vm_on_xfs_sr, compression, defer)
 
     @pytest.mark.small_vm
-    def test_vdi_export_import(self, storage_test_vm: VM, xfs_sr: SR, image_format: ImageFormat) -> None:
-        vdi_export_import(storage_test_vm, xfs_sr, image_format)
+    def test_vdi_export_import(self, storage_test_vm: VM, xfs_sr: SR, image_format: ImageFormat, defer: Defer) -> None:
+        vdi_export_import(storage_test_vm, xfs_sr, image_format, defer)
 
     # *** tests with reboots (longer tests).
 
