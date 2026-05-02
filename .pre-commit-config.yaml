@@ -1,0 +1,29 @@
+repos:
+  - repo: local
+    hooks:
+      - id: "ruff"
+        name: "ruff"
+        language: "system"
+        require_serial: true
+        entry: "uv run ruff check"
+        types: ["python"]
+      - id: "flake8"
+        name: "flake8"
+        language: "system"
+        require_serial: true
+        entry: "uv run flake8"
+        types: ["python"]
+      - id: "mypy"
+        name: "mypy"
+        language: "system"
+        require_serial: true
+        entry: "uv run mypy --install-types --non-interactive ."
+        pass_filenames: false
+        types: ["python"]
+      - id: "pyright"
+        name: "pyright"
+        language: "system"
+        require_serial: true
+        entry: "uv run pyright ."
+        pass_filenames: false
+        types: ["python"]

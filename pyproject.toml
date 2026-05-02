@@ -32,6 +32,7 @@ dev = [
     "types-colorama",
     "types-pexpect",
     "zizmor",
+    "prek>=0.3.11",
 ]
 
 [tool.pyright]

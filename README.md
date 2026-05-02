@@ -377,6 +377,57 @@ servers (LSP).
 These configurations are provided as optional suggestions for convenience and do not imply official support or a
 requirement to use specific tools.
 
+### Pre-commit hook
+
+#### General
+
+The repository has a [prek](https://prek.j178.dev/) configuration, which allows for making sure that each commit created is compliant with the [code checking implemented in the CI](./.github/workflows/code-checkers.yml). This feature is **opt-in** and can be run manually.
+
+This tool is configured via the [`.pre-commit-config.yaml`](./.pre-commit-config.yaml) file.
+
+In order to run all the checks that the CI performs, you can simply run:
+```shell
+$ uv run prek -a
+ruff.....................................................................Passed
+flake8...................................................................Passed
+mypy.....................................................................Passed
+pyright..................................................................Passed
+```
+
+#### Install git hooks
+
+[prek](https://prek.j178.dev/) really shines once you start to run it automatically before each commit.
+For this, we need to tell [prek](https://prek.j178.dev/) to install a [git hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) in our local repository:
+
+```bash
+$ uv run prek install
+```
+
+Note that you can easily remove this hook by running:
+
+```bash
+$ uv run prek uninstall
+```
+
+Once the hooks are in place, `git commit` will automatically:
+- stash the changes that are not staged for this commit
+- perform the `ruff`, `mypy`, `flake8` and `pyright` checks (unless the staged changes do not affect any python files, in which case the checks are skipped)
+- re-apply the changes that were stashed
+
+If the checks happen to fail, the commit is cancelled.
+
+If for some reason, you are fine with a specific check failing, you can simply skip it with the `SKIP` environment variable.
+You can also bypass all the hooks by adding the git option `--no-verify`, or the environment variable `GIT_NO_HOOKS=1`:
+
+```bash
+# Only skip the `flake8` hook
+$ SKIP=flake8 git commit -m "my message"
+# Do not run any hook before commit
+$ git commit -m "my message" --no-verify
+# Same thing, using an environment variable instead
+$ GIT_NO_HOOKS=1 git commit -m "my message"
+```
+
 ### [VSCodium](https://vscodium.com/)
 
 A few plugins are recommended to properly report the diagnostics during the development:
