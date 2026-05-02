@@ -265,3 +265,7 @@ IMAGE_EQUIVS: dict[str, str] = {
 
 # This should be a working DNS server that's not used by any VM images.
 TEST_DNS_SERVER = "1.1.1.1"
+
+GITLAB_API = 'https://gitlab.com/api/v4/projects/xen-project%2Fxen-guest-' \
+             'agent/jobs/artifacts/main/download?search_recent_successful_' \
+             'pipelines=true&job='
