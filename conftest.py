@@ -8,6 +8,7 @@ import os
 import tempfile
 
 import git
+from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
 from packaging import version
 
 import lib.config as global_config
@@ -105,7 +106,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
-    global_config.ssh_output_max_lines = int(config.getoption('--ssh-output-max-lines'))
+    ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
+    assert ssh_output_max_lines is not None
+    global_config.ssh_output_max_lines = int(ssh_output_max_lines)
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
@@ -116,6 +119,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
     if "image_format" in metafunc.fixturenames:
         image_format = metafunc.config.getoption("image_format")
+        assert image_format is not None
         if len(image_format) == 0:
             image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
         metafunc.parametrize("image_format", image_format, scope="session")
@@ -223,6 +227,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
     # a list of master hosts, each from a different pool
     hosts_args = pytestconfig.getoption("hosts")
+    assert hosts_args is not None
     hosts_split = [hostlist.split(',') for hostlist in hosts_args]
     hostname_list = list(itertools.chain(*hosts_split))
 
@@ -376,8 +381,10 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
         devices = disks_string.split(',') if disks_string else []
         return host_address, devices
 
+    disks = pytestconfig.getoption("disks")
+    assert disks is not None
     cli_disks = dict(_parse_disk_option(option_text)
-                     for option_text in pytestconfig.getoption("disks"))
+                     for option_text in disks)
 
     def _host_disks(host: Host, hosts_cli_disks: list[DiskDevName] | None) -> Iterable[Host.BlockDeviceInfo]:
         """Filter host disks according to list from `--cli` if given."""
@@ -721,6 +728,7 @@ gpgcheck=0
 @pytest.fixture(scope='session')
 def second_network(pytestconfig: pytest.Config, host: Host) -> str:
     network_uuids = pytestconfig.getoption("second_network")
+    assert network_uuids is not None
     if len(network_uuids) != 1:
         pytest.fail("This test requires exactly one --second-network parameter!")
     network_uuid = network_uuids[0]
