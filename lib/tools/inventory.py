@@ -13,36 +13,43 @@ class HostConfig(TypedDict):
     repositories: list[str]
 
 
-Inventory: TypeAlias = dict[HostAddress, HostConfig]
+HostConfigs: TypeAlias = dict[HostAddress, HostConfig]
 
+class Inventory(TypedDict):
+    hosts: HostConfigs
+    parent: HostAddress | None
 
 def load_inventory(inventory_path: Path) -> Inventory:
     """Create an inventory object from loaded inventory file."""
-    inventory: Inventory = {}
-
     with open(inventory_path, "rb") as f:
         data = tomllib.load(f)
 
     all = data.get("all", {})
     hosts = data.get("hosts", [])
 
-    for server, config in hosts.items():
+    inventory_hosts: HostConfigs = {}
+    for h, config in hosts.items():
         repos = config.get("repositories", [])
         host: HostConfig = {"repositories": repos or all.get("repositories", [])}
-        inventory[server] = host
+        inventory_hosts[h] = host
 
-    return inventory
+    return {
+        "hosts": inventory_hosts,
+        "parent": data.get("parent", None),
+    }
 
 
-def into_inventory(hosts: list[HostAddress], repositories: list[str]) -> Inventory:
+def into_inventory(hosts: list[HostAddress], repositories: list[str], parent: HostAddress) -> Inventory:
     """Create an inventory object from arguments.
 
     Basically, it is used as compatibility when we don't want inventory from file.
     """
-    inventory: Inventory = {}
-
+    inventory_hosts: HostConfigs = {}
     for h in hosts:
         host: HostConfig = {"repositories": repositories or []}
-        inventory[h] = host
+        inventory_hosts[h] = host
 
-    return inventory
+    return {
+        "hosts": inventory_hosts,
+        "parent": parent,
+    }

@@ -601,6 +601,7 @@ Take a look at an example inventory file:
 
 ```toml
 # my_inventory.toml
+parent = "ip_or_hostname" # master host
 
 [all]
 repositories = ["xcp-ng-base"]
