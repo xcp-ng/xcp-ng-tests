@@ -36,7 +36,7 @@ def update_pools(inventory: Inventory) -> None:
 
     with ThreadPoolExecutor() as executor:
         for p in pools:
-            executor.submit(p.master.update, inventory_hosts[p.master.hostname_or_ip]["enablerepos"])
+            executor.submit(p.master.update, inventory_hosts[p.master.hostname_or_ip]["repositories"])
 
     # secondary hosts
     with ThreadPoolExecutor() as executor:
@@ -44,5 +44,5 @@ def update_pools(inventory: Inventory) -> None:
             # omit first item because it is a primary (master)
             for secondary in p.hosts[1:]:
                 # repos are the same as the primary (master)
-                repos = inventory_hosts[p.master.hostname_or_ip]["enablerepos"]
+                repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
                 executor.submit(secondary.update, repos)
