@@ -1,5 +1,5 @@
 # generated with update_requirements.py, do not edit manually
-cryptography>=3.3.1
+cryptography>=47.0.0
 gitpython
 legacycrypt
 packaging>=20.7
