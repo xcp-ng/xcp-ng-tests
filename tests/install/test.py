@@ -207,8 +207,8 @@ class TestNested:
             # pool master must be reachable here
             pool = Pool(ip)
 
-            # wait for XAPI
-            wait_for(pool.master.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
+            # Master should be available now that the pool is instanciated
+            assert pool.master.is_enabled()
 
             if lsb_rel in ["8.2.1", "8.3.0", "8.4.0"]:
                 SERVICES = ["control-domain-params-init",

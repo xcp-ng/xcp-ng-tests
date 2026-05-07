@@ -25,6 +25,7 @@ from lib.common import (
     strtobool,
     to_xapi_bool,
     wait_for,
+    wait_for_not,
 )
 from lib.netutil import wrap_ip
 from lib.network import Network
@@ -555,7 +556,36 @@ class Host:
         logging.info("Restart toolstack on host %s" % self)
         self.ssh('xe-toolstack-restart')
         if verify:
-            wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=30 * 60)
+            self.wait_for_xapi_enabled()
+
+    def wait_for_host_down(self, timeout_secs: int = 2 * 60) -> None:
+        wait_for_not(
+            lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
+            "Wait for host down",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=2,
+        )
+
+    def wait_for_host_up(self, timeout_secs: int = 10 * 60) -> None:
+        wait_for(
+            lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
+            "Wait for host up",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=10,
+        )
+
+    def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
+        wait_for(
+            lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
+            "Wait for ssh up on host",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=5
+        )
+
+    def wait_for_xapi_enabled(self, timeout_secs: int = 30 * 60) -> None:
+        logging.info(f"Wait for XAPI to complete initialization on {self.hostname_or_ip}")
+        self.ssh(f"xapi-wait-init-complete {timeout_secs}")
+        assert self.is_enabled()
 
     def is_enabled(self) -> bool:
         try:
@@ -679,12 +709,10 @@ class Host:
         # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
         self.ssh('systemd-run --on-active=2s reboot')
         if verify:
-            wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
-            wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
-                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
-                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
-            wait_for(self.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
+            self.wait_for_host_down()
+            self.wait_for_host_up()
+            self.wait_for_ssh_reachable()
+            self.wait_for_xapi_enabled()
 
     def management_network(self) -> str:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
