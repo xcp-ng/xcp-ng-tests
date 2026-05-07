@@ -24,7 +24,7 @@ def load_inventory(inventory_path: Path) -> Inventory:
     with open(inventory_path, "rb") as f:
         data = tomllib.load(f)
 
-    all = data.get("all", {})
+    default = data.get("default", {})
     hosts = data.get("hosts", [])
 
     inventory_hosts: HostConfigs = {}
@@ -32,9 +32,9 @@ def load_inventory(inventory_path: Path) -> Inventory:
         repos = config.get("repositories", [])
         hosting_pool = config.get("hosting_pool", None)
         if hosting_pool is None:
-            hosting_pool = all.get("hosting_pool", None)
+            hosting_pool = default.get("hosting_pool", None)
         host: HostConfig = {
-            "repositories": repos or all.get("repositories", []),
+            "repositories": repos or default.get("repositories", []),
             "hosting_pool": hosting_pool,
         }
         inventory_hosts[h] = host

@@ -671,7 +671,7 @@ Take a look at an example inventory file:
 ```toml
 # my_inventory.toml
 
-[all]
+[default]
 repositories = ["xcp-ng-base"]
 hosting_pool = "A"
 
@@ -686,9 +686,10 @@ hosting_pool = "B"
 ```
 
 > [!IMPORTANT]
-> Config values under `hosts` override values under `all`. For instance, the above inventory would produce
+> * `default` is applied to all hosts
+> * Config values under `hosts` override values under `default`. For instance, the above inventory would produce
 > the following python dict:
 >
 > `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
 >
-> Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
+> * Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
