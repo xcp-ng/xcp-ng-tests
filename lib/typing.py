@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import sys
 
-from typing import NotRequired, TypedDict
+from typing import NotRequired, Sequence, TypedDict, Union
 
 if sys.version_info >= (3, 11):
     from typing import NotRequired
@@ -15,3 +17,27 @@ IsoImageDef = TypedDict('IsoImageDef',
                          })
 
 JSONType = None | bool | int | float | str | list["JSONType"] | dict[str, "JSONType"]
+
+
+# Dict-based description of an Answerfile object to be built.
+AnswerfileDict = TypedDict('AnswerfileDict', {
+    'TAG': str,
+    'CONTENTS': str | list["AnswerfileDict"],
+})
+
+# Simplified version of AnswerfileDict for user input.
+# - does not require to write 0 or 1 subelement as a list
+SimpleAnswerfileDict = TypedDict('SimpleAnswerfileDict', {
+    'TAG': str,
+    'CONTENTS': NotRequired[Union[str, "SimpleAnswerfileDict", Sequence["SimpleAnswerfileDict"]]],
+
+    # No way to allow arbitrary fields in addition?  This conveys the
+    # field's type, but allows them in places we wouldn't want them,
+    # and forces every XML attribute we use to appear here.
+    'guest-storage': NotRequired[str],
+    'mode': NotRequired[str],
+    'name': NotRequired[str],
+    'proto': NotRequired[str],
+    'stage': NotRequired[str],
+    'type': NotRequired[str],
+})

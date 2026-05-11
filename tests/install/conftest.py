@@ -13,6 +13,7 @@ from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.host import Host
 from lib.installer import AnswerFile
+from lib.typing import SimpleAnswerfileDict
 from lib.vm import VM
 
 from typing import Generator, Sequence
@@ -134,8 +135,9 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
 
         if answerfile:
             logging.info("generating answerfile %s", answerfile_xml)
-            answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
-                                       type="url", CONTENTS="file:///root/postinstall.sh"))
+            answerfile.top_append(SimpleAnswerfileDict(TAG="script", stage="filesystem-populated",
+                                                       type="url",
+                                                       CONTENTS="file:///root/postinstall.sh"))
             if unsigned:
                 # *gpgcheck is 8.3+ syntax, netinstall-gpg-check is 8.2 syntax;
                 # installers ignore attributes they don't know
