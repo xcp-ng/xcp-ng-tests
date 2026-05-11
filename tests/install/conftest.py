@@ -13,6 +13,7 @@ from lib import installer, pxe
 from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
+from lib.typing import SimpleAnswerfileDict
 
 from typing import TYPE_CHECKING, Any, Generator, Sequence
 
@@ -137,8 +138,9 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
 
         if answerfile:
             logging.info("generating answerfile %s", answerfile_xml)
-            answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
-                                       type="url", CONTENTS="file:///root/postinstall.sh"))
+            answerfile.top_append(SimpleAnswerfileDict(TAG="script", stage="filesystem-populated",
+                                                       type="url",
+                                                       CONTENTS="file:///root/postinstall.sh"))
             if unsigned:
                 answerfile.top_setattr({'gpgcheck': "false",
                                         'repo-gpgcheck': "false",

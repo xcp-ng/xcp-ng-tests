@@ -6,14 +6,15 @@ import xml.etree.ElementTree as ET
 
 from lib.commands import SSHCommandFailed, ssh
 from lib.common import wait_for
+from lib.typing import AnswerfileDict, SimpleAnswerfileDict
 
-from typing import Any, Self
+from typing import Optional, Self, Sequence, cast
 
 class AnswerFile:
-    def __init__(self, kind: str, /):
+    def __init__(self, kind: str, /) -> None:
         from data import BASE_ANSWERFILES
-        defn = BASE_ANSWERFILES[kind]
-        self.defn = self._normalize_structure(defn)  # type: ignore
+        defn: SimpleAnswerfileDict = BASE_ANSWERFILES[kind]
+        self.defn = self._normalize_structure(defn)
 
     def write_xml(self, filename: str) -> None:
         etree = ET.ElementTree(self._defn_to_xml_et(self.defn))
@@ -21,26 +22,27 @@ class AnswerFile:
 
     # chainable mutators for lambdas
 
-    def top_append(self, *defs: dict[str, Any] | None) -> Self:
+    def top_append(self, *defs: SimpleAnswerfileDict | None | ValueError) -> Self:
+        assert not isinstance(self.defn['CONTENTS'], str), "a toplevel CONTENTS must be a list"
         for defn in defs:
             if defn is None:
                 continue
             self.defn['CONTENTS'].append(self._normalize_structure(defn))
         return self
 
-    def top_setattr(self, attrs: dict[str, Any]) -> Self:
+    def top_setattr(self, attrs: dict[str, str]) -> Self:
         assert 'CONTENTS' not in attrs
-        self.defn.update(attrs)
+        self.defn.update(cast(AnswerfileDict, attrs))
         return self
 
     # makes a mutable deep copy of all `contents`
     @staticmethod
-    def _normalize_structure(defn: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_structure(defn: SimpleAnswerfileDict | ValueError) -> AnswerfileDict:
         assert isinstance(defn, dict), f"{defn!r} is not a dict"
         assert 'TAG' in defn, f"{defn} has no TAG"
 
         # type mutation through nearly-shallow copy
-        new_defn: dict[str, Any] = {
+        new_defn: AnswerfileDict = {
             'TAG': defn['TAG'],
             'CONTENTS': [],
         }
@@ -49,29 +51,39 @@ class AnswerFile:
                 if isinstance(value, str):
                     new_defn['CONTENTS'] = value
                 else:
+                    # TypedDict is not typed enough?
+                    value_as_sequence: Sequence[SimpleAnswerfileDict]
+                    if isinstance(value, Sequence):
+                        value_as_sequence = value
+                    else:
+                        # FIXME what is that?
+                        value_as_sequence = (
+                            cast(SimpleAnswerfileDict, value),
+                        )
                     new_defn['CONTENTS'] = [
                         AnswerFile._normalize_structure(item)
-                        for item in value
+                        for item in value_as_sequence
                         if item is not None
                     ]
             elif key == 'TAG':
                 pass            # already copied
             else:
-                new_defn[key] = value
+                new_defn[key] = value # type: ignore[literal-required]
 
         return new_defn
 
     # convert to a ElementTree.Element tree suitable for further
     # modification before we serialize it to XML
     @staticmethod
-    def _defn_to_xml_et(defn: dict[str, Any], *, parent: ET.Element | None = None) -> ET.Element:
+    def _defn_to_xml_et(defn: AnswerfileDict, /, *, parent: Optional[ET.Element] = None) -> ET.Element:
         assert isinstance(defn, dict)
-        defn = dict(defn)
-        name = defn.pop('TAG')
+        defn_copy = dict(defn)
+        name = defn_copy.pop('TAG')
         assert isinstance(name, str)
-        contents = defn.pop('CONTENTS', ())
+        contents = cast(str | list[AnswerfileDict], defn_copy.pop('CONTENTS', []))
         assert isinstance(contents, (str, list))
-        element = ET.Element(name, {}, **defn)
+        defn_filtered = cast(dict[str, str], defn_copy)
+        element = ET.Element(name, {}, **defn_filtered)
         if parent is not None:
             parent.append(element)
         if isinstance(contents, str):

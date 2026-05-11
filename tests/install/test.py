@@ -97,6 +97,7 @@ class TestNested:
         ))
     def test_install(self, vm_booted_with_installer: VM, system_disks_names: list[str],
                      firmware: str, iso_version: str, package_source: str, local_sr: str) -> None:
+        assert isinstance(system_disks_names, list)
         host_vm = vm_booted_with_installer
         assert host_vm.ip is not None
         installer.monitor_install(ip=host_vm.ip)
