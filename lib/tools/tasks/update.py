@@ -18,7 +18,7 @@ def update_pools(inventory: Inventory) -> None:
 
         Every non-master hosts in inventory will be ignored
 
-    *Update master hosts declared in inventory first, then, update secondary hosts attached to each master.*
+    *Update each pool's master host declared in inventory first, then, update other hosts for each pool.*
 
     :param dict inventory:
         Each host (key) holds its own config data (values, eg: `enablerepos`).
@@ -34,15 +34,16 @@ def update_pools(inventory: Inventory) -> None:
         except NotAMasterHostError:
             logger.warning(f"[{host}] Skipping: not a master host")
 
+    # update master hosts
     with ThreadPoolExecutor() as executor:
         for p in pools:
             executor.submit(p.master.update, inventory_hosts[p.master.hostname_or_ip]["repositories"])
 
-    # secondary hosts
+    # update other hosts
     with ThreadPoolExecutor() as executor:
         for p in pools:
-            # omit first item because it is a primary (master)
-            for secondary in p.hosts[1:]:
-                # repos are the same as the primary (master)
+            # omit first item because it is the pool's master
+            for other_host in p.hosts[1:]:
+                # repos are the same as for the master host
                 repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
-                executor.submit(secondary.update, repos)
+                executor.submit(other_host.update, repos)

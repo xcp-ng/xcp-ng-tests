@@ -641,17 +641,17 @@ uv run scripts/tools.py -h
 This command performs an update operation on remote targets.
 
 ```bash
-uv run scripts/tools.py update -H primary1 primary2
+uv run scripts/tools.py update -H master1 master2
 ```
 
 For each pool target :
 
-1. Update master (primary) host of the pool:
+1. Update master host of the pool:
   * Clean cached metadata
   * Update with repository manager (yum): Optionally enables repositories
   * Reboot
-2. Get attached secondary hosts of the pool
-  * Repeat step `1.` for each secondary
+2. Get other hosts of the pool
+  * Repeat step `1.` for each host
 
 **Inventory file**
 
@@ -692,4 +692,4 @@ hosting_pool = "B"
 >
 > `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
 >
-> * Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
+> * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.
