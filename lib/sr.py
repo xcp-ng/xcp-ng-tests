@@ -6,6 +6,11 @@ import time
 import lib.commands as commands
 from lib.common import (
     GiB,
+    _param_add,
+    _param_clear,
+    _param_get,
+    _param_remove,
+    _param_set,
     prefix_object_name,
     randid,
     safe_split,
@@ -15,13 +20,15 @@ from lib.common import (
 )
 from lib.vdi import VDI, ImageFormat
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.pool import Pool
 
 class SR:
+    xe_prefix = 'sr'
+
     def __init__(self, uuid: str, pool: Pool):
         self.uuid = uuid
         self.pool = pool
@@ -160,19 +167,46 @@ class SR:
                 self._main_host = self.pool.get_host_by_uuid(self.hosts_uuids()[0])
         return self._main_host
 
+    @overload
+    def param_get(self, param_name: str, key: str | None = ..., accept_unknown_key: Literal[False] = ...) -> str:
+        ...
+
+    @overload
+    def param_get(
+        self, param_name: str, key: str | None = ..., accept_unknown_key: Literal[True] = ...
+    ) -> str | None:
+        ...
+
+    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
+        return _param_get(self.pool.master, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+
+    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
+        _param_set(self.pool.master, self.xe_prefix, self.uuid, param_name, value, key)
+
+    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
+        _param_remove(self.pool.master, self.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
+
+    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
+        _param_add(self.pool.master, self.xe_prefix, self.uuid, param_name, value, key)
+
+    def param_clear(self, param_name: str) -> None:
+        _param_clear(self.pool.master, self.xe_prefix, self.uuid, param_name)
+
     def content_type(self) -> str:
-        return self.pool.master.xe('sr-param-get', {'uuid': self.uuid, 'param-name': 'content-type'})
+        return self.param_get('content-type')
 
     def is_shared(self) -> bool:
         if self._is_shared is None:
-            self._is_shared = strtobool(self.pool.master.xe('sr-param-get',
-                                                            {'uuid': self.uuid, 'param-name': 'shared'}))
+            self._is_shared = strtobool(self.param_get('shared'))
         return self._is_shared
 
     def get_type(self) -> str:
         if self._type is None:
-            self._type = self.pool.master.xe("sr-param-get", {"uuid": self.uuid, "param-name": "type"})
+            self._type = self.param_get('type')
         return self._type
+
+    def get_name_label(self) -> str:
+        return self.param_get('name-label')
 
     def create_vdi(
         self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
