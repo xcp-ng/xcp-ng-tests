@@ -40,7 +40,7 @@ class TestHSTS:
 
     @staticmethod
     def __get_header(host: Host) -> list[str]:
-        def get_or_none():
+        def get_or_none() -> list[str] | None:
             res = commands.local_cmd(["curl", "-s", "-XGET", "-k", "-I", "https://"
                                       + wrap_ip(host.hostname_or_ip)], check=False)
             if res.returncode != 0:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 import json
@@ -16,7 +18,7 @@ from tests.storage import vdi_is_open
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
-from typing import Tuple
+from typing import Generator, Tuple
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
@@ -27,7 +29,7 @@ def get_drbd_status(host: Host, resource: str):
     logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
     return json.loads(host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"])))
 
-def get_corrupted_resources(host: Host, resource: str):
+def get_corrupted_resources(host: Host, resource: str) -> list[tuple[str, str, int]]:
     return [
         (
             res.get("name", ""),
@@ -40,7 +42,7 @@ def get_corrupted_resources(host: Host, resource: str):
         if peer.get("out-of-sync", 0) > 0
     ]
 
-def wait_drbd_sync(host: Host, resource: str):
+def wait_drbd_sync(host: Host, resource: str) -> None:
     logging.info("[%s] Waiting for DRBD sync on resource `%s`...", host, resource)
     host.ssh(shlex.join(["drbdadm", "wait-sync", resource]))
 
@@ -109,7 +111,9 @@ class TestLinstorSR:
             vm.shutdown(verify=True)
 
     @pytest.fixture(scope='function')
-    def host_and_vm_with_corrupted_vdi_on_linstor_sr(self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM):
+    def host_and_vm_with_corrupted_vdi_on_linstor_sr(
+        self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM
+    ) -> Generator[tuple[Host, VM, str], None, None]:
         vm: VM = vm_on_linstor_sr_function
         pool: Pool = host.pool
         master: Host = pool.master
@@ -133,9 +137,7 @@ class TestLinstorSR:
         yield vdi_host, vm, volume_name
 
     @pytest.mark.small_vm
-    def test_resynchronization(
-        self, host_and_vm_with_corrupted_vdi_on_linstor_sr: Tuple[Host, VM, str]
-    ):
+    def test_resynchronization(self, host_and_vm_with_corrupted_vdi_on_linstor_sr: Tuple[Host, VM, str]) -> None:
         (host, vm, resource_name) = host_and_vm_with_corrupted_vdi_on_linstor_sr
         hostname = host.hostname()
 
