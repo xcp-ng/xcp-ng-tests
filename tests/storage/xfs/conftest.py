@@ -5,6 +5,7 @@ import pytest
 import logging
 from dataclasses import dataclass
 
+from lib import config
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -57,7 +58,7 @@ def xfs_sr(
 
 @pytest.fixture(scope='module')
 def vdi_on_xfs_sr(xfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = xfs_sr.create_vdi('XFS-local-VDI-test')
+    vdi = xfs_sr.create_vdi('XFS-local-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 

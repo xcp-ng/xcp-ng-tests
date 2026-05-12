@@ -19,6 +19,7 @@ from lib.common import (
     HostAddress,
     callable_marker,
     is_uuid,
+    parse_size,
     prefix_object_name,
     setup_formatted_and_mounted_disk,
     shortened_nodeid,
@@ -103,12 +104,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Format of VDI to execute tests on."
         "Example: vhd,qcow2"
     )
+    parser.addoption(
+        "--volume-size",
+        action="store",
+        default="1GiB",
+        help="Default volume size for tests"
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
     assert ssh_output_max_lines is not None
     global_config.ssh_output_max_lines = int(ssh_output_max_lines)
+    volume_size = config.getoption('--volume-size')
+    assert volume_size is not None
+    global_config.volume_size = parse_size(volume_size)
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:

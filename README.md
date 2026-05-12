@@ -175,6 +175,11 @@ Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those 
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
+Some tests support an optional `--volume-size` parameter to configure the size of test VDIs (virtual disk images). This parameter accepts size strings like `1GiB`, `2.5TiB`, `500MiB`, or byte values. The default is `1GiB`. This is useful for testing with larger volumes. Example:
+```
+pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1 --volume-size=10GiB
+```
+
 See also, below: "Markers and test selection" and "Running test jobs with `jobs.py`"
 
 ### Test log level

@@ -59,8 +59,8 @@ def moosefs_sr(moosefs_device_config: dict[str, str], pool_with_moosefs_enabled:
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_moosefs_sr(moosefs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = moosefs_sr.create_vdi('MooseFS-VDI-test')
+def vdi_on_moosefs_sr(moosefs_sr) -> Generator[VDI, None, None]:
+    vdi = moosefs_sr.create_vdi('MooseFS-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
