@@ -186,7 +186,7 @@ def _by_name(devices: list[Host.BlockDeviceInfo], name: str) -> Host.BlockDevice
 # focused tests
 # ---------------------------------------------------------------------------
 
-def test_plain_disk_no_children():
+def test_plain_disk_no_children() -> None:
     devices = _rescan(
         'NAME="sda" KNAME="sda" PKNAME="" SIZE="500107862016" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN=""\n'
     )
@@ -201,14 +201,14 @@ def test_plain_disk_no_children():
     assert d.wwn == ''
 
 
-def test_plain_disk_wwn_stripped():
+def test_plain_disk_wwn_stripped() -> None:
     devices = _rescan(
         'NAME="sda" KNAME="sda" PKNAME="" SIZE="500107862016" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="0x6005076813810286"\n'
     )
     assert devices[0].wwn == '6005076813810286'
 
 
-def test_disk_with_free_partitions_is_available():
+def test_disk_with_free_partitions_is_available() -> None:
     devices = _rescan("""\
 NAME="sda" KNAME="sda" PKNAME="" SIZE="536870912000" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN=""
 NAME="sda1" KNAME="sda1" PKNAME="sda" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN=""
@@ -221,7 +221,7 @@ NAME="sda2" KNAME="sda2" PKNAME="sda" SIZE="536334039040" LOG-SEC="512" TYPE="pa
     assert d.available is True
 
 
-def test_disk_with_mounted_partition_is_unavailable():
+def test_disk_with_mounted_partition_is_unavailable() -> None:
     devices = _rescan("""\
 NAME="sda" KNAME="sda" PKNAME="" SIZE="536870912000" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN=""
 NAME="sda1" KNAME="sda1" PKNAME="sda" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN=""
@@ -231,7 +231,7 @@ NAME="sda2" KNAME="sda2" PKNAME="sda" SIZE="536334039040" LOG-SEC="512" TYPE="pa
     assert devices[0].available is False
 
 
-def test_disk_with_partition_in_raid_is_unavailable():
+def test_disk_with_partition_in_raid_is_unavailable() -> None:
     devices = _rescan("""\
 NAME="sda" KNAME="sda" PKNAME="" SIZE="536870912000" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN=""
 NAME="sda1" KNAME="sda1" PKNAME="sda" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN=""
@@ -242,7 +242,7 @@ NAME="md0" KNAME="md0" PKNAME="sda1" SIZE="536739586048" LOG-SEC="512" TYPE="rai
     assert disk.available is False
 
 
-def test_md_array_detected():
+def test_md_array_detected() -> None:
     devices = _rescan(LSBLK_MD_FREE)
     md = _by_name(devices, 'md0')
     assert md.type == 'md'
@@ -250,19 +250,19 @@ def test_md_array_detected():
     assert md.size == 30721630535680
 
 
-def test_md_array_deduplicated():
+def test_md_array_deduplicated() -> None:
     # md0 appears twice in the lsblk output (once per member disk)
     devices = _rescan(LSBLK_MD_FREE)
     md_devices = [d for d in devices if d.name == 'md0']
     assert len(md_devices) == 1
 
 
-def test_md_array_free_is_available():
+def test_md_array_free_is_available() -> None:
     devices = _rescan(LSBLK_MD_FREE)
     assert _by_name(devices, 'md0').available is True
 
 
-def test_md_array_mounted_is_unavailable():
+def test_md_array_mounted_is_unavailable() -> None:
     devices = _rescan("""\
 NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="15360950534144" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN=""
 NAME="md0" KNAME="md0" PKNAME="nvme0n1" SIZE="30721630535680" LOG-SEC="512" TYPE="raid0" MOUNTPOINT="/mnt/data" WWN=""
@@ -272,7 +272,7 @@ NAME="md0" KNAME="md0" PKNAME="nvme1n1" SIZE="30721630535680" LOG-SEC="512" TYPE
     assert _by_name(devices, 'md0').available is False
 
 
-def test_md_member_disks_are_unavailable():
+def test_md_member_disks_are_unavailable() -> None:
     devices = _rescan(LSBLK_MD_FREE)
     assert _by_name(devices, 'nvme0n1').available is False
     assert _by_name(devices, 'nvme1n1').available is False
@@ -282,7 +282,7 @@ def test_md_member_disks_are_unavailable():
 # full real-world output tests
 # ---------------------------------------------------------------------------
 
-def test_full_output_device_count():
+def test_full_output_device_count() -> None:
     devices = _rescan(LSBLK_FULL)
     disks = [d for d in devices if d.type == 'disk']
     mpaths = [d for d in devices if d.type == 'mpath']
@@ -295,14 +295,14 @@ def test_full_output_device_count():
     assert len(mpaths) == 2
 
 
-def test_full_output_mpath_deduplicated():
+def test_full_output_mpath_deduplicated() -> None:
     devices = _rescan(LSBLK_FULL)
     mpaths = [d for d in devices if d.type == 'mpath']
     names = {d.name for d in mpaths}
     assert names == {'dm-0', 'dm-8'}
 
 
-def test_full_output_mpath_paths():
+def test_full_output_mpath_paths() -> None:
     devices = _rescan(LSBLK_FULL)
     dm0 = _by_name(devices, 'dm-0')
     dm8 = _by_name(devices, 'dm-8')
@@ -310,7 +310,7 @@ def test_full_output_mpath_paths():
     assert dm8.path == '/dev/mapper/3600507638081046dd800000000000043'
 
 
-def test_full_output_mpath_availability():
+def test_full_output_mpath_availability() -> None:
     devices = _rescan(LSBLK_FULL)
     # dm-0 has mounted partitions (/, [SWAP], /boot/efi, /var/log) -> unavailable
     assert _by_name(devices, 'dm-0').available is False
@@ -318,20 +318,20 @@ def test_full_output_mpath_availability():
     assert _by_name(devices, 'dm-8').available is False
 
 
-def test_full_output_mpath_path_disks_unavailable():
+def test_full_output_mpath_path_disks_unavailable() -> None:
     devices = _rescan(LSBLK_FULL)
     # First-seen path disk for dm-0 and dm-8 must be unavailable (mpath child)
     assert _by_name(devices, 'sdd').available is False
     assert _by_name(devices, 'sdo').available is False
 
 
-def test_full_output_free_plain_disks_available():
+def test_full_output_free_plain_disks_available() -> None:
     devices = _rescan(LSBLK_FULL)
     # sdf is the first-seen representative of the 8 free disks sharing the same WWN
     assert _by_name(devices, 'sdf').available is True
 
 
-def test_full_output_disk_wwn():
+def test_full_output_disk_wwn() -> None:
     devices = _rescan(LSBLK_FULL)
     # only the first-seen representative per WWN group is present after deduplication
     assert _by_name(devices, 'sdf').wwn == '6005076813810286'
@@ -339,14 +339,14 @@ def test_full_output_disk_wwn():
     assert _by_name(devices, 'sdo').wwn == '600507638081046d'
 
 
-def test_full_output_mpath_wwn():
+def test_full_output_mpath_wwn() -> None:
     devices = _rescan(LSBLK_FULL)
     # mpath NAME is the T10 NAA identifier; strip the leading '3' and truncate to 16 hex chars
     assert _by_name(devices, 'dm-0').wwn == '6005076813810225'
     assert _by_name(devices, 'dm-8').wwn == '600507638081046d'
 
 
-def test_disk_with_lvm_child_is_unavailable():
+def test_disk_with_lvm_child_is_unavailable() -> None:
     # part -> lvm (mounted): unavailability must propagate up through the partition to the disk
     devices = _rescan("""\
 NAME="sda" KNAME="sda" PKNAME="" SIZE="536870912000" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN=""
@@ -379,19 +379,19 @@ NAME="sda6" KNAME="sda6" PKNAME="sda" SIZE="1073741824" LOG-SEC="512" TYPE="part
 """
 
 
-def test_raid1_host_sdb_free():
+def test_raid1_host_sdb_free() -> None:
     # sdb has only unused partitions -> available
     devices = _rescan(LSBLK_RAID1_HOST)
     assert _by_name(devices, 'sdb').available is True
 
 
-def test_raid1_host_sda_unavailable():
+def test_raid1_host_sda_unavailable() -> None:
     # sda has mounted partitions and an lvm child -> unavailable
     devices = _rescan(LSBLK_RAID1_HOST)
     assert _by_name(devices, 'sda').available is False
 
 
-def test_raid1_host_md0_detected_and_deduplicated():
+def test_raid1_host_md0_detected_and_deduplicated() -> None:
     devices = _rescan(LSBLK_RAID1_HOST)
     md_devices = [d for d in devices if d.name == 'md0']
     assert len(md_devices) == 1
@@ -399,7 +399,7 @@ def test_raid1_host_md0_detected_and_deduplicated():
     assert md_devices[0].available is True
 
 
-def test_raid1_host_nvme_members_unavailable():
+def test_raid1_host_nvme_members_unavailable() -> None:
     devices = _rescan(LSBLK_RAID1_HOST)
     assert _by_name(devices, 'nvme0n1').available is False
     assert _by_name(devices, 'nvme1n1').available is False
@@ -421,12 +421,12 @@ NAME="sda6" KNAME="sda6" PKNAME="sda" SIZE="1073741824" LOG-SEC="512" TYPE="part
 """
 
 
-def test_simple_host_nvme_free():
+def test_simple_host_nvme_free() -> None:
     devices = _rescan(LSBLK_SIMPLE_HOST)
     assert _by_name(devices, 'nvme0n1').available is True
 
 
-def test_simple_host_sda_unavailable():
+def test_simple_host_sda_unavailable() -> None:
     devices = _rescan(LSBLK_SIMPLE_HOST)
     assert _by_name(devices, 'sda').available is False
 
@@ -447,7 +447,7 @@ NAME="nvme1n1p6" KNAME="nvme1n1p6" PKNAME="nvme1n1" SIZE="1073741824" LOG-SEC="5
 """
 
 
-def test_4k_block_device_detected():
+def test_4k_block_device_detected() -> None:
     devices = _rescan(LSBLK_4K_BLOCK_DEVICE)
     d = _by_name(devices, 'nvme0n1')
     assert d.path == '/dev/nvme0n1'
@@ -464,12 +464,12 @@ NAME="sdb" KNAME="sdb" PKNAME="" SIZE="500107862016" LOG-SEC="512" TYPE="disk" M
 """
 
 
-def test_no_mpath_same_wwn_deduplicated():
+def test_no_mpath_same_wwn_deduplicated() -> None:
     devices = _rescan(LSBLK_NO_MPATH_SAME_WWN)
     assert len(devices) == 1
     assert devices[0].name == 'sda'
 
 
-def test_no_mpath_same_wwn_available():
+def test_no_mpath_same_wwn_available() -> None:
     devices = _rescan(LSBLK_NO_MPATH_SAME_WWN)
     assert devices[0].available is True
