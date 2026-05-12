@@ -103,9 +103,10 @@ def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
                 )
 
 @pytest.fixture(scope='function')
-def system_disks_names(request: pytest.FixtureRequest) -> Generator[str, None, None]:
+def system_disks_names(request: pytest.FixtureRequest) -> tuple[str, ...]:
     firmware = request.getfixturevalue("firmware")
-    yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    main_disk = {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    return (main_disk,)
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
