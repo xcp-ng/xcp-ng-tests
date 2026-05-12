@@ -12,7 +12,7 @@ from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
-from typing import Literal
+from typing import Literal, Tuple
 
 def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
     try:
@@ -24,6 +24,28 @@ def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
         ), 'Bad error, current: {}'.format(e.stdout)
         return
     assert False, 'SR creation should not have succeeded!'
+
+def partial_stream_size(vdi_size: int) -> int:
+    return min((vdi_size // 16 // (32 * KiB)) * (32 * KiB), 2 * GiB)
+
+def partially_populate_device(vm: VM, dev_path: str, dev_size: int) -> Tuple[str, str, str]:
+    logging.info(f"Generate {dev_path} content")
+    size = partial_stream_size(dev_size)
+    # generate at the start, in the middle and the end of the disk
+    # use seeds unlikely to collide with other usages
+    checksum1 = randstream(vm, f'generate --seed 10 --size {size} {dev_path}')
+    checksum2 = randstream(vm, f'generate --seed 11 --position {dev_size // 2} --size {size} {dev_path}')
+    checksum3 = randstream(vm, f'generate --seed 12 --position {dev_size - size} --size {size} {dev_path}')
+    return (checksum1, checksum2, checksum3)
+
+def validate_partially_populated_device(vm: VM, dev_path: str, dev_size: int, checksums: Tuple[str, str, str]) -> None:
+    logging.info(f"Validate {dev_path} content")
+    size = partial_stream_size(dev_size)
+    checksum1, checksum2, checksum3 = checksums
+    randstream(vm, f'validate --expected-checksum {checksum1} --size {size} {dev_path}')
+    randstream(vm, f'validate --expected-checksum {checksum2} --position {dev_size // 2} --size {size} {dev_path}')
+    randstream(vm, f'validate --expected-checksum {checksum3} --position {dev_size - size} --size {size} {dev_path}')
+
 
 def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     """ Storage migration of a shutdown VM, then migrate it back. """
@@ -197,16 +219,15 @@ CoalesceOperation = Literal['snapshot', 'clone']
 
 def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
     vdi_size = vdi.get_virtual_size()
-    # second stream is 1/8 of the full one, truncated to a multiple of 32KiB, in order to
-    # be validable in a single command
-    second_stream_size = (vdi_size // 8 // (32 * KiB)) * (32 * KiB)
+    stream_size = partial_stream_size(vdi_size)
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
-    checksum = randstream(vm, f'generate {dev}')
-    # default seed is 0
-    randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+    # generate at the start, in the middle and the end of the disk
+    checksum1, checksum2, checksum3 = partially_populate_device(vm, dev, vdi_size)
+    # make sure we can read that exact data before the snapshot/clone
+    validate_partially_populated_device(vm, dev, vdi_size, (checksum1, checksum2, checksum3))
     new_vdi: VDI | None = None
     match vdi_op:
         case 'clone': new_vdi = vdi.clone()
@@ -214,11 +235,26 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
     defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
     assert vdi is not None
 
-    randstream(vm, f'generate --seed 1 --size {second_stream_size} {dev}')
-    checksum = randstream(vm, f"validate {dev}")
+    # add some data in a non-used place, and overwrite an already used one
+    checksum2bis = randstream(vm, f'generate --seed 0 --position {vdi_size // 2} --size {stream_size} {dev}')
+    checksum4 = randstream(vm, f'generate --seed 1 --position {stream_size} --size {stream_size} {dev}')
+    # make sure we can write that data before the coalesce
+    randstream(
+        vm, f'validate --expected-checksum {checksum2bis} --position {vdi_size // 2} --size {stream_size} {dev}',
+    )
+    randstream(
+        vm, f'validate --expected-checksum {checksum4} --position {stream_size} --size {stream_size} {dev}'
+    )
+
+    # trigger the coalesce
     vdi.wait_for_coalesce(new_vdi.destroy)
     new_vdi = None
-    randstream(vm, f'validate --expected-checksum {checksum} {dev}')
+
+    # verify the data is still as expected
+    validate_partially_populated_device(vm, dev, vdi_size, (checksum1, checksum2bis, checksum3))
+    randstream(
+        vm, f'validate --expected-checksum {checksum4} --position {stream_size} --size {stream_size} {dev}'
+    )
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
