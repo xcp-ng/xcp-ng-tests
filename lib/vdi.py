@@ -13,7 +13,7 @@ from lib.common import (
     wait_for,
 )
 
-from typing import TYPE_CHECKING, Callable, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Callable, Literal, TypeAlias, TypeVar, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 R = TypeVar("R")
 
-ImageFormat = Literal['qcow2', 'raw', 'vhd']
+ImageFormat: TypeAlias = Literal['qcow2', 'raw', 'vhd']
 
 class VDI:
     xe_prefix = "vdi"
