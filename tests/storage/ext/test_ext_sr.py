@@ -104,6 +104,7 @@ class TestEXTSR:
         vdi_export_import(storage_test_vm, ext_sr, image_format, temp_large_dir, defer)
 
     @pytest.mark.small_vm
+    @pytest.mark.disk_throughput_intensive
     def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_ext_sr: VDI, defer: Defer):
         full_vdi_write(storage_test_vm, vdi_on_ext_sr, defer)
 

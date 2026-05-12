@@ -43,6 +43,7 @@ class TestLVMOISCSISRCreateDestroy:
 
 @pytest.mark.usefixtures('image_format')
 @pytest.mark.usefixtures("lvmoiscsi_sr")
+@pytest.mark.thick_provisioned
 class TestLVMOISCSISR:
     @pytest.mark.quicktest
     def test_quicktest(self, lvmoiscsi_sr: SR) -> None:
@@ -77,6 +78,7 @@ class TestLVMOISCSISR:
         coalesce_integrity(storage_test_vm, vdi_on_lvmoiscsi_sr, vdi_op, defer)
 
     @pytest.mark.small_vm
+    @pytest.mark.disk_throughput_intensive
     def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_lvmoiscsi_sr: VDI, defer: Defer):
         full_vdi_write(storage_test_vm, vdi_on_lvmoiscsi_sr, defer)
 
