@@ -155,8 +155,9 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
 set -ex
 INSTALLIMG="$1"
 
-mkdir -p "$INSTALLIMG/root/.ssh"
+install -d -m 750 "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+chmod 600 "$INSTALLIMG/root/.ssh/authorized_keys"
 
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
