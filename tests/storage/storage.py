@@ -16,7 +16,7 @@ from typing import Literal
 
 MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
-def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
+def try_to_create_sr_with_missing_device(sr_type: str, label: str, host: Host) -> None:
     try:
         host.sr_create(sr_type, label, {}, verify=True)
     except SSHCommandFailed as e:
@@ -227,7 +227,7 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 XVACompression = Literal['none', 'gzip', 'zstd']
 
 def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str,
-                      defer: Defer, *, with_snapshot=False) -> None:
+                      defer: Defer, *, with_snapshot: bool = False) -> None:
     # clone the vm, so we can resize the disk without affecting the vm from the fixture
     vm: VM | None = source_vm.clone()
     snap1: Snapshot | None = None
@@ -342,7 +342,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
 
     validate_partially_populated_device(vm, dev, spans)
 
-def full_vdi_write(vm: VM, vdi: VDI, defer: Defer):
+def full_vdi_write(vm: VM, vdi: VDI, defer: Defer) -> None:
     vdi.get_virtual_size()
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))

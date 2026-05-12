@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import pytest
 
 import json
 import logging
 import shlex
 import time
+
+from pydantic import BaseModel, Field, TypeAdapter
 
 from lib.commands import SSHCommandFailed
 from lib.common import safe_split, vm_image, wait_for
@@ -16,31 +20,50 @@ from tests.storage import vdi_is_open
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
-from typing import Tuple
+from typing import Generator, Tuple
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
 # - access to XCP-ng RPM repository from the host
 
 
-def get_drbd_status(host: Host, resource: str):
-    logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
-    return json.loads(host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"])))
+class DrbdPeerDevice(BaseModel):
+    out_of_sync: int = Field(default=0, alias="out-of-sync")
+    peer_disk_state: str = Field(default="", alias="peer-disk-state")
 
-def get_corrupted_resources(host: Host, resource: str):
+
+class DrbdConnection(BaseModel):
+    name: str = ""
+    peer_devices: list[DrbdPeerDevice] = Field(default=[], alias="peer-devices")
+
+
+class DrbdResource(BaseModel):
+    name: str = ""
+    connections: list[DrbdConnection] = Field(default=[], alias="connections")
+
+
+_drbd_status_adapter = TypeAdapter(list[DrbdResource])
+
+def get_drbd_status(host: Host, resource: str) -> list[DrbdResource]:
+    logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
+    return _drbd_status_adapter.validate_json(
+        host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"]))
+    )
+
+def get_corrupted_resources(host: Host, resource: str) -> list[tuple[str, str, int]]:
     return [
         (
-            res.get("name", ""),
-            conn.get("name", ""),
-            peer.get("out-of-sync", 0),
+            res.name,
+            conn.name,
+            peer.out_of_sync,
         )
         for res in get_drbd_status(host, resource)
-        for conn in res.get("connections", [])
-        for peer in conn.get("peer_devices", [])
-        if peer.get("out-of-sync", 0) > 0
+        for conn in res.connections
+        for peer in conn.peer_devices
+        if peer.out_of_sync > 0
     ]
 
-def wait_drbd_sync(host: Host, resource: str):
+def wait_drbd_sync(host: Host, resource: str) -> None:
     logging.info("[%s] Waiting for DRBD sync on resource `%s`...", host, resource)
     host.ssh(shlex.join(["drbdadm", "wait-sync", resource]))
 
@@ -109,7 +132,9 @@ class TestLinstorSR:
             vm.shutdown(verify=True)
 
     @pytest.fixture(scope='function')
-    def host_and_vm_with_corrupted_vdi_on_linstor_sr(self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM):
+    def host_and_vm_with_corrupted_vdi_on_linstor_sr(
+        self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM
+    ) -> Generator[tuple[Host, VM, str], None, None]:
         vm: VM = vm_on_linstor_sr_function
         pool: Pool = host.pool
         master: Host = pool.master
@@ -135,17 +160,17 @@ class TestLinstorSR:
     @pytest.mark.small_vm
     def test_resynchronization(
         self, host_and_vm_with_corrupted_vdi_on_linstor_sr: Tuple[Host, VM, str]
-    ):
+    ) -> None:
         (host, vm, resource_name) = host_and_vm_with_corrupted_vdi_on_linstor_sr
         hostname = host.hostname()
 
         try:
             other_host = next(
-                next(h for h in host.pool.hosts if h.hostname() == conn.get("name", ""))
+                next(h for h in host.pool.hosts if h.hostname() == conn.name)
                 for res in get_drbd_status(host, resource_name)
-                for conn in res.get("connections", [])
-                for peer in conn.get("peer_devices", [])
-                if peer.get("peer-disk-state", "") == "UpToDate"
+                for conn in res.connections
+                for peer in conn.peer_devices
+                if peer.peer_disk_state == "UpToDate"
             )
             logging.info("Elected `%s` as peer for verification and repair", other_host)
         except StopIteration:
