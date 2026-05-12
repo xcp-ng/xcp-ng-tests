@@ -252,7 +252,13 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
+def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
+    # clone the vm, so we can resize the disk without affecting the vm from the fixture
+    vm: VM | None = source_vm.clone()
+    defer(lambda: vm.destroy() if vm is not None else None)
+    assert vm is not None
+    host = vm.host
+    sr = vm.vdis[0].sr
     # we can't shrink a volume
     volume_size = max(vm.vdis[0].get_virtual_size(), config.volume_size)
     vm.vdis[0].resize(volume_size)
@@ -285,7 +291,7 @@ def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, 
     vm.shutdown(verify=True)
 
     xva_path = f'{temp_large_dir}/{vm.uuid}.xva'
-    defer(lambda: vm.host.ssh(f'rm -f {xva_path}'))
+    defer(lambda: host.ssh(f'rm -f {xva_path}'))
     vm.export(xva_path, compression)
     # check that the zero blocks are not part of the result. Most of the data is from the random stream, so
     # compression has little effect. We just take into account the system size
@@ -296,9 +302,13 @@ def xva_export_import(vm: VM, compression: XVACompression, temp_large_dir: str, 
         f"unexpected xva size {size_mb}MiB, was expected to be between {min_size}MiB and {max_size}MiB"
     )
 
-    imported_vm = vm.host.import_vm(xva_path, vm.vdis[0].sr.uuid)
+    # destroy the source vm to free some space to re-import the image
+    vm.destroy()
+    vm = None
+
+    imported_vm = host.import_vm(xva_path, sr.uuid)
     defer(lambda: imported_vm.destroy())
-    assert vm.vdis[0].get_virtual_size() == volume_size
+    assert imported_vm.vdis[0].get_virtual_size() == volume_size
 
     imported_vm.start()
     imported_vm.wait_for_vm_running_and_ssh_up()
