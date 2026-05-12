@@ -4,6 +4,7 @@ import logging
 import re
 
 from lib.cpu_policy import NO_SUBLEAF, HostCpuPolicy
+from lib.host import Host
 
 # Requirements:
 # - one XCP-ng host (--host) >= 8.3
@@ -11,7 +12,7 @@ from lib.cpu_policy import NO_SUBLEAF, HostCpuPolicy
 
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestDts:
-    def test_dts(self, host):
+    def test_dts(self, host: Host) -> None:
         """
         We can't meaningfully check if DTS/PTS hardware feature works neither
         if Xen returns correct values. The goal here is to make sure that DTS
