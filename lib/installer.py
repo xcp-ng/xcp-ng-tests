@@ -83,7 +83,8 @@ class AnswerFile:
 
 def poweroff(ip: str) -> None:
     try:
-        ssh(ip, "poweroff")
+        # disable multiplexing to get proper info in SSHCommandFailed
+        ssh(ip, "poweroff", multiplexing=False)
     except SSHCommandFailed as e:
         # ignore connection closed by reboot
         if e.returncode == 255 and "closed by remote host" in e.stdout:
