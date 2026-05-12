@@ -140,9 +140,9 @@ class TestNFSSR:
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) \
-            -> None:
-        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.volume_size > 20 * GiB:
+    def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, temp_large_dir: str,
+                               defer: Defer) -> None:
+        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.write_volume_cap > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         xva_export_import(dispatch_nfs, compression, temp_large_dir, defer)
 
@@ -150,7 +150,7 @@ class TestNFSSR:
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
     def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat,
                                temp_large_dir: str, defer: Defer) -> None:
-        if "NFS4" in dispatch_nfs.get_name_label() and config.volume_size > 20 * GiB:
+        if "NFS4" in dispatch_nfs.get_name_label() and config.write_volume_cap > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format, temp_large_dir, defer)
 
