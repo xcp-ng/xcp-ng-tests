@@ -424,4 +424,4 @@ def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None
 def hash_password(password: str) -> str:
     """Hash password for /etc/shadow."""
     # XCP-ng uses sha512 with 5000 rounds by default
-    return sha512_crypt.using(rounds=5000).hash(password)
+    return sha512_crypt.using(rounds=5000).hash(password)  # type: ignore[no-untyped-call]
