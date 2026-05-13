@@ -116,7 +116,7 @@ class VDI:
 
     def wait_for_coalesce(self, fn: Callable[[], R] | None = None) -> R | None:
         previous_parent = self.get_parent()
-        ret: R | None = None
+        ret = None
         if fn is not None:
             ret = fn()
         # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.
