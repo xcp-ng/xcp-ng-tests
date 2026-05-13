@@ -13,4 +13,5 @@ types-pygments
 types-colorama
 types-pexpect
 zizmor
+prek>=0.3.11
 -r base.txt
