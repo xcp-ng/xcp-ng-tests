@@ -8,19 +8,6 @@ env:
   PREK_COLOR: "always"
 
 jobs:
-  mypy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/uv-setup
-      - name: Create a dummy data.py
-        run: cp data.py-dist data.py
-      - name: Create a dummy vm_data.py
-        run: cp vm_data.py-dist vm_data.py
-      - run: prek -a mypy
-
   pyright:
     runs-on: ubuntu-latest
     steps:
