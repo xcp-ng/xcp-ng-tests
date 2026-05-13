@@ -42,6 +42,9 @@ check_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
+# allow more pythonic, in the flow type inferences and redefinitions
+local_partial_types = true
+allow_redefinition_new = true
 
 [tool.pyright]
 typeCheckingMode = "standard"

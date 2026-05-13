@@ -368,7 +368,7 @@ class Host:
         return None
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
-        vm: VM | None = None
+        vm = None
         if use_cache:
             assert sr_uuid is not None
             if '://' in uri and uri.startswith("clone"):
