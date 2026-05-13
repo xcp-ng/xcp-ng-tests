@@ -391,7 +391,7 @@ class Host:
         return None
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
-        vm: VM | None = None
+        vm = None
 
         if uri.startswith("clone://") or uri.startswith("clone+start://"):
             assert sr_uuid is not None

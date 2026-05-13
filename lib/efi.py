@@ -440,7 +440,6 @@ class EFIAuth:
     def sign_with(self, signer: Self) -> None:
         """Sign this object, using another EFIAuth object as signer."""
         owner_cert = signer.owner_cert()
-        assert owner_cert is not None
 
         self._auth_data = owner_cert.sign_efi_sig_db(self.name, self._efi_signature_list, self.guid)
 

@@ -21,24 +21,19 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "autopep8",
     "bs4>=0.0.1",
-    "mypy",
     "flake8",
     "flake8-pyproject",
+    "icecream",
+    "libarchive-c==5.3",
+    "prek",
     "pydocstyle",
     "pyright",
     "ruff",
-    "types-requests",
-    "typing-extensions",
-    "libarchive-c==5.3",
-    "types-pygments",
-    "types-colorama",
-    "types-pexpect",
-    "zizmor",
-    "prek",
-    "autopep8",
     "types-passlib",
-    "icecream",
+    "typing-extensions",
+    "zizmor",
 ]
 
 [tool.pyright]
@@ -148,5 +143,5 @@ python-preference = "managed"
 
 [tool.pytest-language-server]
 # pytest-language-server shows some internal variables, like host, as undeclared fixture.
-# An undeclared fixture would be cought by pyright/mypy. Just disable that diagnostic.
+# An undeclared fixture would be cought by pyright. Just disable that diagnostic.
 disabled_diagnostics = ["undeclared-fixture"]
