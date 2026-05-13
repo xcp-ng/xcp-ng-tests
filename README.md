@@ -361,16 +361,16 @@ Check `./jobs.py --help` and `./jobs.py {command name} --help`.
 
 ## Development
 
-This project uses multiple code checkers to ensure a high quality and coherence of the code.
-The checkers are run in the CI on github and will report any failure in the PRs.
+This project uses %pyright% as code checkers to ensure a high quality and coherence of the code.
+`pyright` run in the CI on github and will report any failure in the PRs.
 
 To run the checkers locally, you need to install the dev dependencies, and run these commands:
 
 ```sh
-mypy --install-types --non-interactive lib/ conftest.py pkgfixtures.py tests/
-pyright lib/ conftest.py pkgfixtures.py
-ruff check lib/ tests/
+ruff check .
+autopep8 --global-config /dev/null --diff --exit-code
 flake8
+pyright .
 ```
 
 > [!NOTE]
@@ -395,9 +395,9 @@ This tool is configured via the [`.pre-commit-config.yaml`](./.pre-commit-config
 In order to run all the checks that the CI performs, you can simply run:
 ```shell
 $ uv run prek -a
-ruff.....................................................................Passed
+ruff-fix.................................................................Passed
+autopep8-fix.............................................................Passed
 flake8...................................................................Passed
-mypy.....................................................................Passed
 pyright..................................................................Passed
 ```
 
@@ -418,7 +418,7 @@ $ uv run prek uninstall
 
 Once the hooks are in place, `git commit` will automatically:
 - stash the changes that are not staged for this commit
-- perform the `ruff`, `mypy`, `flake8` and `pyright` checks (unless the staged changes do not affect any python files, in which case the checks are skipped)
+- perform the `ruff`, `autopep8`, `flake8` and `pyright` checks (unless the staged changes do not affect any python files, in which case the checks are skipped)
 - re-apply the changes that were stashed
 
 If the checks happen to fail, the commit is cancelled.
