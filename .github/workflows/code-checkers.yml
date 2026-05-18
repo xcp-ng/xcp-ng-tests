@@ -4,6 +4,9 @@ on: [push]
 
 permissions: {}
 
+env:
+  PREK_COLOR: "always"
+
 jobs:
   mypy:
     runs-on: ubuntu-latest
@@ -16,7 +19,7 @@ jobs:
         run: cp data.py-dist data.py
       - name: Create a dummy vm_data.py
         run: cp vm_data.py-dist vm_data.py
-      - run: mypy --install-types --non-interactive .
+      - run: prek -a mypy
 
   pyright:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
         run: cp data.py-dist data.py
       - name: Create a dummy vm_data.py
         run: cp vm_data.py-dist vm_data.py
-      - run: pyright .
+      - run: prek -a pyright
 
   ruff:
     runs-on: ubuntu-latest
@@ -42,7 +45,7 @@ jobs:
       - uses: ./.github/actions/uv-setup/
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
-      - run: ruff check
+      - run: prek -a ruff
 
   flake8:
     runs-on: ubuntu-latest
@@ -51,4 +54,4 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
-      - run: flake8
+      - run: prek -a flake8
