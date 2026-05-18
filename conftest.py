@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import argparse
 import itertools
 import logging
 import os
@@ -49,6 +50,15 @@ try:
 except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
+
+class SplitCommaAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        items = getattr(namespace, self.dest, None)
+        if items is None:
+            items = []
+        if isinstance(values, str):
+            items.extend([v.strip() for v in values.split(",") if v.strip()])
+        setattr(namespace, self.dest, items)
 
 # pytest hooks
 
@@ -99,7 +109,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     parser.addoption(
         "--image-format",
-        action="append",
+        action=SplitCommaAction,
         default=[],
         help="Format of VDI to execute tests on."
         "Example: vhd,qcow2"
