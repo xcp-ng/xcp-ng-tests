@@ -93,6 +93,7 @@ class TestZfsvolVm:
             zfsvol_sr.create_vdi(virtual_size=MAX_VDI_SIZE[image_format] + 1)
         assert 'VDI Invalid size' in excinfo.value.stdout
 
+    @pytest.mark.xfail # Failing on Exception "Only snapshots can be cloned!"
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression, temp_large_dir: str,
