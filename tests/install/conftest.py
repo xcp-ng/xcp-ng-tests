@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from data import ARP_SERVER, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE, TEST_SSH_PUBKEY, TOOLS
 from lib import installer, pxe
 from lib.commands import local_cmd
-from lib.common import Defer, callable_marker, url_download, wait_for
+from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
 
 from typing import TYPE_CHECKING, Any, Generator, Sequence
@@ -103,9 +103,10 @@ def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
                 )
 
 @pytest.fixture(scope='function')
-def system_disks_names(request: pytest.FixtureRequest) -> Generator[str, None, None]:
+def system_disks_names(request: pytest.FixtureRequest) -> tuple[str, ...]:
     firmware = request.getfixturevalue("firmware")
-    yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    main_disk = {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    return (main_disk,)
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
@@ -154,8 +155,9 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
 set -ex
 INSTALLIMG="$1"
 
-mkdir -p "$INSTALLIMG/root/.ssh"
+install -d -m 750 "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+chmod 600 "$INSTALLIMG/root/.ssh/authorized_keys"
 
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
@@ -271,8 +273,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
         yield remastered_iso
 
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host: Host, create_vms: list[VM], remastered_iso: str, defer: Defer) \
-        -> Generator[VM, None, None]:
+def vm_booted_with_installer(host: Host, create_vms: list[VM], remastered_iso: str) -> Generator[VM, None, None]:
     host_vm, = create_vms # one single VM
     iso = remastered_iso
 
@@ -281,39 +282,52 @@ def vm_booted_with_installer(host: Host, create_vms: list[VM], remastered_iso: s
     assert mac_address is not None
     logging.info("Host VM has MAC %s", mac_address)
 
-    remote_iso = host.pool.push_iso(iso)
-    host_vm.insert_cd(os.path.basename(remote_iso))
-    defer(lambda: host.pool.remove_iso(remote_iso))
+    remote_iso = None
+    try:
+        remote_iso = host.pool.push_iso(iso)
+        host_vm.insert_cd(os.path.basename(remote_iso))
 
-    host_vm.start()
-    defer(lambda: host_vm.shutdown(force=True))
-    wait_for(host_vm.is_running, "Wait for host VM running")
+        try:
+            host_vm.start()
+            wait_for(host_vm.is_running, "Wait for host VM running")
 
-    # catch host-vm IP address
-    wait_for(lambda: pxe.arp_addresses_for(mac_address),
-             "Wait for DHCP server to see Host VM in ARP tables",
-             timeout_secs=10 * 60)
-    ips = pxe.arp_addresses_for(mac_address)
-    logging.info("Host VM has IPs %s", ips)
-    assert len(ips) == 1
-    host_vm.ip = ips[0]
-    ip = host_vm.ip
-    assert ip is not None
+            # catch host-vm IP address
+            wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                     "Wait for DHCP server to see Host VM in ARP tables",
+                     timeout_secs=10 * 60)
+            ips = pxe.arp_addresses_for(mac_address)
+            logging.info("Host VM has IPs %s", ips)
+            assert len(ips) == 1
+            host_vm.ip = ips[0]
+            ip = host_vm.ip
+            assert ip is not None
 
-    # host may not be up if ARP cache was filled
-    wait_for(lambda: local_cmd(["ping", "-c1", ip], check=False),
-             "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-    wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
-             "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+            # host may not be up if ARP cache was filled
+            wait_for(lambda: local_cmd(["ping", "-c1", ip], check=False),
+                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+            wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
+                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
 
-    yield host_vm
+            yield host_vm
 
-    logging.info("Shutting down Host VM")
-    assert host_vm.ip is not None
-    installer.poweroff(host_vm.ip)
-    wait_for(host_vm.is_halted, "Wait for host VM halted")
+            logging.info("Shutting down Host VM")
+            assert host_vm.ip is not None
+            installer.poweroff(host_vm.ip)
+            wait_for(host_vm.is_halted, "Wait for host VM halted")
 
-    host_vm.eject_cd()
+        except Exception as e:
+            logging.critical("caught exception %s", e)
+            host_vm.shutdown(force=True)
+            raise
+        except KeyboardInterrupt:
+            logging.warning("keyboard interrupt")
+            host_vm.shutdown(force=True)
+            raise
+
+        host_vm.eject_cd()
+    finally:
+        if remote_iso:
+            host.pool.remove_iso(remote_iso)
 
 @pytest.fixture(scope='function')
 def xcpng_chained(request: pytest.FixtureRequest) -> None:

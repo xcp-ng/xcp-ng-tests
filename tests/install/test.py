@@ -273,7 +273,8 @@ class TestNested:
                 # use "poweroff" because "reboot" would cause ARP and
                 # SSH to be checked before host is down, and require
                 # ssh retries
-                pool.master.ssh("poweroff")
+                # disable multiplexing to get proper info in SSHCommandFailed
+                pool.master.ssh("poweroff", multiplexing=False)
             except commands.SSHCommandFailed as e:
                 # ignore connection closed by reboot
                 if e.returncode == 255 and "closed by remote host" in e.stdout:
