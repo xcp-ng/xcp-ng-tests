@@ -15,7 +15,7 @@ pyright: data.py
 	uv run pyright .
 
 ruff: data.py
-	FORCE_COLOR=1 uv run ruff check
+	FORCE_COLOR=1 uv run ruff check --fix
 
 flake8:
 	uv run flake8

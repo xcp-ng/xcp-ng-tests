@@ -473,7 +473,7 @@ language-servers = [
   "pylsp",
   "ruff",
 ]
-formatter = { command = "autopep8", args=["-"] }
+formatter = { command = "bash", args = ["-c", "ruff check --fix --silent - | autopep8 -"] }
 auto-format = true
 
 [language-server.basedpyright]
