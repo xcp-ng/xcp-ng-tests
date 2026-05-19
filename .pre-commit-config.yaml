@@ -7,6 +7,12 @@ repos:
         require_serial: true
         entry: "uv run ruff check"
         types: ["python"]
+      - id: "autopep8"
+        name: "autopep8"
+        language: "system"
+        require_serial: true
+        entry: "uv run autopep8 -i"
+        types: ["python"]
       - id: "flake8"
         name: "flake8"
         language: "system"

@@ -173,7 +173,7 @@ class Host:
             return f'{key}={shlex.quote(value)}'
 
         command: str = f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
-                       ' '.join(stringify(key, value) for key, value in args.items())
+            ' '.join(stringify(key, value) for key, value in args.items())
         if simple_output:
             return self.ssh(command, check=check, simple_output=True)
         else:

@@ -41,6 +41,7 @@ class TestIrqBalance:
     We want to avoid this to happen again, so this testcase runs several VMs
     and verifies that the IRQs are balanced on more than one CPU.
     """
+
     def test_start_four_vms(self, host: Host, four_vms: tuple[VM, VM, VM, VM]) -> None:
         for vm in four_vms:
             vm.start(on=host.uuid)

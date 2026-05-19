@@ -3,7 +3,7 @@
 
 .PHONY: all mypy pyright ruff flake8
 
-all: mypy pyright ruff flake8
+all: ruff autopep8 flake8 mypy pyright
 
 data.py:
 	@test -r data.py || echo "File 'data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
@@ -19,3 +19,6 @@ ruff: data.py
 
 flake8:
 	uv run flake8
+
+autopep8:
+	uv run autopep8 -ir --exit-code .

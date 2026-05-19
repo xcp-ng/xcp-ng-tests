@@ -33,6 +33,7 @@ dev = [
     "types-pexpect",
     "zizmor",
     "prek>=0.3.11",
+    "autopep8",
 ]
 
 [tool.pyright]
@@ -121,6 +122,18 @@ ignore = [
   "F",  # already done by ruff
 ]
 exclude=[".git", ".venv", "data.py", "vm_data.py"]
+
+[tool.autopep8]
+max_line_length = 120
+ignore = [
+  "E261",
+  "E302",
+  "E305",
+  "E402",
+  "W503",
+  "F",
+]
+exclude=".git,.venv,data.py,vm_data.py"
 
 [tool.uv]
 # fedora is changing the defaults: https://src.fedoraproject.org/rpms/uv/blob/f43/f/uv.toml

@@ -71,7 +71,7 @@ class TestVIFLimit:
             # Clean up on exceptions
             logging.info('Create separate iperf servers on the host')
             with tempfile.NamedTemporaryFile('w') as host_script:
-                iperf_configs = [f'iperf3 -s -p {5100+i} &'
+                iperf_configs = [f'iperf3 -s -p {5100 + i} &'
                                  for i in range(0, VIF_LIMIT)]
                 host_script.write('\n'.join(iperf_configs))
                 host_script.flush()
@@ -82,7 +82,7 @@ class TestVIFLimit:
             logging.info('Start multiple iperfs on separate interfaces on the VM')
             with tempfile.NamedTemporaryFile('w') as vm_script:
                 iperf_configs = [f'iperf3 --no-delay -c {host.hostname_or_ip} '
-                                 f'-p {5100+i} --bind-dev {interface_name}{i} '
+                                 f'-p {5100 + i} --bind-dev {interface_name}{i} '
                                  f'--interval 0 --parallel 1 --time 30 &'
                                  for i in range(0, VIF_LIMIT)]
                 vm_script.write('\n'.join(iperf_configs))
