@@ -9,16 +9,16 @@ data.py:
 	@test -r data.py || echo "File 'data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
 
 mypy: data.py
-	uv run mypy --install-types --non-interactive .
+	uv run prek -a mypy
 
 pyright: data.py
-	uv run pyright .
+	uv run prek -a pyright
 
 ruff: data.py
-	FORCE_COLOR=1 uv run ruff check --fix
+	uv run prek -a ruff
 
 flake8:
-	uv run flake8
+	uv run prek -a flake8
 
 autopep8:
-	uv run autopep8 -ir --exit-code .
+	uv run prek -a autopep8
