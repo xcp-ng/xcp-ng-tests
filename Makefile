@@ -3,19 +3,12 @@
 
 .PHONY: all mypy pyright ruff flake8
 
-all: mypy pyright ruff flake8
+all: ruff autopep8 flake8 mypy pyright
 
 data.py:
 	@test -r data.py || echo "File 'data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
 
-mypy: data.py
-	uv run mypy --install-types --non-interactive .
+mypy pyright ruff: data.py
 
-pyright: data.py
-	uv run pyright .
-
-ruff: data.py
-	FORCE_COLOR=1 uv run ruff check
-
-flake8:
-	uv run flake8
+ruff autopep8 flake8 mypy pyright:
+	uv run prek -a $@

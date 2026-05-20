@@ -439,6 +439,18 @@ A few plugins are recommended to properly report the diagnostics during the deve
 * [BasedPyright](https://open-vsx.org/extension/detachhead/basedpyright)
 * [flake8](https://open-vsx.org/extension/ms-python/flake8)
 * [ruff](https://open-vsx.org/extension/charliermarsh/ruff)
+* [autopep8](https://open-vsx.org/extension/ms-python/autopep8)
+
+
+You can ensure VS Code automatically formats all your Python files by setting the following in your User settings
+(View > Command Palette… and run Preferences: Open User Settings (JSON)):
+
+~~~json
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.formatOnSave": true
+  }
+~~~
 
 ### [Helix](https://helix-editor.com/)
 
@@ -461,7 +473,8 @@ language-servers = [
   "pylsp",
   "ruff",
 ]
-auto-format = false
+formatter = { command = "bash", args = ["-c", "ruff check --fix --silent - | autopep8 -"] }
+auto-format = true
 
 [language-server.basedpyright]
 environment = { "LANG" = "en" }

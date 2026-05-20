@@ -5,7 +5,13 @@ repos:
         name: "ruff"
         language: "system"
         require_serial: true
-        entry: "uv run ruff check"
+        entry: "uv run ruff check --fix --show-fixes"
+        types: ["python"]
+      - id: "autopep8"
+        name: "autopep8"
+        language: "system"
+        require_serial: true
+        entry: "uv run autopep8 -i"
         types: ["python"]
       - id: "flake8"
         name: "flake8"

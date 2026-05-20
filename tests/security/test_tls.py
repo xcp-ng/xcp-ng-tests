@@ -29,7 +29,7 @@ def test_tls_disabled(host: Host, protocol_name: str) -> None:
     with pytest.raises(ssl.SSLError):
         context = ssl.SSLContext(protocol)
         with socket.create_connection((str(host), PORT), timeout=10) as sock, \
-             context.wrap_socket(sock, server_hostname=str(host)) as ssock:
+                context.wrap_socket(sock, server_hostname=str(host)) as ssock:
             ssock.do_handshake()
             # If we reach this point, the protocol is enabled (test should fail)
             pytest.fail(f"Protocol {protocol} should be disabled but connection succeeded")
@@ -51,7 +51,7 @@ def test_enabled(host: Host, protocol_name: str) -> None:
     try:
         context = ssl.SSLContext(protocol)
         with socket.create_connection((str(host), PORT), timeout=10) as sock, \
-             context.wrap_socket(sock, server_hostname=str(host)) as ssock:
+                context.wrap_socket(sock, server_hostname=str(host)) as ssock:
             ssock.do_handshake()
             assert ssock.version()
     except ssl.SSLError as e:
