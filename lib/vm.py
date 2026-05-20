@@ -4,6 +4,7 @@ import pytest
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import uuid
@@ -12,6 +13,7 @@ import lib.commands as commands
 import lib.efi as efi
 from lib.basevm import BaseVM
 from lib.common import (
+    KiB,
     PackageManagerEnum,
     expand_scope_relative_nodeid,
     parse_xe_dict,
@@ -505,6 +507,30 @@ class VM(BaseVM):
         if self.file_exists('/sbin/apk'):
             return PackageManagerEnum.APK
         return PackageManagerEnum.UNKNOWN
+
+    def grow_root_partition(self) -> int | None:
+        if self.detect_package_manager() == PackageManagerEnum.APK:
+            # growpart is not available in alpine 3.12
+            # vm.ssh('apk add cloud-utils-growpart e2fsprogs-extra')
+            self.ssh('apk add gawk util-linux e2fsprogs-extra')
+            self.ssh(
+                'wget https://raw.githubusercontent.com/canonical/cloud-utils/main/bin/growpart -O /usr/bin/growpart'
+            )
+            self.ssh('chmod +x /usr/bin/growpart')
+        else:
+            return None
+        mount_output = self.ssh('mount').strip()
+        root_match = re.search(r'/dev/(\w+?)(p?)(\d+) on / type (\w+)', mount_output)
+        assert root_match is not None
+        disk, p, partition, typ = root_match.groups()
+        if not typ.startswith('ext'):
+            logging.debug(f"Unsupported filesystem: {typ}")
+            return None
+        growpart_returncode = self.ssh_with_result(f'growpart /dev/{disk} {partition}').returncode
+        assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
+        self.ssh(f'resize2fs /dev/{disk}{p}{partition}')
+        df_output = self.ssh('df /')
+        return int(df_output.splitlines()[-1].split()[3]) * KiB
 
     def insert_cd(self, vdi_name: str) -> None:
         logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
