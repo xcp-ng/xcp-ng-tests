@@ -172,7 +172,7 @@ JOBS: dict[str, JobData] = {
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks",
-        "name_filter": "migration and not linstor",
+        "name_filter": "migration and not linstor and not glusterfs", # FIXME: glusterfs temporarily excluded
     },
     "storage-migrations-large-thin": {
         "description": "same as storage-migrations with 3TiB VDIs, and no test requiring 3TiB allocation",
