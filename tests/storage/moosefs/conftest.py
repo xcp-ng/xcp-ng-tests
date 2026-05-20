@@ -5,14 +5,22 @@ import pytest
 import logging
 
 from lib import config
-
-# explicit import for package-scope fixtures
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from pkgfixtures import pool_with_saved_yum_state
+
+# explicit import for package-scope fixtures
+from pkgfixtures import (
+    _xfs_config_on_hostA2,
+    _xfs_config_on_hostB1,
+    hostA2_with_xfsprogs,
+    hostB1_with_xfsprogs,
+    pool_with_saved_yum_state,
+    xfs_sr_on_hostA2,
+    xfs_sr_on_hostB1,
+)
 
 from typing import Generator
 
