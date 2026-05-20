@@ -17,7 +17,7 @@ from typing import Any, Callable, Iterable
 class Pool:
     """Pool
 
-    :raises NotAMasterHostError: if initial host is not a master (primary)
+    :raises NotAMasterHostError: if initial host is not a master
     """
     xe_prefix = "pool"
 
@@ -300,4 +300,4 @@ class Pool:
         return self.master.xe('network-list', {'name-label': network_name}, minimal=True)
 
 class NotAMasterHostError(Exception):
-    """Host must be a master (primary)."""
+    """Host must be a master."""

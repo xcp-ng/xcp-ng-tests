@@ -641,17 +641,17 @@ uv run scripts/tools.py -h
 This command performs an update operation on remote targets.
 
 ```bash
-uv run scripts/tools.py update -H primary1 primary2
+uv run scripts/tools.py update -H master1 master2
 ```
 
 For each pool target :
 
-1. Update master (primary) host of the pool:
+1. Update master host of the pool:
   * Clean cached metadata
   * Update with repository manager (yum): Optionally enables repositories
   * Reboot
-2. Get attached secondary hosts of the pool
-  * Repeat step `1.` for each secondary
+2. Get other hosts of the pool
+  * Repeat step `1.` for each host
 
 **Inventory file**
 
@@ -671,8 +671,9 @@ Take a look at an example inventory file:
 ```toml
 # my_inventory.toml
 
-[all]
+[default]
 repositories = ["xcp-ng-base"]
+hosting_pool = "A"
 
 [hosts]
 
@@ -681,12 +682,14 @@ repositories = ["xcp-ng-base"]
 [hosts."ip_or_hostname-2"]
 
 repositories = ["xcp-ng-updates"]
+hosting_pool = "B"
 ```
 
 > [!IMPORTANT]
-> Config values under `servers` override values under `all`. For instance, the above inventory would produce
+> * `default` is applied to all hosts
+> * Config values under `hosts` override values under `default`. For instance, the above inventory would produce
 > the following python dict:
 >
-> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base']}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates']}}`
+> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
 >
-> Using *enablerepo flag* `-e` with inventory is still possible, it won't be used though.
+> * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.
