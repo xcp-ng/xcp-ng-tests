@@ -513,12 +513,11 @@ class VM(BaseVM):
         """ Heuristic to determine the package manager on a unix distro. """
         if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
             return PackageManagerEnum.RPM
-        elif self.file_exists('/usr/bin/apt-get'):
+        if self.file_exists('/usr/bin/apt-get'):
             return PackageManagerEnum.APT_GET
-        elif self.file_exists('/sbin/apk'):
+        if self.file_exists('/sbin/apk'):
             return PackageManagerEnum.APK
-        else:
-            return PackageManagerEnum.UNKNOWN
+        return PackageManagerEnum.UNKNOWN
 
     def insert_cd(self, vdi_name: str) -> None:
         logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
