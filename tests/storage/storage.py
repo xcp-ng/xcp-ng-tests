@@ -244,17 +244,9 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     vm.wait_for_vm_running_and_ssh_up()
     install_randstream(vm)
 
-    if vm.detect_package_manager() == PackageManagerEnum.APK:
-        # growpart is not available in alpine 3.12
-        # vm.ssh('apk add cloud-utils-growpart e2fsprogs-extra')
-        vm.ssh('apk add gawk util-linux e2fsprogs-extra')
-        vm.ssh('wget https://raw.githubusercontent.com/canonical/cloud-utils/main/bin/growpart -O /usr/bin/growpart')
-        vm.ssh('chmod +x /usr/bin/growpart')
-        # TODO: maybe use `findmnt -no SOURCE /` from util-linux to get the blockdevice mounted on /
-        growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
-        assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
-        vm.ssh('resize2fs /dev/xvda3')
-        stream_size = min(volume_size // 2, config.write_volume_cap)
+    root_partition_size = vm.grow_root_partition()
+    if root_partition_size is not None:
+        stream_size = min(root_partition_size // 2, config.write_volume_cap)
     else:
         stream_size = 500 * MiB
 
