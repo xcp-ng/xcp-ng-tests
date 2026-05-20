@@ -6,6 +6,16 @@ from lib import config
 from lib.sr import SR
 from lib.vdi import ImageFormat
 
+# explicit import for package-scope fixtures
+from pkgfixtures import (
+    _xfs_config_on_hostA2,
+    _xfs_config_on_hostB1,
+    hostA2_with_xfsprogs,
+    hostB1_with_xfsprogs,
+    xfs_sr_on_hostA2,
+    xfs_sr_on_hostB1,
+)
+
 @pytest.fixture(scope='package')
 def lvmohba_device_config():
     return config.sr_device_config("LVMOHBA_DEVICE_CONFIG")

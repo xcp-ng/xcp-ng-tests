@@ -11,7 +11,15 @@ from lib.vdi import VDI
 from lib.vm import VM
 
 # explicit import for package-scope fixtures
-from pkgfixtures import pool_with_saved_yum_state
+from pkgfixtures import (
+    _xfs_config_on_hostA2,
+    _xfs_config_on_hostB1,
+    hostA2_with_xfsprogs,
+    hostB1_with_xfsprogs,
+    pool_with_saved_yum_state,
+    xfs_sr_on_hostA2,
+    xfs_sr_on_hostB1,
+)
 
 from typing import Generator
 
