@@ -55,6 +55,7 @@ select = [
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
   "UP007",  # non-pep604-annotation-union
+  "UP045",  # non-pep604-annotation-optional
 ]
 # don't use some of the default D and SIM rules
 ignore = [
