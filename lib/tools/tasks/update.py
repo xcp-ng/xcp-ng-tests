@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
 from lib.tools.inventory import Inventory
+from lib.tools.tasks.snapshot import create_snapshots
 
 from .. import logger
 
@@ -56,3 +57,9 @@ def update_pools(inventory: Inventory) -> None:
                 # repos are the same as for the master host
                 repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
                 executor.submit(other_host.update, repos)
+
+    # Snapshot creation
+    for hosting_pool, nested in nested_hosts.items():
+        pool = Pool(hosting_pool) # mandatory for getting an host instance
+        vm_uuids = [h.get_system_uuid() for h in nested]
+        create_snapshots(pool.master, vm_uuids)
