@@ -531,6 +531,8 @@ class VM(BaseVM):
             self.ssh('apk add util-linux e2fsprogs-extra')
         elif pkg_manager == PackageManagerEnum.APT_GET:
             self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
+        elif pkg_manager == PackageManagerEnum.RPM:
+            self.ssh('yum install -y util-linux e2fsprogs')
         else:
             return None
         mount_output = self.ssh('mount').strip()
