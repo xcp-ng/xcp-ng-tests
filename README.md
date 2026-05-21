@@ -477,7 +477,7 @@ language-servers = [
   "pylsp",
   "ruff",
 ]
-formatter = { command = "bash", args = ["-c", "ruff check --fix --silent - | autopep8 -"] }
+formatter = { command = "bash", args = ["-c", "ruff check --fix --silent --stdin-filename %sh{realpath %{buffer_name}} | autopep8 -"] }
 auto-format = true
 
 [language-server.basedpyright]
