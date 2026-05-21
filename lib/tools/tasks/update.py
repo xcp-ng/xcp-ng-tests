@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
+from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
 from lib.tools.inventory import Inventory
 
@@ -27,10 +28,18 @@ def update_pools(inventory: Inventory) -> None:
     inventory_hosts = inventory["hosts"]
     # init related pools
     pools: list[Pool] = []
+    nested_hosts: dict[str, list[Host]] = {}
     for host in inventory_hosts:
         try:
             p = Pool(host)
             pools.append(p)
+            hosting_pool = inventory_hosts[host]["hosting_pool"]
+            if hosting_pool is not None:
+                # we assume all hosts are nested, not only master
+                if nested_hosts.get(hosting_pool) is not None:
+                    nested_hosts[hosting_pool].extend(p.hosts)
+                else:
+                    nested_hosts[hosting_pool] = p.hosts
         except NotAMasterHostError:
             logger.warning(f"[{host}] Skipping: not a master host")
 
