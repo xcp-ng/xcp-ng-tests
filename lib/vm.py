@@ -526,8 +526,11 @@ class VM(BaseVM):
         return PackageManagerEnum.UNKNOWN
 
     def grow_root_partition(self) -> int | None:
-        if self.detect_package_manager() == PackageManagerEnum.APK:
+        pkg_manager = self.detect_package_manager()
+        if pkg_manager == PackageManagerEnum.APK:
             self.ssh('apk add util-linux e2fsprogs-extra')
+        elif pkg_manager == PackageManagerEnum.APT_GET:
+            self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
         else:
             return None
         mount_output = self.ssh('mount').strip()
