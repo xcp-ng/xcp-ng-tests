@@ -174,7 +174,7 @@ SCHEDULING_AXES: List[str] = [
     "image_format",
 ]
 
-def get_axis(item: pytest.Item) -> Optional[str]:
+def get_axis(item: pytest.Item) -> str | None:
     callspec = getattr(item, "callspec", None)
     if callspec is None:
         return None
@@ -223,7 +223,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
     # -----------------------------------------------------
     # Build execution matrix: axis -> leaf package -> items
     # -----------------------------------------------------
-    axis_ordering: Dict[Optional[str], int] = defaultdict(int)
+    axis_ordering: Dict[str | None, int] = defaultdict(int)
     # "None" gets the same order value as the first real axis, on purpose,
     # so that we may better retain initial test order.
     # For example, if we start with this test order:
