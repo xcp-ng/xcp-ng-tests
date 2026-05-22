@@ -584,8 +584,6 @@ JOBS: dict[str, JobData] = {
 BROKEN_TESTS = [
     # not really broken but has complex prerequisites (3 NICs on 3 different networks)
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
-    # needs Fibre Channel host bus adapter (HBA)
-    "tests/storage/lvmohba",
     # running quicktest on zfsvol generates dangling TAP devices that are hard to
     # cleanup. Bug needs to be fixed before enabling quicktest on zfsvol.
     "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
