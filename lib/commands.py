@@ -5,6 +5,7 @@ import logging
 import os
 import platform
 import subprocess
+import tempfile
 
 import lib.config as config
 from lib.netutil import wrap_ip
@@ -24,12 +25,15 @@ class BaseCommandFailed(Exception):
         self.cmd = cmd
 
 class SSHCommandFailed(BaseCommandFailed):
-    def __init__(self, returncode: int, stdout: str, cmd: str):
+    __slots__ = ('ssherr',)
+
+    def __init__(self, returncode: int, stdout: str, cmd: str, ssherr: str = ''):
         msg_end = f": {stdout}" if stdout else "."
         super(SSHCommandFailed, self).__init__(
             returncode, stdout, cmd,
             f'SSH command ({cmd}) failed with return code {returncode}{msg_end}'
         )
+        self.ssherr = ssherr
 
 class LocalCommandFailed(BaseCommandFailed):
     def __init__(self, returncode: int, stdout: str, cmd: str | list[str]):
@@ -49,8 +53,11 @@ class BaseCmdResult(Generic[ResultOutputT]):
         self.stdout: ResultOutputT = stdout
 
 class SSHResult(BaseCmdResult[ResultOutputT]):
-    def __init__(self, returncode: int, stdout: ResultOutputT):
+    __slots__ = ('ssherr',)
+
+    def __init__(self, returncode: int, stdout: ResultOutputT, ssherr: str = ''):
         super(SSHResult, self).__init__(returncode, stdout)
+        self.ssherr: str = ssherr
 
 class LocalCommandResult(BaseCmdResult[ResultOutputT]):
     def __init__(self, returncode: int, stdout: ResultOutputT):
@@ -102,63 +109,80 @@ def _ssh(
     else:
         opts += ['-o', 'ControlMaster no']
 
-    ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
-
     # Fetch banner and remove it to avoid stdout/stderr pollution.
     banner_res = None
     if config.ignore_ssh_banner:
-        banner_res = subprocess.run(
-            ['ssh', f'root@{hostname_or_ip}'] + opts + ['\n'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False
-        )
+        with tempfile.NamedTemporaryFile(suffix='.log', prefix='ssh_err_banner_', mode='r') as banner_log_file:
+            banner_res = subprocess.run(
+                ['ssh', f'root@{hostname_or_ip}'] + opts + ['-E', banner_log_file.name] + ['\n'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False
+            )
+            banner_ssherr = banner_log_file.read()
+        if banner_res.returncode == 255:
+            return SSHCommandFailed(255, "SSH Error: %s" % banner_ssherr, cmd, ssherr=banner_ssherr)
 
-    logging.debug(f"[{hostname_or_ip}] {cmd}")
-    process = subprocess.Popen(
-        ssh_cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT
-    )
     if background:
+        ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
+        logging.debug(f"[{hostname_or_ip}] {cmd}")
+        subprocess.Popen(
+            ssh_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
         return None
 
-    stdout = []
-    assert process.stdout is not None
-    for line in iter(process.stdout.readline, b''):
-        readable_line = line.decode(errors='replace').strip()
-        stdout.append(line)
-        logging.debug("> %s", readable_line)
-    _, stderr = process.communicate()
-    res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
+    with tempfile.NamedTemporaryFile(suffix='.log', prefix='ssh_err_', mode='r') as ssh_log_file:
+        opts += ['-E', ssh_log_file.name]
+        ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
+
+        logging.debug(f"[{hostname_or_ip}] {cmd}")
+        process = subprocess.Popen(
+            ssh_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+
+        stdout = []
+        assert process.stdout is not None
+        for line in iter(process.stdout.readline, b''):
+            readable_line = line.decode(errors='replace').strip()
+            stdout.append(line)
+            logging.debug("> %s", readable_line)
+        _, stderr = process.communicate()
+        res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
+
+        ssherr = ssh_log_file.read()
+
+    if ssherr:
+        logging.debug("[%s] ssh stderr: %s", hostname_or_ip, ssherr)
 
     # Get a decoded version of the output in any case, replacing potential errors
     output_for_errors = res.stdout.decode(errors='replace').strip()
 
     # Even if check is False, we still raise in case of return code 255, which means a SSH error.
     if res.returncode == 255:
-        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, cmd)
+        return SSHCommandFailed(255, "SSH Error: %s" % ssherr, cmd, ssherr=ssherr)
 
     output: bytes = res.stdout
     if banner_res:
-        if banner_res.returncode == 255:
-            return SSHCommandFailed(255, "SSH Error: %s" % banner_res.stdout.decode(errors='replace'), cmd)
         output = output[len(banner_res.stdout):]
 
     if res.returncode and check:
-        return SSHCommandFailed(res.returncode, output_for_errors, cmd)
+        return SSHCommandFailed(res.returncode, output_for_errors, cmd, ssherr=ssherr)
 
     if decode:
         output_str = output.decode()
         if simple_output:
             return output_str.strip()
         else:
-            return SSHResult[str](res.returncode, output_str)
+            return SSHResult[str](res.returncode, output_str, ssherr=ssherr)
     else:
         if simple_output:
             return output.strip()
         else:
-            return SSHResult[bytes](res.returncode, output)
+            return SSHResult[bytes](res.returncode, output, ssherr=ssherr)
 
 # The actual code is in _ssh().
 # This function is kept short for shorter pytest traces upon SSH failures, which are common,
