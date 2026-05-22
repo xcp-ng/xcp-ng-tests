@@ -19,7 +19,7 @@ from typing import Generator
 # - access to XCP-ng RPM repository from hostA1
 
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def nfs_sr(host: Host, image_format: ImageFormat) -> Generator[SR, None, None]:
     """
     A NFS SR on first host.

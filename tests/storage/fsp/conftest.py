@@ -15,7 +15,7 @@ FSP_PACKAGES = ['xcp-ng-xapi-storage']
 
 DIRECTORIES_PATH = 'directories'
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_with_runx_repo(host_with_saved_yum_state_toolstack_restart: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state_toolstack_restart
     host.add_xcpng_repo(FSP_REPO_NAME, 'vates')
@@ -23,7 +23,7 @@ def host_with_runx_repo(host_with_saved_yum_state_toolstack_restart: Host) -> Ge
     # teardown
     host.remove_xcpng_repo(FSP_REPO_NAME)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_with_fsp(host_with_runx_repo: Host) -> Generator[Host, None, None]:
     host = host_with_runx_repo
     host.yum_install(FSP_PACKAGES)
@@ -33,7 +33,7 @@ def host_with_fsp(host_with_runx_repo: Host) -> Generator[Host, None, None]:
     yield host
     # teardown: nothing to do, done by host_with_saved_yum_state.
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def fsp_config(host_with_fsp: Host) -> dict[str, str]:
     db_path = host_with_fsp.ssh('mktemp -d')
     shared_dir_path = host_with_fsp.ssh('mktemp -d')
@@ -42,7 +42,7 @@ def fsp_config(host_with_fsp: Host) -> dict[str, str]:
         'shared_dir_path': shared_dir_path
     }
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def fsp_sr(host_with_fsp: Host, fsp_config: dict[str, str]) -> Generator[SR, None, None]:
     """ An FSP SR on first host. """
     db_path = fsp_config['db_path']

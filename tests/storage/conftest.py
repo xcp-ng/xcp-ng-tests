@@ -55,7 +55,7 @@ def temp_large_dir(host: Host) -> Generator[str, None, None]:
 class XfsConfig:
     uninstall_xfs: bool = True
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def _xfs_config_on_hostA2() -> XfsConfig:
     return XfsConfig()
 
@@ -63,7 +63,7 @@ def _xfs_config_on_hostA2() -> XfsConfig:
 # To recreate host_with_xfsprogs for each image_format value, accept
 # image_format in the fixture arguments.
 # ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def hostA2_with_xfsprogs(hostA2: Host, image_format: ImageFormat, _xfs_config_on_hostA2: XfsConfig) \
         -> Generator[Host, None, None]:
     assert not hostA2.file_exists('/usr/sbin/mkfs.xfs'), \
@@ -75,7 +75,7 @@ def hostA2_with_xfsprogs(hostA2: Host, image_format: ImageFormat, _xfs_config_on
     if _xfs_config_on_hostA2.uninstall_xfs:
         hostA2.yum_restore_saved_state()
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def xfs_sr_on_hostA2(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     hostA2_with_xfsprogs: Host,
@@ -95,7 +95,7 @@ def xfs_sr_on_hostA2(
         _xfs_config_on_hostA2.uninstall_xfs = False
         raise pytest.fail("Could not destroy xfs SR, leaving packages in place for manual cleanup") from e
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def _xfs_config_on_hostB1() -> XfsConfig:
     return XfsConfig()
 
@@ -103,7 +103,7 @@ def _xfs_config_on_hostB1() -> XfsConfig:
 # To recreate host_with_xfsprogs for each image_format value, accept
 # image_format in the fixture arguments.
 # ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def hostB1_with_xfsprogs(hostB1: Host, image_format: ImageFormat, _xfs_config_on_hostB1: XfsConfig) \
         -> Generator[Host, None, None]:
     assert not hostB1.file_exists('/usr/sbin/mkfs.xfs'), \
@@ -115,7 +115,7 @@ def hostB1_with_xfsprogs(hostB1: Host, image_format: ImageFormat, _xfs_config_on
     if _xfs_config_on_hostB1.uninstall_xfs:
         hostB1.yum_restore_saved_state()
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def xfs_sr_on_hostB1(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     hostB1_with_xfsprogs: Host,

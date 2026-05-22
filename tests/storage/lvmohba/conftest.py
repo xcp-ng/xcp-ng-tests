@@ -10,7 +10,7 @@ from lib.vdi import ImageFormat
 def lvmohba_device_config():
     return config.sr_device_config("LVMOHBA_DEVICE_CONFIG")
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def lvmohba_sr(host, lvmohba_device_config, image_format: ImageFormat):
     """ A lvmohba SR on first host. """
     sr = host.sr_create('lvmohba', "lvmohba-SR-test",

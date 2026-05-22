@@ -12,7 +12,6 @@ from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from pkgfixtures import pool_with_saved_yum_state
 
 from typing import Generator
 
@@ -32,14 +31,16 @@ def enable_moosefs(host: Host) -> None:
 def disable_moosefs(host: Host) -> None:
     host.deactivate_smapi_driver('moosefs')
 
-@pytest.fixture(scope='package')
-def pool_with_moosefs_installed(pool_with_saved_yum_state: Pool) -> Generator[Pool, None, None]:
-    pool = pool_with_saved_yum_state
+@pytest.fixture(scope='module')
+def pool_with_moosefs_installed(host: Host) -> Generator[Pool, None, None]:
+    pool = host.pool
+    pool.exec_on_hosts_on_error_continue(lambda h: h.yum_save_state())
     pool.exec_on_hosts_on_error_rollback(install_moosefs, uninstall_moosefs_repo)
     yield pool
     pool.exec_on_hosts_on_error_continue(uninstall_moosefs_repo)
+    pool.exec_on_hosts_on_error_continue(lambda h: h.yum_restore_saved_state())
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def pool_with_moosefs_enabled(pool_with_moosefs_installed: Pool) -> Generator[Pool, None, None]:
     pool = pool_with_moosefs_installed
     pool.exec_on_hosts_on_error_rollback(enable_moosefs, disable_moosefs)
@@ -50,7 +51,7 @@ def pool_with_moosefs_enabled(pool_with_moosefs_installed: Pool) -> Generator[Po
 def moosefs_device_config() -> dict[str, str]:
     return config.sr_device_config("MOOSEFS_DEVICE_CONFIG")
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def moosefs_sr(moosefs_device_config: dict[str, str], pool_with_moosefs_enabled: Pool) -> Generator[SR, None, None]:
     """ MooseFS SR on a specific host. """
     sr = pool_with_moosefs_enabled.master.sr_create('moosefs', "MooseFS-SR-test", moosefs_device_config, shared=True)

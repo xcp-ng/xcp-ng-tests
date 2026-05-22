@@ -24,7 +24,7 @@ def dispatch_nfs(request: pytest.FixtureRequest) -> Generator[SR | VDI | VM, Non
 def nfs_device_config() -> dict[str, str]:
     return config.sr_device_config("NFS_DEVICE_CONFIG")
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def nfs_sr(host: Host, image_format: ImageFormat, nfs_device_config: dict[str, str]) -> Generator[SR, None, None]:
     """ A NFS SR on first host. """
     sr = host.sr_create(
@@ -54,7 +54,7 @@ def vm_on_nfs_sr(host: Host, nfs_sr: SR, vm_ref: str) -> Generator[VM, None, Non
 def nfs4_device_config() -> dict[str, str]:
     return config.sr_device_config("NFS4_DEVICE_CONFIG")
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def nfs4_sr(host: Host, image_format: ImageFormat, nfs4_device_config: dict[str, str]) -> Generator[SR, None, None]:
     """ A NFS4+ SR on first host. """
     sr = host.sr_create(

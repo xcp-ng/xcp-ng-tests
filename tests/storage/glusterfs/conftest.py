@@ -18,16 +18,13 @@ if TYPE_CHECKING:
     from lib.vdi import VDI
     from lib.vm import VM
 
-# explicit import for package-scope fixtures
-from pkgfixtures import pool_with_saved_yum_state
-
 GLUSTERFS_PORTS = [('24007', 'tcp'), ('49152:49251', 'tcp')]
 
 @dataclass
 class GlusterFsConfig:
     uninstall_glusterfs: bool = True
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def _glusterfs_config() -> GlusterFsConfig:
     return GlusterFsConfig()
 
@@ -78,7 +75,7 @@ def _restore_host_iptables(host: Host) -> None:
 
     raise_errors(errors)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def pool_without_glusterfs(host: Host) -> Generator[Pool, None, None]:
     for h in host.pool.hosts:
         if h.file_exists('/usr/sbin/glusterd'):
@@ -87,10 +84,9 @@ def pool_without_glusterfs(host: Host) -> Generator[Pool, None, None]:
             )
     yield host.pool
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def pool_with_glusterfs(
     pool_without_glusterfs: Pool,
-    pool_with_saved_yum_state: Pool,
     _glusterfs_config: GlusterFsConfig
 ) -> Generator[Pool, None, None]:
 
@@ -101,7 +97,8 @@ def pool_with_glusterfs(
     def _disable_yum_rollback(host: Host) -> None:
         host.saved_rollback_id = None
 
-    pool = pool_with_saved_yum_state
+    pool = pool_without_glusterfs
+    pool.exec_on_hosts_on_error_continue(lambda h: h.yum_save_state())
     pool.exec_on_hosts_on_error_rollback(_setup_host_with_glusterfs, _host_rollback)
 
     yield pool
@@ -112,8 +109,9 @@ def pool_with_glusterfs(
 
     pool.exec_on_hosts_on_error_continue(_uninstall_host_glusterfs)
     pool.exec_on_hosts_on_error_continue(_restore_host_iptables)
+    pool.exec_on_hosts_on_error_continue(lambda h: h.yum_restore_saved_state())
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def gluster_disk(
     pool_with_unused_512B_disk: Pool,
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
@@ -174,7 +172,7 @@ def _fallback_gluster_teardown(host: Host) -> None:
                 logging.error("< Fallback teardown failed on host: %s with error: %s" % (h, e))
                 pass
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def gluster_volume_started(
     host: Host,
     hostA2: Host,
@@ -243,7 +241,7 @@ def glusterfs_device_config(host: Host) -> dict[str, str]:
         'backupservers': ':'.join(backup_servers)
     }
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def glusterfs_sr(
     host: Host,
     pool_with_glusterfs: Pool,

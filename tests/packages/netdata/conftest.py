@@ -7,7 +7,7 @@ from pkgfixtures import host_with_saved_yum_state
 
 from typing import Generator
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="module")
 def host_with_netdata(host_with_saved_yum_state: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
     # Installing netdata-ui also installs netdata and all required dependencies

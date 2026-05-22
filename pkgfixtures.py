@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # Reference: https://github.com/pytest-dev/pytest/issues/8189
 
 # package scope because previous test packages may have used the disk
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[DiskDevName]:
     """A disk on MASTER HOST OF FIRST POOL which we wipe."""
     host_disks = unused_512B_disks[host]
@@ -31,7 +31,7 @@ def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDevic
     yield sr_disk
 
 # package scope so that the device is unmounted before tests from the next package is executed.
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def formatted_and_mounted_ext4_disk(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]
                                     ) -> Generator[str]:
     """Mountpoint for newly-formatted disk on MASTER HOST OF FIRST POOL."""
@@ -56,7 +56,7 @@ def _host_with_saved_yum_state(host: Host, restart_toolstack: bool) -> Generator
     if restart_toolstack:
         host.restart_toolstack(verify=True)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_with_saved_yum_state(host: Host) -> Generator[Host]:
     """
     Saves the yum state and then restore it on teardown.
@@ -65,7 +65,7 @@ def host_with_saved_yum_state(host: Host) -> Generator[Host]:
     """
     yield from _host_with_saved_yum_state(host, False)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_with_saved_yum_state_toolstack_restart(host: Host) -> Generator[Host]:
     """
     Saves the yum state then restore it and restarts the toolstack on teardown.
@@ -74,7 +74,7 @@ def host_with_saved_yum_state_toolstack_restart(host: Host) -> Generator[Host]:
     """
     yield from _host_with_saved_yum_state(host, True)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def pool_with_saved_yum_state(host: Host) -> Generator[Pool]:
     for h in host.pool.hosts:
         h.yum_save_state()

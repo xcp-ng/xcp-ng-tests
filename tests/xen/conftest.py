@@ -31,7 +31,7 @@ def host_with_dynamically_disabled_ept_sp(host: Host) -> Generator[Host, None, N
     logging.info("Switching back EPT superpages to fast")
     host.ssh('xl set-parameters ept=exec-sp')
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="module")
 def host_with_git_and_gcc_and_py3(host_with_saved_yum_state: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
     host_less_8_3 = host.xcp_version < version.parse("8.3")
@@ -44,7 +44,7 @@ def host_with_git_and_gcc_and_py3(host_with_saved_yum_state: Host) -> Generator[
     if host_less_8_3:
         host.ssh('rm /usr/bin/python3')
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="module")
 def xtf_runner(host_with_git_and_gcc_and_py3: Host) -> Generator[str, None, None]:
     host = host_with_git_and_gcc_and_py3
     logging.info("Download and build XTF")
@@ -65,7 +65,7 @@ make -j$(nproc)
     logging.info("Delete XTF")
     host.ssh(f'rm -rf {tmp_dir}')
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="module")
 def host_with_dom0_tests(host_with_saved_yum_state: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
     host.yum_install(['xen-dom0-tests'])

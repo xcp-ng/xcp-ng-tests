@@ -10,31 +10,31 @@ from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 
-# explicit import for package-scope fixtures
-from pkgfixtures import pool_with_saved_yum_state
-
 from typing import Generator
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def pool_without_ceph(host: Host) -> Generator[Pool, None, None]:
     for h in host.pool.hosts:
         assert not host.file_exists('/usr/sbin/mount.ceph'), \
             "mount.ceph must not be installed on the host at the beginning of the tests"
     yield host.pool
 
-@pytest.fixture(scope='package')
-def pool_with_ceph(pool_without_ceph: Pool, pool_with_saved_yum_state: Pool) -> Generator[Pool, None, None]:
-    pool = pool_with_saved_yum_state
+@pytest.fixture(scope='module')
+def pool_with_ceph(pool_without_ceph: Pool) -> Generator[Pool, None, None]:
+    pool = pool_without_ceph
+    for h in pool.hosts:
+        h.yum_save_state()
     for h in pool.hosts:
         h.yum_install(['centos-release-ceph-jewel'], enablerepo="base,extras")
         h.yum_install(['ceph-common'], enablerepo="base,extras")
     yield pool
+    pool.exec_on_hosts_on_error_continue(lambda h: h.yum_restore_saved_state())
 
 @pytest.fixture(scope='package')
 def cephfs_device_config() -> dict[str, str]:
     return config.sr_device_config("CEPHFS_DEVICE_CONFIG")
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def cephfs_sr(host: Host, cephfs_device_config: dict[str, str], pool_with_ceph: Pool) -> Generator[SR, None, None]:
     """ A CephFS SR on first host. """
     sr = host.sr_create('cephfs', "CephFS-SR-test", cephfs_device_config, shared=True)

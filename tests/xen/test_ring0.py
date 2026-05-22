@@ -18,7 +18,7 @@ from typing import Generator
 # Only XST tests with pass/fail results, and that don't crash the host were included.
 
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="module")
 def host_with_ring0_tests(
     host_with_saved_yum_state: Host,
 ) -> Generator[Host, None, None]:

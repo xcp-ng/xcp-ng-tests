@@ -10,11 +10,11 @@ from lib.vm import VM
 
 from typing import Generator
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def lvmoiscsi_device_config() -> dict[str, str]:
     return config.sr_device_config("LVMOISCSI_DEVICE_CONFIG")
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def lvmoiscsi_sr(host: Host, lvmoiscsi_device_config: dict[str, str], image_format: ImageFormat) \
         -> Generator[SR, None, None]:
     """ A lvmoiscsi SR on first host. """

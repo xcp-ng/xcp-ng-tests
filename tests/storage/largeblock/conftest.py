@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from lib.vdi import VDI
     from lib.vm import VM
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def largeblock_sr(host: Host,
                   unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
                   image_format: ImageFormat) -> Generator[SR, None, None]:

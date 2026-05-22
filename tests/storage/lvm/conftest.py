@@ -12,7 +12,7 @@ from lib.vm import VM
 
 from typing import Generator
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def lvm_sr(host: Host,
            unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
            image_format: ImageFormat

@@ -11,14 +11,14 @@ from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
-from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
+from pkgfixtures import sr_disk_wiped
 
 from typing import Generator
 
 POOL_NAME = 'pool0'
 POOL_PATH = '/' + POOL_NAME
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_without_zfs(host: Host) -> Generator[Host, None, None]:
     assert not host.file_exists('/usr/sbin/zpool'), \
         "zfs must not be installed on the host at the beginning of the tests"
@@ -28,17 +28,18 @@ def host_without_zfs(host: Host) -> Generator[Host, None, None]:
 # To recreate host_with_zfs for each image_format value, accept
 # image_format in the fixture arguments.
 # ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_with_zfs(host_without_zfs: Host,
-                  host_with_saved_yum_state: Host,
                   image_format: ImageFormat
                   ) -> Generator[Host, None, None]:
-    host = host_with_saved_yum_state
+    host = host_without_zfs
+    host.yum_save_state()
     host.yum_install(['zfs'])
     host.ssh('modprobe zfs')
     yield host
+    host.yum_restore_saved_state()
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def zpool_vol0(sr_disk_wiped: str, host_with_zfs: Host) -> Generator[None, None, None]:
     host_with_zfs.ssh(f'zpool create -f {POOL_NAME} /dev/{sr_disk_wiped}')
     yield
@@ -46,7 +47,7 @@ def zpool_vol0(sr_disk_wiped: str, host_with_zfs: Host) -> Generator[None, None,
     host_with_zfs.ssh(f'zpool destroy {POOL_NAME}')
     host_with_zfs.ssh(f'wipefs -a /dev/{sr_disk_wiped}')
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def zfs_sr(host: Host, image_format: ImageFormat, zpool_vol0: None) -> Generator[SR, None, None]:
     """ A ZFS SR on first host. """
     sr = host.sr_create('zfs', "ZFS-local-SR-test", {

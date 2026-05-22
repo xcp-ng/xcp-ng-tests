@@ -15,14 +15,14 @@ from pkgfixtures import host_with_saved_yum_state_toolstack_restart, sr_disk_wip
 
 from typing import Generator
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def host_with_zfsvol(host_with_saved_yum_state_toolstack_restart: Host) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state_toolstack_restart
     host.yum_install(['xcp-ng-xapi-storage-volume-zfsvol'])
     host.restart_toolstack(verify=True)
     yield host
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def zfsvol_sr(host: Host, sr_disk_wiped: str, host_with_zfsvol: Host) -> Generator[SR, None, None]:
     """ A ZFS Volume SR on first host. """
     device = '/dev/' + sr_disk_wiped

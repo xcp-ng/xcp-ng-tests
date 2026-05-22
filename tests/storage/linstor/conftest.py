@@ -15,8 +15,6 @@ try:
 except ImportError:
     LINSTOR_REDUNDANCY = 2
 
-# explicit import for package-scope fixtures
-from pkgfixtures import pool_with_saved_yum_state
 
 from typing import TYPE_CHECKING, Generator
 
@@ -36,11 +34,11 @@ LINSTOR_PACKAGE = 'xcp-ng-linstor'
 class LinstorConfig:
     uninstall_linstor: bool = True
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def _linstor_config() -> LinstorConfig:
     return LinstorConfig()
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def lvm_disks(
     pool_with_unused_512B_disk: Pool,
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
@@ -97,15 +95,14 @@ def storage_pool_name(provisioning_type: str) -> str:
 def provisioning_type(request: pytest.FixtureRequest) -> str:
     return request.param
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def pool_with_linstor(
     hostA2: Host,
     lvm_disks: None,
-    pool_with_saved_yum_state: Pool,
     _linstor_config: LinstorConfig
 ) -> Generator[Pool, None, None]:
     import concurrent.futures
-    pool = pool_with_saved_yum_state
+    pool = hostA2.pool
 
     def check_linstor_installed(host: Host) -> None:
         if host.is_package_installed(LINSTOR_PACKAGE):
@@ -115,6 +112,9 @@ def pool_with_linstor(
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(check_linstor_installed, pool.hosts)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(lambda h: h.yum_save_state(), pool.hosts)
 
     def install_linstor(host: Host) -> None:
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
@@ -130,28 +130,17 @@ def pool_with_linstor(
 
     yield pool
 
-    def _disable_yum_rollback(host: Host) -> None:
-        host.saved_rollback_id = None
-
     if not _linstor_config.uninstall_linstor:
-        pool.exec_on_hosts_on_error_continue(_disable_yum_rollback)
         return
 
-    # Need to remove this package as we have separate run of `test_create_sr_without_linstor`
-    # for `thin` and `thick` `provisioning_type`.
-    def remove_linstor(host: Host) -> None:
-        logging.info(f"Cleaning up python-linstor from host {host}...")
-        host.yum_remove(["python-linstor"])
-        host.restart_toolstack(verify=True)
-
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(remove_linstor, pool.hosts)
+        executor.map(lambda h: h.yum_restore_saved_state(), pool.hosts)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def linstor_redundancy(pool_with_linstor: Pool) -> int:
     return min(len(pool_with_linstor.hosts), LINSTOR_REDUNDANCY)
 
-@pytest.fixture(scope='package')
+@pytest.fixture(scope='module')
 def linstor_sr(
     pool_with_linstor: Pool,
     linstor_redundancy: int,
