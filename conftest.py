@@ -256,7 +256,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
     # a list of master hosts, each from a different pool
     hosts_args = pytestconfig.getoption("hosts")
-    assert hosts_args is not None
+    assert hosts_args, "This test requires at least one --hosts parameter"
     hosts_split = [hostlist.split(',') for hostlist in hosts_args]
     hostname_list = list(itertools.chain(*hosts_split))
 
@@ -268,7 +268,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
         raise
 
     if not host_list:
-        pytest.fail("This test requires at least one --hosts parameter")
+        pytest.fail("This test requires at least one valid host")
     yield host_list
 
     cleanup_hosts()
