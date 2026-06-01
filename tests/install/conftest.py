@@ -280,8 +280,15 @@ def iso_in_pool_isosr(host: Host, remastered_iso: str) -> Generator[str, None, N
     host.pool.remove_iso(remote_iso)
 
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host: Host, create_vms: list[VM], iso_in_pool_isosr: str
-                             ) -> Generator[VM, None, None]:
+def try_booting_vm_with_installer(host: Host, create_vms: list[VM], iso_in_pool_isosr: str
+                                  ) -> Generator[VM | None, None, None]:
+    """Provide a VM booted using remastered installer ISO.
+
+    The VM may fail to boot if the we encounter an early bug, in which
+    case `None` is returned.  Caller test is expected to assert when
+    this is the case, and this fixture's cleanup step will then kill
+    the VM.
+    """
     host_vm, = create_vms # one single VM
     remote_iso = iso_in_pool_isosr
 
@@ -292,6 +299,7 @@ def vm_booted_with_installer(host: Host, create_vms: list[VM], iso_in_pool_isosr
 
     host_vm.insert_cd(os.path.basename(remote_iso))
 
+    vm_running = False
     try:
         host_vm.start()
         wait_for(host_vm.is_running, "Wait for host VM running")
@@ -313,21 +321,34 @@ def vm_booted_with_installer(host: Host, create_vms: list[VM], iso_in_pool_isosr
         wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
                  "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
 
+    except Exception as e:
+        logging.critical("incomplete vm startup: caught exception %s", e)
+    except KeyboardInterrupt:
+        logging.warning("incomplete vm startup: keyboard interrupt")
+    else:
+        # test can proceed
+        vm_running = True
+
+    if vm_running:
         yield host_vm
 
-        logging.info("Shutting down Host VM")
-        assert host_vm.ip is not None
-        installer.poweroff(host_vm.ip)
-        wait_for(host_vm.is_halted, "Wait for host VM halted")
+        try:
+            logging.info("Shutting down Host VM")
+            assert host_vm.ip is not None
+            installer.poweroff(host_vm.ip)
+            wait_for(host_vm.is_halted, "Wait for host VM halted")
+            # VM properly stopped
+            vm_running = False
 
-    except Exception as e:
-        logging.critical("caught exception %s", e)
+        except Exception as e:
+            logging.critical("caught exception %s", e)
+        except KeyboardInterrupt:
+            logging.warning("keyboard interrupt")
+
+    if not vm_running:
+        # not able to start or shutdown the VM properly
+        logging.critical("Forcing VM shutdown")
         host_vm.shutdown(force=True)
-        raise
-    except KeyboardInterrupt:
-        logging.warning("keyboard interrupt")
-        host_vm.shutdown(force=True)
-        raise
 
     host_vm.eject_cd()
 
