@@ -5,6 +5,11 @@ import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import vm_image, wait_for
+from lib.host import Host
+from lib.pool import Pool
+from lib.sr import SR
+from lib.vdi import VDI
+from lib.vm import VM
 from tests.storage import vdi_is_open
 
 # Requirements:
@@ -19,7 +24,7 @@ class TestCephFSSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_cephfs_sr_without_ceph(self, host, cephfs_device_config):
+    def test_create_cephfs_sr_without_ceph(self, host: Host, cephfs_device_config: dict[str, str]) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/mount.ceph'), \
             "mount.ceph must not be installed on the host at the beginning of the tests"
@@ -32,7 +37,9 @@ class TestCephFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
-    def test_create_and_destroy_sr(self, host, cephfs_device_config, pool_with_ceph):
+    def test_create_and_destroy_sr(
+        self, host: Host, cephfs_device_config: dict[str, str], pool_with_ceph: Pool
+    ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('cephfs', "CephFS-SR-test", cephfs_device_config, shared=True, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
@@ -44,15 +51,15 @@ class TestCephFSSRCreateDestroy:
 @pytest.mark.usefixtures("cephfs_sr")
 class TestCephFSSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, cephfs_sr):
+    def test_quicktest(self, cephfs_sr: SR) -> None:
         cephfs_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_cephfs_sr):
+    def test_vdi_is_not_open(self, vdi_on_cephfs_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_cephfs_sr)
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_cephfs_sr):
+    def test_start_and_shutdown_VM(self, vm_on_cephfs_sr: VM) -> None:
         vm = vm_on_cephfs_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -60,7 +67,7 @@ class TestCephFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_cephfs_sr):
+    def test_snapshot(self, vm_on_cephfs_sr: VM) -> None:
         vm = vm_on_cephfs_sr
         vm.start()
         try:
@@ -73,7 +80,7 @@ class TestCephFSSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, vm_on_cephfs_sr, host, cephfs_sr):
+    def test_reboot(self, vm_on_cephfs_sr: VM, host: Host, cephfs_sr: SR) -> None:
         sr = cephfs_sr
         vm = vm_on_cephfs_sr
         host.reboot(verify=True)
@@ -84,7 +91,7 @@ class TestCephFSSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.reboot # reboots the host
-    def test_ceph_missing(self, host, cephfs_sr):
+    def test_ceph_missing(self, host: Host, cephfs_sr: SR) -> None:
         sr = cephfs_sr
         ceph_installed = True
         try:

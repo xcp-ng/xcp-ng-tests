@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import legacycrypt as crypt     # type: ignore
 import os
-from typing import Any, TYPE_CHECKING
+
+import legacycrypt as crypt  # type: ignore[import-untyped]
+
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from lib.typing import IsoImageDef
@@ -17,7 +19,7 @@ HOST_DEFAULT_PASSWORD = ""
 
 def hash_password(password):
     """Hash password for /etc/password."""
-    salt = crypt.mksalt(crypt.METHOD_SHA512)
+    salt = crypt.mksalt(crypt.METHOD_SHA512)  # type: ignore
     return crypt.crypt(password, salt)
 
 HOST_DEFAULT_PASSWORD_HASH = hash_password(HOST_DEFAULT_PASSWORD)
@@ -72,6 +74,8 @@ WIN_GUEST_TOOLS_ISOS = {
         "xenclean_path": "package\\XenClean\\x64\\Invoke-XenClean.ps1",
         # ISO-relative path of root cert file to be installed before guest tools (optional)
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
+        # What's the onboard family of our tools? This is equal to the WinPV VENDOR_NAME value
+        "onboard_family": "XCP-ng",
     },
     # Add more guest tool ISOs here as needed
 }
@@ -100,6 +104,8 @@ OTHER_GUEST_TOOLS = {
 
         # Can we upgrade automatically from this guest tool to our tools?
         "upgradable": True,
+        # What is the expected onboarding phase after running XenClean when this tool is installed? (optional)
+        "onboarding_phase": "see test_xenclean.py ONBOARDING_PHASES",
     },
     "vendor": {
         "vendor_device": True,
@@ -185,6 +191,9 @@ DEFAULT_SR = 'default'
 # This setting affects VMs managed by the `imported_vm` fixture.
 CACHE_IMPORTED_VM = False
 
+# Default LINSTOR redundancy configuration for creating SRs.
+LINSTOR_REDUNDANCY = 2
+
 # Default NFS device config:
 NFS_DEVICE_CONFIG: dict[str, str] = {
 #    'server': '10.0.0.2', # URL/Hostname of NFS server
@@ -230,6 +239,10 @@ LVMOISCSI_DEVICE_CONFIG: dict[str, str] = {
 #    'SCSIid': 'id'
 }
 
+LVMOHBA_DEVICE_CONFIG: dict[str, str] = {
+#    'SCSIid': 'wwid'
+}
+
 BASE_ANSWERFILES = dict(
     INSTALL={
         "TAG": "installation",
@@ -256,3 +269,6 @@ IMAGE_EQUIVS: dict[str, str] = {
 #    'install.test::Nested::install[bios-830-ext]-vm1-607cea0c825a4d578fa5fab56978627d8b2e28bb':
 #    'install.test::Nested::install[bios-830-ext]-vm1-addb4ead4da49856e1d2fb3ddf4e31027c6b693b',
 }
+
+# This should be a working DNS server that's not used by any VM images.
+TEST_DNS_SERVER = "1.1.1.1"

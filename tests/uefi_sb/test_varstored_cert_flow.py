@@ -2,9 +2,15 @@ import pytest
 
 import logging
 
-from lib.common import wait_for
+from lib.common import Defer, wait_for
+from lib.efi import EFIAuth
+from lib.host import Host
+from lib.snapshot import Snapshot
+from lib.vm import VM
 
 from .utils import check_disk_cert_md5sum, check_vm_cert_md5sum, generate_keys, revert_vm_state
+
+from typing import Generator
 
 # These tests check the behaviour of XAPI and varstored as they are in XCP-ng 8.3
 # For XCP-ng 8.2, see test_uefistored_cert_flow.py
@@ -23,7 +29,7 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
 @pytest.mark.usefixtures("host_at_least_8_3", "hostA2")
 class TestPoolToDiskCertPropagationToAllHosts:
-    def test_set_pool_certificates(self, host):
+    def test_set_pool_certificates(self, host: Host) -> None:
         keys = ['PK', 'KEK', 'db', 'dbx']
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
@@ -33,7 +39,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
             for key in keys:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth())
 
-    def test_set_pool_certificates_partial(self, host):
+    def test_set_pool_certificates_partial(self, host: Host) -> None:
         keys = ['PK', 'KEK', 'db']
         missing_key = 'dbx'
         pool_auths = generate_keys(as_dict=True)
@@ -45,7 +51,7 @@ class TestPoolToDiskCertPropagationToAllHosts:
                 check_disk_cert_md5sum(h, key, pool_auths[key].auth())
             assert not h.file_exists(f'{host.varstore_dir()}/{missing_key}.auth')
 
-    def test_clear_custom_pool_certificates(self, host):
+    def test_clear_custom_pool_certificates(self, host: Host) -> None:
         keys = ['PK', 'KEK', 'db', 'dbx']
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in keys])
@@ -58,58 +64,49 @@ class TestPoolToDiskCertPropagationToAllHosts:
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestVMCertMisc:
     @pytest.fixture(autouse=True, scope="function")
-    def auto_revert_vm(self, uefi_vm_and_snapshot):
+    def auto_revert_vm(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         yield
         # Revert the VM, which has the interesting effect of also shutting it down instantly
         revert_vm_state(vm, snapshot)
 
-    def test_snapshot_revert_restores_certs(self, uefi_vm):
+    def test_snapshot_revert_restores_certs(self, uefi_vm: VM, defer: Defer) -> None:
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
         snapshot = vm.snapshot()
-        try:
-            # clear all certs
-            vm.set_uefi_setup_mode()
-            snapshot.revert()
-            logging.info("Check that the VM certs were restored")
-            for key in ['PK', 'KEK', 'db', 'dbx']:
-                check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
-        finally:
-            snapshot.destroy()
+        defer(lambda: snapshot.destroy())
+        # clear all certs
+        vm.set_uefi_setup_mode()
+        snapshot.revert()
+        logging.info("Check that the VM certs were restored")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
-    def test_vm_import_restores_certs(self, uefi_vm, formatted_and_mounted_ext4_disk):
+    def test_vm_import_restores_certs(self, uefi_vm: VM, formatted_and_mounted_ext4_disk: str, defer: Defer) -> None:
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
         filepath = formatted_and_mounted_ext4_disk + '/test-export-with-uefi-certs.xva'
         vm.export(filepath, 'zstd')
-        vm2 = None
-        try:
-            vm2 = vm.host.import_vm(filepath)
-            logging.info("Check that the VM certs were imported with the VM")
-            for key in ['PK', 'KEK', 'db', 'dbx']:
-                check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())
-        finally:
-            try:
-                if vm2 is not None:
-                    logging.info(f"Destroy VM {vm2.uuid}")
-                    vm2.destroy(verify=True)
-            finally:
-                vm.host.ssh(['rm', '-f', filepath], check=False)
+        defer(lambda: vm.host.ssh('rm -f {filepath}', check=False))
+        vm2 = vm.host.import_vm(filepath)
+        defer(lambda: vm2.destroy())
+        logging.info("Check that the VM certs were imported with the VM")
+        for key in ['PK', 'KEK', 'db', 'dbx']:
+            check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolToVMCertInheritance:
     @pytest.fixture(autouse=True, scope="function")
-    def auto_revert_vm(self, uefi_vm_and_snapshot):
+    def auto_revert_vm(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         yield
         # Revert the VM, which has the interesting effect of also shutting it down instantly
         revert_vm_state(vm, snapshot)
 
-    def test_start_vm_without_uefi_vars(self, uefi_vm):
+    def test_start_vm_without_uefi_vars(self, uefi_vm: VM) -> None:
         # The only situation where varstored will propagate the certs automatically
         # at VM start is when the VM looks like it never started, that is it has no
         # UEFI vars at all in its NVRAM.
@@ -122,7 +119,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, pool_auths[key].auth())
 
-    def test_start_vm_in_setup_mode(self, uefi_vm):
+    def test_start_vm_in_setup_mode(self, uefi_vm: VM) -> None:
         # In setup mode, no cert is set, but other UEFI variables are present.
         # varstored will *not* propagate the certs in this case.
         vm = uefi_vm
@@ -134,7 +131,7 @@ class TestPoolToVMCertInheritance:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             assert not vm.is_uefi_var_present(key)
 
-    def test_start_vm_which_already_has_pk(self, uefi_vm):
+    def test_start_vm_which_already_has_pk(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         pool_auths = generate_keys(as_dict=True)
         vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
@@ -147,7 +144,7 @@ class TestPoolToVMCertInheritance:
         for key in ['KEK', 'db', 'dbx']:
             assert not vm.is_uefi_var_present(key)
 
-    def test_switching_to_user_mode(self, uefi_vm):
+    def test_switching_to_user_mode(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         pool_auths = generate_keys(as_dict=True)
         vm.host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
@@ -169,7 +166,9 @@ class TestPoolToVMCertInheritance:
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolToDiskCertInheritanceOnPoolJoin:
     @pytest.fixture(scope='function')
-    def keys_auths_for_joined_host(self, host, hostB1):
+    def keys_auths_for_joined_host(
+        self, host: Host, hostB1: Host
+    ) -> Generator[tuple[list[str], dict[str, EFIAuth], Host], None, None]:
         from packaging import version
         version_str = "8.3"
         if not hostB1.xcp_version >= version.parse(version_str):
@@ -190,7 +189,9 @@ class TestPoolToDiskCertInheritanceOnPoolJoin:
         host.pool.eject_host(joined_host)
         host.pool.clear_custom_uefi_certs()
 
-    def test_host_certificates_updated_after_join(self, keys_auths_for_joined_host):
+    def test_host_certificates_updated_after_join(
+        self, keys_auths_for_joined_host: tuple[list[str], dict[str, EFIAuth], Host]
+    ) -> None:
         keys, pool_auths, joined_host = keys_auths_for_joined_host
 
         for key in keys:

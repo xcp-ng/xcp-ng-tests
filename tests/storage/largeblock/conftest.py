@@ -4,29 +4,38 @@ import pytest
 
 import logging
 
+from lib import config
+from lib.vdi import ImageFormat
+
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.sr import SR
+    from lib.vdi import VDI
+    from lib.vm import VM
 
 @pytest.fixture(scope='package')
-def largeblock_sr(host: Host, unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[SR]:
+def largeblock_sr(host: Host,
+                  unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                  image_format: ImageFormat) -> Generator[SR, None, None]:
     """ A LARGEBLOCK SR on first host. """
-    sr_disk = unused_4k_disks[host][0]["name"]
-    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr_disk = unused_4k_disks[host][0].name
+    sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
+                        {'device': '/dev/' + sr_disk,
+                         'preferred-image-formats': image_format})
     yield sr
     # teardown
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_largeblock_sr(largeblock_sr):
-    vdi = largeblock_sr.create_vdi('LARGEBLOCK-local-VDI-test')
+def vdi_on_largeblock_sr(largeblock_sr) -> Generator[VDI, None, None]:
+    vdi = largeblock_sr.create_vdi('LARGEBLOCK-local-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_largeblock_sr(host, largeblock_sr, vm_ref):
+def vm_on_largeblock_sr(host: Host, largeblock_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=largeblock_sr.uuid)
     yield vm
     # teardown

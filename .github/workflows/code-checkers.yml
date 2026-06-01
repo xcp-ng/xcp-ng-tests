@@ -4,47 +4,63 @@ on: [push]
 
 permissions: {}
 
+env:
+  PREK_COLOR: "always"
+
 jobs:
   mypy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
-      - run: mypy --install-types --non-interactive lib/ conftest.py pkgfixtures.py tests/
+      - name: Create a dummy vm_data.py
+        run: cp vm_data.py-dist vm_data.py
+      - run: prek -a mypy
 
   pyright:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
-      - run: pyright lib/ conftest.py pkgfixtures.py # tests/
+      - name: Create a dummy vm_data.py
+        run: cp vm_data.py-dist vm_data.py
+      - run: prek -a pyright
 
   ruff:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
-      - run: ruff check lib/ tests/
+      - run: prek -a ruff
 
   flake8:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
       - uses: ./.github/actions/uv-setup/
-      - run: flake8
+      - run: prek -a flake8
+
+  autopep8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup/
+      - run: prek -a autopep8

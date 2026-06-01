@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import pytest
-import pytest_dependency  # type: ignore
+import pytest_dependency  # type: ignore[import-untyped]
 
 import logging
 import os
@@ -12,12 +14,16 @@ from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
 
-from typing import Generator, Sequence, Union
+from typing import TYPE_CHECKING, Any, Generator, Sequence
+
+if TYPE_CHECKING:
+    from lib.host import Host
+    from lib.vm import VM
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
 # package_source values for each ISO.
-def skip_package_source(version, package_source):
+def skip_package_source(version: str, package_source: str) -> tuple[bool, str]:
     if version not in ISO_IMAGES:
         return True, "version of ISO {} is unknown".format(version)
 
@@ -39,7 +45,7 @@ def skip_package_source(version, package_source):
     return True, "unknown source type {}".format(package_source)
 
 @pytest.fixture(scope='function')
-def answerfile(request: pytest.FixtureRequest) -> Generator[Union[AnswerFile, None], None, None]:
+def answerfile(request: pytest.FixtureRequest) -> Generator[AnswerFile | None, None, None]:
     """
     Makes an AnswerFile object available to test and other fixtures.
 
@@ -73,7 +79,7 @@ def answerfile(request: pytest.FixtureRequest) -> Generator[Union[AnswerFile, No
 
 
 @pytest.fixture(scope='function')
-def installer_iso(request):
+def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
     iso_key = request.getfixturevalue("iso_version")
     package_source = request.getfixturevalue("package_source")
     skip, reason = skip_package_source(iso_key, package_source)
@@ -97,9 +103,10 @@ def installer_iso(request):
                 )
 
 @pytest.fixture(scope='function')
-def system_disks_names(request):
+def system_disks_names(request: pytest.FixtureRequest) -> tuple[str, ...]:
     firmware = request.getfixturevalue("firmware")
-    yield {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    main_disk = {"uefi": "nvme0n1", "bios": "sda"}[firmware]
+    return (main_disk,)
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
@@ -114,8 +121,8 @@ def system_disks_names(request):
 #     in contexts where the same IP is reused by successively different MACs
 #     (when cloning VMs from cache)
 @pytest.fixture(scope='function')
-def remastered_iso(installer_iso, answerfile):
-    iso_file = installer_iso['iso']
+def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile | None) -> Generator[str, None, None]:
+    iso_file = str(installer_iso['iso'])
     unsigned = installer_iso['unsigned']
 
     assert "iso-remaster" in TOOLS
@@ -148,8 +155,9 @@ def remastered_iso(installer_iso, answerfile):
 set -ex
 INSTALLIMG="$1"
 
-mkdir -p "$INSTALLIMG/root/.ssh"
+install -d -m 750 "$INSTALLIMG/root/.ssh"
 echo "{TEST_SSH_PUBKEY}" > "$INSTALLIMG/root/.ssh/authorized_keys"
+chmod 600 "$INSTALLIMG/root/.ssh/authorized_keys"
 
 test ! -e "{answerfile_xml}" ||
     cp "{answerfile_xml}" "$INSTALLIMG/root/answerfile.xml"
@@ -266,60 +274,87 @@ sed -i "${{SED_COMMANDS[@]}}" \
         yield remastered_iso
 
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host, create_vms, remastered_iso):
+def iso_in_pool_isosr(host: Host, remastered_iso: str) -> Generator[str, None, None]:
+    """Make a remastered_iso available in host's pool's ISO SR"""
+    remote_iso = host.pool.push_iso(remastered_iso)
+    yield remote_iso
+    host.pool.remove_iso(remote_iso)
+
+@pytest.fixture(scope='function')
+def try_booting_vm_with_installer(host: Host, create_vms: list[VM], iso_in_pool_isosr: str
+                                  ) -> Generator[VM | None, None, None]:
+    """Provide a VM booted using remastered installer ISO.
+
+    The VM may fail to boot if the we encounter an early bug, in which
+    case `None` is returned.  Caller test is expected to assert when
+    this is the case, and this fixture's cleanup step will then kill
+    the VM.
+    """
     host_vm, = create_vms # one single VM
-    iso = remastered_iso
+    remote_iso = iso_in_pool_isosr
 
     vif = host_vm.vifs()[0]
     mac_address = vif.param_get('MAC')
+    assert mac_address is not None
     logging.info("Host VM has MAC %s", mac_address)
 
-    remote_iso = None
+    host_vm.insert_cd(os.path.basename(remote_iso))
+
+    vm_running = False
     try:
-        remote_iso = host.pool.push_iso(iso)
-        host_vm.insert_cd(os.path.basename(remote_iso))
+        host_vm.start()
+        wait_for(host_vm.is_running, "Wait for host VM running")
+
+        # catch host-vm IP address
+        wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                 "Wait for DHCP server to see Host VM in ARP tables",
+                 timeout_secs=10 * 60)
+        ips = pxe.arp_addresses_for(mac_address)
+        logging.info("Host VM has IPs %s", ips)
+        assert len(ips) == 1
+        host_vm.ip = ips[0]
+        ip = host_vm.ip
+        assert ip is not None
+
+        # host may not be up if ARP cache was filled
+        wait_for(lambda: local_cmd(["ping", "-c1", ip], check=False),
+                 "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+        wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
+                 "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+
+    except Exception as e:
+        logging.critical("incomplete vm startup: caught exception %s", e)
+    except KeyboardInterrupt:
+        logging.warning("incomplete vm startup: keyboard interrupt")
+    else:
+        # test can proceed
+        vm_running = True
+
+    if vm_running:
+        yield host_vm
 
         try:
-            host_vm.start()
-            wait_for(host_vm.is_running, "Wait for host VM running")
-
-            # catch host-vm IP address
-            wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                     "Wait for DHCP server to see Host VM in ARP tables",
-                     timeout_secs=10 * 60)
-            ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Host VM has IPs %s", ips)
-            assert len(ips) == 1
-            host_vm.ip = ips[0]
-
-            # host may not be up if ARP cache was filled
-            wait_for(lambda: local_cmd(["ping", "-c1", host_vm.ip], check=False),
-                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: local_cmd(["nc", "-zw5", host_vm.ip, "22"], check=False),
-                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
-
-            yield host_vm
-
             logging.info("Shutting down Host VM")
+            assert host_vm.ip is not None
             installer.poweroff(host_vm.ip)
             wait_for(host_vm.is_halted, "Wait for host VM halted")
+            # VM properly stopped
+            vm_running = False
 
         except Exception as e:
             logging.critical("caught exception %s", e)
-            host_vm.shutdown(force=True)
-            raise
         except KeyboardInterrupt:
             logging.warning("keyboard interrupt")
-            host_vm.shutdown(force=True)
-            raise
 
-        host_vm.eject_cd()
-    finally:
-        if remote_iso:
-            host.pool.remove_iso(remote_iso)
+    if not vm_running:
+        # not able to start or shutdown the VM properly
+        logging.critical("Forcing VM shutdown")
+        host_vm.shutdown(force=True)
+
+    host_vm.eject_cd()
 
 @pytest.fixture(scope='function')
-def xcpng_chained(request):
+def xcpng_chained(request: pytest.FixtureRequest) -> None:
     # take test name from mark
     marker = request.node.get_closest_marker("continuation_of")
     assert marker is not None, "xcpng_chained fixture requires 'continuation_of' marker"

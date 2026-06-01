@@ -1,4 +1,5 @@
 import logging
+import time
 from pathlib import PureWindowsPath
 
 from lib.common import strtobool, wait_for
@@ -8,7 +9,7 @@ from . import WINDOWS_SHUTDOWN_COMMAND, enable_testsign, insert_cd_safe, wait_fo
 
 from typing import Any, Dict
 
-def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]):
+def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, Any]) -> None:
     if param.get("vendor_device"):
         assert not strtobool(vm.param_get("has-vendor-device"))
         vm.param_set("has-vendor-device", True)
@@ -49,4 +50,10 @@ def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, An
 
         vm.eject_cd()
         vm.start()
+        wait_for_vm_running_and_ssh_up_without_tools(vm)
+        # HACK: For some reason, the XenServer 9.4.2 package causes a network blip after bootup. This could exhibit as
+        # random disconnections, SSH command failure, etc. The reason is not yet clear, but retry confirmation of the
+        # network link as a workaround.
+        # TODO: XCPNG-3038
+        time.sleep(30)
         wait_for_vm_running_and_ssh_up_without_tools(vm)

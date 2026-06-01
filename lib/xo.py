@@ -1,7 +1,13 @@
 import json
 import subprocess
 
-from typing import Any, Dict, Literal, Union, overload
+from lib.typing import JSONType
+
+from typing import Dict, Literal, overload
+
+# TODO: either:
+#   * replace simple_output and use_json by a single output type
+#   * make sure that simple_output=False and use_json=True are not being used together
 
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[True] = True,
@@ -9,17 +15,19 @@ def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple
     ...
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[True] = True,
-           use_json: Literal[True]) -> Any:
+           use_json: Literal[True]) -> JSONType:
     ...
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: Literal[False],
-           use_json: bool = False) -> subprocess.CompletedProcess:
+           use_json: bool = False) -> subprocess.CompletedProcess[bytes]:
     ...
 @overload
 def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple_output: bool = True,
-           use_json: bool = False) -> Union[subprocess.CompletedProcess, Any, str]:
+           use_json: bool = False) -> subprocess.CompletedProcess[bytes] | JSONType | str:
     ...
-def xo_cli(action, args={}, check=True, simple_output=True, use_json=False):
+def xo_cli(
+    action: str, args: dict[str, str] = {}, check: bool = True, simple_output: bool = True, use_json: bool = False
+) -> subprocess.CompletedProcess[bytes] | JSONType | str:
     run_array = ['xo-cli', action]
     if use_json:
         run_array += ['--json']
@@ -37,6 +45,6 @@ def xo_cli(action, args={}, check=True, simple_output=True, use_json=False):
         return output
     return res
 
-def xo_object_exists(uuid):
+def xo_object_exists(uuid: str) -> bool:
     lst = json.loads(xo_cli('--list-objects', {'uuid': uuid}))
     return len(lst) > 0

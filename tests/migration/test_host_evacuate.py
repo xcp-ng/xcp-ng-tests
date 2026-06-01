@@ -4,6 +4,8 @@ import logging
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
+from lib.host import Host
+from lib.vm import VM
 
 # The pool needs a shared SR to use `host.evacuate`. All three fixtures below are needed.
 from tests.storage.nfs.conftest import nfs_device_config, nfs_sr, vm_on_nfs_sr
@@ -21,10 +23,11 @@ from tests.storage.nfs.conftest import nfs_device_config, nfs_sr, vm_on_nfs_sr
 #   Must NOT be the network used to access the NFS SR.
 #   This network will be disconnected at some point during the tests
 
-def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=False, error=""):
+def _host_evacuate_test(source_host: Host, dest_host: Host, network_uuid: str | None,
+                        vm: VM, expect_error: bool = False, error: str = "") -> None:
     vm.start(on=source_host.uuid)
     vm.wait_for_os_booted()
-    args = {'host': source_host.uuid}
+    args: dict[str, str | bool | dict[str, str]] = {'host': source_host.uuid}
     if network_uuid is not None:
         args['network-uuid'] = network_uuid
 
@@ -45,8 +48,8 @@ def _host_evacuate_test(source_host, dest_host, network_uuid, vm, expect_error=F
     finally:
         vm.shutdown(verify=True)
 
-def _save_ip_configuration_mode(host, pif_uuid):
-    args = {'uuid': pif_uuid}
+def _save_ip_configuration_mode(host: Host, pif_uuid: str) -> dict[str, str | bool | dict[str, str]]:
+    args: dict[str, str | bool | dict[str, str]] = {'uuid': pif_uuid}
     ipv6 = (host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'primary-address-type'}) == "IPv6")
     keys = [
         ('IPv6', 'IPv6'), ('DNS', 'DNS'), ('gateway', 'IPv6-gateway'), ('mode', 'IPv6-configuration-mode')
@@ -62,17 +65,19 @@ def _save_ip_configuration_mode(host, pif_uuid):
 
 @pytest.mark.small_vm # what we test here is that evacuate works, the goal is not to test with various VMs
 class TestHostEvacuate:
-    def test_host_evacuate(self, host, hostA2, vm_on_nfs_sr):
+    def test_host_evacuate(self, host: Host, hostA2: Host, vm_on_nfs_sr: VM) -> None:
         _host_evacuate_test(host, hostA2, None, vm_on_nfs_sr)
 
 @pytest.mark.complex_prerequisites # requires a special network setup.
 @pytest.mark.small_vm # what we test here is the network-uuid option, the goal is not to test with various VMs
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestHostEvacuateWithNetwork:
-    def test_host_evacuate_with_network(self, host, hostA2, second_network, vm_on_nfs_sr):
+    def test_host_evacuate_with_network(self, host: Host, hostA2: Host, second_network: str, vm_on_nfs_sr: VM) -> None:
         _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr)
 
-    def test_host_evacuate_with_network_no_ip(self, host, hostA2, second_network, vm_on_nfs_sr):
+    def test_host_evacuate_with_network_no_ip(
+        self, host: Host, hostA2: Host, second_network: str, vm_on_nfs_sr: VM
+    ) -> None:
         pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
         ipv6 = (host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'primary-address-type'}) == "IPv6")
         reconfigure_method = 'pif-reconfigure-ipv6' if ipv6 else 'pif-reconfigure-ip'
@@ -86,7 +91,9 @@ class TestHostEvacuateWithNetwork:
             logging.info(f"Restore the configuration of PIF {pif_uuid}")
             host.xe(reconfigure_method, args)
 
-    def test_host_evacuate_with_network_not_attached(self, host, hostA2, second_network, vm_on_nfs_sr):
+    def test_host_evacuate_with_network_not_attached(
+        self, host: Host, hostA2: Host, second_network: str, vm_on_nfs_sr: VM
+    ) -> None:
         pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
         logging.info(f"Unplug PIF {pif_uuid}")
         host.xe('pif-unplug', {'uuid': pif_uuid})
@@ -98,7 +105,9 @@ class TestHostEvacuateWithNetwork:
             logging.info(f"Re-plug PIF {pif_uuid}")
             host.xe('pif-plug', {'uuid': pif_uuid})
 
-    def test_host_evacuate_with_network_not_present(self, host, hostA2, second_network, vm_on_nfs_sr):
+    def test_host_evacuate_with_network_not_present(
+        self, host: Host, hostA2: Host, second_network: str, vm_on_nfs_sr: VM
+    ) -> None:
         pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
         ipv6 = (host.xe('pif-param-get', {'uuid': pif_uuid, 'param-name': 'primary-address-type'}) == "IPv6")
         reconfigure_method = 'pif-reconfigure-ipv6' if ipv6 else 'pif-reconfigure-ip'

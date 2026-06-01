@@ -4,21 +4,15 @@ import logging
 import os
 import re
 import shlex
+import subprocess
 import tempfile
 import uuid
+from dataclasses import dataclass
 
 from packaging import version
 
 import lib.commands as commands
-import lib.pif as pif
-
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, TypedDict, Union, overload
-
-if TYPE_CHECKING:
-    from lib.pool import Pool
-
 from lib.common import (
-    DiskDevName,
     _param_add,
     _param_clear,
     _param_get,
@@ -30,18 +24,24 @@ from lib.common import (
     strtobool,
     to_xapi_bool,
     wait_for,
-    wait_for_not,
 )
 from lib.netutil import wrap_ip
+from lib.pif import PIF
 from lib.sr import SR
-from lib.vdi import VDI
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
+
+from typing import TYPE_CHECKING, Literal, overload
+
+if TYPE_CHECKING:
+    from lib.pool import Pool
+    from lib.vdi import VDI
+    from lib.vm import VM
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
-def host_data(hostname_or_ip):
+def host_data(hostname_or_ip: str) -> dict[str, str]:
     # read from data.py
     from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER, HOSTS
     if hostname_or_ip in HOSTS:
@@ -52,162 +52,171 @@ def host_data(hostname_or_ip):
 
 class Host:
     xe_prefix = "host"
-    pool: Pool
+    pool: "Pool"
 
     # Data extraction is automatic, no conversion from str is done.
-    BlockDeviceInfo = TypedDict('BlockDeviceInfo', {"name": str,
-                                                    "kname": str,
-                                                    "pkname": str,
-                                                    "size": str,
-                                                    "log-sec": str,
-                                                    "type": str,
-                                                    })
-    BLOCK_DEVICES_FIELDS = ','.join(k.upper() for k in BlockDeviceInfo.__annotations__)
+    @dataclass
+    class BlockDeviceInfo:
+        name: str       # short kernel name: "sda", "md0", "dm-3"
+        path: str       # full device path: "/dev/sda", "/dev/md/myarray", "/dev/mapper/mpathb"
+        size: int       # bytes
+        log_sec: int    # logical sector size
+        type: str       # "disk", "md", "mpath"
+        available: bool # not mounted, not member of md/lvm/mpath/zfs
+        wwn: str = ''   # LUN WWN (hex, no 0x prefix); same LUN has same WWN across hosts
 
     block_devices_info: list[BlockDeviceInfo]
 
-    def __init__(self, pool: Pool, hostname_or_ip):
+    def __init__(self, pool: Pool, hostname_or_ip: str):
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
-        self.xo_srv_id: Optional[str] = None
+        self.xo_srv_id: str | None = None
 
         h_data = host_data(self.hostname_or_ip)
         self.user = h_data['user']
         self.password = h_data['password']
         self.skip_xo_config = h_data.get('skip_xo_config', False)
 
-        self.saved_packages_list = None
-        self.saved_rollback_id = None
+        self.saved_packages_list: list[str] | None = None
+        self.saved_rollback_id: int | None = None
         self.inventory = self._get_xensource_inventory()
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
-        self._dom0: Optional[VM] = None
+        self._dom0: VM | None = None
 
         self.rescan_block_devices_info()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.hostname_or_ip
 
+    def name(self) -> str:
+        return self.param_get('name-label')
+
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True) -> str:
+            decode: Literal[True] = True, multiplexing: bool = True) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[True] = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[False]) -> bytes:
+            decode: Literal[False], multiplexing: bool = True) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: Literal[False],
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
             suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: bool = True) -> commands.SSHResult:
+            decode: Literal[True] = True, multiplexing: bool = True) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            decode: Literal[False], multiplexing: bool = True) -> commands.SSHResult[bytes]:
+        ...
+
+    @overload
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
             suppress_fingerprint_warnings: bool = True, background: Literal[True],
-            decode: bool = True) -> None:
+            decode: bool = True, multiplexing: bool = True) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: Union[str, List[str]], *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True) \
-            -> Union[str, bytes, commands.SSHResult, None]:
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
+            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
+            decode: Literal[True] = True, multiplexing: bool = True) -> str | commands.SSHResult[str]:
         ...
 
-    def ssh(self, cmd, *, check=True, simple_output=True, suppress_fingerprint_warnings=True,
-            background=False, decode=True):
+    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
+            suppress_fingerprint_warnings: bool = True, background: bool = False, decode: bool = True,
+            multiplexing: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
-                            background=background, decode=decode)
+                            background=background, decode=decode, multiplexing=multiplexing)
 
-    def ssh_with_result(self, cmd) -> commands.SSHResult:
+    def ssh_with_result(self, cmd: str) -> commands.SSHResult[str]:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         return commands.ssh_with_result(self.hostname_or_ip, cmd)
 
-    def scp(self, src, dest, check=True, suppress_fingerprint_warnings=True, local_dest=False):
+    def scp(self, src: str, dest: str, check: bool = True, suppress_fingerprint_warnings: bool = True,
+            local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
         return commands.scp(
             self.hostname_or_ip, src, dest, check=check,
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
 
     @overload
-    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: Dict[str, Union[str, bool]] = {}, *, check: bool = ...,
-           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult:
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+           simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
-    def xe(self, action, args={}, *, check=True, simple_output=True, minimal=False, force=False) \
-            -> Union[str, commands.SSHResult]:
-        maybe_param_minimal = ['--minimal'] if minimal else []
-        maybe_param_force = ['--force'] if force else []
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
+           simple_output: bool = True, minimal: bool = False, force: bool = False) \
+            -> str | commands.SSHResult[str]:
+        maybe_param_minimal = '--minimal' if minimal else ''
+        maybe_param_force = '--force' if force else ''
 
-        def stringify(key, value):
+        def stringify(key: str, value: str | bool | dict[str, str]) -> str:
             if isinstance(value, bool):
                 return "{}={}".format(key, to_xapi_bool(value))
             if isinstance(value, dict):
                 ret = ""
                 for key2, value2 in value.items():
-                    ret += f"{key}:{key2}={value2} "
+                    ret += f'{key}:{key2}={shlex.quote(value2)} '
                 return ret.rstrip()
-            return "{}={}".format(key, shlex.quote(value))
+            return f'{key}={shlex.quote(value)}'
 
-        command: List[str] = ['xe', action] + maybe_param_minimal + maybe_param_force + \
-                             [stringify(key, value) for key, value in args.items()]
-        result = self.ssh(
-            command,
-            check=check,
-            simple_output=simple_output
-        )
-        assert isinstance(result, (str, commands.SSHResult))
-
-        return result
+        command: str = f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
+            ' '.join(stringify(key, value) for key, value in args.items())
+        if simple_output:
+            return self.ssh(command, check=check, simple_output=True)
+        else:
+            return self.ssh(command, check=check, simple_output=False)
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
+    def param_get(self, param_name: str, key: str | None = ...,
                   accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload
-    def param_get(self, param_name: str, key: Optional[str] = ...,
-                  accept_unknown_key: Literal[True] = ...) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = ...,
+                  accept_unknown_key: Literal[True] = ...) -> str | None:
         ...
 
-    def param_get(self, param_name: str, key: Optional[str] = None, accept_unknown_key: bool = False) -> Optional[str]:
+    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
         return _param_get(self, self.xe_prefix, self.uuid,
                           param_name, key, accept_unknown_key)
 
-    def param_set(self, param_name, value, key=None):
+    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
         _param_set(self, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
-    def param_remove(self, param_name, key, accept_unknown_key=False):
+    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
         _param_remove(self, self.xe_prefix, self.uuid,
                       param_name, key, accept_unknown_key)
 
-    def param_add(self, param_name, value, key=None):
+    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
         _param_add(self, self.xe_prefix, self.uuid,
                    param_name, value, key)
 
-    def param_clear(self, param_name):
+    def param_clear(self, param_name: str) -> None:
         _param_clear(self, self.xe_prefix, self.uuid,
                      param_name)
 
-    def create_file(self, filename, text):
+    def create_file(self, filename: str, text: str) -> None:
         with tempfile.NamedTemporaryFile('w') as file:
             file.write(text)
             file.flush()
             self.scp(file.name, filename)
 
-    def add_xcpng_repo(self, name, base_repo='xcp-ng'):
+    def add_xcpng_repo(self, name: str, base_repo: str = 'xcp-ng') -> None:
         assert base_repo in ['xcp-ng', 'vates']
         base_repo_url = 'http://mirrors.xcp-ng.org/' if base_repo == 'xcp-ng' else 'https://repo.vates.tech/xcp-ng/'
         major = self.xcp_version.major
@@ -222,10 +231,21 @@ class Host:
             "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-xcpng\n"
         ))
 
-    def remove_xcpng_repo(self, name):
-        self.ssh(['rm -f /etc/yum.repos.d/xcp-ng-{}.repo'.format(name)])
+    def remove_xcpng_repo(self, name: str) -> None:
+        self.ssh(f'rm -f /etc/yum.repos.d/xcp-ng-{name}.repo')
 
-    def execute_script(self, script_contents, shebang='sh', simple_output=True):
+    @overload
+    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = True) -> str:
+        ...
+
+    @overload
+    def execute_script(
+        self, script_contents: str, *, shebang: str = ..., simple_output: Literal[False]
+    ) -> commands.SSHResult[str]:
+        ...
+
+    def execute_script(self, script_contents: str, shebang: str = 'sh',
+                       simple_output: bool = True) -> str | commands.SSHResult[str]:
         with tempfile.NamedTemporaryFile('w') as script:
             os.chmod(script.name, 0o775)
             script.write('#!/usr/bin/env ' + shebang + '\n')
@@ -234,44 +254,53 @@ class Host:
             try:
                 remote_path = self.ssh("mktemp").strip()
                 self.scp(script.name, remote_path)
-                self.ssh(['chmod', '0755', remote_path])
+                self.ssh(f'chmod 0755 {remote_path}')
             except Exception as e:
                 logging.error("Failed to create temporary file. %s", e)
                 raise
 
             try:
                 logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
-                return self.ssh([remote_path], simple_output=simple_output)
+                return self.ssh(remote_path, simple_output=simple_output)
             finally:
-                self.ssh(['rm', '-f', remote_path])
+                self.ssh(f'rm -f {remote_path}')
 
-    def _get_xensource_inventory(self) -> Dict[str, str]:
-        output = self.ssh(['cat', '/etc/xensource-inventory'])
-        inventory: Dict[str, str] = {}
+    def _get_xensource_inventory(self) -> dict[str, str]:
+        output = self.ssh('cat /etc/xensource-inventory')
+        inventory: dict[str, str] = {}
         for line in output.splitlines():
             key, raw_value = line.split('=')
             inventory[key] = raw_value.strip('\'')
         return inventory
 
-    def xo_get_server_id(self, store=True):
+    def xo_get_server_id(self, store: bool = True) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
+        assert isinstance(servers, list)
         for server in servers:
+            assert isinstance(server, dict)
+            assert isinstance(server['host'], str)
+            assert isinstance(server['id'], str)
             if server['host'] == wrap_ip(self.hostname_or_ip):
                 if store:
                     self.xo_srv_id = server['id']
                 return server['id']
         return None
 
-    def xo_server_remove(self):
+    def xo_server_remove(self) -> None:
         if self.xo_srv_id is not None:
             xo_cli('server.remove', {'id': self.xo_srv_id})
         else:
             servers = xo_cli('server.getAll', use_json=True)
+            assert isinstance(servers, list)
             for server in servers:
+                assert isinstance(server, dict)
+                assert isinstance(server['host'], str)
+                assert isinstance(server['id'], str)
                 if server['host'] == wrap_ip(self.hostname_or_ip):
                     xo_cli('server.remove', {'id': server['id']})
 
-    def xo_server_add(self, username, password, label=None, unregister_first=True):
+    def xo_server_add(self, username: str, password: str, label: str | None = None,
+                      unregister_first: bool = True) -> None:
         """ Returns the server ID created by XO's `server.add`. """
         if unregister_first:
             self.xo_server_remove()
@@ -289,17 +318,21 @@ class Host:
         )
         self.xo_srv_id = xo_srv_id
 
-    def xo_server_status(self):
+    def xo_server_status(self) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
+        assert isinstance(servers, list)
         for server in servers:
+            assert isinstance(server, dict)
+            assert isinstance(server['host'], str)
+            assert isinstance(server['status'], str | None)
             if server['host'] == wrap_ip(self.hostname_or_ip):
                 return server['status']
         return None
 
-    def xo_server_connected(self):
+    def xo_server_connected(self) -> bool:
         return self.xo_server_status() == "connected"
 
-    def xo_server_reconnect(self):
+    def xo_server_reconnect(self) -> None:
         assert self.xo_srv_id is not None
         logging.info("Reconnect XO to host %s" % self)
         xo_cli('server.disable', {'id': self.xo_srv_id})
@@ -310,10 +343,10 @@ class Host:
         wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about HOST %s" % self.uuid)
 
     @staticmethod
-    def vm_cache_key(uri):
+    def vm_cache_key(uri: str) -> str:
         return f"[Cache for {strip_suffix(uri, '.xva')}]"
 
-    def cached_vm(self, uri, sr_uuid):
+    def cached_vm(self, uri: str, sr_uuid: str) -> VM | None:
         assert sr_uuid, "A SR UUID is necessary to use import cache"
         cache_key = self.vm_cache_key(uri)
         # Look for an existing cache VM
@@ -328,10 +361,12 @@ class Host:
                 logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
                 return vm
         logging.info("Could not find a VM in cache for %r", uri)
+        return None
 
-    def import_vm(self, uri, sr_uuid=None, use_cache=False):
-        vm = None
+    def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
+        vm: VM | None = None
         if use_cache:
+            assert sr_uuid is not None
             if '://' in uri and uri.startswith("clone"):
                 protocol, rest = uri.split(":", 1)
                 assert rest.startswith("//")
@@ -350,7 +385,7 @@ class Host:
         else:
             assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
-        params = {}
+        params: dict[str, str | bool | dict[str, str]] = {}
         msg = "Import VM %s" % uri
         if '://' in uri:
             params['url'] = uri
@@ -373,7 +408,7 @@ class Host:
             vm.param_set('name-description', cache_key)
         return vm
 
-    def import_iso(self, uri, sr: SR):
+    def import_iso(self, uri: str, sr: SR) -> VDI:
         random_name = str(uuid.uuid4())
 
         vdi_uuid = self.xe(
@@ -387,7 +422,7 @@ class Host:
 
         download_path = None
         try:
-            params: Dict[str, Union[str, bool]] = {'uuid': vdi_uuid}
+            params: dict[str, str | bool | dict[str, str]] = {'uuid': vdi_uuid}
             if '://' in uri:
                 logging.info(f"Download ISO {uri}")
                 download_path = f'/tmp/{vdi_uuid}'
@@ -404,8 +439,8 @@ class Host:
 
         return VDI(vdi_uuid, sr=sr)
 
-    def vm_from_template(self, name, template):
-        params = {
+    def vm_from_template(self, name: str, template: str) -> VM:
+        params: dict[str, str | bool | dict[str, str]] = {
             "new-name-label": prefix_object_name(name),
             "template": template,
             "sr-uuid": self.main_sr_uuid(),
@@ -413,19 +448,87 @@ class Host:
         vm_uuid = self.xe('vm-install', params)
         return VM(vm_uuid, self)
 
-    def pool_has_vm(self, vm_uuid, vm_type='vm'):
+    def pool_has_vm(self, vm_uuid: str, vm_type: str = 'vm') -> bool:
         if vm_type == 'snapshot':
             return self.xe('snapshot-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
-    def install_updates(self):
-        logging.info("Install updates on host %s" % self)
-        return self.ssh(['yum', 'update', '-y'])
+    def get_system_uuid(self) -> str:
+        """Return system uuid of current host.
 
-    def restart_toolstack(self, verify=False):
+        Intended for driving current host from its "parent host" in a **nested context**.
+
+        .. note::
+            If the current host is nested, it means it is not a physical host. It is a VM living inside a real host.::
+
+                [PH: Physical Host] -> [VM: emulation of an XCP-ng host] -> [vm: a vm inside nested host]
+                                       |      current working host     |
+
+            So we need system-uuid of current working host (`VM`) which is
+            the uuid seen in physical host's (`PH`) scope.
+
+        Performs the following command::
+
+            dmidecode -s system-uuid
+
+        ref: `dmidecode(8) <https://man.archlinux.org/man/dmidecode.8.en#s>__`
+        """
+        return self.ssh("dmidecode -s system-uuid").lower().strip()
+
+    def yum_clean_metadata(self) -> str:
+        """Quietly removes cached metadata on target.
+
+        Performs the following shell command::
+
+            yum clean metadata -q
+        """
+        logging.info(f"[{self}] Removing cache metadata...")
+        return self.ssh("yum clean metadata -q")
+
+    def yum_update(self, enablerepos: list[str] = []) -> str:
+        """Updates packages on target.
+
+        Performs the following shell command::
+
+            yum update -y
+            # with enablerepos
+            yum update -y --enablerepo=extra1 --enablerepos=extra2
+
+        :param enablerepos: Enable one or more repositories (default: []).
+        """
+        base_command = "yum update -y"
+
+        logging.info(f"[{self}] Updating packages...")
+        if enablerepos:
+            extra = " ".join(f"--enablerepo={r}" for r in enablerepos)
+            base_command = f"{base_command} {extra}"
+
+        return self.ssh(base_command)
+
+    def update(self, enablerepos: list[str] = [], reboot: bool = True) -> None:
+        """Updates current host.
+
+        An helper function that wraps update tasks on current host.
+
+        :param list[str] enablerepos:
+            Repositories to enable when updating.
+        :param bool reboot:
+            Choose to reboot or not after update (default: True).
+        """
+        logging.info(f"[{self}] Updating...")
+
+        self.yum_clean_metadata()
+        self.yum_update(enablerepos=enablerepos)
+        if reboot:
+            # Everything's ok, just reboot
+            self.reboot(verify=True)
+
+        logging.info(f"[{self}] Updated successfully!")
+
+    def restart_toolstack(self, verify: bool = False) -> None:
         logging.info("Restart toolstack on host %s" % self)
-        self.ssh(['xe-toolstack-restart'])
+        self.ssh('xe-toolstack-restart')
         if verify:
             wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=30 * 60)
 
@@ -436,10 +539,10 @@ class Host:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
-    def has_updates(self):
+    def has_updates(self) -> bool:
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
-            self.ssh(['yum', 'check-update'])
+            self.ssh('yum check-update')
             # returned 0, else there would have been a SSHCommandFailed
             return False
         except commands.SSHCommandFailed as e:
@@ -448,7 +551,7 @@ class Host:
             else:
                 raise
 
-    def get_last_yum_history_tid(self):
+    def get_last_yum_history_tid(self) -> int:
         """
         Get the last transaction in yum history.
 
@@ -463,7 +566,7 @@ class Host:
         [...]
         """
         try:
-            history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
+            history_str = self.ssh('yum history list --noplugins')
         except commands.SSHCommandFailed:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
@@ -471,7 +574,7 @@ class Host:
             logging.info('Install and remove a small package to workaround empty yum history.')
             self.yum_install(['gpm-libs'])
             self.yum_remove(['gpm-libs'])
-            history_str = self.ssh(['yum', 'history', 'list', '--noplugins'])
+            history_str = self.ssh('yum history list --noplugins')
 
         history = history_str.splitlines()
         line_index = None
@@ -488,40 +591,39 @@ class Host:
         except ValueError:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
-    def yum_install(self, packages, enablerepo=None):
+    def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
         logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
-        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
-        return self.ssh(['yum', 'install', '--setopt=skip_missing_names_on_install=False', '-y']
-                        + enablerepo_cmd + packages)
+        cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
+        if enablerepo is not None:
+            cmd = f'{cmd} --enablerepo={enablerepo}'
+        return self.ssh(f'{cmd} {" ".join(packages)}')
 
-    def yum_remove(self, packages):
+    def yum_remove(self, packages: list[str]) -> str:
         logging.info('Remove packages: %s from host %s' % (' '.join(packages), self))
-        return self.ssh(['yum', 'remove', '-y'] + packages)
+        return self.ssh(f'yum remove -y {" ".join(packages)}')
 
-    def packages(self):
+    def packages(self) -> list[str]:
         """ Returns the list of installed RPMs - with version, release, arch and epoch. """
-        return sorted(
-            self.ssh(['rpm', '-qa', '--qf', '%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\\\\n']).splitlines()
-        )
+        return sorted(self.ssh('rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\n"').splitlines())
 
-    def check_packages_available(self, packages):
+    def check_packages_available(self, packages: list[str]) -> bool:
         """ Check if a given package list is available in the YUM repositories. """
-        return len(self.ssh(['repoquery'] + packages).splitlines()) == len(packages)
+        return len(self.ssh(f'repoquery {" ".join(packages)}').splitlines()) == len(packages)
 
-    def get_available_package_versions(self, package):
-        return self.ssh(['repoquery', '--show-duplicates', package]).splitlines()
+    def get_available_package_versions(self, package: str) -> list[str]:
+        return self.ssh(f'repoquery --show-duplicates {package}').splitlines()
 
-    def is_package_installed(self, package):
-        return self.ssh_with_result(['rpm', '-q', package]).returncode == 0
+    def is_package_installed(self, package: str) -> bool:
+        return self.ssh_with_result(f'rpm -q {package}').returncode == 0
 
-    def yum_save_state(self):
+    def yum_save_state(self) -> None:
         logging.info(f"Save yum state for host {self}")
         # For now, that saved state feature does not support several saved states
         assert self.saved_packages_list is None, "There is already a saved package list set"
         self.saved_packages_list = self.packages()
         self.saved_rollback_id = self.get_last_yum_history_tid()
 
-    def yum_restore_saved_state(self):
+    def yum_restore_saved_state(self) -> None:
         logging.info(f"Restore yum state for host {self}")
         """ Restore yum state to saved state. """
         assert self.saved_packages_list is not None, \
@@ -531,10 +633,9 @@ class Host:
 
         assert isinstance(self.saved_rollback_id, int)
 
-        self.ssh([
-            'yum', 'history', 'rollback', '--enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates',
-            str(self.saved_rollback_id), '-y'
-        ])
+        self.ssh(
+            f'yum history rollback --enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates {self.saved_rollback_id} -y'
+        )
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
             missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
@@ -547,78 +648,162 @@ class Host:
         self.saved_packages_list = None
         self.saved_rollback_id = None
 
-    def reboot(self, verify=False):
+    def reboot(self, verify: bool = False) -> None:
         logging.info("Reboot host %s" % self)
-        try:
-            self.ssh(['reboot'])
-        except commands.SSHCommandFailed as e:
-            # ssh connection may get killed by the reboot and terminate with an error code
-            if "closed by remote host" not in e.stdout:
-                raise
+        # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
+        # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
+        self.ssh('systemd-run --on-active=2s reboot')
         if verify:
-            wait_for_not(self.is_enabled, "Wait for host down")
+            wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
             wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
             wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
                      "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
             wait_for(self.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 
-    def management_network(self):
+    def management_network(self) -> str:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
 
-    def management_pif(self):
+    def management_pif(self) -> PIF:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
-        return pif.PIF(uuid, self)
+        return PIF(uuid, self)
 
     def rescan_block_devices_info(self) -> None:
         """
-        Initalize static informations about the disks.
+        Initialize information about block devices: local disks, mdadm arrays, and multipath devices.
 
-        Despite those being static, it can be necessary to rescan,
+        Despite those being mostly static, it can be necessary to rescan,
         when we test how XCP-ng reacts to changes of hardware (or
         reconfiguration of device blocksize), or after a reboot.
-        """
-        output_string = self.ssh(["lsblk", "--pairs", "--bytes",
-                                  '-I', '8,259', # limit to: sd, blkext
-                                  "--output", Host.BLOCK_DEVICES_FIELDS])
 
-        self.block_devices_info = [
-            Host.BlockDeviceInfo({key.lower(): value.strip('"') # type: ignore[misc]
-                                  for key, value in re.findall(r'(\S+)=(".*?"|\S+)', line)})
-            for line in output_string.strip().splitlines()
+        Handled device scenarios and their effect on `available`:
+
+        - Plain disk, no children: available unless the disk itself has a
+          mountpoint.
+        - Partitioned disk: available if no partition is mounted and no partition
+          has a used child (lvm, md, mpath, crypt); unavailable otherwise.
+        - Disk member of an mdadm array: the disk itself is unavailable; the md
+          array is added as a separate entry (type 'md'), deduplicated across
+          member appearances, and available if it has no mountpoint and no used
+          children.
+        - LUN with multipath configured: each path appears as a 'disk' entry and
+          a shared 'mpath' entry as its child. The path disks are unavailable
+          (mpath child); the mpath device is added once (type 'mpath'),
+          deduplicated by kname across path appearances.
+        - LUN accessible through multiple paths without multipath configured:
+          multiple 'disk' entries with no children but sharing the same WWN.
+          Deduplicated to a single entry (first path seen) based on WWN.
+        """
+        RAID_TYPES = {'raid0', 'raid1', 'raid4', 'raid5', 'raid6', 'raid10', 'linear'}
+        USED_TYPES = RAID_TYPES | {'lvm', 'mpath', 'crypt'}
+        LSBLK_FIELDS = 'NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN'
+
+        devices: list[Host.BlockDeviceInfo] = []
+
+        raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS}')
+
+        def _split_keys(line: str) -> list[tuple[str, str]]:
+            return re.findall(r'(\S+)=(".*?"|\S+)', line)
+
+        rows = [
+            {key.lower(): val.strip('"') for key, val in _split_keys(line)}
+            for line in raw.strip().splitlines()
         ]
-        logging.debug("blockdevs found: %s", [disk["name"] for disk in self.block_devices_info])
+
+        # build children map: kname -> list of child knames
+        children: dict[str, list[str]] = {}
+        for r in rows:
+            if r['pkname']:
+                children.setdefault(r['pkname'], []).append(r['kname'])
+
+        # availability from lsblk fields: no mountpoint, not a "used" type, all descendants also free
+        def _row_by_kname(kname: str) -> dict[str, str] | None:
+            for r in rows:
+                if r['kname'] == kname:
+                    return r
+            return None
+
+        def _all_available(kname: str) -> bool:
+            r = _row_by_kname(kname)
+            if r is None:
+                return False
+            if r['mountpoint'] or r['type'] in USED_TYPES:
+                return False
+            return all(_all_available(c) for c in children.get(kname, []))
+
+        seen_knames: set[str] = set()
+        seen_wwns: set[str] = set()
+
+        for r in rows:
+            # --- local disks ---
+            if r['type'] == 'disk' and not r['pkname']:
+                wwn = r['wwn']
+                if wwn:
+                    if wwn in seen_wwns:
+                        continue
+                    seen_wwns.add(wwn)
+                devices.append(Host.BlockDeviceInfo(
+                    name=r['name'],
+                    path=f'/dev/{r["name"]}',
+                    size=int(r['size']),
+                    log_sec=int(r['log-sec']),
+                    type='disk',
+                    available=_all_available(r['kname']),
+                    wwn=wwn.removeprefix('0x'),
+                ))
+
+            # --- mdadm arrays (may appear once per member, deduplicate) ---
+            elif r['type'] in RAID_TYPES:
+                if r['kname'] in seen_knames:
+                    continue
+                seen_knames.add(r['kname'])
+                available = not r['mountpoint'] and all(_all_available(c) for c in children.get(r['kname'], []))
+                devices.append(Host.BlockDeviceInfo(
+                    name=r['name'],
+                    path=f'/dev/{r["name"]}',
+                    size=int(r['size']),
+                    log_sec=int(r['log-sec']),
+                    type='md',
+                    available=available,
+                ))
+
+            # --- multipath devices (may appear once per path, deduplicate) ---
+            elif r['type'] == 'mpath':
+                if r['kname'] in seen_knames:
+                    continue
+                seen_knames.add(r['kname'])
+                available = not r['mountpoint'] and all(_all_available(c) for c in children.get(r['kname'], []))
+                wwn = r['name'][1:17] if re.fullmatch(r'3[0-9a-f]{32}', r['name']) else ''
+                devices.append(Host.BlockDeviceInfo(
+                    name=r['kname'],
+                    path=f'/dev/mapper/{r["name"]}',
+                    size=int(r['size']),
+                    log_sec=int(r['log-sec']),
+                    type='mpath',
+                    available=available,
+                    wwn=wwn,
+                ))
+
+        self.block_devices_info = sorted(devices, key=lambda d: d.size, reverse=True)
+        logging.debug("blockdevs found: %s", [d.name for d in self.block_devices_info])
 
     def disks(self) -> list[Host.BlockDeviceInfo]:
-        """ List of BlockDeviceInfo for all disks. """
-        # filter out partitions from block_devices
-        return sorted((disk for disk in self.block_devices_info if not disk["pkname"]),
-                      key=lambda disk: disk["name"])
+        """ List of all block devices (local disks, mdadm arrays, multipath devices). """
+        return list(self.block_devices_info)
 
-    def disk_is_available(self, disk: DiskDevName) -> bool:
-        """
-        Check if a disk is unmounted and appears available for use.
-
-        It may or may not contain identifiable filesystem or partition label.
-        If there are no mountpoints, it is assumed that the disk is not in use.
-
-        Warn: This function may misclassify LVM_member disks (e.g. in XOSTOR, RAID, ZFS) as "available".
-        Such disks may not have mountpoints but still be in use.
-        """
-        return len(self.ssh(['lsblk', '--noheadings', '-o', 'MOUNTPOINT', '/dev/' + disk]).strip()) == 0
-
-    def file_exists(self, filepath, regular_file=True):
+    def file_exists(self, filepath: str, regular_file: bool = True) -> bool:
         option = '-f' if regular_file else '-e'
-        return self.ssh_with_result(['test', option, filepath]).returncode == 0
+        return self.ssh_with_result(f'test {option} {filepath}').returncode == 0
 
-    def binary_exists(self, binary):
-        return self.ssh_with_result(['which', binary]).returncode == 0
+    def binary_exists(self, binary: str) -> bool:
+        return self.ssh_with_result(f'which {binary}').returncode == 0
 
-    def is_symlink(self, filepath):
-        return self.ssh_with_result(['test', '-L', filepath]).returncode == 0
+    def is_symlink(self, filepath: str) -> bool:
+        return self.ssh_with_result(f'test -L {filepath}').returncode == 0
 
-    def sr_create(self, sr_type, label, device_config, shared=False, verify=False):
-        params = {
+    def sr_create(self, sr_type: str, label: str, device_config: dict[str, str], shared: bool = False,
+                  verify: bool = False) -> SR:
+        params: dict[str, str | bool | dict[str, str]] = {
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': prefix_object_name(label),
@@ -637,10 +822,10 @@ class Host:
             wait_for(sr.exists, "Wait for SR to exist")
         return sr
 
-    def is_master(self):
-        return self.ssh(['cat', '/etc/xensource/pool.conf']) == 'master'
+    def is_master(self) -> bool:
+        return self.ssh('cat /etc/xensource/pool.conf') == 'master'
 
-    def local_vm_srs(self):
+    def local_vm_srs(self) -> list[SR]:
         srs = []
         sr_uuids = safe_split(self.xe('pbd-list', {'host-uuid': self.uuid, 'params': 'sr-uuid'}, minimal=True))
         for sr_uuid in sr_uuids:
@@ -649,7 +834,7 @@ class Host:
                 srs.append(sr)
         return srs
 
-    def main_sr_uuid(self):
+    def main_sr_uuid(self) -> str:
         """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
         try:
             from data import DEFAULT_SR
@@ -680,12 +865,12 @@ class Host:
         assert sr_uuid != "<not in database>"
         return sr_uuid
 
-    def hostname(self):
-        return self.ssh(['hostname'])
+    def hostname(self) -> str:
+        return self.ssh('hostname')
 
     def call_plugin(self, plugin_name: str, function: str,
-                    args: Optional[Dict[str, str]] = None) -> str:
-        params: Dict[str, str | bool] = {
+                    args: dict[str, str] | None = None) -> str:
+        params: dict[str, str | bool | dict[str, str]] = {
             'host-uuid': self.uuid,
             'plugin': plugin_name,
             'fn': function
@@ -695,7 +880,7 @@ class Host:
                 params['args:%s' % k] = v
         return self.xe('host-call-plugin', params)
 
-    def join_pool(self, pool):
+    def join_pool(self, pool: Pool) -> None:
         master = pool.master
         self.xe('pool-join', {
             'master-address': master.hostname_or_ip,
@@ -714,32 +899,31 @@ class Host:
         )
         self.pool = pool
 
-    def activate_smapi_driver(self, driver):
-        sm_plugins = self.ssh(['grep', '[[:space:]]*sm-plugins[[:space:]]*=[[:space:]]*', XAPI_CONF_FILE]).splitlines()
-        sm_plugins = sm_plugins[-1] + ' ' + driver
-        self.ssh([f'echo "{sm_plugins}" > {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
+    def activate_smapi_driver(self, driver: str) -> None:
+        sm_plugins = self.ssh(f'grep [[:space:]]*sm-plugins[[:space:]]*=[[:space:]]* {XAPI_CONF_FILE}').splitlines()
+        sm_plugin = sm_plugins[-1] + ' ' + driver
+        self.ssh(f'echo "{sm_plugin}" > {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf')
         self.restart_toolstack(verify=True)
 
-    def deactivate_smapi_driver(self, driver):
-        self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf'])
+    def deactivate_smapi_driver(self, driver: str) -> None:
+        self.ssh(f'rm -f {XAPI_CONF_DIR}/00-XCP-ng-tests-sm-driver-{driver}.conf')
         self.restart_toolstack(verify=True)
 
-    def varstore_dir(self):
+    def varstore_dir(self) -> str:
         if self.xcp_version < version.parse("8.3"):
             return "/var/lib/uefistored"
         else:
             return "/var/lib/varstored"
 
-    def enable_hsts_header(self):
-        self.ssh(['echo', '"hsts_max_age = 63072000"', '>',
-                  f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
+    def enable_hsts_header(self) -> None:
+        self.ssh(f'echo "hsts_max_age = 63072000" > {XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf')
         self.restart_toolstack(verify=True)
 
-    def disable_hsts_header(self):
-        self.ssh(['rm', '-f', f'{XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf'])
+    def disable_hsts_header(self) -> None:
+        self.ssh(f'rm -f {XAPI_CONF_DIR}/00-XCP-ng-tests-enable-hsts-header.conf')
         self.restart_toolstack(verify=True)
 
-    def get_dom0_uuid(self):
+    def get_dom0_uuid(self) -> str:
         return self.inventory["CONTROL_DOMAIN_UUID"]
 
     def get_dom0_vm(self) -> VM:
@@ -747,7 +931,7 @@ class Host:
             self._dom0 = VM(self.get_dom0_uuid(), self)
         return self._dom0
 
-    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> Optional[SR]:
+    def get_sr_from_vdi_uuid(self, vdi_uuid: str) -> SR | None:
         sr_uuid = self.xe("vdi-param-get", {
             "param-name": "sr-uuid",
             "uuid": vdi_uuid,
@@ -756,11 +940,11 @@ class Host:
             return None
         return SR(sr_uuid, self.pool)
 
-    def lvs(self, vgName: Optional[str] = None, ignore_MGT: bool = True) -> List[str]:
-        ret: List[str] = []
-        cmd = ["lvs", "--noheadings", "-o", "LV_NAME"]
+    def lvs(self, vgName: str | None = None, ignore_MGT: bool = True) -> list[str]:
+        ret: list[str] = []
+        cmd = 'lvs --noheadings -o LV_NAME'
         if vgName:
-            cmd.append(vgName)
+            cmd = f'{cmd} {vgName}'
         output = self.ssh(cmd)
         for line in output.splitlines():
             if ignore_MGT and "MGT" in line:

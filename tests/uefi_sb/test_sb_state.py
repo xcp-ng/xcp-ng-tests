@@ -1,8 +1,13 @@
 import pytest
 
-import logging
+from lib.efi import EFIAuth
+from lib.host import Host
+from lib.snapshot import Snapshot
+from lib.vm import VM
 
 from .utils import generate_keys, revert_vm_state
+
+from typing import Generator
 
 # Requirements:
 # On the test runner:
@@ -16,12 +21,12 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolGuestSecureBootReadiness:
-    def test_pool_ready(self, host):
+    def test_pool_ready(self, host: Host) -> None:
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
         assert host.xe("pool-get-guest-secureboot-readiness") == "ready"
 
-    def test_pool_ready_no_dbx(self, host):
+    def test_pool_ready_no_dbx(self, host: Host) -> None:
         pool_auths = generate_keys(as_dict=True)
         host.pool.install_custom_uefi_certs([pool_auths[key] for key in ['PK', 'KEK', 'db']])
         assert host.xe("pool-get-guest-secureboot-readiness") == "ready_no_dbx"
@@ -29,61 +34,66 @@ class TestPoolGuestSecureBootReadiness:
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestVmSecureBootReadiness:
+    PK: EFIAuth
+    KEK: EFIAuth
+    db: EFIAuth
+    dbx: EFIAuth
+
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
         yield
         revert_vm_state(vm, snapshot)
 
-    def test_vm_not_supported(self, uefi_vm):
+    def test_vm_not_supported(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set('HVM-boot-params', 'bios', key='firmware') # Fake BIOS VM
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "not_supported"
 
-    def test_vm_disabled(self, uefi_vm):
+    def test_vm_disabled(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set('platform', False, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "disabled"
 
-    def test_vm_first_boot(self, uefi_vm):
+    def test_vm_first_boot(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.clear_uefi_variables()
         vm.param_set('platform', True, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "first_boot"
 
-    def test_vm_ready(self, uefi_vm):
+    def test_vm_ready(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db, self.dbx])
         vm.param_set('platform', True, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "ready"
 
-    def test_vm_ready_no_dbx(self, uefi_vm):
+    def test_vm_ready_no_dbx(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.db])
         vm.param_set('platform', True, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "ready_no_dbx"
 
-    def test_vm_setup_mode(self, uefi_vm):
+    def test_vm_setup_mode(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set('platform', True, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "setup_mode"
         vm.install_uefi_certs([self.KEK, self.db, self.dbx])
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "setup_mode"
 
-    def test_vm_certs_incomplete_no_kek(self, uefi_vm):
+    def test_vm_certs_incomplete_no_kek(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.db, self.dbx])
         vm.param_set('platform', True, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "certs_incomplete"
 
-    def test_vm_certs_incomplete_no_db(self, uefi_vm):
+    def test_vm_certs_incomplete_no_db(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK, self.KEK, self.dbx])
         vm.param_set('platform', True, key='secureboot')
         assert vm.host.xe("vm-get-secureboot-readiness", {"uuid": vm.uuid}) == "certs_incomplete"
 
-    def test_vm_certs_incomplete_only_pk(self, uefi_vm):
+    def test_vm_certs_incomplete_only_pk(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.install_uefi_certs([self.PK])
         vm.param_set('platform', True, key='secureboot')
@@ -92,8 +102,13 @@ class TestVmSecureBootReadiness:
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestVmSetUefiMode:
+    PK: EFIAuth
+    KEK: EFIAuth
+    db: EFIAuth
+    dbx: EFIAuth
+
     @pytest.fixture(autouse=True)
-    def setup_and_cleanup(self, uefi_vm_and_snapshot):
+    def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:
         vm, snapshot = uefi_vm_and_snapshot
         self.PK, self.KEK, self.db, self.dbx = generate_keys()
         vm.install_uefi_certs([self.PK, self.KEK, self.db, self.dbx])
@@ -101,7 +116,7 @@ class TestVmSetUefiMode:
         yield
         revert_vm_state(vm, snapshot)
 
-    def test_vm_set_uefi_mode(self, uefi_vm):
+    def test_vm_set_uefi_mode(self, uefi_vm: VM) -> None:
         vm = uefi_vm
 
         # Add certs to the pool so that `xe vm-set-uefi-mode` propagates them to the VM later in the test

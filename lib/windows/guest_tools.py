@@ -10,6 +10,7 @@ from . import (
     enable_testsign,
     insert_cd_safe,
     wait_for_vm_running_and_ssh_up_without_tools,
+    wait_for_vm_xenvif_offboard,
 )
 
 from typing import Any, Dict
@@ -22,7 +23,8 @@ ERROR_SUCCESS_REBOOT_REQUIRED = 3010
 GUEST_TOOLS_COPY_PATH = "C:\\package.msi"
 
 
-def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAction, check: bool = True):
+def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAction,
+                        check: bool = True) -> int | None:
     insert_cd_safe(vm, guest_tools_iso["name"])
 
     if guest_tools_iso.get("testsign_cert"):
@@ -57,7 +59,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
             install_cmd += WINDOWS_SHUTDOWN_COMMAND
         vm.start_background_powershell(install_cmd)
         if action != PowerAction.Nothing:
-            wait_for(vm.is_halted, "Wait for VM halted")
+            wait_for(vm.is_halted, "Wait for VM halted", timeout_secs=600)
         if action == PowerAction.Reboot:
             vm.start()
             wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -68,14 +70,15 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
     return exitcode
 
 
-def uninstall_guest_tools(vm: VM, action: PowerAction):
+def uninstall_guest_tools(vm: VM, action: PowerAction) -> None:
     msiexec_args = f"/x {GUEST_TOOLS_COPY_PATH} /log C:\\tools_uninstall.log /passive /norestart"
     uninstall_cmd = f"Start-Process -Wait msiexec.exe -ArgumentList '{msiexec_args}';"
     if action != PowerAction.Nothing:
         uninstall_cmd += WINDOWS_SHUTDOWN_COMMAND
     vm.start_background_powershell(uninstall_cmd)
     if action != PowerAction.Nothing:
-        wait_for(vm.is_halted, "Wait for VM halted")
+        wait_for(vm.is_halted, "Wait for VM halted", timeout_secs=600)
     if action == PowerAction.Reboot:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+        wait_for_vm_xenvif_offboard(vm)

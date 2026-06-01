@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
+from __future__ import annotations
 
+#!/usr/bin/env python3
 import argparse
 import atexit
 import logging
@@ -17,15 +18,16 @@ from packaging import version
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
-from lib.commands import SSHCommandFailed, scp, ssh
+from lib.commands import SSHCommandFailed, ssh
 from lib.common import is_uuid, wait_for
-from lib.host import host_data
+from lib.host import Host, host_data
 from lib.pool import Pool
 from lib.vm import VM
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
-def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, action, hdd, netinstall_gpg_check):
+def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, target_hostname: str | None, action: str,
+                        hdd: str, netinstall_gpg_check: str) -> None:
     password = host_data(hostname_or_ip)['password']
     cmd = ['openssl', 'passwd', '-6', password]
     res = subprocess.run(cmd, stdout=subprocess.PIPE)
@@ -62,25 +64,25 @@ def generate_answerfile(directory, installer, hostname_or_ip, target_hostname, a
 </installation>
         """)
         elif action == 'restore':
-            answerfile.write(f"""<?xml version="1.0"?>
+            answerfile.write("""<?xml version="1.0"?>
 <restore>
 </restore>
         """)
         else:
             raise Exception(f"Unknown action: `{action}`")
 
-def is_ip_active(ip):
+def is_ip_active(ip: str) -> bool:
     return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
 
-def is_ssh_up(ip):
+def is_ssh_up(ip: str) -> bool:
     try:
-        ssh(ip, ['true'], options=['-o "ConnectTimeout 10"'])
+        ssh(ip, 'true', options=['-o', 'ConnectTimeout 10'])
         return True
     except SSHCommandFailed:
         # probably not up yet
         return False
 
-def get_new_host_ip(mac_address):
+def get_new_host_ip(mac_address: str) -> str | None:
     candidate_ips = pxe.arp_addresses_for(mac_address)
     logging.debug("Candidate IPs: " + ", ".join(candidate_ips))
     for ip in candidate_ips:
@@ -88,23 +90,23 @@ def get_new_host_ip(mac_address):
             return ip
     return None
 
-def is_new_host_ready(ip_address):
+def is_new_host_ready(ip_address: str) -> bool:
     try:
-        output = ssh(ip_address, ['xe', 'host-list', 'enabled=true', '--minimal'])
+        output = ssh(ip_address, 'xe host-list enabled=true --minimal')
         return is_uuid(output)
     except Exception:
         return False
 
-def check_mac_address(host, mac_address):
+def check_mac_address(host: Host, mac_address: str) -> None:
     bridge = host.inventory['MANAGEMENT_INTERFACE']
-    host_mac_address = host.ssh(['cat', f'/sys/class/net/{bridge}/address'])
+    host_mac_address = host.ssh(f'cat /sys/class/net/{bridge}/address')
     if mac_address != host_mac_address:
         raise Exception(
             f"Unexpected MAC address `{host_mac_address}` for host `{host.hostname_or_ip}`. "
             f"Expected: `{mac_address}`"
         )
 
-def url_checker(url):
+def url_checker(url: str) -> None:
     try:
         response = requests.get(url)
         if not response:
@@ -112,7 +114,7 @@ def url_checker(url):
     except requests.exceptions.RequestException as e:
         raise SystemExit(f"{url}: URL is not reachable\nErr: {e}")
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "host",
@@ -160,7 +162,7 @@ def main():
     try:
         pool = Pool(args.host) # will fail if host is not XCP-ng or XAPI doesn't respond yet
     except Exception as e:
-        raise Exception(f"Host `{args.host}` isn't ready or isn't an XCP-ng host")
+        raise Exception(f"Host `{args.host}` isn't ready or isn't an XCP-ng host") from e
 
     host = pool.master
     assert host.is_enabled()
@@ -178,6 +180,7 @@ def main():
     vm = VM(args.vm_uuid, host)
     vif = vm.vifs()[0]
     mac_address = vif.param_get('MAC')
+    assert mac_address is not None
     with tempfile.TemporaryDirectory(suffix=mac_address) as tmp_local_path:
         logging.info('Generate files: answerfile.xml and boot.conf')
         hdd = 'nvme0n1' if vm.is_uefi else 'sda'
@@ -201,11 +204,12 @@ def main():
             "Waiting for the installation process to complete and the VM to reboot and be up", 3600, 10
         )
         vm_ip_address = get_new_host_ip(mac_address)
+        assert vm_ip_address is not None
         logging.info('The IP address of the installed XCP-ng is: ' + vm_ip_address)
         wait_for(lambda: is_new_host_ready(vm_ip_address), "Waiting for XAPI to be ready", 600, 10)
         pool2 = Pool(vm_ip_address)
         host2 = pool2.master
-        host2.inventory = host2._get_xensource_inventory()
+        host2.inventory = host2._get_xensource_inventory()  # noqa: SLF001
         check_mac_address(host2, mac_address)
         logging.info(f'Target host is started and enabled in version: {host2.xcp_version}')
         if args.action == 'restore' and host2.xcp_version >= version.parse(xcp_version):

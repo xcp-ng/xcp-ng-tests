@@ -1,6 +1,9 @@
 import pytest
 
 from lib.common import strtobool
+from lib.host import Host
+
+from typing import Generator
 
 # Requirements:
 # From --hosts parameter:
@@ -9,15 +12,15 @@ from lib.common import strtobool
 # - access to XCP-ng RPM repository from hostA1
 
 @pytest.fixture(scope='module')
-def host_without_netdata(host):
+def host_without_netdata(host: Host) -> Generator[Host, None, None]:
     assert not strtobool(host.call_plugin('netdata.py', 'is_netdata_installed'))
     yield host
 
 class TestInstall:
-    def test_is_netdata_installed(self, host):
+    def test_is_netdata_installed(self, host: Host) -> None:
         host.call_plugin('netdata.py', 'is_netdata_installed')
 
-    def test_install_netdata(self, host_without_netdata):
+    def test_install_netdata(self, host_without_netdata: Host) -> None:
         host = host_without_netdata
         host.yum_save_state()
         host.call_plugin('netdata.py', 'install_netdata', {
@@ -29,7 +32,7 @@ class TestInstall:
         host.yum_restore_saved_state()
 
 class TestApiKey:
-    def test_get_netdata_api_key(self, host_without_netdata):
+    def test_get_netdata_api_key(self, host_without_netdata: Host) -> None:
         host = host_without_netdata
         host.yum_save_state()
         host.call_plugin('netdata.py', 'install_netdata', {

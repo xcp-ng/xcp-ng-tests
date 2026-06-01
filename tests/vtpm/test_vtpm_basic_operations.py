@@ -3,6 +3,7 @@ import pytest
 import logging
 
 import lib.commands as commands
+from lib.vm import VM
 
 # These tests are basic tests for vTPM devices.
 #   - Create / Destroy a vTPM device on a VM
@@ -63,19 +64,29 @@ rm -rf ${TMPDIR}
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
-def test_create_and_destroy_vtpm(halted_uefi_unix_vm):
+def test_create_and_destroy_vtpm(halted_uefi_unix_vm: VM) -> None:
     vm = halted_uefi_unix_vm
-    assert not vm.get_vtpm_uuid(), "there must be no vTPM before we create it"
-    vtpm_uuid = vm.create_vtpm()
-    assert vtpm_uuid
-    assert vm.get_vtpm_uuid(), "a vTPM must be present after creation"
-    logging.info("vTPM created with uuid: %s" % vtpm_uuid)
-    vm.destroy_vtpm()
-    assert not vm.get_vtpm_uuid(), "there must be no vTPM after we deleted it"
+    image_has_vtpm = vm.get_vtpm_uuid()
+    try:
+        if image_has_vtpm:
+            vm.destroy_vtpm()
+            assert not vm.get_vtpm_uuid(), "there must be no vTPM after we deleted it"
+        assert not vm.get_vtpm_uuid(), "there must be no vTPM before we create it"
+        vtpm_uuid = vm.create_vtpm()
+        assert vtpm_uuid
+        assert vm.get_vtpm_uuid(), "a vTPM must be present after creation"
+        logging.info("vTPM created with uuid: %s" % vtpm_uuid)
+        vm.destroy_vtpm()
+        assert not vm.get_vtpm_uuid(), "there must be no vTPM after we deleted it"
+    finally:
+        if image_has_vtpm and not vm.get_vtpm_uuid():
+            vm.create_vtpm()
+        elif not image_has_vtpm and vm.get_vtpm_uuid():
+            vm.destroy_vtpm()
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
-def test_vtpm(unix_vm_with_tpm2_tools):
+def test_vtpm(unix_vm_with_tpm2_tools: VM) -> None:
     global vtpm_signing_test_script
     vm = unix_vm_with_tpm2_tools
 

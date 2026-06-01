@@ -3,9 +3,12 @@ import pytest
 import logging
 
 from lib.common import safe_split
+from lib.host import Host
+
+from typing import Generator
 
 @pytest.fixture(scope="session")
-def enabled_pgpu_uuid(host):
+def enabled_pgpu_uuid(host: Host) -> Generator[str, None, None]:
     pgpu_uuids = safe_split(host.xe("pgpu-list", {"host-uuid": host.uuid}, minimal=True), ',')
 
     pgpu_uuid = None
@@ -29,6 +32,6 @@ def enabled_pgpu_uuid(host):
             host.reboot(verify=True)
 
 @pytest.fixture(scope="session")
-def enabled_pci_uuid(host, enabled_pgpu_uuid):
+def enabled_pci_uuid(host: Host, enabled_pgpu_uuid: str) -> str:
     pci_uuid = host.xe("pgpu-param-get", {"uuid": enabled_pgpu_uuid, "param-name": "pci-uuid"})
     return pci_uuid

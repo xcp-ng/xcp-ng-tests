@@ -10,6 +10,7 @@ dependencies = [
     "legacycrypt",
     "packaging>=20.7",
     "pluggy>=1.1.0",
+    "pydantic",
     "pytest>=8.0.0",
     "pytest-dependency",
     "requests",
@@ -17,18 +18,22 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ansible>=5.0.1",
     "bs4>=0.0.1",
     "mypy",
     "flake8",
     "flake8-pyproject",
     "pydocstyle",
     "pyright",
-    "pyyaml>=6.0",
     "ruff",
     "types-requests",
     "typing-extensions",
     "libarchive-c==5.3",
+    "types-pygments",
+    "types-colorama",
+    "types-pexpect",
+    "zizmor",
+    "prek>=0.4.0",
+    "autopep8",
 ]
 
 [tool.pyright]
@@ -49,6 +54,7 @@ select = [
   "I",  # isort
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
+  "UP007",  # non-pep604-annotation-union
 ]
 # don't use some of the default D and SIM rules
 ignore = [
@@ -77,9 +83,13 @@ ignore = [
 pydocstyle.convention = "pep257"
 
 [tool.ruff.lint.extend-per-file-ignores]
-# pytest requires some import and function arguments to match, but
-# the linter doesn't know that
+# Pytest fixtures are often flagged as unused imports (F401) or 
+# redefined variables (F811) because they are injected by name.
 "tests/**/*.py" = [
+  "F401",  # F401 unused-import
+  "F811",  # F811 redefined-while-unused
+]
+"conftest.py" = [
   "F401",  # F401 unused-import
   "F811",  # F811 redefined-while-unused
 ]
@@ -112,3 +122,26 @@ ignore = [
   "F",  # already done by ruff
 ]
 exclude=[".git", ".venv", "data.py", "vm_data.py"]
+
+[tool.autopep8]
+max_line_length = 120
+ignore = [
+  "E261",
+  "E302",
+  "E305",
+  "E402",
+  "W503",
+  "F",
+]
+exclude=".git,.venv,data.py,vm_data.py"
+
+[tool.uv]
+# fedora is changing the defaults: https://src.fedoraproject.org/rpms/uv/blob/f43/f/uv.toml
+# We force them back to the upstream value, so we can just download the expected python version
+python-downloads = "automatic"
+python-preference = "managed"
+
+[tool.pytest-language-server]
+# pytest-language-server shows some internal variables, like host, as undeclared fixture.
+# An undeclared fixture would be cought by pyright/mypy. Just disable that diagnostic.
+disabled_diagnostics = ["undeclared-fixture"]

@@ -5,13 +5,13 @@ import pytest
 import logging
 from dataclasses import dataclass
 
-from typing import TYPE_CHECKING, Generator
+from lib import config
+from lib.host import Host
+from lib.sr import SR
+from lib.vdi import VDI, ImageFormat
+from lib.vm import VM
 
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.sr import SR
-    from lib.vdi import VDI
-    from lib.vm import VM
+from typing import Generator
 
 @dataclass
 class XfsConfig:
@@ -21,8 +21,12 @@ class XfsConfig:
 def _xfs_config() -> XfsConfig:
     return XfsConfig()
 
+# NOTE: @pytest.mark.usefixtures does not parametrize this fixture.
+# To recreate host_with_xfsprogs for each image_format value, accept
+# image_format in the fixture arguments.
+# ref https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
 @pytest.fixture(scope='package')
-def host_with_xfsprogs(host: Host, _xfs_config: XfsConfig) -> Generator[Host]:
+def host_with_xfsprogs(host: Host, image_format: ImageFormat, _xfs_config: XfsConfig) -> Generator[Host, None, None]:
     assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
         "xfsprogs must not be installed on the host at the beginning of the tests"
     host.yum_save_state()
@@ -36,11 +40,14 @@ def host_with_xfsprogs(host: Host, _xfs_config: XfsConfig) -> Generator[Host]:
 def xfs_sr(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     host_with_xfsprogs: Host,
+    image_format: ImageFormat,
     _xfs_config: XfsConfig,
-) -> Generator[SR]:
+) -> Generator[SR, None, None]:
     """ A XFS SR on first host. """
-    sr_disk = unused_512B_disks[host_with_xfsprogs][0]["name"]
-    sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test", {'device': '/dev/' + sr_disk})
+    sr_disk = unused_512B_disks[host_with_xfsprogs][0].name
+    sr = host_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
+                                      {'device': '/dev/' + sr_disk,
+                                       'preferred-image-formats': image_format})
     yield sr
     # teardown
     try:
@@ -50,13 +57,13 @@ def xfs_sr(
         raise pytest.fail("Could not destroy xfs SR, leaving packages in place for manual cleanup") from e
 
 @pytest.fixture(scope='module')
-def vdi_on_xfs_sr(xfs_sr: SR) -> Generator[VDI]:
-    vdi = xfs_sr.create_vdi('XFS-local-VDI-test')
+def vdi_on_xfs_sr(xfs_sr: SR) -> Generator[VDI, None, None]:
+    vdi = xfs_sr.create_vdi('XFS-local-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
 @pytest.fixture(scope='module')
-def vm_on_xfs_sr(host: Host, xfs_sr: SR, vm_ref: str) -> Generator[VM]:
+def vm_on_xfs_sr(host: Host, xfs_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=xfs_sr.uuid)
     yield vm
     # teardown

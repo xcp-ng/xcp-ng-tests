@@ -3,12 +3,16 @@ from __future__ import annotations
 import pytest
 
 from lib.common import vm_image, wait_for
+from lib.vdi import ImageFormat
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.host import Host
+    from lib.sr import SR
+    from lib.vdi import VDI
+    from lib.vm import VM
 
 # Requirements:
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
@@ -20,13 +24,17 @@ class TestLARGEBLOCKSRCreateDestroy:
     and VM import.
     """
 
-    def test_create_sr_with_missing_device(self, host):
+    def test_create_sr_with_missing_device(self, host: Host) -> None:
         try_to_create_sr_with_missing_device('largeblock', 'LARGEBLOCK-local-SR-test', host)
 
-    def test_create_and_destroy_sr(self, host: Host, unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> None:
+    def test_create_and_destroy_sr(self, host: Host,
+                                   unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
+                                   image_format: ImageFormat) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr_disk = unused_4k_disks[host][0]["name"]
-        sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test", {'device': '/dev/' + sr_disk}, verify=True)
+        sr_disk = unused_4k_disks[host][0].name
+        sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
+                            {'device': '/dev/' + sr_disk,
+                             'preferred-image-formats': image_format}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown
         vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
@@ -36,15 +44,22 @@ class TestLARGEBLOCKSRCreateDestroy:
 @pytest.mark.usefixtures("largeblock_sr")
 class TestLARGEBLOCKSR:
     @pytest.mark.quicktest
-    def test_quicktest(self, largeblock_sr):
+    def test_quicktest(self, largeblock_sr: SR) -> None:
         largeblock_sr.run_quicktest()
 
-    def test_vdi_is_not_open(self, vdi_on_largeblock_sr):
+    def test_vdi_is_not_open(self, vdi_on_largeblock_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_largeblock_sr)
+
+    def test_vdi_image_format(self, vdi_on_largeblock_sr: VDI, image_format: ImageFormat) -> None:
+        fmt = vdi_on_largeblock_sr.get_image_format()
+        # feature-detect: if the SM doesn't report image-format, skip this check
+        if not fmt:
+            pytest.skip("SM does not report sm-config:image-format; skipping format check")
+        assert fmt == image_format
 
     @pytest.mark.small_vm # run with a small VM to test the features
     @pytest.mark.big_vm # and ideally with a big VM to test it scales
-    def test_start_and_shutdown_VM(self, vm_on_largeblock_sr):
+    def test_start_and_shutdown_VM(self, vm_on_largeblock_sr: VM) -> None:
         vm = vm_on_largeblock_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -52,7 +67,7 @@ class TestLARGEBLOCKSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_snapshot(self, vm_on_largeblock_sr):
+    def test_snapshot(self, vm_on_largeblock_sr: VM) -> None:
         vm = vm_on_largeblock_sr
         vm.start()
         vm.wait_for_os_booted()
@@ -63,7 +78,7 @@ class TestLARGEBLOCKSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    def test_reboot(self, host, largeblock_sr, vm_on_largeblock_sr):
+    def test_reboot(self, host: Host, largeblock_sr: SR, vm_on_largeblock_sr: VM) -> None:
         sr = largeblock_sr
         vm = vm_on_largeblock_sr
         host.reboot(verify=True)

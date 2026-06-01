@@ -1,7 +1,9 @@
-# Requirements:
-# - one XCP-ng host (--host) (>= 8.3 for IPv6 test)
+from lib.host import Host
 
-def test_management_disable_address_type(host):
+# Requirements:
+# - one XCP-ng host (--hosts) (>= 8.3 for IPv6 test)
+
+def test_management_disable_address_type(host: Host) -> None:
     management_pif = host.management_pif()
     type = management_pif.param_get("primary-address-type").lower()
 
