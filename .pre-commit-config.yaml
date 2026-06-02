@@ -11,7 +11,7 @@ repos:
         name: "autopep8"
         language: "system"
         require_serial: true
-        entry: "uv run autopep8 -i"
+        entry: "uv run autopep8 --global-config /dev/null -i"
         types: ["python"]
       - id: "flake8"
         name: "flake8"
