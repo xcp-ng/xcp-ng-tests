@@ -701,10 +701,33 @@ class Host:
         RAID_TYPES = {'raid0', 'raid1', 'raid4', 'raid5', 'raid6', 'raid10', 'linear'}
         USED_TYPES = RAID_TYPES | {'lvm', 'mpath', 'crypt'}
         LSBLK_FIELDS = 'NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN'
+        # The device major numbers we have on an xcp-ng host, except 254 (tapdev) and 202 (xvd)
+        # From /dev/devices:
+        #   8 sd
+        #   9 md
+        #  65 sd
+        #  66 sd
+        #  67 sd
+        #  68 sd
+        #  69 sd
+        #  70 sd
+        #  71 sd
+        # 128 sd
+        # 129 sd
+        # 130 sd
+        # 131 sd
+        # 132 sd
+        # 133 sd
+        # 134 sd
+        # 135 sd
+        # 252 mdp
+        # 253 device-mapper
+        # 259 blkext
+        LSBLK_MAJOR_NUMBERS = '8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259'
 
         devices: list[Host.BlockDeviceInfo] = []
 
-        raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS}')
+        raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS} --include {LSBLK_MAJOR_NUMBERS}')
 
         def _split_keys(line: str) -> list[tuple[str, str]]:
             return re.findall(r'(\S+)=(".*?"|\S+)', line)
