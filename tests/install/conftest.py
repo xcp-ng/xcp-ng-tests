@@ -345,6 +345,9 @@ def try_booting_vm_with_installer(host: Host, create_vms: list[VM], iso_in_pool_
             logging.critical("caught exception %s", e)
         except KeyboardInterrupt:
             logging.warning("keyboard interrupt")
+    else:
+        # communicate that VM could not be booted as requested
+        yield None
 
     if not vm_running:
         # not able to start or shutdown the VM properly
