@@ -375,6 +375,8 @@ flake8
 
 > [!NOTE]
 > There is also a `Makefile` to run checks, just launch `make` command at root level project.
+> If `make` fails with formatting or linting issues that can be fixed automatically (such as ordering imports), you can run `make fix` to automatically fix those.
+> Note that `make` and `make fix` run on all files managed by git (untracked files won't be checked or modified, respectively)
 
 The code checker diagnostics can also be shown directly in your IDE or text editor, by using plugins or language
 servers (LSP).

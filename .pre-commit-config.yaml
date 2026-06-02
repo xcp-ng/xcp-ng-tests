@@ -5,10 +5,24 @@ repos:
         name: "ruff"
         language: "system"
         require_serial: true
+        entry: "uv run ruff check"
+        types: ["python"]
+        stages: ["manual"]
+      - id: "ruff-fix"
+        name: "ruff-fix"
+        language: "system"
+        require_serial: true
         entry: "uv run ruff check --fix --show-fixes"
         types: ["python"]
       - id: "autopep8"
         name: "autopep8"
+        language: "system"
+        require_serial: true
+        entry: "uv run autopep8 --global-config /dev/null --diff --exit-code"
+        types: ["python"]
+        stages: ["manual"]
+      - id: "autopep8-fix"
+        name: "autopep8-fix"
         language: "system"
         require_serial: true
         entry: "uv run autopep8 --global-config /dev/null -i"
