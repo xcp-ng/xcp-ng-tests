@@ -103,7 +103,7 @@ def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
                 unsigned=ISO_IMAGES[iso_key].get('unsigned', False),
                 )
 
-SystemDiskConfig: TypeAlias = Literal['disk'] | Literal['raid1']
+SystemDiskConfig: TypeAlias = Literal['disk'] | Literal['raid1'] | Literal['xsraid1']
 
 @pytest.fixture(scope='function')
 def system_disk_config(request: pytest.FixtureRequest) -> SystemDiskConfig:
@@ -138,6 +138,7 @@ def system_disks_names(request: pytest.FixtureRequest, system_disk_config: Syste
     main_disk = {"uefi": "nvme0n1", "bios": "sda"}[firmware]
 
     extra_disks = {"raid1": {"uefi": ("nvme0n2",), "bios": ("sdb",)}[firmware],
+                   "xsraid1": {"uefi": ("nvme0n2",), "bios": ("sdb",)}[firmware],
                    "disk": (),
                    }[system_disk_config]
 

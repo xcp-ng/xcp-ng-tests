@@ -40,5 +40,6 @@ SimpleAnswerfileDict = TypedDict('SimpleAnswerfileDict', {
     'name': NotRequired[str],
     'proto': NotRequired[str],
     'stage': NotRequired[str],
+    'swraid': NotRequired[str],
     'type': NotRequired[str],
 })
