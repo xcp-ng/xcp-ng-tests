@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 import logging
-import time
 
 from lib.common import PackageManagerEnum, wait_for
 from lib.host import Host
@@ -57,7 +56,7 @@ class TestGuestToolsUnix:
         # remove the installed tools
         logging.info("Detect package manager and uninstall the guest tools")
         pkg_mgr = vm.detect_package_manager()
-        if pkg_mgr == PackageManagerEnum.RPM:
+        if pkg_mgr in [PackageManagerEnum.YUM, PackageManagerEnum.DNF]:
             # Our guest tools come in two packages for RPM distros: xe-guest-utilities and xe-guest-utilities-xenstore.
             # However, the following implementation will also work for a single xe-guest-utilities RPM.
             vm.execute_script('rpm -qa | grep xe-guest-utilities | xargs rpm -e')
