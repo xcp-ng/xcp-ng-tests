@@ -511,12 +511,16 @@ class VM(BaseVM):
 
     def detect_package_manager(self) -> PackageManagerEnum:
         """ Heuristic to determine the package manager on a unix distro. """
-        if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
-            return PackageManagerEnum.RPM
+        if self.file_exists('/usr/bin/dnf'):
+            return PackageManagerEnum.DNF
+        if self.file_exists('/usr/bin/yum'):
+            return PackageManagerEnum.YUM
         if self.file_exists('/usr/bin/apt-get'):
             return PackageManagerEnum.APT_GET
         if self.file_exists('/sbin/apk'):
             return PackageManagerEnum.APK
+        if self.file_exists('/usr/bin/zypper'):
+            return PackageManagerEnum.ZYPPER
         return PackageManagerEnum.UNKNOWN
 
     def insert_cd(self, vdi_name: str) -> None:
