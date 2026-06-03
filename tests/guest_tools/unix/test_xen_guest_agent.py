@@ -12,7 +12,7 @@ from lib.vm import VM
 # From --hosts parameter:
 # - host(A1): first XCP-ng host >= 8.0
 # From --vm parameter:
-# - A Linux VM with systemd and a supported package manager (RPM or APT)
+# - A Linux VM with systemd and a supported package manager (YUM or APT)
 
 
 def _vif_published_ips(host: Host, xs_prefix: str, vif_id: int, proto: str) -> list[str]:
@@ -38,22 +38,23 @@ class TestXenGuestAgent:
             pytest.skip("systemd not available on this VM")
 
         pkg_mgr = vm.detect_package_manager()
-        if pkg_mgr not in (PackageManagerEnum.RPM, PackageManagerEnum.APT_GET):
+        if pkg_mgr not in (PackageManagerEnum.YUM, PackageManagerEnum.DNF, PackageManagerEnum.APT_GET):
             pytest.skip(f"Package manager '{pkg_mgr}' not supported in this test")
 
         # Remove conflicting xe-guest-utilities if present
         logging.info("Removing xe-guest-utilities if present")
-        if pkg_mgr == PackageManagerEnum.RPM:
+        if pkg_mgr in (PackageManagerEnum.YUM, PackageManagerEnum.DNF):
             vm.ssh('rpm -qa | grep xe-guest-utilities | xargs --no-run-if-empty rpm -e')
         elif pkg_mgr == PackageManagerEnum.APT_GET and \
                 vm.ssh_with_result('dpkg -l xe-guest-utilities').returncode == 0:
             vm.ssh('apt-get remove -y xe-guest-utilities')
 
-        if pkg_mgr == PackageManagerEnum.RPM:
+        if pkg_mgr in (PackageManagerEnum.YUM, PackageManagerEnum.DNF):
             rpm_repo = xen_guest_agent_urls['rpm_repo']
             vm.ssh(f"echo -e '[xen-guest-agent]\\nbaseurl={rpm_repo}main/\\ngpgcheck=0'"
                    f" > /etc/yum.repos.d/xen-guest-agent.repo")
-            vm.ssh('dnf install -y xen-guest-agent')
+            cmd = 'dnf' if pkg_mgr == PackageManagerEnum.DNF else 'yum'
+            vm.ssh(f'{cmd} install -y xen-guest-agent')
         elif pkg_mgr == PackageManagerEnum.APT_GET:
             # DEB packages are published to a stable APT repo in the GitLab
             # Generic Package Registry after each push to main.

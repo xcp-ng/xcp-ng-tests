@@ -60,8 +60,10 @@ def unix_vm_with_tpm2_tools(started_unix_vm_with_vtpm: VM) -> Generator[VM, None
         # Old versions of apt-get doesn't support the --update option with the
         # install command so we have to first update then install
         cmd = 'apt-get update && apt-get'
-    elif pkg_mgr == PackageManagerEnum.RPM:
+    elif pkg_mgr == PackageManagerEnum.YUM:
         cmd = 'yum'
+    elif pkg_mgr == PackageManagerEnum.DNF:
+        cmd = 'dnf'
     else:
         pytest.fail("Unsupported package manager for this test. Cannot install tpm2-tools")
 
