@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import tomllib
 import warnings
@@ -218,6 +219,30 @@ def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, An
     return base
 
 
+def _parse_env_value(raw: str) -> Any:
+    """Parse env var value as TOML, falling back to plain string."""
+    try:
+        return tomllib.loads(f"x = {raw}")["x"]
+    except tomllib.TOMLDecodeError:
+        return raw
+
+
+def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
+    """Override config values from XCPNG_CFG__* env vars."""
+    prefix = "XCPNG_TESTS_"
+    overrides: dict[str, Any] = {}
+    for key, raw in os.environ.items():
+        if not key.startswith(prefix):
+            continue
+        path = key.removeprefix(prefix).lower().split("__")
+        value = _parse_env_value(raw)
+        branch = overrides
+        for part in path[:-1]:
+            branch = branch.setdefault(part, {})
+        branch[path[-1]] = value
+    return _merge_dicts(data, overrides) if overrides else data
+
+
 def _replace_password_hash_placeholder(obj: Any, password_hash: str) -> Any:
     """Recursively replace <PASSWORD_HASH> placeholders with actual hash."""
     if isinstance(obj, str):
@@ -249,6 +274,7 @@ def _build_config(base_data: dict[str, Any]) -> Config:
         password = base_data["host"].get("default_password", "")
         password_hash = hash_password(password)
         base_data = _replace_password_hash_placeholder(base_data, password_hash)
+    base_data = _apply_env_overrides(base_data)
     try:
         return Config(**base_data)
     except Exception as e:
