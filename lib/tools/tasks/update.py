@@ -61,5 +61,5 @@ def update_pools(inventory: Inventory) -> None:
     # Snapshot creation
     for hosting_pool, nested in nested_hosts.items():
         pool = Pool(hosting_pool) # mandatory for getting an host instance
-        vm_uuids = [h.get_system_uuid() for h in nested]
+        vm_uuids = [h.get_system_serial_number() for h in nested]
         create_snapshots(pool.master, vm_uuids)

@@ -454,10 +454,17 @@ class Host:
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
-    def get_system_uuid(self) -> str:
-        """Return system uuid of current host.
+    def get_system_serial_number(self) -> str:
+        """Get system serial number.
 
-        Intended for driving current host from its "parent host" in a **nested context**.
+        Connect to host and execute a raw python script to
+        get system serial number. This function is quite
+        equivalent to the command: `dmidecode -s system-uuid`.
+
+        >>> my_host.get_serial_system()
+        1392c56b-5f8b-47a3-a077-b17900fd7922
+
+        Intended for driving current host from its "hosting pool" in a **nested context**.
 
         .. note::
             If the current host is nested, it means it is not a physical host. It is a VM living inside a real host.::
@@ -465,16 +472,30 @@ class Host:
                 [PH: Physical Host] -> [VM: emulation of an XCP-ng host] -> [vm: a vm inside nested host]
                                        |      current working host     |
 
-            So we need system-uuid of current working host (`VM`) which is
-            the uuid seen in physical host's (`PH`) scope.
-
-        Performs the following command::
-
-            dmidecode -s system-uuid
-
-        ref: `dmidecode(8) <https://man.archlinux.org/man/dmidecode.8.en#s>__`
+            So we need system serial number of current working host (`VM`) which is
+            the uuid seen in physical host's (`PH`) scope, the hosting pool.
         """
-        return self.ssh("dmidecode -s system-uuid").lower().strip()
+        raw_python_script = f"""
+import XenAPI
+def main():
+    session = XenAPI.xapi_local()
+    try:
+        session.xenapi.login_with_password('root', '')
+        current_host = session.xenapi.host.get_by_uuid('{self.uuid}')
+        uuid = session.xenapi.host.get_bios_strings(current_host)['system-serial-number']
+    except Exception:
+        pass
+    finally:
+        session.xenapi.session.logout()
+    return uuid
+if __name__ == '__main__':
+    print(main())
+       """
+        system_serial_number = self.execute_script(raw_python_script, shebang='python')
+        if not system_serial_number:
+            raise ValueError("System serial number has incorrect value.")
+
+        return system_serial_number
 
     def yum_clean_metadata(self) -> str:
         """Quietly removes cached metadata on target.
