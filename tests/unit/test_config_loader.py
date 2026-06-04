@@ -6,7 +6,13 @@ from pathlib import Path
 
 from passlib.hash import sha512_crypt
 
-from lib.config_loader import ConfigError, _build_config, _load_toml_file, load_config
+from lib.config_loader import (
+    ConfigError,
+    _build_config,
+    _load_toml_file,
+    _load_toml_with_includes,
+    load_config,
+)
 
 from typing import Any
 
@@ -79,3 +85,24 @@ def test_storage_device_config_delta() -> None:
     assert cfg.sr_device_config("CIFS_ISO_DEVICE_CONFIG") == {}
     with pytest.raises(ConfigError):
         cfg.sr_device_config("NFS_ISO_DEVICE_CONFIG", required=["location"])
+
+
+def test_include_merge(tmp_path: Path) -> None:
+    (tmp_path / "base.toml").write_text("a = 1\n")
+    (tmp_path / "overlay.toml").write_text('include = ["base.toml"]\nb = 2\n')
+    assert _load_toml_with_includes(tmp_path / "overlay.toml") == {"a": 1, "b": 2}
+
+
+def test_include_cycle_detected(tmp_path: Path) -> None:
+    (tmp_path / "a.toml").write_text('include = ["b.toml"]\n')
+    (tmp_path / "b.toml").write_text('include = ["a.toml"]\n')
+    with pytest.raises(ConfigError):
+        _load_toml_with_includes(tmp_path / "a.toml")
+
+
+def test_include_diamond_allowed(tmp_path: Path) -> None:
+    (tmp_path / "d.toml").write_text("d = 1\n")
+    (tmp_path / "b.toml").write_text('include = ["d.toml"]\nb = 1\n')
+    (tmp_path / "c.toml").write_text('include = ["d.toml"]\nc = 1\n')
+    (tmp_path / "a.toml").write_text('include = ["b.toml", "c.toml"]\n')
+    assert _load_toml_with_includes(tmp_path / "a.toml") == {"d": 1, "b": 1, "c": 1}

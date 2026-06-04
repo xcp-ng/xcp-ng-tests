@@ -23,6 +23,13 @@ _EXTRA_PROPERTIES: dict[str, Any] = {
         "type": "string",
         "description": "Path to the JSON schema used by the editor for validation and autocompletion.",
     },
+    "include": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of TOML files to load and deep-merge before this file's content. "
+        "Paths are relative to this file's directory.",
+        "default": [],
+    },
 }
 
 # Config fields that accept a human-readable size string ("1 GiB") in addition
