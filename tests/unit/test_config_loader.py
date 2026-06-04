@@ -106,3 +106,18 @@ def test_include_diamond_allowed(tmp_path: Path) -> None:
     (tmp_path / "c.toml").write_text('include = ["d.toml"]\nc = 1\n')
     (tmp_path / "a.toml").write_text('include = ["b.toml", "c.toml"]\n')
     assert _load_toml_with_includes(tmp_path / "a.toml") == {"d": 1, "b": 1, "c": 1}
+
+
+def test_env_override_parses_toml(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('XCPNG_TESTS_network__free_nics', '["eth1"]')
+    assert load_config().network.free_nics == ["eth1"]
+
+
+def test_env_override_preserves_key_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XCPNG_TESTS_storage__lvmoiscsi__SCSIid", '"wwn-1234567890abcdef"')
+    assert load_config().storage.lvmoiscsi.SCSIid == "wwn-1234567890abcdef"
+
+
+def test_env_override_preserves_value_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XCPNG_TESTS_network__mgmt", '"MgmtNet"')
+    assert load_config().network.mgmt == "MgmtNet"
