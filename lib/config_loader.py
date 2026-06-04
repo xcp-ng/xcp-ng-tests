@@ -235,6 +235,45 @@ def _load_toml_file(path: Path) -> ConfigDict:
     return data
 
 
+def _require_str_list(value: JSONType, what: str) -> list[str]:
+    """Return ``value`` as a list of strings, raising ConfigError otherwise."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ConfigError(f"{what} must be a list of file paths")
+    return [item for item in value if isinstance(item, str)]
+
+
+def _load_toml_with_includes(path: Path, _seen: set[Path] | None = None) -> ConfigDict:
+    """Load a TOML file and recursively merge its includes.
+
+    Files listed in the root-level ``include`` key (array of strings)
+    are loaded and deep-merged before the file's own content.
+    Paths are resolved relative to the including file's directory.
+    """
+    if _seen is None:
+        _seen = set()
+    path = path.resolve()
+    if path in _seen:
+        raise ConfigError(f"Cyclic include detected: {path}")
+    _seen.add(path)
+
+    try:
+        data = _load_toml_file(path)
+        includes = _require_str_list(data.pop("include", None) or [], f"'include' in {path}")
+
+        result: ConfigDict = {}
+        for inc in includes:
+            inc_path = (path.parent / inc).resolve()
+            included = _load_toml_with_includes(inc_path, _seen)
+            result = _merge_dicts(result, included)
+
+        return _merge_dicts(result, data)
+    finally:
+        # Track the recursion stack, not all visited files, so diamond
+        # includes (A -> [B, C], B -> D, C -> D) are allowed while true
+        # cycles still raise above.
+        _seen.discard(path)
+
+
 def _merge_dicts(base: ConfigDict, override: ConfigDict) -> ConfigDict:
     """Deep merge override into base (recursive)."""
     for key, value in override.items():
@@ -300,7 +339,7 @@ def load_config() -> Config:
     repo_root = Path(__file__).parent.parent
     base_config_path = repo_root / "config.toml"
     try:
-        base_data = _load_toml_file(base_config_path)
+        base_data = _load_toml_with_includes(base_config_path)
     except FileNotFoundError as e:
         raise ConfigError(f"{base_config_path} not found") from e
     return _build_config(base_data)
@@ -311,13 +350,13 @@ def apply_override(config_name: str) -> None:
     repo_root = Path(__file__).parent.parent
     base_config_path = repo_root / "config.toml"
     try:
-        base_data = _load_toml_file(base_config_path)
+        base_data = _load_toml_with_includes(base_config_path)
     except FileNotFoundError as e:
         raise ConfigError(f"{base_config_path} not found") from e
     override_path = repo_root / f"config.{config_name}.toml"
     if not override_path.exists():
         raise ConfigError(f"{override_path} not found")
-    base_data = _merge_dicts(base_data, _load_toml_file(override_path))
+    base_data = _merge_dicts(base_data, _load_toml_with_includes(override_path))
     new = _build_config(base_data)
     for field in Config.model_fields:
         setattr(config, field, getattr(new, field))
