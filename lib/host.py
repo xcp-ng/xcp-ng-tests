@@ -90,6 +90,9 @@ class Host:
     def __str__(self) -> str:
         return self.hostname_or_ip
 
+    def __repr__(self) -> str:
+        return f"Host('{self.hostname_or_ip}')"
+
     def name(self) -> str:
         return self.param_get('name-label')
 
