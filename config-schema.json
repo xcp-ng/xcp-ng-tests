@@ -851,6 +851,14 @@
       "title": "Hosts",
       "type": "object"
     },
+    "include": {
+      "default": [],
+      "description": "List of TOML files to load and deep-merge before this file's content. Paths are relative to this file's directory.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "install": {
       "$ref": "#/$defs/InstallConfig"
     },
