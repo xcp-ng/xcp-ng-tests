@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import tomllib
 from pathlib import Path
 
@@ -285,15 +286,41 @@ def _merge_dicts(base: ConfigDict, override: ConfigDict) -> ConfigDict:
     return base
 
 
+def _parse_env_value(raw: str) -> JSONType:
+    """Parse env var value as TOML, falling back to plain string."""
+    try:
+        return tomllib.loads(f"x = {raw}")["x"]
+    except tomllib.TOMLDecodeError:
+        return raw
+
+
+def _apply_env_overrides(data: ConfigDict) -> ConfigDict:
+    """Override config values from XCPNG_CFG__* env vars."""
+    prefix = "XCPNG_TESTS_"
+    overrides: ConfigDict = {}
+    for key, raw in os.environ.items():
+        if not key.startswith(prefix):
+            continue
+        path = key.removeprefix(prefix).split("__")
+        value = _parse_env_value(raw)
+        branch = overrides
+        for part in path[:-1]:
+            node = branch.get(part)
+            if not isinstance(node, dict):
+                node = {}
+                branch[part] = node
+            branch = node
+        branch[path[-1]] = value
+    return _merge_dicts(data, overrides) if overrides else data
+
+
 @overload
 def _replace_password_hash_placeholder(obj: ConfigDict, password_hash: str) -> ConfigDict:
     ...
 
-
 @overload
 def _replace_password_hash_placeholder(obj: JSONType, password_hash: str) -> JSONType:
     ...
-
 
 def _replace_password_hash_placeholder(obj: JSONType, password_hash: str) -> JSONType:
     """Recursively replace <PASSWORD_HASH> placeholders with actual hash."""
@@ -319,7 +346,8 @@ def warn_legacy_data_py() -> None:
 
 
 def _build_config(base_data: ConfigDict) -> Config:
-    """Apply password hash replacement, validate with Pydantic, and return Config."""
+    """Apply env overrides and password hash replacement, then validate with Pydantic."""
+    base_data = _apply_env_overrides(base_data)
     if "host" in base_data and isinstance(base_data["host"], dict):
         host = base_data["host"]
         password = host.get("default_password", "")
