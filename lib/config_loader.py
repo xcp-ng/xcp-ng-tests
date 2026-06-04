@@ -182,6 +182,32 @@ def _load_toml_file(path: Path) -> dict[str, Any]:
         return tomllib.load(f)
 
 
+def _load_toml_with_includes(path: Path, _seen: set[Path] | None = None) -> dict[str, Any]:
+    """Load a TOML file and recursively merge its includes.
+
+    Files listed in the root-level ``include`` key (array of strings)
+    are loaded and deep-merged before the file's own content.
+    Paths are resolved relative to the including file's directory.
+    """
+    if _seen is None:
+        _seen = set()
+    path = path.resolve()
+    if path in _seen:
+        raise ValueError(f"Cyclic include detected: {path}")
+    _seen.add(path)
+
+    data = _load_toml_file(path)
+    includes = data.pop("include", None) or []
+
+    result: dict[str, Any] = {}
+    for inc in includes:
+        inc_path = (path.parent / inc).resolve()
+        included = _load_toml_with_includes(inc_path, _seen)
+        result = _merge_dicts(result, included)
+
+    return _merge_dicts(result, data)
+
+
 def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Deep merge override into base (recursive)."""
     for key, value in override.items():
@@ -235,7 +261,7 @@ def load_config() -> Config:
     repo_root = Path(__file__).parent.parent
     base_config_path = repo_root / "config.toml"
     try:
-        base_data = _load_toml_file(base_config_path)
+        base_data = _load_toml_with_includes(base_config_path)
     except FileNotFoundError:
         print(f"FATAL: {base_config_path} not found", file=sys.stderr)
         sys.exit(1)
@@ -247,7 +273,7 @@ def apply_override(config_name: str) -> None:
     repo_root = Path(__file__).parent.parent
     base_config_path = repo_root / "config.toml"
     try:
-        base_data = _load_toml_file(base_config_path)
+        base_data = _load_toml_with_includes(base_config_path)
     except FileNotFoundError:
         print(f"FATAL: {base_config_path} not found", file=sys.stderr)
         sys.exit(1)
@@ -255,7 +281,7 @@ def apply_override(config_name: str) -> None:
     if not override_path.exists():
         print(f"FATAL: {override_path} not found", file=sys.stderr)
         sys.exit(1)
-    base_data = _merge_dicts(base_data, _load_toml_file(override_path))
+    base_data = _merge_dicts(base_data, _load_toml_with_includes(override_path))
     new = _build_config(base_data)
     for field in new.model_fields:
         setattr(config, field, getattr(new, field))

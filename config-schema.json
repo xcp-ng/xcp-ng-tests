@@ -282,6 +282,12 @@
     }
   },
   "properties": {
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of TOML files to load and deep-merge before this file's content. Paths are relative to this file's directory.",
+      "default": []
+    },
     "objects_name_prefix": {
       "anyOf": [
         {
