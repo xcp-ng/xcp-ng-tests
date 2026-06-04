@@ -11,7 +11,13 @@ from lib.host import Host
 # - XCP-ng host
 
 class TestCpuPolicy:
-    def test_cpu_policy(self, host: Host) -> None:
+    def test_cpu_policy_collection(self, host: Host) -> None:
+        """
+        This test simply collects the CPU policy (CPUIDs and MSRs) from the host.
+        We only check that we collected the information successfully, without errors.
+        No extra check is made on the accuracy or completeness of the information.
+        A side effect is the logging of the collected information in the test output.
+        """
         cpu_policy = HostCpuPolicy(host)
 
         for name, policy in cpu_policy.policies.items():
