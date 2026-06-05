@@ -1,6 +1,7 @@
 import json
 import subprocess
 
+from data import TOOLS
 from lib.typing import JSONType
 
 from typing import Dict, Literal, overload
@@ -28,7 +29,7 @@ def xo_cli(action: str, args: Dict[str, str] = {}, *, check: bool = True, simple
 def xo_cli(
     action: str, args: dict[str, str] = {}, check: bool = True, simple_output: bool = True, use_json: bool = False
 ) -> subprocess.CompletedProcess[bytes] | JSONType | str:
-    run_array = ['xo-cli', action]
+    run_array = [TOOLS.get('xo-cli', 'xo-cli'), action]
     if use_json:
         run_array += ['--json']
     run_array += ["%s=%s" % (key, value) for key, value in args.items()]
