@@ -38,7 +38,6 @@ from typing import TYPE_CHECKING, Literal, overload
 if TYPE_CHECKING:
     from lib.pool import Pool
     from lib.vdi import VDI
-    from lib.vm import VM
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
