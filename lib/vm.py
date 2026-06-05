@@ -738,6 +738,9 @@ class VM(BaseVM):
         tmp_file = res_host.ssh('mktemp')
         session = f"detached-cat-{self.uuid}"
         ret = False
+        # screen install is broken on RHEL, see https://bugzilla.redhat.com/show_bug.cgi?id=2385964
+        if res_host.pm == 'dnf' and not res_host.ssh('ls -ld /run/screen').startswith('drwxrwxrwx'):
+            res_host.ssh('dnf reinstall -y screen')
         try:
             res_host.ssh(f'screen -dmS {session}')
             # run `cat` on the pty in a background screen session and redirect to a tmp file.
