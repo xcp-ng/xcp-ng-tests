@@ -450,11 +450,23 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
            }
     # Cross-host deduplication: a LUN in use on any host (same WWN) is unavailable on all hosts.
     # This matters for shared FC/iSCSI LUNs visible on multiple hosts simultaneously.
+    # Note that local disks on nested hosts end up with the following WWNs:
+    # - uuid.00000000-0000-0000-0000-000000000001
+    # - uuid.00000000-0000-0000-0000-000000000002
+    # - and so on
+    # Those are obviously not shared among hosts, so we need to exclude them from `used_wwns`.
+    # This is especially important for tests where one host has its system installed on disk 1,
+    # and another host has its system installed on disk 1 and 2 using RAID1 (in this case, disk 2
+    # of the first host **is** available although it shares the same WWN with disk 2 of host 2
+    # which **is not** available). We can safely assume that any disk with a WWN starting with
+    # "uuid.00000000-0000-0000-0000-" comes from a local disk on a nested host, and consequently
+    # are never shared with other hosts. As such, we can exclude them from `used_wwns` so that
+    # they are not incorrectly detected as shared.
     used_wwns = {
         disk.wwn
         for host_disks in ret.values()
         for disk in host_disks
-        if disk.wwn and not disk.available
+        if disk.wwn and not disk.available and not disk.wwn.startswith("uuid.00000000-0000-0000-0000-")
     }
     if used_wwns:
         logging.debug("cross-host used WWNs: %s", used_wwns)
