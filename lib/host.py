@@ -481,26 +481,25 @@ class Host:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
     def get_system_uuid(self) -> str:
-        """Return system uuid of current host.
+        """Get system uuid of current host.
 
-        Intended for driving current host from its "parent host" in a **nested context**.
+        In case host is nested, it uses `system-serial-number` instead of `system-uuid`.
 
-        .. note::
-            If the current host is nested, it means it is not a physical host. It is a VM living inside a real host.::
-
-                [PH: Physical Host] -> [VM: emulation of an XCP-ng host] -> [vm: a vm inside nested host]
-                                       |      current working host     |
-
-            So we need system-uuid of current working host (`VM`) which is
-            the uuid seen in physical host's (`PH`) scope.
+        If command result is empty or None, it raises an Error.
 
         Performs the following command::
 
-            dmidecode -s system-uuid
+            dmidecode -s [system-uuid|system-serial-number]
 
         ref: `dmidecode(8) <https://man.archlinux.org/man/dmidecode.8.en#s>__`
         """
-        return self.ssh("dmidecode -s system-uuid").lower().strip()
+        # TODO: This workaround is tracked in XCPNG-2775
+        dmi_key = "system-serial-number" if self.is_nested else "system-uuid"
+        system_uuid = self.ssh(f"dmidecode -s {dmi_key}").lower().strip()
+        if not system_uuid:
+            raise ValueError(f"The system uuid '{system_uuid}' is incorrect.")
+
+        return system_uuid
 
     def yum_clean_metadata(self) -> str:
         """Quietly removes cached metadata on target.
