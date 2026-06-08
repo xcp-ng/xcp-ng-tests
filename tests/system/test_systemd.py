@@ -28,7 +28,7 @@ def test_verify_default_target(host: Host) -> None:
     polkit_msg = "Cannot add dependency job for unit polkit.service, ignoring: Unit not found."
     for line in analyse.splitlines():
         if line == polkit_msg:
-            pytest.xfail(f"drbd-reactor package should be fix to remove dep to polkit: {polkit_msg}")
+            pytest.xfail(f"drbd-reactor package must be fixed to remove dep to polkit: {polkit_msg}")
         if line not in white_list_issues:
             logging.error(f"{line}")
             err = True
