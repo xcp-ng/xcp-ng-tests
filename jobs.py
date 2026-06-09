@@ -368,6 +368,66 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/storage"],
         "markers": "unused_4k_disks and quicktest",
     },
+    "qcow2-4k-main": {
+        "description": "tests QCOW2 image format on EXT and LVM SRs backed by native 4KiB block devices. "
+                       "avoids quicktest, migrations and reboots",
+        "requirements": [
+            "A pool >= 8.3  with at least 1 host.",
+            "An additional free native 4KiB disk on the first host.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/storage/ext", "tests/storage/lvm"],
+        "markers": "(small_vm or no_vm) and unused_4k_disks and not reboot and not quicktest",
+        "name_filter": "_4k and not migration",
+    },
+    "qcow2-4k-migrations": {
+        "description": "storage migration tests for QCOW2 VDIs on EXT and LVM SRs backed by native 4KiB block devices",
+        "requirements": [
+            "A pool >= 8.3  with at least 2 hosts, each with a local SR.",
+            "An additional free native 4KiB disk on the first host.",
+            "A second pool with a SR to receive migrated VMs.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/storage/ext", "tests/storage/lvm"],
+        "markers": "unused_4k_disks",
+        "name_filter": "_4k and migration",
+    },
+    "qcow2-4k-reboots": {
+        "description": "QCOW2 on native 4KiB block device tests on EXT and LVM SRs that involve rebooting hosts",
+        "requirements": [
+            "A pool >= 8.3  with at least 1 host.",
+            "An additional free native 4KiB disk on the first host.",
+            "A small VM that can be imported on the SRs.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/storage/ext", "tests/storage/lvm"],
+        "markers": "unused_4k_disks and reboot",
+        "name_filter": "_4k",
+    },
+    "qcow2-4k-quicktest": {
+        "description": "runs `quicktest` for QCOW2 VDIs on EXT and LVM SRs backed by native 4KiB block devices",
+        "requirements": [
+            "A pool >= 8.3  with at least 1 host",
+            "An additional free native 4KiB disk on the first host.",
+        ],
+        "nb_pools": 1,
+        "params": {
+        },
+        "paths": ["tests/storage/ext", "tests/storage/lvm"],
+        "markers": "unused_4k_disks and quicktest",
+        "name_filter": "_4k",
+    },
     "sb-main": {
         "description": "tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)",
         "requirements": [
