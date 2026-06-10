@@ -1,0 +1,370 @@
+{
+  "$defs": {
+    "GuestToolsConfig": {
+      "properties": {
+        "download_url": {
+          "title": "Download Url",
+          "type": "string"
+        },
+        "win": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Win",
+          "type": "object"
+        },
+        "other": {
+          "additionalProperties": true,
+          "title": "Other",
+          "type": "object"
+        },
+        "installed": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Installed",
+          "type": "object"
+        }
+      },
+      "required": [
+        "download_url"
+      ],
+      "title": "GuestToolsConfig",
+      "type": "object"
+    },
+    "HostConfig": {
+      "properties": {
+        "default_user": {
+          "title": "Default User",
+          "type": "string"
+        },
+        "default_password": {
+          "title": "Default Password",
+          "type": "string"
+        },
+        "default_password_hash": {
+          "default": "",
+          "title": "Default Password Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "default_user",
+        "default_password"
+      ],
+      "title": "HostConfig",
+      "type": "object"
+    },
+    "InstallConfig": {
+      "properties": {
+        "answerfiles": {
+          "additionalProperties": true,
+          "title": "Answerfiles",
+          "type": "object"
+        },
+        "isos": {
+          "$ref": "#/$defs/InstallIsosConfig"
+        },
+        "iso_remaster": {
+          "default": "",
+          "title": "Iso Remaster",
+          "type": "string"
+        }
+      },
+      "required": [
+        "isos"
+      ],
+      "title": "InstallConfig",
+      "type": "object"
+    },
+    "InstallIsosConfig": {
+      "properties": {
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "cache_dir": {
+          "title": "Cache Dir",
+          "type": "string"
+        },
+        "definitions": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Definitions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "base_url",
+        "cache_dir"
+      ],
+      "title": "InstallIsosConfig",
+      "type": "object"
+    },
+    "LintstorConfig": {
+      "properties": {
+        "redundancy": {
+          "default": 2,
+          "title": "Redundancy",
+          "type": "integer"
+        }
+      },
+      "title": "LintstorConfig",
+      "type": "object"
+    },
+    "NetworkConfig": {
+      "properties": {
+        "mgmt": {
+          "default": "Pool-wide network associated with eth0",
+          "title": "Mgmt",
+          "type": "string"
+        },
+        "free_nics": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Free Nics",
+          "type": "array"
+        }
+      },
+      "title": "NetworkConfig",
+      "type": "object"
+    },
+    "PXEConfig": {
+      "properties": {
+        "config_server": {
+          "title": "Config Server",
+          "type": "string"
+        },
+        "arp_server": {
+          "title": "Arp Server",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_server",
+        "arp_server"
+      ],
+      "title": "PXEConfig",
+      "type": "object"
+    },
+    "SSHConfig": {
+      "properties": {
+        "pubkey": {
+          "title": "Pubkey",
+          "type": "string"
+        },
+        "output_max_lines": {
+          "default": 20,
+          "title": "Output Max Lines",
+          "type": "integer"
+        },
+        "ignore_banner": {
+          "default": false,
+          "title": "Ignore Banner",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pubkey"
+      ],
+      "title": "SSHConfig",
+      "type": "object"
+    },
+    "StorageConfig": {
+      "properties": {
+        "nfs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Nfs",
+          "type": "object"
+        },
+        "nfs4": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Nfs4",
+          "type": "object"
+        },
+        "nfs_iso": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Nfs Iso",
+          "type": "object"
+        },
+        "cifs_iso": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Cifs Iso",
+          "type": "object"
+        },
+        "cephfs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Cephfs",
+          "type": "object"
+        },
+        "moosefs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Moosefs",
+          "type": "object"
+        },
+        "lvmohba": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Lvmohba",
+          "type": "object"
+        },
+        "lvmoiscsi": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Lvmoiscsi",
+          "type": "object"
+        },
+        "linstor": {
+          "$ref": "#/$defs/LintstorConfig"
+        }
+      },
+      "title": "StorageConfig",
+      "type": "object"
+    },
+    "VMConfig": {
+      "properties": {
+        "def_url": {
+          "title": "Def Url",
+          "type": "string"
+        },
+        "cache_imported": {
+          "title": "Cache Imported",
+          "type": "boolean"
+        },
+        "default_sr": {
+          "title": "Default Sr",
+          "type": "string"
+        },
+        "images": {
+          "$ref": "#/$defs/VMImagesConfig"
+        },
+        "equivalents": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Equivalents",
+          "type": "object"
+        }
+      },
+      "required": [
+        "def_url",
+        "cache_imported",
+        "default_sr"
+      ],
+      "title": "VMConfig",
+      "type": "object"
+    },
+    "VMImagesConfig": {
+      "additionalProperties": true,
+      "properties": {},
+      "title": "VMImagesConfig",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of TOML files to load and deep-merge before this file's content. Paths are relative to this file's directory.",
+      "default": []
+    },
+    "objects_name_prefix": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Objects Name Prefix"
+    },
+    "dns_server": {
+      "default": "1.1.1.1",
+      "title": "Dns Server",
+      "type": "string"
+    },
+    "host": {
+      "$ref": "#/$defs/HostConfig"
+    },
+    "hosts": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Hosts",
+      "type": "object"
+    },
+    "network": {
+      "$ref": "#/$defs/NetworkConfig"
+    },
+    "pxe": {
+      "$ref": "#/$defs/PXEConfig"
+    },
+    "vm": {
+      "$ref": "#/$defs/VMConfig"
+    },
+    "install": {
+      "$ref": "#/$defs/InstallConfig"
+    },
+    "guest_tools": {
+      "$ref": "#/$defs/GuestToolsConfig"
+    },
+    "ssh": {
+      "$ref": "#/$defs/SSHConfig"
+    },
+    "storage": {
+      "$ref": "#/$defs/StorageConfig"
+    },
+    "volume_size": {
+      "title": "Volume Size",
+      "type": ["string", "integer"],
+      "description": "Default size of VDIs created for storage tests. Accepts sizes like '1 GiB', '2.5TiB', or plain integers."
+    },
+    "write_volume_cap": {
+      "title": "Write Volume Cap",
+      "type": ["string", "integer"],
+      "description": "Maximum amount of data written to a volume during storage tests. Accepts sizes like '2 GiB' or '500MiB'."
+    },
+    "write_volume_align": {
+      "title": "Write Volume Align",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "host",
+    "pxe",
+    "vm",
+    "install",
+    "guest_tools",
+    "ssh",
+    "volume_size",
+    "write_volume_cap",
+    "write_volume_align"
+  ],
+  "title": "XCP-ng Tests Configuration Schema",
+  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "JSON Schema for validating config.toml, config.default.toml, and config.NAME.toml files"
+}

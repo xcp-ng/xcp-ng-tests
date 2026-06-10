@@ -4,7 +4,7 @@ import pytest
 
 import logging
 
-from data import OTHER_GUEST_TOOLS, OTHER_GUEST_TOOLS_ISO, WIN_GUEST_TOOLS_ISOS
+from lib import config
 from lib.common import wait_for
 from lib.host import Host
 from lib.snapshot import Snapshot
@@ -21,6 +21,10 @@ from lib.windows.guest_tools import install_guest_tools
 from lib.windows.other_tools import install_other_drivers
 
 from typing import Any, Dict, Generator, Tuple
+
+WIN_GUEST_TOOLS_ISOS = config.guest_tools.win
+OTHER_GUEST_TOOLS_ISO = config.guest_tools.other
+OTHER_GUEST_TOOLS = config.guest_tools.installed
 
 @pytest.fixture(scope="module")
 def running_windows_vm_without_tools(imported_vm: VM) -> VM:

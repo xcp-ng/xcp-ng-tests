@@ -8,12 +8,7 @@ import os
 from dataclasses import dataclass
 
 import lib.commands as commands
-from lib import config
-
-try:
-    from data import LINSTOR_REDUNDANCY  # type: ignore
-except ImportError:
-    LINSTOR_REDUNDANCY = 2
+from lib.config_loader import config
 
 # explicit import for package-scope fixtures
 from pkgfixtures import (
@@ -157,7 +152,7 @@ def pool_with_linstor(
 
 @pytest.fixture(scope='package')
 def linstor_redundancy(pool_with_linstor: Pool) -> int:
-    return min(len(pool_with_linstor.hosts), LINSTOR_REDUNDANCY)
+    return min(len(pool_with_linstor.hosts), config.storage.linstor.redundancy)
 
 @pytest.fixture(scope='package')
 def linstor_sr(
