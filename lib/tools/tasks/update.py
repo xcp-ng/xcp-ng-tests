@@ -36,11 +36,10 @@ def update_pools(inventory: Inventory) -> None:
             pools.append(p)
             hosting_pool = inventory_hosts[host]["hosting_pool"]
             if hosting_pool is not None:
-                # we assume all hosts are nested, not only master
                 if nested_hosts.get(hosting_pool) is not None:
-                    nested_hosts[hosting_pool].extend(p.hosts)
+                    nested_hosts[hosting_pool].extend([h for h in p.hosts if h.is_nested])
                 else:
-                    nested_hosts[hosting_pool] = p.hosts
+                    nested_hosts[hosting_pool] = [h for h in p.hosts if h.is_nested]
         except NotAMasterHostError:
             logger.warning(f"[{host}] Skipping: not a master host")
 
