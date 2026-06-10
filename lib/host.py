@@ -81,6 +81,7 @@ class Host:
         self.saved_packages_list: list[str] | None = None
         self.saved_rollback_id: int | None = None
         self.inventory = self._get_xensource_inventory()
+        self._bios_vendor: str | None = None
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
@@ -276,6 +277,26 @@ class Host:
             key, raw_value = line.split('=')
             inventory[key] = raw_value.strip('\'')
         return inventory
+
+    def _get_bios_vendor(self) -> str:
+        """Get Bios Vendor information for Host.
+
+        Performs a dmidecode command to get this bios information::
+
+            dmidecode -s bios-vendor
+
+        >>> my_host._get_bios_vendor()
+        Xen
+        """
+        return self.ssh('dmidecode -s bios-vendor')
+
+    @property
+    def is_nested(self) -> bool:
+        """The host is nested or not (physical).
+        """
+        if self._bios_vendor is None:
+            self._bios_vendor = self._get_bios_vendor()
+        return 'Xen' in self._bios_vendor
 
     def xo_get_server_id(self, store: bool = True) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
