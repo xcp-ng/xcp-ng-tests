@@ -33,9 +33,10 @@ def vm_with_tcpdump_scope_module(imported_vm: VM):
         vm.ssh("apk add tcpdump")
     elif pkg_mgr == PackageManagerEnum.APT_GET:
         vm.ssh("apt-get install tcpdump")
-    elif pkg_mgr == PackageManagerEnum.RPM:
-        # XXX assume yum for now
+    elif pkg_mgr == PackageManagerEnum.YUM:
         vm.ssh("yum install tcpdump")
+    elif pkg_mgr == PackageManagerEnum.DNF:
+        vm.ssh("dnf install tcpdump")
     else:
         pytest.fail("Package manager '%s' not supported" % pkg_mgr)
 

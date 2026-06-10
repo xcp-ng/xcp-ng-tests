@@ -78,9 +78,10 @@ Defer: TypeAlias = Callable[[Callable[[], object]], None]
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
-    RPM = 2
+    YUM = 2
     APT_GET = 3
     APK = 4
+    DNF = 5
 
 # Common VM images used in tests
 def vm_image(vm_key: str) -> str:
@@ -187,17 +188,17 @@ def callable_marker(value: T | Callable[..., T], request: pytest.FixtureRequest)
     else:
         return value
 
-def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
-             invert: bool = False) -> None:
+def wait_for(fn: Callable[[], T], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
+             invert: bool = False) -> T:
     if msg is not None:
         logging.info(msg)
     start_time = time.perf_counter()
     while True:
         ret = fn()
         if not invert and ret:
-            return
+            return ret
         if invert and not ret:
-            return
+            return ret
         if time.perf_counter() - start_time >= timeout_secs:
             expected = 'True' if not invert else 'False'
             raise TimeoutError(

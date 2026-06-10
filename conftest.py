@@ -358,7 +358,7 @@ def host_less_than_8_3(host: Host) -> None:
     if not host.xcp_version < version.parse(version_str):
         pytest.skip(f"This test requires an XCP-ng < {version_str} host")
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def host_with_hsts(host: Host) -> Generator[Host, None, None]:
     host.enable_hsts_header()
     yield host
