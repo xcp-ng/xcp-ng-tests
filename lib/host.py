@@ -13,6 +13,7 @@ from packaging import version
 
 import lib.commands as commands
 from lib.bond import Bond
+from lib.commands import local_cmd
 from lib.common import (
     _param_add,
     _param_clear,
@@ -658,10 +659,11 @@ class Host:
         # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
         self.ssh('systemd-run --on-active=2s reboot')
         if verify:
-            wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
-            wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
+            wait_for(lambda: local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode != 0,
+                     "Wait for host down")
+            wait_for(lambda: local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
                      "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
+            wait_for(lambda: local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
                      "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
             wait_for(self.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
 
