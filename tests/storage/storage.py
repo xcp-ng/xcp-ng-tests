@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import QCOW2_MAX, VHD_MAX, Defer, GiB, MiB, TiB, strtobool, wait_for
+from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -244,8 +244,7 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     vm.wait_for_vm_running_and_ssh_up()
     install_randstream(vm)
 
-    is_alpine = vm.ssh_with_result('apk --version').returncode == 0
-    if is_alpine:
+    if vm.detect_package_manager() == PackageManagerEnum.APK:
         # growpart is not available in alpine 3.12
         # vm.ssh('apk add cloud-utils-growpart e2fsprogs-extra')
         vm.ssh('apk add gawk util-linux e2fsprogs-extra')
