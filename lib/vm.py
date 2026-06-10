@@ -496,6 +496,25 @@ class VM(BaseVM):
         option = '-f' if regular_file else '-e'
         return self.ssh_with_result(f'test {option} {filepath}').returncode == 0
 
+    def install_packages(self, packages: list[str]) -> str:
+        """Resolves the package manager and installs listed packages.
+        """
+        pkg_manager = self.detect_package_manager()
+        if pkg_manager == PackageManagerEnum.UNKNOWN:
+            raise RuntimeError("Package manager cannot be resolved!")
+
+        cmds = []
+        if pkg_manager == PackageManagerEnum.APK:
+            cmds.append('apk add')
+        elif pkg_manager == PackageManagerEnum.APT_GET:
+            cmds.append('apt-get update && apt-get install -y -qq')
+        elif pkg_manager == PackageManagerEnum.RPM:
+            cmds.append('yum install -y')
+
+        cmds.extend(packages)
+
+        return self.ssh(' '.join(cmds))
+
     def detect_package_manager(self) -> PackageManagerEnum:
         """ Heuristic to determine the package manager on a unix distro. """
         if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
