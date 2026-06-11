@@ -366,7 +366,7 @@ class Host:
         wait_for(self.xo_server_connected, timeout_secs=10)
         # wait for XO to know about the host. Apparently a connected server status
         # is not enough to guarantee that the host object exists yet.
-        wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about HOST %s" % self.uuid)
+        wait_for(lambda: xo_object_exists(self.uuid), f"[{self}] Wait for XO to know about HOST {self.uuid}")
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
@@ -403,7 +403,7 @@ class Host:
                     vm.param_clear('name-description')
                     if uri.startswith("clone+start"):
                         vm.start()
-                        wait_for(vm.is_running, "Wait for VM running")
+                        wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
             else:
                 vm = self.cached_vm(uri, sr_uuid)
             if vm:
@@ -560,7 +560,7 @@ class Host:
     def wait_for_host_down(self, timeout_secs: int = 2 * 60) -> None:
         wait_for_not(
             lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
-            "Wait for host down",
+            f"[{self}] Wait for host down",
             timeout_secs=timeout_secs,
             retry_delay_secs=2,
         )
@@ -568,7 +568,7 @@ class Host:
     def wait_for_host_up(self, timeout_secs: int = 10 * 60) -> None:
         wait_for(
             lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
-            "Wait for host up",
+            f"[{self}] Wait for host up",
             timeout_secs=timeout_secs,
             retry_delay_secs=10,
         )
@@ -576,13 +576,13 @@ class Host:
     def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
         wait_for(
             lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
-            "Wait for ssh up on host",
+            f"[{self}] Wait for ssh up on host",
             timeout_secs=timeout_secs,
             retry_delay_secs=5
         )
 
     def wait_for_xapi_enabled(self, timeout_secs: int = 30 * 60) -> None:
-        logging.info(f"Wait for XAPI to complete initialization on {self.hostname_or_ip}")
+        logging.info(f"[{self}] Wait for XAPI to complete initialization")
         self.ssh(f"xapi-wait-init-complete {timeout_secs}")
         assert self.is_enabled()
 
@@ -894,7 +894,7 @@ class Host:
         sr_uuid = self.xe('sr-create', params)
         sr = SR(sr_uuid, self.pool)
         if verify:
-            wait_for(sr.exists, "Wait for SR to exist")
+            wait_for(sr.exists, f"[{self}] Wait for SR {sr_uuid} to exist")
         return sr
 
     def is_master(self) -> bool:
