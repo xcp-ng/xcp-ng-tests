@@ -53,7 +53,7 @@ class TestXenGuestAgent:
             rpm_repo = xen_guest_agent_urls['rpm_repo']
             vm.ssh(f"echo -e '[xen-guest-agent]\\nbaseurl={rpm_repo}main/\\ngpgcheck=0'"
                    f" > /etc/yum.repos.d/xen-guest-agent.repo")
-            vm.ssh('dnf install -y xen-guest-agent')
+            vm.ssh('app=yum && which dnf && app=dnf ; $app install -y xen-guest-agent')
         elif pkg_mgr == PackageManagerEnum.APT_GET:
             # DEB packages are published to a stable APT repo in the GitLab
             # Generic Package Registry after each push to main.
