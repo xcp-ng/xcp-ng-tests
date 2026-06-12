@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import re
 import shlex
@@ -9,6 +8,7 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 
+import structlog
 from packaging import version
 
 import lib.commands as commands
@@ -73,6 +73,7 @@ class Host:
         self.pool = pool
         self.hostname_or_ip = hostname_or_ip
         self.xo_srv_id: str | None = None
+        self.logger = structlog.get_logger("Host").bind(pool=self.pool.master_hostname_or_ip, host=hostname_or_ip)
 
         h_data = host_data(self.hostname_or_ip)
         self.user = h_data['user']
@@ -140,11 +141,12 @@ class Host:
             multiplexing: bool = True) -> str | bytes | commands.SSHResult[str] | commands.SSHResult[bytes] | None:
         return commands.ssh(self.hostname_or_ip, cmd, check=check, simple_output=simple_output,
                             suppress_fingerprint_warnings=suppress_fingerprint_warnings,
-                            background=background, decode=decode, multiplexing=multiplexing)
+                            background=background, decode=decode, multiplexing=multiplexing,
+                            logger=self.logger)
 
     def ssh_with_result(self, cmd: str) -> commands.SSHResult[str]:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
-        return commands.ssh_with_result(self.hostname_or_ip, cmd)
+        return commands.ssh_with_result(self.hostname_or_ip, cmd, logger=self.logger)
 
     def scp(self, src: str, dest: str, check: bool = True, suppress_fingerprint_warnings: bool = True,
             local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
@@ -261,12 +263,12 @@ class Host:
                 remote_path = self.ssh("mktemp").strip()
                 self.scp(script.name, remote_path)
                 self.ssh(f'chmod 0755 {remote_path}')
-            except Exception as e:
-                logging.error("Failed to create temporary file. %s", e)
+            except Exception:
+                self.logger.exception("Failed to create temporary file")
                 raise
 
             try:
-                logging.debug(f"[{self}] # Will execute this temporary script:\n{script_contents.strip()}")
+                self.logger.debug("Will execute this temporary script", script_contents=script_contents)
                 return self.ssh(remote_path, simple_output=simple_output)
             finally:
                 self.ssh(f'rm -f {remote_path}')
@@ -360,13 +362,17 @@ class Host:
 
     def xo_server_reconnect(self) -> None:
         assert self.xo_srv_id is not None
-        logging.info(f"[{self}] Reconnect XO to host")
+        self.logger.info("Reconnect XO to host %s" % self)
         xo_cli('server.disable', {'id': self.xo_srv_id})
         xo_cli('server.enable', {'id': self.xo_srv_id})
-        wait_for(self.xo_server_connected, timeout_secs=10)
+        wait_for(self.xo_server_connected, timeout_secs=10, logger=self.logger)
         # wait for XO to know about the host. Apparently a connected server status
         # is not enough to guarantee that the host object exists yet.
-        wait_for(lambda: xo_object_exists(self.uuid), f"[{self}] Wait for XO to know about HOST {self.uuid}")
+        wait_for(
+            lambda: xo_object_exists(self.uuid),
+            "Wait for XO to know about host",
+            logger=self.logger,
+        )
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
@@ -384,9 +390,9 @@ class Host:
             # Assumption: if the first disk is on the SR, the VM is.
             # If there's no VDI at all, then it is virtually on any SR.
             if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
-                logging.info(f"[{self}] Reusing cached VM {vm.uuid} for {uri}")
+                self.logger.info("Reusing cached VM", vm_uuid=vm.uuid, uri=uri)
                 return vm
-        logging.info(f"[{self}] Could not find a VM in cache for {uri!r}")
+        self.logger.info("Could not find a VM in cache for %r", uri)
         return None
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
@@ -403,7 +409,7 @@ class Host:
                     vm.param_clear('name-description')
                     if uri.startswith("clone+start"):
                         vm.start()
-                        wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
+                        wait_for(vm.is_running, "Wait for VM running", logger=self.logger)
             else:
                 vm = self.cached_vm(uri, sr_uuid)
             if vm:
@@ -412,15 +418,14 @@ class Host:
             assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
         params: dict[str, str | bool | dict[str, str]] = {}
-        msg = f"[{self}] Import VM {uri}"
+        msg = "Import VM"
         if '://' in uri:
             params['url'] = uri
         else:
             params['filename'] = uri
         if sr_uuid is not None:
-            msg += " (SR: %s)" % sr_uuid
             params['sr-uuid'] = sr_uuid
-        logging.info(msg)
+        self.logger.info(msg, uri=uri, sr_uuid=sr_uuid)
         vm_uuid = self.xe('vm-import', params)
         vm_name = prefix_object_name(self.xe('vm-param-get', {'uuid': vm_uuid, 'param-name': 'name-label'}))
         vm = VM(vm_uuid, self)
@@ -430,7 +435,7 @@ class Host:
             vif.move(self.management_network())
         if use_cache:
             cache_key = self.vm_cache_key(uri)
-            logging.info(f"[{self}] Marking VM {vm.uuid} as cached")
+            self.logger.info("Marking VM as cached", vm_uuid=vm_uuid)
             vm.param_set('name-description', cache_key)
         return vm
 
@@ -450,13 +455,13 @@ class Host:
         try:
             params: dict[str, str | bool | dict[str, str]] = {'uuid': vdi_uuid}
             if '://' in uri:
-                logging.info(f"[{self}] Download ISO {uri}")
+                self.logger.info("Download ISO", uri=uri)
                 download_path = f'/tmp/{vdi_uuid}'
                 self.ssh(f"curl -o '{download_path}' '{uri}'")
                 params['filename'] = download_path
             else:
                 params['filename'] = uri
-            logging.info(f"[{self}] Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
+            self.logger.info("Import ISO", uri=uri, name=random_name, vdi_uuid=vdi_uuid)
 
             self.xe('vdi-import', params)
         finally:
@@ -508,7 +513,7 @@ class Host:
 
             yum clean metadata -q
         """
-        logging.info(f"[{self}] Removing cache metadata...")
+        self.logger.info("Removing cache metadata...")
         return self.ssh("yum clean metadata -q")
 
     def yum_update(self, enablerepos: list[str] = []) -> str:
@@ -524,7 +529,7 @@ class Host:
         """
         base_command = "yum update -y"
 
-        logging.info(f"[{self}] Updating packages...")
+        self.logger.info("Updating packages...")
         if enablerepos:
             extra = " ".join(f"--enablerepo={r}" for r in enablerepos)
             base_command = f"{base_command} {extra}"
@@ -541,7 +546,7 @@ class Host:
         :param bool reboot:
             Choose to reboot or not after update (default: True).
         """
-        logging.info(f"[{self}] Updating...")
+        self.logger.info(f"[{self}] Updating...")
 
         self.yum_clean_metadata()
         self.yum_update(enablerepos=enablerepos)
@@ -549,10 +554,10 @@ class Host:
             # Everything's ok, just reboot
             self.reboot(verify=True)
 
-        logging.info(f"[{self}] Updated successfully!")
+        self.logger.info("Updated successfully!")
 
     def restart_toolstack(self, verify: bool = False) -> None:
-        logging.info(f"[{self}] Restart toolstack on host")
+        self.logger.info("Restart toolstack")
         self.ssh('xe-toolstack-restart')
         if verify:
             self.wait_for_xapi_enabled()
@@ -571,6 +576,7 @@ class Host:
             f"[{self}] Wait for host up",
             timeout_secs=timeout_secs,
             retry_delay_secs=10,
+            logger=self.logger,
         )
 
     def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
@@ -578,11 +584,12 @@ class Host:
             lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
             f"[{self}] Wait for ssh up on host",
             timeout_secs=timeout_secs,
-            retry_delay_secs=5
+            retry_delay_secs=5,
+            logger=self.logger,
         )
 
     def wait_for_xapi_enabled(self, timeout_secs: int = 30 * 60) -> None:
-        logging.info(f"[{self}] Wait for XAPI to complete initialization")
+        self.logger.info("Wait for XAPI to complete initialization")
         self.ssh(f"xapi-wait-init-complete {timeout_secs}")
         assert self.is_enabled()
 
@@ -625,7 +632,7 @@ class Host:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
             # To workaround this, create transactions: install and remove a small package.
-            logging.info(f"[{self}] Install and remove a small package to workaround empty yum history.")
+            self.logger.info('Install and remove a small package to workaround empty yum history.')
             self.yum_install(['gpm-libs'])
             self.yum_remove(['gpm-libs'])
             history_str = self.ssh('yum history list --noplugins')
@@ -646,14 +653,14 @@ class Host:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
     def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
-        logging.info(f"[{self}] Install packages: {' '.join(packages)} on host")
+        self.logger.info('Install packages', packages=packages)
         cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
         if enablerepo is not None:
             cmd = f'{cmd} --enablerepo={enablerepo}'
         return self.ssh(f'{cmd} {" ".join(packages)}')
 
     def yum_remove(self, packages: list[str]) -> str:
-        logging.info(f"[{self}] Remove packages: {' '.join(packages)} from host")
+        self.logger.info('Remove packages', packages)
         return self.ssh(f'yum remove -y {" ".join(packages)}')
 
     def packages(self) -> list[str]:
@@ -671,14 +678,14 @@ class Host:
         return self.ssh_with_result(f'rpm -q {package}').returncode == 0
 
     def yum_save_state(self) -> None:
-        logging.info(f"[{self}] Save yum state for host")
+        self.logger.info("Save yum state")
         # For now, that saved state feature does not support several saved states
         assert self.saved_packages_list is None, "There is already a saved package list set"
         self.saved_packages_list = self.packages()
         self.saved_rollback_id = self.get_last_yum_history_tid()
 
     def yum_restore_saved_state(self) -> None:
-        logging.info(f"[{self}] Restore yum state for host")
+        self.logger.info("Restore yum state")
         """ Restore yum state to saved state. """
         assert self.saved_packages_list is not None, \
             "Can't restore previous state without a package list: no saved packages list"
@@ -703,7 +710,7 @@ class Host:
         self.saved_rollback_id = None
 
     def reboot(self, verify: bool = False) -> None:
-        logging.info(f"[{self}] Reboot host")
+        self.logger.info("Reboot host")
         # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
         # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
         self.ssh('systemd-run --on-active=2s reboot')
@@ -860,7 +867,7 @@ class Host:
                 ))
 
         self.block_devices_info = sorted(devices, key=lambda d: d.size, reverse=True)
-        logging.debug(f"[{self}] blockdevs found: {[d.name for d in self.block_devices_info]}")
+        self.logger.debug("Block devices collected", block_devices=[d.name for d in self.block_devices_info])
 
     def disks(self) -> list[Host.BlockDeviceInfo]:
         """ List of all block devices (local disks, mdadm arrays, multipath devices). """
@@ -888,13 +895,16 @@ class Host:
         for key, value in device_config.items():
             params['device-config:{}'.format(key)] = value
 
-        logging.info(
-            f"[{self}] Create {sr_type} SR on host with label '{label}' and device-config: {str(device_config)}"
+        self.logger.info(
+            "Create SR",
+            sr_type=sr_type,
+            device_config=device_config,
+            label=label
         )
         sr_uuid = self.xe('sr-create', params)
         sr = SR(sr_uuid, self.pool)
         if verify:
-            wait_for(sr.exists, f"[{self}] Wait for SR {sr_uuid} to exist")
+            wait_for(sr.exists, "Wait for SR to exist", logger=self.logger)
         return sr
 
     def is_master(self) -> bool:
@@ -964,13 +974,15 @@ class Host:
         })
         wait_for(
             lambda: self.uuid in pool.hosts_uuids(),
-            f"Wait for joining host {self} to appear in joined pool {master}."
+            f"Wait for joining host {self} to appear in joined pool {master}.",
+            logger=self.logger,
         )
         pool.hosts.append(Host(pool, pool.host_ip(self.uuid)))
         # Do not use `self.is_enabled` since it'd ask the XAPI of hostB1 before the join...
         wait_for(
             lambda: strtobool(master.xe('host-param-get', {'uuid': self.uuid, 'param-name': 'enabled'})),
-            f"Wait for pool {master} to see joined host {self} as enabled."
+            f"Wait for pool {master} to see joined host {self} as enabled.",
+            logger=self.logger,
         )
         self.pool = pool
 
@@ -1047,7 +1059,7 @@ class Host:
             args['mode'] = mode
 
         uuid = self.xe("bond-create", args, minimal=True)
-        logging.info(f"[{self}] New Bond: {uuid}")
+        self.logger.info("New Bond", bond_uuid=uuid)
 
         return Bond(self, uuid)
 
@@ -1059,8 +1071,8 @@ class Host:
         if description is not None:
             args['name-description'] = description
 
-        logging.info(f"[{self}] Creating network '{label}'")
+        self.logger.info("Creating network", network_label=label)
         uuid = self.xe("network-create", args, minimal=True)
-        logging.info(f"[{self}] New Network: {uuid}")
+        self.logger.info("New Network", network_label=label, network_uuid=uuid)
 
         return Network(self, uuid)

@@ -29,7 +29,6 @@ class TestPCIPassthrough:
         if hidden_devices == "":
             hidden_devices = "xen-pciback.hide="
         devices = hidden_devices + f"({device_id})"
-
         host.ssh(f'{XEN_CMDLINE} --set-dom0 "{devices}"')
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "disable_on_reboot"
         host.reboot(verify=True)

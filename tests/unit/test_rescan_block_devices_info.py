@@ -3,6 +3,8 @@ from __future__ import annotations
 # flake8: noqa: E501 - lsblk output lines are intentionally long
 from unittest.mock import MagicMock
 
+import structlog
+
 from lib.common import KiB
 from lib.host import Host
 
@@ -171,6 +173,7 @@ NAME="md0" KNAME="md0" PKNAME="nvme1n1" SIZE="30721630535680" LOG-SEC="512" TYPE
 
 def _rescan(lsblk_output: str) -> list[Host.BlockDeviceInfo]:
     host = MagicMock(spec=Host)
+    host.logger = structlog.get_logger()
     host.ssh.return_value = lsblk_output
     Host.rescan_block_devices_info(host)
     return host.block_devices_info

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import structlog
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 
@@ -19,6 +19,7 @@ class VBD:
         self.uuid = uuid
         self.vm = vm
         self.device = device
+        self.logger = structlog.get_logger("VBD").bind(vbd_uuid=uuid, vm_uuid=vm.uuid, device=device)
 
     def plug(self) -> None:
         self.vm.host.xe("vbd-plug", {'uuid': self.uuid})
@@ -47,7 +48,7 @@ class VBD:
                      param_name)
 
     def destroy(self) -> None:
-        logging.info("Destroy %s", self)
+        self.logger.info("Destroy VBD")
         self.vm.host.pool.master.xe('vbd-destroy', {'uuid': self.uuid})
 
     def __str__(self) -> str:
