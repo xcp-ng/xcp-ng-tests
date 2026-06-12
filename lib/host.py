@@ -360,7 +360,7 @@ class Host:
 
     def xo_server_reconnect(self) -> None:
         assert self.xo_srv_id is not None
-        logging.info("Reconnect XO to host %s" % self)
+        logging.info(f"[{self}] Reconnect XO to host")
         xo_cli('server.disable', {'id': self.xo_srv_id})
         xo_cli('server.enable', {'id': self.xo_srv_id})
         wait_for(self.xo_server_connected, timeout_secs=10)
@@ -384,9 +384,9 @@ class Host:
             # Assumption: if the first disk is on the SR, the VM is.
             # If there's no VDI at all, then it is virtually on any SR.
             if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
-                logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
+                logging.info(f"[{self}] Reusing cached VM {vm.uuid} for {uri}")
                 return vm
-        logging.info("Could not find a VM in cache for %r", uri)
+        logging.info(f"[{self}] Could not find a VM in cache for {uri!r}")
         return None
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
@@ -412,7 +412,7 @@ class Host:
             assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
         params: dict[str, str | bool | dict[str, str]] = {}
-        msg = "Import VM %s" % uri
+        msg = f"[{self}] Import VM {uri}"
         if '://' in uri:
             params['url'] = uri
         else:
@@ -430,7 +430,7 @@ class Host:
             vif.move(self.management_network())
         if use_cache:
             cache_key = self.vm_cache_key(uri)
-            logging.info(f"Marking VM {vm.uuid} as cached")
+            logging.info(f"[{self}] Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
         return vm
 
@@ -450,13 +450,13 @@ class Host:
         try:
             params: dict[str, str | bool | dict[str, str]] = {'uuid': vdi_uuid}
             if '://' in uri:
-                logging.info(f"Download ISO {uri}")
+                logging.info(f"[{self}] Download ISO {uri}")
                 download_path = f'/tmp/{vdi_uuid}'
                 self.ssh(f"curl -o '{download_path}' '{uri}'")
                 params['filename'] = download_path
             else:
                 params['filename'] = uri
-            logging.info(f"Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
+            logging.info(f"[{self}] Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
 
             self.xe('vdi-import', params)
         finally:
@@ -552,7 +552,7 @@ class Host:
         logging.info(f"[{self}] Updated successfully!")
 
     def restart_toolstack(self, verify: bool = False) -> None:
-        logging.info("Restart toolstack on host %s" % self)
+        logging.info(f"[{self}] Restart toolstack on host")
         self.ssh('xe-toolstack-restart')
         if verify:
             self.wait_for_xapi_enabled()
@@ -625,7 +625,7 @@ class Host:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
             # To workaround this, create transactions: install and remove a small package.
-            logging.info('Install and remove a small package to workaround empty yum history.')
+            logging.info(f"[{self}] Install and remove a small package to workaround empty yum history.")
             self.yum_install(['gpm-libs'])
             self.yum_remove(['gpm-libs'])
             history_str = self.ssh('yum history list --noplugins')
@@ -646,14 +646,14 @@ class Host:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
     def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
-        logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
+        logging.info(f"[{self}] Install packages: {' '.join(packages)} on host")
         cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
         if enablerepo is not None:
             cmd = f'{cmd} --enablerepo={enablerepo}'
         return self.ssh(f'{cmd} {" ".join(packages)}')
 
     def yum_remove(self, packages: list[str]) -> str:
-        logging.info('Remove packages: %s from host %s' % (' '.join(packages), self))
+        logging.info(f"[{self}] Remove packages: {' '.join(packages)} from host")
         return self.ssh(f'yum remove -y {" ".join(packages)}')
 
     def packages(self) -> list[str]:
@@ -671,14 +671,14 @@ class Host:
         return self.ssh_with_result(f'rpm -q {package}').returncode == 0
 
     def yum_save_state(self) -> None:
-        logging.info(f"Save yum state for host {self}")
+        logging.info(f"[{self}] Save yum state for host")
         # For now, that saved state feature does not support several saved states
         assert self.saved_packages_list is None, "There is already a saved package list set"
         self.saved_packages_list = self.packages()
         self.saved_rollback_id = self.get_last_yum_history_tid()
 
     def yum_restore_saved_state(self) -> None:
-        logging.info(f"Restore yum state for host {self}")
+        logging.info(f"[{self}] Restore yum state for host")
         """ Restore yum state to saved state. """
         assert self.saved_packages_list is not None, \
             "Can't restore previous state without a package list: no saved packages list"
@@ -703,7 +703,7 @@ class Host:
         self.saved_rollback_id = None
 
     def reboot(self, verify: bool = False) -> None:
-        logging.info("Reboot host %s" % self)
+        logging.info(f"[{self}] Reboot host")
         # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
         # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
         self.ssh('systemd-run --on-active=2s reboot')
@@ -889,7 +889,7 @@ class Host:
             params['device-config:{}'.format(key)] = value
 
         logging.info(
-            f"Create {sr_type} SR on host {self} with label '{label}' and device-config: {str(device_config)}"
+            f"[{self}] Create {sr_type} SR on host with label '{label}' and device-config: {str(device_config)}"
         )
         sr_uuid = self.xe('sr-create', params)
         sr = SR(sr_uuid, self.pool)
@@ -1047,7 +1047,7 @@ class Host:
             args['mode'] = mode
 
         uuid = self.xe("bond-create", args, minimal=True)
-        logging.info(f"New Bond: {uuid}")
+        logging.info(f"[{self}] New Bond: {uuid}")
 
         return Bond(self, uuid)
 
@@ -1059,8 +1059,8 @@ class Host:
         if description is not None:
             args['name-description'] = description
 
-        logging.info(f"Creating network '{label}'")
+        logging.info(f"[{self}] Creating network '{label}'")
         uuid = self.xe("network-create", args, minimal=True)
-        logging.info(f"New Network: {uuid}")
+        logging.info(f"[{self}] New Network: {uuid}")
 
         return Network(self, uuid)
