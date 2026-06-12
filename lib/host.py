@@ -860,7 +860,7 @@ class Host:
                 ))
 
         self.block_devices_info = sorted(devices, key=lambda d: d.size, reverse=True)
-        logging.debug("blockdevs found: %s", [d.name for d in self.block_devices_info])
+        logging.debug(f"[{self}] blockdevs found: {[d.name for d in self.block_devices_info]}")
 
     def disks(self) -> list[Host.BlockDeviceInfo]:
         """ List of all block devices (local disks, mdadm arrays, multipath devices). """
