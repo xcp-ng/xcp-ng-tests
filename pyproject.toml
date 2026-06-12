@@ -32,7 +32,7 @@ dev = [
     "types-colorama",
     "types-pexpect",
     "zizmor",
-    "prek>=0.4.1",
+    "prek>=0.4.4",
     "autopep8",
 ]
 
