@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import logging
-
 from typing import TYPE_CHECKING, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
+
+import structlog
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
@@ -15,9 +15,9 @@ class BaseVM:
 
     xe_prefix = "vm"
     uuid: str
+    logger: structlog.BoundLogger
 
     def __init__(self, uuid: str, host: Host):
-        logging.info("New %s: %s", type(self).__name__, uuid)
         self.uuid = uuid
         self.host = host
 
@@ -96,7 +96,7 @@ class BaseVM:
         return sr
 
     def export(self, filepath: str, compress: str = 'none', use_cache: bool = False) -> None:
-        logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
+        self.logger.info("Export VM", filepath=filepath, compress=compress)
         params: dict[str, str | bool | dict[str, str]] = {
             'uuid': self.uuid,
             'compress': compress,
