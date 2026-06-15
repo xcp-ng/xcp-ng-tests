@@ -443,8 +443,19 @@ class VM(BaseVM):
             self.ssh(f'rm -f {pidfile}')
             return str(pid)
 
-    def pid_exists(self, pid: str) -> bool:
-        return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
+    def pid_exists(self, pid: str, winpid: bool = False) -> bool:
+        if self.is_windows and winpid:
+            return strtobool(
+                self.execute_powershell_script(f"$null -ne (Get-Process -Id {pid} -ErrorAction SilentlyContinue)")
+            )
+        else:
+            return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
+
+    def kill_pid(self, pid: str, winpid: bool = False) -> None:
+        if self.is_windows and winpid:
+            self.execute_powershell_script(f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue")
+        else:
+            self.ssh(f'kill {pid}')
 
     @overload
     def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
