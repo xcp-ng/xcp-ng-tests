@@ -412,6 +412,8 @@ class VM(BaseVM):
         return self.host.pool.get_host_by_uuid(host_uuid)
 
     def start_background_process(self, cmd: str) -> str:
+        if self.is_windows:
+            logging.warning('start_background_process is not reliable on Windows')
         script = "/tmp/bg_process.sh"
         pidfile = "/tmp/bg_process.pid"
         with tempfile.NamedTemporaryFile('w') as f:
@@ -443,8 +445,19 @@ class VM(BaseVM):
             self.ssh(f'rm -f {pidfile}')
             return str(pid)
 
-    def pid_exists(self, pid: str) -> bool:
-        return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
+    def pid_exists(self, pid: str, winpid: bool = False) -> bool:
+        if self.is_windows and winpid:
+            return strtobool(
+                self.execute_powershell_script(f"$null -ne (Get-Process -Id {pid} -ErrorAction SilentlyContinue)")
+            )
+        else:
+            return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
+
+    def kill_pid(self, pid: str, winpid: bool = False) -> None:
+        if self.is_windows and winpid:
+            self.execute_powershell_script(f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue")
+        else:
+            self.ssh(f'kill {pid}')
 
     @overload
     def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
@@ -818,17 +831,19 @@ class VM(BaseVM):
             f"Write-Output (Start-Process -Wait -PassThru {program} -ArgumentList '{args}').ExitCode")
         return int(output)
 
-    def start_background_powershell(self, cmd: str) -> None:
+    def start_background_powershell(self, cmd: str) -> str:
         """
-        Run command under powershell in the background.
+        Run command under powershell in the background. Return the PID as string.
 
         Backslash-safe.
         """
         assert self.is_windows
         encoded_command = commands.encode_powershell_command(cmd)
-        self.ssh(
-            "powershell.exe -noprofile -noninteractive Invoke-WmiMethod -Class Win32_Process -Name Create "
+        return self.ssh(
+            "powershell.exe -noprofile -noninteractive -command \\("
+            "Invoke-WmiMethod -Class Win32_Process -Name Create "
             f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\'"
+            "\\).ProcessId"
         )
 
     def is_windows_pv_device_installed(self) -> bool:
