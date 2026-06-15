@@ -818,17 +818,19 @@ class VM(BaseVM):
             f"Write-Output (Start-Process -Wait -PassThru {program} -ArgumentList '{args}').ExitCode")
         return int(output)
 
-    def start_background_powershell(self, cmd: str) -> None:
+    def start_background_powershell(self, cmd: str) -> str:
         """
-        Run command under powershell in the background.
+        Run command under powershell in the background. Return the PID as string.
 
         Backslash-safe.
         """
         assert self.is_windows
         encoded_command = commands.encode_powershell_command(cmd)
-        self.ssh(
-            "powershell.exe -noprofile -noninteractive Invoke-WmiMethod -Class Win32_Process -Name Create "
+        return self.ssh(
+            "powershell.exe -noprofile -noninteractive -command \\("
+            "Invoke-WmiMethod -Class Win32_Process -Name Create "
             f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\'"
+            "\\).ProcessId"
         )
 
     def is_windows_pv_device_installed(self) -> bool:
