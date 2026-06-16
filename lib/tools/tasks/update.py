@@ -4,7 +4,7 @@ This module is intended for performing update actions on existing remote targets
 """
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
@@ -45,17 +45,40 @@ def update_pools(inventory: Inventory) -> None:
 
     # update master hosts
     with ThreadPoolExecutor() as executor:
-        for p in pools:
-            executor.submit(p.master.update, inventory_hosts[p.master.hostname_or_ip]["repositories"])
+        future_masters = {executor.submit(
+            p.master.update, inventory_hosts[p.master.hostname_or_ip]["repositories"]): p.master for p in pools}
+        for future in as_completed(future_masters):
+            future_master = future_masters[future]
+            try:
+                future.result()
+            except Exception as exc:
+                logger.error(f"Updating pool has failed! The master {future_master} cannot be updated.")
+                logger.info(
+                    "*** Due to previous error, the pool updating task will stop. "
+                    "Waiting for running updates to finish if any. ***"
+                )
+                raise exc
 
     # update other hosts
     with ThreadPoolExecutor() as executor:
+        future_other_hosts = {}
         for p in pools:
             # omit first item because it is the pool's master
-            for other_host in p.hosts[1:]:
+            for h in p.hosts[1:]:
                 # repos are the same as for the master host
                 repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
-                executor.submit(other_host.update, repos)
+                future_other_hosts[executor.submit(h.update, repos)] = h
+        for future in as_completed(future_other_hosts):
+            other_host = future_other_hosts[future]
+            try:
+                future.result()
+            except Exception as exc:
+                logger.error(f"Updating pool has failed! The host {other_host} cannot be updated.")
+                logger.info(
+                    "*** Due to previous error, the pool updating task will stop. "
+                    "Waiting for running updates to finish if any. ***"
+                )
+                raise exc
 
     # Snapshot creation
     for hosting_pool, nested in nested_hosts.items():
