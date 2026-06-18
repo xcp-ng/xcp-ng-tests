@@ -1,0 +1,14 @@
+# Copy to data.py and edit:
+#   cp tests/ha/data.py-dist tests/ha/data.py
+#
+# CARTRIDGES keys must match --hosts addresses.
+# Values are cartridge slot numbers (28 -> C28N1).
+
+CHASSIS_IP = "192.168.11.1"
+USERNAME = "admin"
+PASSWORD = "change-me"
+
+CARTRIDGES = {
+    "192.168.11.10": 28,
+    "192.168.11.11": 29,
+}

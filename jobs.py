@@ -150,6 +150,20 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/network"],
         "markers": "complex_prerequisites",
     },
+    "ha": {
+        "description": "pool HA failover scenarios on a 2-node Moonshot pool",
+        "requirements": [
+            "A 2-node pool on Moonshot whose hosts can be hard power-cycled.",
+            "tests/ha/data.py with CARTRIDGES mapping host addresses to Moonshot slots.",
+            "NFS_DEVICE_CONFIG in data.py (shared NFS for VM disks + HA heartbeat).",
+            "A small VM that can be imported on the NFS SR.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/ha"],
+    },
     "packages": {
         "description": "tests that packages can be installed correctly",
         "requirements": [
