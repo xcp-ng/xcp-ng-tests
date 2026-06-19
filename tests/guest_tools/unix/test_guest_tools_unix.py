@@ -26,7 +26,7 @@ class State:
 
 
 @pytest.mark.multi_vms
-@pytest.mark.usefixtures("unix_vm")
+@pytest.mark.usefixtures("skip_if_not_unix_vm")
 class TestGuestToolsUnix:
     @pytest.fixture(scope='class')
     def state(self) -> State:

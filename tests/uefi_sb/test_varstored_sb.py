@@ -37,7 +37,7 @@ pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
-@pytest.mark.usefixtures("unix_vm")
+@pytest.mark.usefixtures("skip_if_not_unix_vm")
 class TestGuestLinuxUEFISecureBoot:
     PK: EFIAuth
     KEK: EFIAuth
@@ -137,7 +137,7 @@ class TestGuestLinuxUEFISecureBoot:
 
 
 @pytest.mark.usefixtures("host_at_least_8_3")
-@pytest.mark.usefixtures("windows_vm")
+@pytest.mark.usefixtures("skip_if_not_windows_vm")
 class TestGuestWindowsUEFISecureBoot:
     @pytest.fixture(autouse=True)
     def setup_and_cleanup(self, uefi_vm_and_snapshot: tuple[VM, Snapshot]) -> Generator[None, None, None]:

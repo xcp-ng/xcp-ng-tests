@@ -94,7 +94,7 @@ def onboarding_guest_tools_iso(guest_tools_iso: Dict[str, Any]) -> Dict[str, Any
 
 
 @pytest.mark.multi_vms
-@pytest.mark.usefixtures("windows_vm")
+@pytest.mark.usefixtures("skip_if_not_windows_vm")
 class TestXenClean:
     def test_xenclean_without_tools(
         self, running_unsealed_windows_vm: VM, guest_tools_iso: Dict[str, Any]
