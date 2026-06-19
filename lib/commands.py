@@ -143,7 +143,7 @@ def _ssh(
         opts += ['-E', ssh_log_file.name]
         ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
 
-        logger.debug("Run SSH command")
+        logger.debug("Run SSH command", ssh_command=True)
         process = subprocess.Popen(
             ssh_cmd,
             stdout=subprocess.PIPE,
@@ -163,9 +163,9 @@ def _ssh(
 
     kwargs = {"ssh_error": ssherr} if ssherr else {}
     if res.returncode != 0:
-        logger.debug("SSH command failed", returncode=res.returncode, **kwargs)
+        logger.debug("SSH command failed", returncode=res.returncode, ssh_result=True, **kwargs)
     else:
-        logger.debug("SSH command succeeded", **kwargs)
+        logger.debug("SSH command succeeded", ssh_result=True, **kwargs)
 
     # Get a decoded version of the output in any case, replacing potential errors
     output_for_errors = res.stdout.decode(errors='replace').strip()

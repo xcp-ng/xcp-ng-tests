@@ -416,7 +416,7 @@ class VM(BaseVM):
 
     def start_background_process(self, cmd: str) -> str:
         if self.is_windows:
-            logging.warning('start_background_process is not reliable on Windows')
+            self.logger.warning('start_background_process is not reliable on Windows')
         script = "/tmp/bg_process.sh"
         pidfile = "/tmp/bg_process.pid"
         with tempfile.NamedTemporaryFile('w') as f:
