@@ -15,7 +15,7 @@ from typing import Literal
 
 MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
-def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
+def try_to_create_sr_with_missing_device(sr_type: str, label: str, host: Host) -> None:
     try:
         host.sr_create(sr_type, label, {}, verify=True)
     except SSHCommandFailed as e:
@@ -29,7 +29,7 @@ def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
 def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     """ Storage migration of a shutdown VM, then migrate it back. """
     prov_sr = vm.get_sr()
-    vdi_name: str | None = None
+    vdi_name = None
     integrity_check = not vm.is_windows
     dev = ""
     spans: list[StreamSpan] = []
@@ -78,7 +78,7 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
 
 def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
     prov_sr = vm.get_sr()
-    vdi_name: str | None = None
+    vdi_name = None
     integrity_check = not vm.is_windows
     dev = ""
     spans: list[StreamSpan] = []
@@ -201,12 +201,10 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
     spans = partially_populate_device(vm, dev, vdi_size, 4, skip_spans=[1])
     # make sure we can read that exact data before the snapshot/clone
     validate_partially_populated_device(vm, dev, spans)
-    new_vdi: VDI | None = None
     match vdi_op:
         case 'clone': new_vdi = vdi.clone()
         case 'snapshot': new_vdi = vdi.snapshot()
     defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
-    assert vdi is not None
 
     # add some data in a non-used place (span 1), and overwrite an already used one (span 2)
     spans[1].generate(vm, dev, seed=1)
@@ -227,9 +225,8 @@ XVACompression = Literal['none', 'gzip', 'zstd']
 
 def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
     # clone the vm, so we can resize the disk without affecting the vm from the fixture
-    vm: VM | None = source_vm.clone()
+    vm = source_vm.clone()
     defer(lambda: vm.destroy() if vm is not None else None)
-    assert vm is not None
     host = vm.host
     sr = vm.vdis[0].sr
     # we can't shrink a volume
@@ -287,9 +284,8 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     randstream(imported_vm, f'validate --expected-checksum {checksum} /root/data')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
-    vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
+    vdi_src = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
     defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
-    assert vdi_src is not None
 
     vbd = vm.connect_vdi(vdi_src)
     defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
@@ -320,7 +316,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
 
     validate_partially_populated_device(vm, dev, spans)
 
-def full_vdi_write(vm: VM, vdi: VDI, defer: Defer):
+def full_vdi_write(vm: VM, vdi: VDI, defer: Defer) -> None:
     vdi.get_virtual_size()
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))

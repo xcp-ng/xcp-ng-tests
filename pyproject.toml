@@ -36,8 +36,20 @@ dev = [
     "autopep8",
 ]
 
+[tool.mypy]
+disallow_any_generics = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+# allow more pythonic, in the flow type inferences and redefinitions
+local_partial_types = true
+allow_redefinition_new = true
+
 [tool.pyright]
 typeCheckingMode = "standard"
+reportMissingParameterType = "error"
+reportUnknownParameterType = "error"
 
 [tool.ruff]
 preview = true
@@ -50,11 +62,15 @@ quote-style = "preserve"
 [tool.ruff.lint]
 select = [
   "D",  # pydocstyle
+  "FA",  # future-annotations
   "F",  # Pyflakes
   "I",  # isort
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
+  "UP006",  # non-pep585-annotation
   "UP007",  # non-pep604-annotation-union
+  "UP037",  # quoted-annotation
+  "UP045",  # non-pep604-annotation-optional
 ]
 # don't use some of the default D and SIM rules
 ignore = [

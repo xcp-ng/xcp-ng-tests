@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-import argparse
 import dataclasses
 import itertools
 import logging
 import os
 import tempfile
+from argparse import Action, ArgumentParser, Namespace
 
 import git
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
@@ -43,7 +43,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable
+from typing import Any, Generator, Iterable, Sequence
 
 # Do we cache VMs?
 try:
@@ -52,8 +52,9 @@ except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
 
-class SplitCommaAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+class SplitCommaAction(Action):
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[str] | None,
+                 option_string: str | None = None) -> None:
         items = getattr(namespace, self.dest, None)
         if items is None:
             items = []
@@ -199,7 +200,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
 # FIXME we may have to move this into lib/ if fixtures in sub-packages
 # want to make use of this feature
 
-PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.TestReport]]()
+PHASE_REPORT_KEY = pytest.StashKey[dict[str, pytest.TestReport]]()
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[Any]
