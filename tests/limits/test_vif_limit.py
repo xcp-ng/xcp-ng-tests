@@ -69,6 +69,9 @@ class TestVIFLimit:
             if vm.ssh_with_result('systemctl restart networking').returncode != 0:
                 assert False, "Failed to configure networking"
 
+            # Open needed ports in the firewall
+            host.ssh(f'iptables -I INPUT -p tcp --match multiport --dports 5100:{5100+VIF_LIMIT-1} -j ACCEPT')
+
             # Test iperf on all interfaces in parallel
             # Clean up on exceptions
             logging.info('Create separate iperf servers on the host')
@@ -83,10 +86,12 @@ class TestVIFLimit:
 
             logging.info('Start multiple iperfs on separate interfaces on the VM')
             with tempfile.NamedTemporaryFile('w') as vm_script:
-                iperf_configs = [f'iperf3 --no-delay -c {host.hostname_or_ip} '
-                                 f'-p {5100 + i} --bind-dev {interface_name}{i} '
-                                 f'--interval 0 --parallel 1 --time 30 &'
-                                 for i in range(0, VIF_LIMIT)]
+                iperf_configs = ['set -e']
+                iperf_configs += [f'iperf3 --no-delay -c {host.hostname_or_ip} '
+                                  f'-p {5100 + i} --bind-dev {interface_name}{i} '
+                                  f'--interval 0 --parallel 1 --time 30 &'
+                                  for i in range(0, VIF_LIMIT)]
+                iperf_configs += ['wait -n']
                 vm_script.write('\n'.join(iperf_configs))
                 vm_script.flush()
                 vm.scp(vm_script.name, vm_script.name)
@@ -100,3 +105,5 @@ class TestVIFLimit:
             for vif in vifs:
                 vif.destroy()
             host.ssh('killall iperf3 || true')
+            # Restore firewall
+            host.ssh('iptables -D INPUT 1')
