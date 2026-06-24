@@ -59,15 +59,12 @@ class TestVIFLimit:
             vm.ssh(f'echo "{config}" >> /etc/network/interfaces')
 
             logging.info('Install iperf3 on VM and host')
-            if vm.ssh_with_result('apt update').returncode != 0:
-                assert False, "Failed to update apt cache on the VM"
-            if vm.ssh_with_result('apt install iperf3 --assume-yes').returncode != 0:
-                assert False, "Failed to install iperf3 on the VM"
+            vm.ssh('apt update')
+            vm.ssh('apt install iperf3 --assume-yes')
             host.yum_install(['iperf3'])
 
             logging.info('Reconfigure VM networking')
-            if vm.ssh_with_result('systemctl restart networking').returncode != 0:
-                assert False, "Failed to configure networking"
+            vm.ssh('systemctl restart networking')
 
             # Open needed ports in the firewall
             host.ssh(f'iptables -I INPUT -p tcp --match multiport --dports 5100:{5100+VIF_LIMIT-1} -j ACCEPT')
