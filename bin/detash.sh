@@ -124,7 +124,7 @@ run_()
     local purplecol="\e[1;35m"
 
     echo -e "${purplecol}================================================================================${defcol}"
-   
+
     cat<<EOF
 
 info: Start cmdline: $@
@@ -136,7 +136,7 @@ info: ssh -t "$USER@$HOSTNAME" \"$0\" --attach "${DETASH_NAME}" # Or remotely
 EOF
 
     echo -e "${purplecol}================================================================================${defcol}\n"
-    
+
     trap "on_quit_ TERM" TERM  # Default handler for liberating resources
     touch "$logfile"
 
