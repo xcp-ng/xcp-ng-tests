@@ -5,12 +5,12 @@ import pytest
 import argparse
 import dataclasses
 import itertools
-import logging
 import os
 import tempfile
 from collections import defaultdict
 
 import git
+import structlog
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
 from packaging import version
 
@@ -31,6 +31,7 @@ from lib.common import (
     wait_for,
 )
 from lib.host import Host
+from lib.logging import configure_logging
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
@@ -152,6 +153,8 @@ def pytest_configure(config: pytest.Config) -> None:
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
+
+    configure_logging()
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
@@ -308,22 +311,24 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
             vif = host_vm.vifs()[0]
             mac_address = vif.mac_address()
-            logging.info("Nested host has MAC %s", mac_address)
+            host_vm.logger.info("Nested host MAC address retrieved", mac_address=mac_address)
 
             host_vm.start()
-            wait_for(host_vm.is_running, "Wait for nested host VM running")
+            wait_for(host_vm.is_running, "Wait for nested host VM running", logger=host_vm.logger)
 
             # catch host-vm IP address
             wait_for(lambda: pxe.arp_addresses_for(mac_address),
                      "Wait for DHCP server to see nested host in ARP tables",
-                     timeout_secs=10 * 60)
+                     timeout_secs=10 * 60,
+                     logger=host_vm.logger.bind(mac_address=mac_address))
             ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Nested host has IPs %s", ips)
+            host_vm.logger.info("Nested host IPs retrieved", ips=ips)
             assert len(ips) == 1
             host_vm.ip = ips[0]
 
             wait_for(lambda: not os.system(f"nc -zw5 {host_vm.ip} 22"),
-                     "Wait for ssh up on nested host", retry_delay_secs=5)
+                     "Wait for ssh up on nested host", retry_delay_secs=5,
+                     logger=host_vm.logger)
 
             hostname_or_ip = host_vm.ip
 
@@ -333,7 +338,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
     def cleanup_hosts() -> None:
         for vm in nested_list:
-            logging.info("Destroying nested host VM %s", vm.uuid)
+            vm.logger.info("Destroying nested host VM")
             vm.destroy(verify=True)
 
     # a list of master hosts, each from a different pool
@@ -375,17 +380,17 @@ def registered_xo_cli() -> None:
 @pytest.fixture(scope='session')
 def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[Host], None, None]:
     for h in hosts:
-        logging.info(">>> Connect host %s" % h)
+        h.logger.info(">>> Connect host")
         if not h.skip_xo_config:
             h.xo_server_add(h.user, h.password)
         else:
             h.xo_get_server_id(store=True)
-        wait_for(h.xo_server_connected, timeout_secs=10)
+        wait_for(h.xo_server_connected, timeout_secs=10, logger=h.logger)
     yield hosts
     # teardown
     for h in hosts:
         if not h.skip_xo_config:
-            logging.info("<<< Disconnect host %s" % h)
+            h.logger.info("<<< Disconnect host")
             h.xo_server_remove()
 
 @pytest.fixture(scope='session')
@@ -403,7 +408,7 @@ def hostA2(hostA1: Host) -> Generator[Host, None, None]:
     """ Second host of pool A. """
     assert len(hostA1.pool.hosts) > 1, "A second host in first pool is required"
     _hostA2 = hostA1.pool.hosts[1]
-    logging.info(">>> hostA2 present: %s" % _hostA2)
+    _hostA2.logger.info(">>> hostA2 present")
     yield _hostA2
 
 @pytest.fixture(scope='session')
@@ -412,7 +417,7 @@ def hostB1(hosts: list[Host]) -> Generator[Host, None, None]:
     assert len(hosts) > 1, "A second pool is required"
     assert hosts[0].pool.uuid != hosts[1].pool.uuid
     _hostB1 = hosts[1]
-    logging.info(">>> hostB1 present: %s" % _hostB1)
+    _hostB1.logger.info(">>> hostB1 present")
     yield _hostB1
 
 @pytest.fixture(scope='session')
@@ -448,7 +453,7 @@ def host_no_ipv6(host: Host) -> None:
 def shared_sr(host: Host) -> Generator[SR, None, None]:
     sr = host.pool.first_shared_sr()
     assert sr, "No shared SR available on hosts"
-    logging.info(">> Shared SR on host present: {} of type {}".format(sr.uuid, sr.get_type()))
+    sr.logger.info(">> Shared SR on host present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
@@ -458,7 +463,7 @@ def local_sr_on_hostA1(hostA1: Host) -> Generator[SR, None, None]:
     assert len(srs) > 0, "a local SR is required on the pool's master"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostA1 present: {} of type {}".format(sr.uuid, sr.get_type()))
+    sr.logger.info(">> local SR on hostA1 present: {} of type {}".format(sr.uuid, sr.get_type()))
     yield sr
 
 @pytest.fixture(scope='session')
@@ -468,7 +473,7 @@ def local_sr_on_hostA2(hostA2: Host) -> Generator[SR, None, None]:
     assert len(srs) > 0, "a local SR is required on the pool's second host"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostA2 present: {} of type {}".format(sr.uuid, sr.get_type()))
+    sr.logger.info(">> local SR on hostA2 present")
     yield sr
 
 @pytest.fixture(scope='session')
@@ -478,13 +483,15 @@ def local_sr_on_hostB1(hostB1: Host) -> Generator[SR, None, None]:
     assert len(srs) > 0, "a local SR is required on the second pool's master"
     # use the first local SR found
     sr = srs[0]
-    logging.info(">> local SR on hostB1 present: {} of type {}".format(sr.uuid, sr.get_type()))
+    sr.logger.info(">> local SR on hostB1 present")
     yield sr
 
 @pytest.fixture(scope='session')
 def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddress, Host]
           ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all disks for on all hosts of first pool."""
+    logger = structlog.get_logger("disks").bind(pools=pools_hosts_by_name_or_ip)
+
     def _parse_disk_option(option_text: str) -> tuple[HostAddress, list[DiskDevName]]:
         parsed = option_text.split(sep=":", maxsplit=1)
         assert len(parsed) == 2, f"--disks option {option_text!r} is not <host>:<disk>[,<disk>]*"
@@ -538,7 +545,7 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
         if disk.wwn and not disk.available and not disk.wwn.startswith("uuid.00000000-0000-0000-0000-")
     }
     if used_wwns:
-        logging.debug("cross-host used WWNs: %s", used_wwns)
+        logger.debug("Resport cross-host used WWNs", used_wwns=used_wwns)
         ret = {
             host: [
                 dataclasses.replace(disk, available=False) if (disk.wwn and disk.wwn in used_wwns) else disk
@@ -560,34 +567,42 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
     except ImportError:
         pass
     if reserved_wwns:
-        logging.debug("reserved WWNs (lvmohba/lvmoiscsi): %s", reserved_wwns)
+        logger.debug("Report reserved WWNs (lvmohba/lvmoiscsi)", reserved_wwns=reserved_wwns)
         ret = {
             host: sorted(host_disks, key=lambda d: d.wwn in reserved_wwns)
             for host, host_disks in ret.items()
         }
-    logging.debug("disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    logger.debug("Disks collected", collected_disks={host.hostname_or_ip: value for host, value in ret.items()})
     return ret
 
 @pytest.fixture(scope='session')
 def unused_512B_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
                       ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all 512-bytes-blocks disks for on all hosts of first pool."""
+    logger = structlog.get_logger("unused_512B_disks").bind(disks=disks)
     ret = {host: [disk for disk in host_disks
                   if disk.log_sec == 512 and disk.available]
            for host, host_disks in disks.items()
            }
-    logging.debug("available disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    logger.debug(
+        "Available disks collected",
+        available_disks={host.hostname_or_ip: value for host, value in ret.items()}
+    )
     return ret
 
 @pytest.fixture(scope='session')
 def unused_4k_disks(disks: dict[Host, list[Host.BlockDeviceInfo]]
                     ) -> dict[Host, list[Host.BlockDeviceInfo]]:
     """Dict identifying names of all 4K-blocks disks for on all hosts of first pool."""
+    logger = structlog.get_logger("unused_4k_disks").bind(disks=disks)
     ret = {host: [disk for disk in host_disks
                   if disk.log_sec == 4096 and disk.available]
            for host, host_disks in disks.items()
            }
-    logging.debug("available 4k disks collected: %s", {host.hostname_or_ip: value for host, value in ret.items()})
+    logger.debug(
+        "Available 4k disks collected",
+        available_4k_disks={host.hostname_or_ip: value for host, value in ret.items()}
+    )
     return ret
 
 @pytest.fixture(scope='session')
@@ -600,6 +615,7 @@ def pool_with_unused_512B_disk(host: Host, unused_512B_disks: dict[Host, list[Ho
 
 @pytest.fixture(scope='module')
 def vm_ref(request: pytest.FixtureRequest) -> str:
+    logger = structlog.get_logger("vm_ref")
     ref = request.param
 
     if ref is None:
@@ -607,11 +623,14 @@ def vm_ref(request: pytest.FixtureRequest) -> str:
         marker = request.node.get_closest_marker("default_vm")
         if marker is not None:
             ref = marker.args[0]
-            logging.info(">> No VM specified on CLI. Using default: %s.", ref)
+            logger.info(">> No VM specified on CLI. Using default", default_vm=ref)
         else:
             # global default
-            logging.info(">> No VM specified on CLI, and no default found in test definition. Using global default.")
             ref = 'mini-linux-x86_64-bios'
+            logger.info(
+                ">> No VM specified on CLI, and no default found in test definition. Using global default.",
+                default_vm=ref,
+            )
 
     if is_uuid(ref) or ref.startswith('http'):
         return ref
@@ -623,13 +642,13 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
     if is_uuid(vm_ref):
         vm_orig = VM(vm_ref, host)
         name = vm_orig.name()
-        logging.info(">> Reuse VM %s (%s) on host %s" % (vm_ref, name, host))
+        vm_orig.logger.info(">> Reuse VM", vm_name=name)
     else:
         vm_orig = host.import_vm(vm_ref, host.main_sr_uuid(), use_cache=CACHE_IMPORTED_VM)
 
     if CACHE_IMPORTED_VM:
         # Clone the VM before running tests, so that the original VM remains untouched
-        logging.info(">> Clone cached VM before running tests")
+        vm_orig.logger.info(">> Clone cached VM before running tests")
         vm = vm_orig.clone()
         # Remove the description, which may contain a cache identifier
         vm.param_set('name-description', "")
@@ -639,7 +658,7 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
     yield vm
     # teardown
     if CACHE_IMPORTED_VM or not is_uuid(vm_ref):
-        logging.info("<< Destroy VM")
+        vm.logger.info("<< Destroy VM")
         vm.destroy(verify=True)
 
 @pytest.fixture(scope="session")
@@ -730,11 +749,11 @@ def create_vms(request: pytest.FixtureRequest, host: Host, tests_git_revision: s
         report = request.node.stash.get(PHASE_REPORT_KEY, None)
         if report is None:
             # user interruption during setup
-            logging.warning("test setup result not available: not exporting VMs")
+            host.logger.warning("test setup result not available: not exporting VMs")
         elif report["setup"].failed:
-            logging.warning("setting up a test failed or skipped: not exporting VMs")
+            host.logger.warning("setting up a test failed or skipped: not exporting VMs")
         elif ("call" not in report) or report["call"].failed:
-            logging.warning("executing test failed or skipped: not exporting VMs")
+            host.logger.warning("executing test failed or skipped: not exporting VMs")
         else:
             # record this state
             for vm_def, vm in zip(vm_defs, vms):
@@ -742,18 +761,18 @@ def create_vms(request: pytest.FixtureRequest, host: Host, tests_git_revision: s
                 vm.save_to_cache(f"{nodeid}-{vm_def['name']}-{tests_git_revision}")
 
     except Exception:
-        logging.error("exception caught...")
+        host.logger.exception()
         raise
 
     finally:
         for vbd in vbds:
-            logging.info("<< Destroy VBD %s", vbd.uuid)
+            vbd.logger.info("<< Destroy VBD")
             vbd.destroy()
         for vdi in vdis:
-            logging.info("<< Destroy VDI %s", vdi.uuid)
+            vdi.logger.info("<< Destroy VDI")
             vdi.destroy()
         for vm in vms:
-            logging.info("<< Destroy VM %s", vm.uuid)
+            vm.logger.info("<< Destroy VM")
             vm.destroy(verify=True)
 
 def _vm_name(request: pytest.FixtureRequest, vm_def: dict[str, Any]) -> str:
@@ -765,7 +784,7 @@ def _create_vm(
     vm_name = _vm_name(request, vm_def)
     vm_template = vm_def["template"]
 
-    logging.info("Installing VM %r from template %r", vm_name, vm_template)
+    host.logger.info("Installing VM from template", vm_name=vm_name, vm_template=vm_template)
 
     vm = host.vm_from_template(vm_name, vm_template)
 
@@ -793,7 +812,7 @@ def _create_vm(
 
     if "params" in vm_def:
         for param_def in vm_def["params"]:
-            logging.info("Setting param %s", param_def)
+            vm.logger.info("Setting parameter", param_def=param_def)
             vm.param_set(**param_def)
 
 def _vm_from_cache(
@@ -805,7 +824,7 @@ def _vm_from_cache(
         raise RuntimeError("No cache found")
 
     # Clone the VM before running tests, so that the original VM remains untouched
-    logging.info("Cloning VM from cache")
+    base_vm.logger.info("Cloning VM from cache")
     vm = base_vm.clone(name=prefix_object_name(_vm_name(request, vm_def)))
     # Remove the description, which may contain a cache identifier
     vm.param_set('name-description', "")
@@ -818,15 +837,15 @@ def started_vm(imported_vm: VM) -> VM:
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
         vm.start()
-    wait_for(vm.is_running, '> Wait for VM running')
-    wait_for(vm.try_get_and_store_ip, "> Wait for VM IP", timeout_secs=5 * 60)
+    wait_for(vm.is_running, 'Wait for VM running', logger=vm.logger)
+    wait_for(vm.try_get_and_store_ip, "Wait for VM IP", timeout_secs=5 * 60, logger=vm.logger)
     return vm
     # no teardown
 
 @pytest.fixture(scope="module")
 def running_vm(started_vm: VM) -> VM:
     vm = started_vm
-    wait_for(vm.is_ssh_up, "> Wait for VM SSH up")
+    wait_for(vm.is_ssh_up, "Wait for VM SSH up", logger=vm.logger)
     return vm
 
 @pytest.fixture(scope='module')
@@ -921,10 +940,10 @@ def nfs_iso_sr(host: Host, nfs_iso_device_config: dict[str, Any]) -> Generator[S
 @pytest.fixture(scope='function')
 def exit_on_fistpoint(host: Host) -> Generator[None, None, None]:
     from lib.fistpoint import FistPoint
-    logging.info(">> Enabling exit on fistpoint")
+    host.logger.info(">> Enabling exit on fistpoint")
     FistPoint.enable_exit_on_fistpoint(host)
     yield
-    logging.info("<< Disabling exit on fistpoint")
+    host.logger.info("<< Disabling exit on fistpoint")
     FistPoint.disable_exit_on_fistpoint(host)
 
 @pytest.fixture(scope='module')

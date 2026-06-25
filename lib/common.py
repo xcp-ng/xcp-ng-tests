@@ -18,6 +18,7 @@ from functools import lru_cache
 from uuid import UUID
 
 import requests
+import structlog
 from pydantic import TypeAdapter
 
 from typing import (
@@ -188,9 +189,9 @@ def callable_marker(value: T | Callable[..., T], request: pytest.FixtureRequest)
         return value
 
 def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
-             invert: bool = False) -> None:
+             invert: bool = False, logger: structlog.BoundLogger | None = None) -> None:
     if msg is not None:
-        logging.info(msg)
+        logging.info(msg) if logger is None else logger.info(msg)
     start_time = time.perf_counter()
     while True:
         ret = fn()
@@ -206,9 +207,10 @@ def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int
         time.sleep(retry_delay_secs)
 
 def wait_for_not(
-    fn: Callable[[], Any], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2
+    fn: Callable[[], Any], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
+    logger: structlog.BoundLogger | None = None,
 ) -> None:
-    return wait_for(fn, msg, timeout_secs, retry_delay_secs, True)
+    return wait_for(fn, msg, timeout_secs, retry_delay_secs, True, logger=logger)
 
 def is_uuid(maybe_uuid: str) -> bool:
     try:

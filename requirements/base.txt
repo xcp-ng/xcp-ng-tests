@@ -8,3 +8,5 @@ pydantic
 pytest>=8.0.0
 pytest-dependency
 requests
+rich>=15.0.0
+structlog>=26.1.0

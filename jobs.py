@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 from lib.commands import ssh
+from lib.logging import configure_logging
 
 from typing import NotRequired, TypedDict, cast
 
@@ -823,6 +824,7 @@ def action_run(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    configure_logging()
     parser = argparse.ArgumentParser(description="Manage test jobs")
     subparsers = parser.add_subparsers(dest="action", metavar="action")
     subparsers.required = True

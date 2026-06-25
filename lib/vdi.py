@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import structlog
 
 from lib.common import (
     _param_add,
@@ -45,12 +45,13 @@ class VDI:
             self.sr = sr
         else:
             self.sr = sr
+        self.logger = structlog.get_logger("VDI").bind(vdi_uuid=uuid, sr_uuid=self.sr.uuid)
 
     def name(self) -> str:
         return self.param_get('name-label')
 
     def destroy(self) -> None:
-        logging.info("Destroy %s", self)
+        self.logger.info("Destroy VDI")
         self.sr.pool.master.xe('vdi-destroy', {'uuid': self.uuid})
 
     def clone(self) -> VDI:
@@ -68,7 +69,7 @@ class VDI:
         return int(self.param_get("virtual-size"))
 
     def resize(self, new_size: int) -> None:
-        logging.info(f"Resizing VDI {self.uuid} to {new_size}")
+        self.logger.info("Resizing VDI", new_size=new_size)
         self.sr.pool.master.xe("vdi-resize", {"uuid": self.uuid, "disk-size": str(new_size)})
 
     def __str__(self) -> str:
@@ -122,5 +123,5 @@ class VDI:
         # It is necessary to wait a long time because the GC can be paused for more than 5 minutes.
         # And it is also necessary to allow a sufficiently long merge time which depends on the amount of data.
         wait_for(lambda: self.get_parent() != previous_parent, msg="Waiting for coalesce", timeout_secs=10 * 60)
-        logging.info("Coalesce done")
+        self.logger.info("Coalesce done")
         return ret
