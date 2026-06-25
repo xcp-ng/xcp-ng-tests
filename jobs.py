@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 
@@ -811,9 +812,15 @@ def action_run(args: argparse.Namespace) -> None:
         print(f"Error: only {nb_pools} master host(s) provided, {job_nb_pools} required.")
         sys.exit(1)
 
-    res = subprocess.run(cmd)
-    if res.returncode:
-        sys.exit(1)
+    # Use `execvp` instead of `subprocess.run` to avoid signal handling issues.
+    # With `subprocess.run`, both the Python parent and the pytest child are in
+    # the same process group and receive SIGINT. But `subprocess.run` internal
+    # logic then terminates the child with SIGKILL before pytest can finish its
+    # teardown. With `execvp`, the current process is replaced by pytest entirely
+    # so pytest handles SIGINT on its own and teardown runs normally.
+    # execvp: "v" = args as a list, "p" = resolve program via PATH.
+    os.execvp(cmd[0], cmd)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Manage test jobs")
