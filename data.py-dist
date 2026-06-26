@@ -116,6 +116,7 @@ OTHER_GUEST_TOOLS = {
 # Tools
 TOOLS: dict[str, str] = {
 #    "iso-remaster": "/home/user/src/xcpng/xcp/scripts/iso-remaster/iso-remaster.sh",
+#    "xo-cli": "xo-cli",
 }
 
 # Values can be either full URLs or only partial URLs that will be automatically appended to DEF_VM_URL
