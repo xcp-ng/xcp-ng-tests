@@ -78,9 +78,10 @@ Defer: TypeAlias = Callable[[Callable[[], object]], None]
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
-    RPM = 2
+    YUM = 2
     APT_GET = 3
     APK = 4
+    DNF = 5
 
 # Common VM images used in tests
 def vm_image(vm_key: str) -> str:
