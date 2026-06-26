@@ -49,9 +49,15 @@ def _linstor_config() -> LinstorConfig:
     return LinstorConfig()
 
 @pytest.fixture(scope='package')
+def lvm_disk_paths(
+    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+) -> dict[Host, list[str]]:
+    return {host: [disk.path for disk in disks[0:1]] for (host, disks) in unused_512B_disks.items()}
+
+@pytest.fixture(scope='package')
 def lvm_disks(
     pool_with_unused_512B_disk: Pool,
-    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
+    lvm_disk_paths: dict[Host, list[str]],
     provisioning_type: str,
 ) -> Generator[None, None, None]:
     """
@@ -66,12 +72,8 @@ def lvm_disks(
     """
     hosts = pool_with_unused_512B_disk.hosts
 
-    @functools.cache
-    def host_devices(host: Host) -> list[str]:
-        return [disk.path for disk in unused_512B_disks[host][0:1]]
-
     for host in hosts:
-        devices = host_devices(host)
+        devices = lvm_disk_paths[host]
         for device in devices:
             try:
                 host.ssh(f'pvcreate -ff -y {device}')
@@ -94,7 +96,7 @@ def lvm_disks(
 
     for host in hosts:
         host.ssh(f'vgremove -f {GROUP_NAME}')
-        for device in host_devices(host):
+        for device in lvm_disk_paths[host]:
             host.ssh(f'pvremove {device}')
 
 @pytest.fixture(scope="package")
