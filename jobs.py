@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 from lib.commands import ssh
+from lib.typing import VmDef, VMSDef
 
 from typing import NotRequired, TypedDict, cast
 
@@ -590,9 +591,6 @@ BROKEN_TESTS = [
     "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
 ]
 
-VmDef = str | tuple[str, str]
-VMSDef = dict[str, dict[str, VmDef | list[VmDef]]]
-
 # Returns the vm filename or None if a host_version is passed and matches the one specified
 # with the vm filename in vm_data.py. ex: ("centos6-32-hvm-created_8.2-zstd.xva", "8\.2\..*")
 def filter_vm(vm: VmDef, host_version: str | None) -> str | None:
@@ -629,14 +627,14 @@ def get_vm_or_vms_refs(handle: str, host_version: str | None = None) -> str | li
 
     VMS = cast(VMSDef, VMS_untyped)
     category, key = handle.split("/")
-    if category not in VMS or key not in VMS[category]:
+    if category not in VMS or key not in VMS[category]:  # type: ignore[literal-required]
         print(f"ERROR: Could not find VMS['{category}']['{key}'] in vm_data.py, or it's empty.")
         print("You need to update your local vm_data.py.")
         print("You may also bypass this error by providing your own --vm parameter(s).")
         sys.exit(1)
 
     vms: str | list[str] | None = []
-    vms_unfiltered = VMS[category][key]
+    vms_unfiltered = VMS[category][key]  # type: ignore[literal-required]
     if isinstance(vms_unfiltered, list):
         # Multi VMs
         vms = [xva for vm in vms_unfiltered if (xva := filter_vm(vm, host_version)) is not None]

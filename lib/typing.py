@@ -7,6 +7,15 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired
 
+
+VmDef = str | tuple[str, str]
+
+
+class VMSDef(TypedDict):
+    single: dict[str, VmDef]
+    multi: dict[str, list[VmDef]]
+
+
 IsoImageDef = TypedDict('IsoImageDef',
                         {'path': str,
                          'net-url': NotRequired[str],

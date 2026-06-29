@@ -12,6 +12,7 @@ libarchive-c==5.3
 types-pygments
 types-colorama
 types-pexpect
+XenAPI
 zizmor
 prek>=0.4.4
 autopep8
