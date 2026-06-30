@@ -15,4 +15,5 @@ types-pexpect
 zizmor
 prek>=0.4.4
 autopep8
+types-passlib
 -r base.txt
