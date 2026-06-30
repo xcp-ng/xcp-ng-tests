@@ -10,11 +10,13 @@ import os
 import random
 import string
 import sys
+import tempfile
 import time
 import traceback
 from datetime import datetime
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 from uuid import UUID
 
 import requests
@@ -317,13 +319,30 @@ def strtobool(val: str | None) -> bool:
     raise ValueError("invalid truth value '{}'".format(val))
 
 def url_download(url: str, filename: str) -> None:
-    r = requests.get(url, stream=True)
-    r.raise_for_status()
-    tempfilename = filename + ".part"
-    with open(tempfilename, 'wb') as fd:
-        for chunk in r.iter_content(chunk_size=128):
-            fd.write(chunk)
-    os.rename(tempfilename, filename)
+    """
+    Download the content of `url` to the `filename` destination.
+
+    A randomized filename is used during download to prevent file corruption on
+    concurrent use. If the download fails then the temporary file is removed.
+    """
+    destination = Path(filename)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        temp_name: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent, prefix=f"{destination.name}.", suffix=".part", delete=False
+            ) as fd:
+                temp_name = fd.name
+                for chunk in r.iter_content(chunk_size=128):
+                    fd.write(chunk)
+        except BaseException:
+            if temp_name is not None:
+                os.unlink(temp_name)
+            raise
+        else:
+            os.rename(temp_name, filename)
 
 def randid(length: int = 6) -> str:
     """
