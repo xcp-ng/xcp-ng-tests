@@ -78,7 +78,10 @@ class TestNested:
                 ),
                 "bios": (),
             }[firmware],
-            vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
+            vdis=[
+                dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0"),
+                dict(name="vm1 extra disk", size="50GiB", device="xvdb", userdevice="1")
+            ],
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
