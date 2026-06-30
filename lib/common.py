@@ -335,7 +335,7 @@ def url_download(url: str, filename: str) -> None:
                 dir=destination.parent, prefix=f"{destination.name}.", suffix=".part", delete=False
             ) as fd:
                 temp_name = fd.name
-                for chunk in r.iter_content(chunk_size=128):
+                for chunk in r.iter_content(chunk_size=64 * 1024):
                     fd.write(chunk)
         except BaseException:
             if temp_name is not None:
