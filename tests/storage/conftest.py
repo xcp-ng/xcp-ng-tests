@@ -34,7 +34,10 @@ def temp_large_dir(host: Host) -> Generator[str, None, None]:
         mount_path = f'/mnt/nfs_{temp_id}'
         host.ssh(f'mkdir -p {mount_path}')
         path = f'{mount_path}/temp_large_dir_{temp_id}'
-        host.ssh(f'mount -t nfs {nfs_conf["server"]}:{nfs_conf["serverpath"]} {mount_path}')
+        hostname = nfs_conf["server"]
+        if ":" in hostname:
+            hostname = f"[{hostname}]"
+        host.ssh(f'mount -t nfs {hostname}:{nfs_conf["serverpath"]} {mount_path}')
         host.ssh(f'mkdir {path}')
         yield path
         host.ssh(f'rm -rf {path}')
