@@ -2,17 +2,28 @@
 # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot
 # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference#package-ecosystem
 version: 2
+
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "dependabot-staging"
     schedule:
       interval: "daily"
     cooldown:
       default-days: 7
+    groups:
+      all:
+        patterns:
+          - "*"
+
   - package-ecosystem: "uv"
     directory: "/"
+    target-branch: "dependabot-staging"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    groups:
+      all:
+        patterns:
+          - "*"
