@@ -2,7 +2,7 @@
 cryptography>=3.3.1
 gitpython
 legacycrypt
-packaging>=20.7
+packaging>=26.2
 pluggy>=1.1.0
 pydantic
 pytest>=8.0.0
