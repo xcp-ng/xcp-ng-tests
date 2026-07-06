@@ -166,8 +166,8 @@ class Host:
     def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
             -> str | commands.SSHResult[str]:
-        maybe_param_minimal = '--minimal' if minimal else ''
-        maybe_param_force = '--force' if force else ''
+        maybe_param_minimal = ' --minimal' if minimal else ''
+        maybe_param_force = ' --force' if force else ''
 
         def stringify(key: str, value: str | bool | dict[str, str]) -> str:
             if isinstance(value, bool):
@@ -179,7 +179,7 @@ class Host:
                 return ret.rstrip()
             return f'{key}={shlex.quote(value)}'
 
-        command: str = f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
+        command: str = f'xe {action}{maybe_param_minimal}{maybe_param_force} ' + \
             ' '.join(stringify(key, value) for key, value in args.items())
         if simple_output:
             return self.ssh(command, check=check, simple_output=True)
