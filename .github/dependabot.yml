@@ -9,6 +9,11 @@ updates:
       interval: "daily"
     cooldown:
       default-days: 7
+    groups:
+      actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
@@ -16,3 +21,14 @@ updates:
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    groups:
+      prod-deps:
+        applies-to: version-updates
+        dependency-type: "production"
+        patterns:
+          - "*"
+      dev-deps:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "*"
