@@ -112,7 +112,7 @@ def make_ssh_result_renderer(
     )
 
 
-def make_pretty_renderer_processor(left_identifier: bool = False) -> structlog.typing.Processor:
+def make_pretty_renderer_processor(left_identifier: bool = True) -> structlog.typing.Processor:
     pad_event_to = 0 if left_identifier else 40
 
     # Default renderer
