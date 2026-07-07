@@ -1,6 +1,7 @@
 import pytest
 
 import logging
+import re
 
 from lib.cpu_policy import NO_SUBLEAF, HostCpuPolicy
 
@@ -31,4 +32,18 @@ class TestDts:
         if power_leaf is None or power_leaf.eax & 1 == 0:
             pytest.skip("This test require a host with DTS support")
 
-        host.ssh("xenpm get-core-temp")
+        output = host.ssh("xenpm get-core-temp")
+
+        # Test if all CPU temperatures are acceptable
+        TEMPERATURE_THRESHOLD_MIN = 5
+        TEMPERATURE_THRESHOLD_MAX = 120
+        has_any_temp = False
+
+        for (entry, temp) in re.findall(r"(\D+\d+): (\d+)°C", output):
+            temp = int(temp)
+            has_any_temp = True
+
+            assert TEMPERATURE_THRESHOLD_MIN < temp < TEMPERATURE_THRESHOLD_MAX, \
+                f"{entry} temperature must be within safe operational limits"
+
+        assert has_any_temp, "The tool should at least output 1 temperature"
