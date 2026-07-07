@@ -29,7 +29,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, assert_never, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -527,14 +527,21 @@ class VM(BaseVM):
 
     def grow_root_partition(self) -> int | None:
         pkg_manager = self.detect_package_manager()
-        if pkg_manager == PackageManagerEnum.APK:
-            self.ssh('apk add util-linux e2fsprogs-extra')
-        elif pkg_manager == PackageManagerEnum.APT_GET:
-            self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
-        elif pkg_manager == PackageManagerEnum.RPM:
-            self.ssh('yum install -y util-linux e2fsprogs')
-        else:
-            return None
+        match pkg_manager:
+            case PackageManagerEnum.APK:
+                self.ssh('apk add util-linux e2fsprogs-extra')
+            case PackageManagerEnum.APT_GET:
+                self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
+            case PackageManagerEnum.DNF:
+                self.ssh('dnf install -y util-linux e2fsprogs')
+            case PackageManagerEnum.YUM:
+                self.ssh('yum install -y util-linux e2fsprogs')
+            case PackageManagerEnum.ZYPPER:
+                self.ssh('zypper --non-interactive install util-linux e2fsprogs')
+            case PackageManagerEnum.UNKNOWN:
+                return None
+            case _:
+                assert_never(pkg_manager)
         mount_output = self.ssh('mount').strip()
         root_match = re.search(r'/dev/(\w+?)(p?)(\d+) on / type (\w+)', mount_output)
         assert root_match is not None
