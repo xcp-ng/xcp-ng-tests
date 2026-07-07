@@ -1,8 +1,10 @@
 import pytest
 
+import concurrent.futures
 import json
 import logging
 import shlex
+import threading
 import time
 
 from lib.commands import SSHCommandFailed
@@ -237,16 +239,14 @@ class TestLinstorSR:
     @pytest.mark.reboot
     @pytest.mark.small_vm
     @pytest.mark.upgrade_test
-    def test_linstor_sr_pool_update(self, linstor_sr, vm_on_linstor_sr):
+    def test_linstor_sr_pool_update(self, linstor_sr: SR, vm_on_linstor_sr: VM) -> None:
         """
         Perform update on the Linstor SR pool hosts while ensuring VM availability.
         1. Identify all hosts in the SR pool and order them with the master first.
         2. Update all hosts if updates are available.
-        3. Reboot all hosts.
+        3. Reboot updated hosts.
         4. Sequentially ensure that the VM can start on all hosts.
         """
-        import concurrent.futures, threading
-
         sr = linstor_sr
         vm = vm_on_linstor_sr
         updates_applied = []
@@ -257,7 +257,7 @@ class TestLinstorSR:
 
         # RPU is disabled for pools with XOSTOR SRs.
         # LINSTOR expects that we always use satellites and controllers with the same version on all hosts.
-        def install_updates_on(host):
+        def install_updates_on(host: Host) -> None:
             logging.info("Checking on host %s", host.hostname_or_ip)
             if host.has_updates(enablerepo="xcp-ng-linstor-testing"):
                 host.install_updates(enablerepo="xcp-ng-linstor-testing")
@@ -270,11 +270,13 @@ class TestLinstorSR:
             executor.map(install_updates_on, hosts)
 
         # Reboot updated hosts
-        def reboot_updated(host):
+        def reboot_updated(host: Host) -> None:
             host.reboot(verify=True)
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(reboot_updated, updates_applied)
+        if updates_applied:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                executor.map(reboot_updated, updates_applied)
+            wait_for(sr.all_pbds_attached, "Wait for PBD attached")
 
         # Ensure VM is able to boot on all the hosts
         for h in hosts:

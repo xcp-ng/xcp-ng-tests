@@ -480,10 +480,10 @@ class Host:
         else:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
-    def install_updates(self, enablerepo=None):
+    def install_updates(self, enablerepo: str | None = None) -> str:
         logging.info("Install updates on host %s" % self)
-        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
-        return self.ssh(f"yum update -y {enablerepo_cmd}")
+        enablerepo_arg = f" --enablerepo={enablerepo}" if enablerepo is not None else ""
+        return self.ssh(f"yum update -y{enablerepo_arg}")
 
     def get_system_uuid(self) -> str:
         """Get system uuid of current host.
@@ -598,11 +598,11 @@ class Host:
             # If XAPI is not ready yet, or the host is down, this will throw. We return False in that case.
             return False
 
-    def has_updates(self, enablerepo=None):
-        enablerepo_cmd = ['--enablerepo=%s' % enablerepo] if enablerepo is not None else []
+    def has_updates(self, enablerepo: str | None = None) -> bool:
+        enablerepo_arg = f" --enablerepo={enablerepo}" if enablerepo is not None else ""
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
-            self.ssh(f"yum check-update {enablerepo_cmd}")
+            self.ssh(f"yum check-update{enablerepo_arg}")
             # returned 0, else there would have been a SSHCommandFailed
             return False
         except commands.SSHCommandFailed as e:
