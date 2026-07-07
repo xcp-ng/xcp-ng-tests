@@ -6,13 +6,29 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
     cooldown:
       default-days: 7
+    groups:
+      ci-deps:
+        patterns:
+          - "*"
+
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    groups:
+      base-deps:
+        dependency-type: "production"
+        patterns:
+          - "*"
+      dev-deps:
+        dependency-type: "development"
+        patterns:
+          - "*"
