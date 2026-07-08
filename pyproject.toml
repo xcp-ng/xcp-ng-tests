@@ -41,6 +41,17 @@ dev = [
 
 [tool.pyright]
 typeCheckingMode = "standard"
+# Pyright doesn't support excluding files from .gitignore like mypy does.
+# So we need to append 'installimg.*' to the default 'exclude' configuration
+# which is ["**/node_modules", "**/__pycache__", "**/.*"]
+exclude = [
+  "**/__pycache__",
+  "**/.*",
+  "installimg.*",
+]
+
+[tool.mypy]
+exclude_gitignore = true
 
 [tool.ruff]
 preview = true
@@ -86,7 +97,7 @@ ignore = [
 pydocstyle.convention = "pep257"
 
 [tool.ruff.lint.extend-per-file-ignores]
-# Pytest fixtures are often flagged as unused imports (F401) or 
+# Pytest fixtures are often flagged as unused imports (F401) or
 # redefined variables (F811) because they are injected by name.
 "tests/**/*.py" = [
   "F401",  # F401 unused-import
