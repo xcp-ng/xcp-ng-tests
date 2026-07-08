@@ -264,18 +264,21 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     else:
         stream_size = 500 * MiB
 
-    checksum = randstream(vm, f'generate --size {stream_size} /root/data')
-    randstream(vm, f'validate --expected-checksum {checksum} /root/data')
+    file_size = (stream_size // 3) // 32768 * 32768
+    checksum1 = randstream(vm, f'generate --size {file_size} /root/data1')
+    randstream(vm, f'validate --expected-checksum {checksum1} /root/data1')
 
     if with_snapshot:
         snap1 = vm.snapshot()
-        # Write new data to a particular sector after taking a snapshot
-        vm.ssh("randstream generate --seed 1 -v --position 300MiB --size 100MiB /root/data")
-        vm.ssh("randstream validate -v --expected-checksum f797ab33 /root/data")
+
+    checksum2 = randstream(vm, f'generate --size {file_size} /root/data2')
+    randstream(vm, f'validate --expected-checksum {checksum2} /root/data2')
+
+    if with_snapshot:
         snap2 = vm.snapshot()
-        vm.ssh("randstream generate --seed 2 -v --position 100MiB --size 100MiB /root/data")
-        vm.ssh("randstream validate -v --expected-checksum 60db5b9f /root/data")
-        checksum = '60db5b9f'
+
+    checksum3 = randstream(vm, f'generate --size {file_size} /root/data3')
+    randstream(vm, f'validate --expected-checksum {checksum3} /root/data3')
 
     vm.shutdown(verify=True)
 
@@ -301,7 +304,9 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
 
     imported_vm.start()
     imported_vm.wait_for_vm_running_and_ssh_up()
-    randstream(imported_vm, f'validate --expected-checksum {checksum} /root/data')
+    randstream(imported_vm, f'validate --expected-checksum {checksum1} /root/data1')
+    randstream(imported_vm, f'validate --expected-checksum {checksum2} /root/data2')
+    randstream(imported_vm, f'validate --expected-checksum {checksum3} /root/data3')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
     vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
