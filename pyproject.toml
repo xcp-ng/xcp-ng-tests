@@ -5,15 +5,15 @@ description = "Testing scripts for XCP-ng"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "cryptography>=3.3.1",
+    "cryptography>=49.0.0",
     "gitpython",
     # TODO: keep legacycrypt to let the user transition to lib.common.hash_password in their data.py
     "legacycrypt",
-    "packaging>=20.7",
+    "packaging>=26.2",
     "passlib",
     "pluggy>=1.1.0",
     "pydantic",
-    "pytest>=8.0.0",
+    "pytest>=9.1.1",
     "pytest-dependency",
     "requests",
 ]
