@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import base64
-import logging
 import os
 import platform
 import subprocess
 import tempfile
+
+import structlog
 
 import lib.config as config
 from lib.netutil import wrap_ip
@@ -86,7 +87,12 @@ def _ssh(
     decode: bool,
     options: list[str],
     multiplexing: bool,
+    logger: structlog.BoundLogger | None = None,
 ) -> SSHResult[str] | SSHResult[bytes] | SSHCommandFailed | str | bytes | None:
+    if logger is None:
+        logger = structlog.get_logger("ssh").bind(host=hostname_or_ip)
+    assert logger is not None
+    logger = logger.bind(command=cmd)
     opts = list(options)
     opts += ['-o', 'BatchMode yes']
     opts += ['-o', 'PubkeyAcceptedKeyTypes +ssh-rsa']
@@ -125,7 +131,7 @@ def _ssh(
 
     if background:
         ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
-        logging.debug(f"[{hostname_or_ip}] {cmd}")
+        logger.debug("Run command in background")
         subprocess.Popen(
             ssh_cmd,
             stdout=subprocess.PIPE,
@@ -137,7 +143,7 @@ def _ssh(
         opts += ['-E', ssh_log_file.name]
         ssh_cmd = ['ssh', f'root@{hostname_or_ip}'] + opts + [cmd]
 
-        logging.debug(f"[{hostname_or_ip}] {cmd}")
+        logger.debug("Run SSH command", ssh_command=True)
         process = subprocess.Popen(
             ssh_cmd,
             stdout=subprocess.PIPE,
@@ -149,14 +155,17 @@ def _ssh(
         for line in iter(process.stdout.readline, b''):
             readable_line = line.decode(errors='replace').strip()
             stdout.append(line)
-            logging.debug("> %s", readable_line)
+            logger.debug("New line on stdout", stdout=readable_line, ssh_output=True)
         _, stderr = process.communicate()
         res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
 
         ssherr = ssh_log_file.read()
 
-    if ssherr:
-        logging.debug("[%s] ssh stderr: %s", hostname_or_ip, ssherr)
+    kwargs = {"ssh_error": ssherr} if ssherr else {}
+    if res.returncode != 0:
+        logger.debug("SSH command failed", returncode=res.returncode, ssh_result=True, **kwargs)
+    else:
+        logger.debug("SSH command succeeded", ssh_result=True, **kwargs)
 
     # Get a decoded version of the output in any case, replacing potential errors
     output_for_errors = res.stdout.decode(errors='replace').strip()
@@ -191,45 +200,52 @@ def _ssh(
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True) -> str:
+        decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) -> str:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[True] = True,
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[False], options: List[str] = [], multiplexing: bool = True) -> bytes:
+        decode: Literal[False], options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) -> bytes:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True) -> SSHResult[str]:
+        decode: Literal[True] = True, options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) -> SSHResult[str]:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-        decode: Literal[False], options: List[str] = [], multiplexing: bool = True) -> SSHResult[bytes]:
+        decode: Literal[False], options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) -> SSHResult[bytes]:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: Literal[False],
         suppress_fingerprint_warnings: bool = True, background: Literal[True],
-        decode: bool = True, options: List[str] = [], multiplexing: bool = True) -> None:
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) -> None:
     ...
 @overload
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True,
         simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True, background: bool = False,
-        decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
+        decode: bool = True, options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) \
         -> str | bytes | SSHResult[str] | SSHResult[bytes] | None:
     ...
 def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_output: bool = True,
         suppress_fingerprint_warnings: bool = True,
-        background: bool = False, decode: bool = True, options: List[str] = [], multiplexing: bool = True) \
+        background: bool = False, decode: bool = True, options: List[str] = [], multiplexing: bool = True,
+        logger: structlog.BoundLogger | None = None) \
         -> str | bytes | SSHResult[str] | SSHResult[bytes] | None:
     result_or_exc = _ssh(hostname_or_ip, cmd, check, simple_output, suppress_fingerprint_warnings,
-                         background, decode, options, multiplexing)
+                         background, decode, options, multiplexing, logger)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
     else:
@@ -239,19 +255,22 @@ def ssh(hostname_or_ip: HostAddress, cmd: str, *, check: bool = True, simple_out
 def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, decode: Literal[True] = True,
                     suppress_fingerprint_warnings: bool = True,
                     background: bool = False, options: List[str] = [],
-                    multiplexing: bool = True) -> SSHResult[str]:
+                    multiplexing: bool = True,
+                    logger: structlog.BoundLogger | None = None) -> SSHResult[str]:
     ...
 @overload
 def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, decode: Literal[False],
                     suppress_fingerprint_warnings: bool = True,
                     background: bool = False, options: List[str] = [],
-                    multiplexing: bool = True) -> SSHResult[bytes]:
+                    multiplexing: bool = True,
+                    logger: structlog.BoundLogger | None = None) -> SSHResult[bytes]:
     ...
 def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, suppress_fingerprint_warnings: bool = True,
                     background: bool = False, decode: bool = True, options: List[str] = [],
-                    multiplexing: bool = True) -> SSHResult[str] | SSHResult[bytes]:
+                    multiplexing: bool = True,
+                    logger: structlog.BoundLogger | None = None) -> SSHResult[str] | SSHResult[bytes]:
     result_or_exc = _ssh(hostname_or_ip, cmd, False, False, suppress_fingerprint_warnings,
-                         background, decode, options, multiplexing)
+                         background, decode, options, multiplexing, logger)
     if isinstance(result_or_exc, SSHCommandFailed):
         raise result_or_exc
     elif isinstance(result_or_exc, SSHResult):
@@ -261,6 +280,7 @@ def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, suppress_fingerpri
 def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         suppress_fingerprint_warnings: bool = True, local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
     opts = ['-o', 'BatchMode=yes']
+    logger = structlog.get_logger("scp").bind(host=hostname_or_ip, source=src, destination=dest)
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
@@ -273,6 +293,7 @@ def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
     else:
         dest = 'root@{}:{}'.format(ip, dest)
 
+    logger.debug("Run SCP command")
     command = ['scp'] + opts + [src, dest]
     res = subprocess.run(
         command,
@@ -280,9 +301,7 @@ def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         stderr=subprocess.STDOUT,
         check=False
     )
-
-    errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
-    logging.debug(f"[{hostname_or_ip}] scp: {src} => {dest}{errorcode_msg}")
+    logger.debug("SCP command returned", returncode=res.returncode)
 
     if check and res.returncode:
         raise SSHCommandFailed(res.returncode, res.stdout.decode(), ' '.join(command))
@@ -325,7 +344,9 @@ def local_cmd(
     cmd: List[str], *, check: bool = True, decode: bool = True
 ) -> LocalCommandResult[str] | LocalCommandResult[bytes]:
     """ Run a command locally on tester end. """
-    logging.debug("[local] %s", (cmd,))
+    command = " ".join(cmd)
+    logger = structlog.get_logger("cmd").bind(command=command)
+    logger.debug("Run local command")
     res = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -336,9 +357,7 @@ def local_cmd(
     # get a decoded version of the output in any case, replacing potential errors
     output_for_logs = res.stdout.decode(errors='replace').strip()
 
-    errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
-    command = " ".join(cmd)
-    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+    logger.debug("Local command returned", returncode=res.returncode, stdout=output_for_logs)
 
     if res.returncode and check:
         raise LocalCommandFailed(res.returncode, output_for_logs, command)

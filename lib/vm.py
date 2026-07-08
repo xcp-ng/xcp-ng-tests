@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-import logging
 import os
 import subprocess
 import tempfile
 import uuid
+
+import structlog
 
 import lib.commands as commands
 import lib.efi as efi
@@ -33,8 +34,15 @@ if TYPE_CHECKING:
     from lib.host import Host
 
 class VM(BaseVM):
+
     def __init__(self, uuid: str, host: Host) -> None:
+        self.logger = structlog.get_logger("VM").bind(
+            pool=host.pool.master_hostname_or_ip,
+            host=host.hostname_or_ip,
+            vm_uuid=uuid
+        )
         super().__init__(uuid, host)
+        self.logger.info("New VM instantiated")
         self.ip: str | None = None
         self.previous_host: Host | None = None # previous host when migrated or being migrated
         self.is_windows = self.param_get('platform', 'device_id', accept_unknown_key=True) == '0002'
@@ -58,8 +66,7 @@ class VM(BaseVM):
 
     # `on` can be an host name-label or UUID
     def start(self, on: str | None = None) -> str:
-        msg_starts_on = f" (on host {on})" if on else ""
-        logging.info("Start VM" + msg_starts_on)
+        self.logger.info("Start VM", on=on)
         args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
@@ -67,15 +74,15 @@ class VM(BaseVM):
 
     def shutdown(self, force: bool = False, verify: bool = False, force_if_fails: bool = False) -> str:
         assert not (force and force_if_fails), "force and force_if_fails cannot be both True"
-        logging.info("Shutdown VM" + (" (force)" if force else ""))
+        self.logger.info("Shutdown VM", force=force)
 
         try:
             ret = self.host.xe('vm-shutdown', {'uuid': self.uuid, 'force': force})
             if verify:
-                wait_for(self.is_halted, "Wait for VM halted")
+                wait_for(self.is_halted, "Wait for VM halted", logger=self.logger)
         except Exception as e:
             if force_if_fails:
-                logging.warning("Shutdown failed: %s" % e)
+                self.logger.warning("Shutdown failed", exception=e)
                 ret = self.shutdown(force=True, verify=verify)
             else:
                 raise
@@ -83,7 +90,7 @@ class VM(BaseVM):
         return str(ret) # Ensure return type matches hint, xe can return non-string
 
     def reboot(self, force: bool = False, verify: bool = False) -> str:
-        logging.info("Reboot VM")
+        self.logger.info("Reboot VM")
         ret = self.host.xe('vm-reboot', {'uuid': self.uuid, 'force': force})
         if verify:
             # No need to verify that the reboot actually happened because the xe command
@@ -100,8 +107,9 @@ class VM(BaseVM):
         if not ip or ip.startswith('169.254.'):
             return False
         else:
-            logging.info("VM IP: %s" % ip)
             self.ip = ip
+            self.logger = self.logger.bind(ip=ip)
+            self.logger.info("Set VM IP")
             return True
 
     @overload
@@ -139,12 +147,12 @@ class VM(BaseVM):
         # raises by default for any nonzero return code
         assert self.ip is not None
         return commands.ssh(self.ip, cmd, check=check, simple_output=simple_output, background=background,
-                            decode=decode)
+                            decode=decode, logger=self.logger)
 
     def ssh_with_result(self, cmd: str) -> commands.SSHResult[str]:
         # doesn't raise if the command's return is nonzero, unless there's a SSH error
         assert self.ip is not None
-        return commands.ssh_with_result(self.ip, cmd)
+        return commands.ssh_with_result(self.ip, cmd, logger=self.logger)
 
     def scp(self, src: str, dest: str, check: bool = True, suppress_fingerprint_warnings: bool = True,
             local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
@@ -191,44 +199,44 @@ class VM(BaseVM):
         )
 
     def wait_for_os_booted(self) -> None:
-        wait_for(self.is_running, "Wait for VM running")
+        wait_for(self.is_running, "Wait for VM running", logger=self.logger)
         # waiting for the IP:
         # - allows to make sure the OS actually started (on VMs that have the management agent)
         # - allows to store the IP for future use in the VM object
-        wait_for(self.try_get_and_store_ip, "Wait for VM IP", timeout_secs=5 * 60)
+        wait_for(self.try_get_and_store_ip, "Wait for VM IP", timeout_secs=5 * 60, logger=self.logger)
         # now wait also for the management agent to have started
-        wait_for(self.is_management_agent_up, "Wait for management agent up")
+        wait_for(self.is_management_agent_up, "Wait for management agent up", logger=self.logger)
 
     def wait_for_vm_running_and_ssh_up(self) -> None:
         self.wait_for_os_booted()
-        wait_for(self.is_ssh_up, "Wait for SSH up")
+        wait_for(self.is_ssh_up, "Wait for SSH up", logger=self.logger)
 
     def ssh_touch_file(self, filepath: str) -> None:
-        logging.info("Create file on VM (%s)" % filepath)
+        self.logger.info("Create file on VM", filepath=filepath)
         self.ssh(f'touch {filepath}')
         if not self.is_windows:
             self.ssh(f'sync {filepath}')
-        logging.info("Check file created")
+        self.logger.info("Check file created")
         self.ssh(f'test -f {filepath}')
 
     def suspend(self, verify: bool = False) -> None:
-        logging.info("Suspend VM")
+        self.logger.info("Suspend VM")
         self.host.xe('vm-suspend', {'uuid': self.uuid})
         if verify:
-            wait_for(self.is_suspended, "Wait for VM suspended")
+            wait_for(self.is_suspended, "Wait for VM suspended", logger=self.logger)
 
     def resume(self) -> None:
-        logging.info("Resume VM")
+        self.logger.info("Resume VM")
         self.host.xe('vm-resume', {'uuid': self.uuid})
 
     def pause(self, verify: bool = False) -> None:
-        logging.info("Pause VM")
+        self.logger.info("Pause VM")
         self.host.xe('vm-pause', {'uuid': self.uuid})
         if verify:
-            wait_for(self.is_paused, "Wait for VM paused")
+            wait_for(self.is_paused, "Wait for VM paused", logger=self.logger)
 
     def unpause(self) -> None:
-        logging.info("Unpause VM")
+        self.logger.info("Unpause VM")
         self.host.xe('vm-unpause', {'uuid': self.uuid})
 
     def _disk_list(self) -> str:
@@ -245,7 +253,7 @@ class VM(BaseVM):
         self.host.xe('vm-destroy', {'uuid': self.uuid})
 
         if verify:
-            wait_for_not(self.exists, "Wait for VM destroyed")
+            wait_for_not(self.exists, "Wait for VM destroyed", logger=self.logger)
 
     def exists(self) -> bool:
         return self.host.pool_has_vm(self.uuid)
@@ -262,15 +270,10 @@ class VM(BaseVM):
             'live': self.is_running()
         }
         cross_pool = self.host.pool.uuid != target_host.pool.uuid
-        if sr is not None:
-            if self.get_sr().uuid == sr.uuid:
-                # Same SR, no need to migrate storage
-                sr = None
-            else:
-                msg += " (SR: %s)" % sr.uuid
-        if network is not None:
-            msg += " (Network: %s)" % network
-        logging.info(msg)
+        if sr is not None and self.get_sr().uuid == sr.uuid:
+            # Same SR, no need to migrate storage
+            sr = None
+        self.logger.info(msg, network=network, sr_uuid=None if sr is None else sr.uuid)
 
         storage_motion = cross_pool or sr is not None or network is not None
         if storage_motion:
@@ -305,7 +308,7 @@ class VM(BaseVM):
         self.create_vdis_list()
 
     def snapshot(self, ignore_vdis: List[str] | None = None, name: str | None = None) -> Snapshot:
-        logging.info("Snapshot VM")
+        self.logger.info("Snapshot VM")
 
         name_label = name or f"Snapshot of {self.uuid}"
         args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid, 'new-name-label': name_label}
@@ -315,13 +318,13 @@ class VM(BaseVM):
         return Snapshot(snap_uuid, self.host, self)
 
     def checkpoint(self) -> Snapshot:
-        logging.info("Checkpoint VM")
+        self.logger.info("Checkpoint VM")
         return Snapshot(self.host.xe('vm-checkpoint', {'uuid': self.uuid,
                                                        'new-name-label': 'Checkpoint of %s' % self.uuid}),
                         self.host, self)
 
     def connect_vdi(self, vdi: VDI, device: str = "autodetect") -> VBD:
-        logging.info(f">> Plugging VDI {vdi.uuid} on VM {self.uuid}")
+        self.logger.info(">> Plugging VDI", vdi_uuid=vdi.uuid)
         vbd_uuid = self.host.xe("vbd-create", {
             "vdi-uuid": vdi.uuid,
             "vm-uuid": self.uuid,
@@ -339,7 +342,7 @@ class VM(BaseVM):
         return VBD(vbd_uuid, self, vdi.name())
 
     def disconnect_vdi(self, vdi: VDI) -> None:
-        logging.info(f"<< Unplugging VDI {vdi.uuid} from VM {self.uuid}")
+        self.logger.info("<< Unplugging VDI", vdi_uuid=vdi.uuid)
         assert vdi in self.vdis, f"VDI {vdi.uuid} not in VM {self.uuid} VDI list"
         vbd_uuid = self.host.xe("vbd-list", {
             "vdi-uuid": vdi.uuid,
@@ -350,7 +353,7 @@ class VM(BaseVM):
                 self.host.xe("vbd-unplug", {"uuid": vbd_uuid})
             except commands.SSHCommandFailed as e:
                 if e.stdout == f"The device is not currently attached\ndevice: {vbd_uuid}":
-                    logging.info(f"VBD {vbd_uuid} already unplugged")
+                    self.logger.info("VBD already unplugged", vbd_uuid=vbd_uuid)
                 else:
                     raise
         self.host.xe("vbd-destroy", {"uuid": vbd_uuid})
@@ -378,7 +381,7 @@ class VM(BaseVM):
         except commands.SSHCommandFailed as e:
             # Doesn't work with Dom0 since `vm-disk-list` doesn't work on it so we create empty list
             if e.stdout == "Error: No matching VMs found":
-                logging.info("Couldn't get disks list. We are Dom0. Continuing...")
+                self.logger.info("Couldn't get disks list. We are Dom0. Continuing...")
                 self.vdis = []
             else:
                 raise
@@ -396,7 +399,7 @@ class VM(BaseVM):
         if network_name:
             network_uuid = self.host.pool.network_named(network_name)
         assert network_uuid, f"No UUID given, and network name {network_name!r} not found"
-        logging.info("Create VIF %d to network %r on VM %s", vif_num, network_uuid, self.uuid)
+        self.logger.info("Create VIF", vif=vif_num, network_uuid=network_uuid)
         vif_uuid = self.host.xe('vif-create', {'vm-uuid': self.uuid,
                                                'device': str(vif_num),
                                                'network-uuid': network_uuid,
@@ -413,7 +416,7 @@ class VM(BaseVM):
 
     def start_background_process(self, cmd: str) -> str:
         if self.is_windows:
-            logging.warning('start_background_process is not reliable on Windows')
+            self.logger.warning('start_background_process is not reliable on Windows')
         script = "/tmp/bg_process.sh"
         pidfile = "/tmp/bg_process.pid"
         with tempfile.NamedTemporaryFile('w') as f:
@@ -439,7 +442,7 @@ class VM(BaseVM):
             self.ssh(remote_cmd, background=True)
 
             wait_for(lambda: self.ssh_with_result(f'test -f {pidfile}').returncode == 0,
-                     "wait for pid file %s to exist" % pidfile)
+                     "wait for pid file %s to exist" % pidfile, logger=self.logger)
             pid = self.ssh(f'cat {pidfile}')
             self.ssh(f'rm -f {script}')
             self.ssh(f'rm -f {pidfile}')
@@ -473,7 +476,7 @@ class VM(BaseVM):
             f.flush()
             self.scp(f.name, f.name)
             try:
-                logging.debug(f"[{self.ip}] # Will execute this temporary script:\n{script_contents.strip()}")
+                self.logger.debug("Will execute this temporary script", script_contents=script_contents)
                 # Use bash to run the script, to avoid being hit by differences between shells, for example on FreeBSD
                 # It is a documented requirement that bash is present on all test VMs.
                 res = self.ssh(f'bash {f.name}', simple_output=simple_output)
@@ -524,14 +527,14 @@ class VM(BaseVM):
         return PackageManagerEnum.UNKNOWN
 
     def insert_cd(self, vdi_name: str) -> None:
-        logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
+        self.logger.info("Insert CD", vdi_name=vdi_name)
         self.host.xe('vm-cd-insert', {'uuid': self.uuid, 'cd-name': vdi_name})
 
     def insert_guest_tools_iso(self) -> None:
         self.insert_cd('guest-tools.iso')
 
     def eject_cd(self) -> None:
-        logging.info("Ejecting CD from VM %s", self.uuid)
+        self.logger.info("Ejecting CD")
         self.host.xe('vm-cd-eject', {'uuid': self.uuid})
 
     # *** Common reusable test fragments
@@ -544,7 +547,7 @@ class VM(BaseVM):
             snapshot.revert()
             self.start()
             self.wait_for_vm_running_and_ssh_up()
-            logging.info("Check file does not exist anymore")
+            self.logger.info("Check file does not exist anymore")
             self.ssh(f'test ! -f {filepath}')
         finally:
             snapshot.destroy(verify=True)
@@ -644,26 +647,26 @@ class VM(BaseVM):
         return self.host.xe('vtpm-list', {'vm-uuid': self.uuid}, minimal=True)
 
     def create_vtpm(self) -> str:
-        logging.info("Creating vTPM for vm %s" % self.uuid)
+        self.logger.info("Creating vTPM")
         return self.host.xe('vtpm-create', {'vm-uuid': self.uuid})
 
     def destroy_vtpm(self) -> str:
         vtpm_uuid = self.get_vtpm_uuid()
         assert vtpm_uuid, "A vTPM must be present"
-        logging.info("Destroying vTPM %s" % vtpm_uuid)
+        self.logger.info("Destroying vTPM")
         return self.host.xe('vtpm-destroy', {'uuid': vtpm_uuid}, force=True)
 
     def create_vbd(self, device: str, vdi_uuid: str) -> VBD:
-        logging.info("Create VBD %r for VDI %r on VM %s", device, vdi_uuid, self.uuid)
+        self.logger.info("Create VBD", vbd=device, vdi_uuid=vdi_uuid)
         vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
                                                'device': device,
                                                'vdi-uuid': vdi_uuid,
                                                })
-        logging.info("New VBD %s", vbd_uuid)
+        self.logger.info("New VBD", vbd_uuid=vbd_uuid)
         return VBD(vbd_uuid, self, device)
 
     def create_cd_vbd(self, device: str, userdevice: str) -> VBD:
-        logging.info("Create CD VBD %r on VM %s", device, self.uuid)
+        self.logger.info("Create CD VBD", vbd=device)
         vbd_uuid = self.host.xe('vbd-create', {'vm-uuid': self.uuid,
                                                'device': device,
                                                'type': 'CD',
@@ -671,13 +674,13 @@ class VM(BaseVM):
                                                })
         vbd = VBD(vbd_uuid, self, device)
         vbd.param_set(param_name="userdevice", value=userdevice)
-        logging.info("New VBD %s", vbd_uuid)
+        self.logger.info("New VBD", vbd_uuid=vbd_uuid)
         return vbd
 
     def clone(self, *, name: str | None = None) -> "VM":
         if name is None:
             name = self.name() + '_clone_for_tests'
-        logging.info("Clone VM")
+        self.logger.info("Clone VM")
         uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
         return VM(uuid, self.host)
 
@@ -702,7 +705,7 @@ class VM(BaseVM):
         """
         for auth in auths:
             assert auth.name in ['PK', 'KEK', 'db', 'dbx']
-        logging.info(f"Installing UEFI certs to VM {self.uuid}: {[auth.name for auth in auths]}")
+        self.logger.info("Installing UEFI certs to VM", auth_names=[auth.name for auth in auths])
         for auth in auths:
             self.set_variable_from_file(auth.auth(), auth.guid.as_str(), auth.name, efi.EFI_AT_ATTRS)
 
@@ -766,11 +769,12 @@ class VM(BaseVM):
                 wait_for(
                     lambda: "UEFI Interactive Shell" in res_host.ssh(f'cat -v {tmp_file}'),
                     "Wait for UEFI shell response in pty output",
-                    10
+                    10,
+                    logger=self.logger,
                 )
                 ret = True
             except TimeoutError as e:
-                logging.debug(e)
+                self.logger.debug(e)
                 pass
         finally:
             res_host.ssh(f'screen -S {session} -X quit', check=False)
@@ -780,12 +784,12 @@ class VM(BaseVM):
     def set_uefi_setup_mode(self) -> None:
         # Note that in XCP-ng 8.2, the VM won't stay in setup mode, because uefistored
         # will add PK and other certs if available when the guest boots.
-        logging.info(f"Set VM {self.uuid} to UEFI setup mode")
+        self.logger.info("Set UEFI setup mode")
         self.host.ssh(f'varstore-sb-state {self.uuid} setup')
 
     def set_uefi_user_mode(self) -> None:
         # Setting user mode propagates the host's certificates to the VM
-        logging.info(f"Set VM {self.uuid} to UEFI user mode")
+        self.logger.info("Set UEFI user mode")
         self.host.ssh(f'varstore-sb-state {self.uuid} user')
 
     def is_uefi_var_present(self, varname: str) -> bool:
@@ -862,7 +866,7 @@ Select-Object -ExpandProperty Problem"""
         # devices may have different statuses (default = installed, vendor = not installed).
         # For now, make sure all of them share the same status since our tools do not support vendor devices anyway.
         statuses = output.splitlines()
-        logging.debug(f"Installed Xen device status: {statuses}")
+        self.logger.debug("Installed Xen device status", statuses)
         if all(x == "CM_PROB_NONE" for x in statuses):
             return True
         elif all(x == "CM_PROB_FAILED_INSTALL" for x in statuses):
@@ -898,17 +902,17 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         )
 
     def save_to_cache(self, cache_id: str) -> None:
-        logging.info("Save VM %s to cache for %r as a clone" % (self.uuid, cache_id))
+        self.logger.info("Save VM to cache", cache_id=cache_id)
 
         while True:
             old_vm = self.host.cached_vm(cache_id, sr_uuid=self.host.main_sr_uuid())
             if old_vm is None:
                 break
-            logging.info("Destroying old cache %s first", old_vm.uuid)
+            self.logger.info("Destroying old cache first", old_vm_uuid=old_vm.uuid)
             old_vm.destroy()
 
         clone = self.clone(name=f"{self.name()} cache")
-        logging.info(f"Marking VM {clone.uuid} as cached")
+        self.logger.info("Marking VM as cached", clone_uuid=clone.uuid)
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
     @overload

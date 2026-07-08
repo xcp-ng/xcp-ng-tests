@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import logging
 import os
-import traceback
 
+import structlog
 from packaging import version
 
 import lib.commands as commands
@@ -22,6 +21,8 @@ class Pool:
     xe_prefix = "pool"
 
     def __init__(self, master_hostname_or_ip: HostAddress) -> None:
+        self.master_hostname_or_ip = master_hostname_or_ip
+        self.logger = structlog.get_logger("Pool").bind(pool=master_hostname_or_ip)
         master = Host(self, master_hostname_or_ip)
         if not master.is_master():
             raise NotAMasterHostError(f"Host {master_hostname_or_ip} is not a master host. Pool not created.")
@@ -32,7 +33,7 @@ class Pool:
         # refused (calling connect )" when calling self.hosts_uuids()
         self.master.wait_for_xapi_enabled()
 
-        logging.info("Getting Pool info for %r", master_hostname_or_ip)
+        self.logger.info("Getting Pool info")
         for host_uuid in self.hosts_uuids():
             if host_uuid != self.hosts[0].uuid:
                 host = Host(self, self.host_ip(host_uuid))
@@ -40,6 +41,9 @@ class Pool:
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs: dict[str, str] | None = None
         self.pre_existing_sr_uuids = safe_split(self.master.xe('sr-list', {'minimal': 'true'}), ',')
+
+    def __repr__(self) -> str:
+        return f"Pool({self.master_hostname_or_ip!r})"
 
     def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
         return _param_get(self.master, Pool.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
@@ -65,14 +69,16 @@ class Pool:
                 hosts_done.append(h)
             except Exception as e:
                 if rollback_func:
-                    logging.warning(
-                        f"An error occurred in `exec_on_hosts_on_error_rollback` for host {h}\n"
-                        f"Backtrace:\n{traceback.format_exc()}"
+                    self.logger.exception(
+                        "An error occurred in `exec_on_hosts_on_error_rollback`",
+                        host=h,
                     )
                     rollback_hosts = hosts_done + [h]
 
-                    logging.info("Attempting to run the rollback function on host(s) "
-                                 f"{', '.join([str(h) for h in rollback_hosts])}...")
+                    self.logger.info(
+                        "Attempting to run the rollback function on host(s)",
+                        rollback_hosts=rollback_hosts,
+                    )
                     try:
                         self.exec_on_hosts_on_error_continue(rollback_func, rollback_hosts)
                     except Exception:
@@ -92,11 +98,13 @@ class Pool:
             try:
                 func(h)
             except Exception as e:
-                logging.warning(
-                    f"An error occurred in `exec_on_hosts_on_error_continue` for host {h}\n"
-                    f"Backtrace:\n{traceback.format_exc()}"
+                self.logger.exception(
+                    "An error occurred in `exec_on_hosts_on_error_continue`",
+                    host=h,
                 )
-                logging.info("Attempting to run the function on the next hosts of the pool if there are any left...")
+                self.logger.info(
+                    "Attempting to run the function on the next hosts of the pool if there are any left..."
+                )
                 errors[h.hostname_or_ip] = e
         if errors:
             raise Exception(f"One or more exceptions were raised in `exec_on_hosts_on_error_continue`: {errors}")
@@ -144,7 +152,7 @@ class Pool:
             remote_filename = self.master.ssh(f'mktemp --suffix=.iso -p {mountpoint}')
             self.master.ssh(f'chmod 644 {remote_filename}')
 
-        logging.info("Uploading to ISO-SR %s as %s", local_file, remote_filename)
+        self.logger.info("Uploading local file to ISO-SR", local_file=local_file, remote_filename=remote_filename)
         self.master.scp(local_file, remote_filename)
         iso_sr.scan()
         return os.path.basename(remote_filename)
@@ -152,7 +160,7 @@ class Pool:
     def remove_iso(self, remote_filename: str) -> None:
         iso_sr = self.get_iso_sr()
         fullpath = f"/run/sr-mount/{iso_sr.uuid}/{remote_filename}"
-        logging.info("Removing %s from ISO-SR server", remote_filename)
+        self.logger.info("Removing ISO from ISO-SR server", remote_filename=remote_filename)
         self.master.ssh(f'rm {fullpath}')
 
     def save_uefi_certs(self) -> None:
@@ -174,7 +182,7 @@ class Pool:
         This can be revised later if a need for saving custom certificates in 8.3+ arises.
         """
         assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
-        logging.info('Saving pool UEFI certificates')
+        self.logger.info('Saving pool UEFI certificates')
 
         if int(self.master.ssh("secureboot-certs --version").split(".")[0]) < 1:
             raise RuntimeError("The host must have secureboot-certs version >= 1.0.0")
@@ -199,8 +207,7 @@ class Pool:
         # else we won't be able to restore the exact same state
         if len(saved_certs) == 0 or ('PK' in saved_certs and 'KEK' in saved_certs and 'db' in saved_certs):
             self.saved_uefi_certs = saved_certs
-            logging.info('Pool UEFI certificates state saved: %s'
-                         % (' '.join(saved_certs.keys()) if saved_certs else 'no certs'))
+            self.logger.info('Pool UEFI certificates state saved', saved_certs=saved_certs)
         else:
             for tmp_file in saved_certs.values():
                 self.master.ssh(f'rm -f {tmp_file}')
@@ -217,11 +224,11 @@ class Pool:
         assert self.master.xcp_version < version.parse("8.3"), "this function should only be needed on XCP-ng 8.2"
         assert self.saved_uefi_certs is not None
         if len(self.saved_uefi_certs) == 0:
-            logging.info('We need to clear pool UEFI certificates to restore initial state')
+            self.logger.info('We need to clear pool UEFI certificates to restore initial state')
             self.clear_uefi_certs()
         else:
             assert 'PK' in self.saved_uefi_certs and 'KEK' in self.saved_uefi_certs and 'db' in self.saved_uefi_certs
-            logging.info('Restoring pool UEFI certificates: ' + ' '.join(self.saved_uefi_certs.keys()))
+            self.logger.info('Restoring pool UEFI certificates', saved_uefi_certs=self.saved_uefi_certs)
             # restore certs
             params = [self.saved_uefi_certs['PK'], self.saved_uefi_certs['KEK'], self.saved_uefi_certs['db']]
             if 'dbx' in self.saved_uefi_certs:
@@ -246,7 +253,7 @@ class Pool:
         For XCP-ng 8.3+, see clear_custom_uefi_certificates()
         """
         assert self.master.xcp_version < version.parse("8.3"), "function only relevant on XCP-ng 8.2"
-        logging.info('Clearing pool UEFI certificates in XAPI and on hosts disks')
+        self.logger.info('Clearing pool UEFI certificates in XAPI and on hosts disks')
         self.master.ssh('secureboot-certs clear')
         # remove files on each host
         for host in self.hosts:
@@ -255,7 +262,7 @@ class Pool:
     def clear_custom_uefi_certs(self) -> None:
         """ Clear Custom UEFI certificates on XCP-ng 8.3+. """
         assert self.master.xcp_version >= version.parse("8.3"), "function only relevant on XCP-ng 8.3+"
-        logging.info('Clearing custom pool UEFI certificates')
+        self.logger.info('Clearing custom pool UEFI certificates')
         self.master.ssh('secureboot-certs clear')
 
     def install_custom_uefi_certs(self, auths: Iterable[EFIAuth]) -> None:
@@ -272,10 +279,10 @@ class Pool:
             assert 'KEK' in auths_dict
             assert 'db' in auths_dict
 
-            logging.info('Installing auths to pool: %s' % list(auths_dict.keys()))
+            self.logger.info('Installing auths to pool', auths=list(auths_dict.keys()))
             for key in auths_dict:
                 value = host.ssh(f'md5sum {auths_dict[key]} | cut -d " " -f 1')
-                logging.debug('Key: %s, value: %s' % (key, value))
+                self.logger.debug('Report auth values', auth_key=key, auth_value=value)
             params = [auths_dict['PK'], auths_dict['KEK'], auths_dict['db']]
             if 'dbx' in auths_dict:
                 params.append(auths_dict['dbx'])

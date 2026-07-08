@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import logging
 import time
+
+import structlog
 
 import lib.commands as commands
 from lib.common import (
@@ -35,6 +36,7 @@ class SR:
         self._is_shared: bool | None = None # cached value for is_shared()
         self._main_host: Host | None = None # cached value for main_host()
         self._type: str | None = None # cache value for get_type()
+        self.logger = structlog.get_logger("SR").bind(sr_uuid=uuid, pool_uuid=pool.uuid)
 
     def pbd_uuids(self) -> list[str]:
         return safe_split(self.pool.master.xe('pbd-list', {'sr-uuid': self.uuid}, minimal=True))
@@ -54,10 +56,10 @@ class SR:
             # if force is set.
             if not force:
                 raise
-            logging.warning('Ignore exception during PBD unplug: {}'.format(e))
+            self.logger.warning('Ignore exception during PBD unplug', exception=e)
 
     def unplug_pbds(self, force: bool = False) -> None:
-        logging.info(f"Unplug PBDs for SR {self.uuid}")
+        self.logger.info("Unplug PBDs")
         for pbd_uuid in self.pbd_uuids():
             self.unplug_pbd(pbd_uuid, force=force)
 
@@ -74,7 +76,7 @@ class SR:
         self.pool.master.xe('pbd-plug', {'uuid': pbd_uuid})
 
     def plug_pbds(self, verify: bool = True) -> None:
-        logging.info("Attach PBDs")
+        self.logger.info("Attach PBDs")
         for pbd_uuid in self.pbd_uuids():
             self.plug_pbd(pbd_uuid)
         if verify:
@@ -90,14 +92,14 @@ class SR:
         return safe_split(self.pool.master.xe('vdi-list', args, minimal=True))
 
     def destroy(self, verify: bool = False, force: bool = False) -> None:
-        logging.info(f"Will attempt SR destroy on {self.uuid}...")
+        self.logger.info(f"Will attempt SR destroy on {self.uuid}...")
         # Rescan SR to improve the chances of the forced GC run triggered by sr-destroy
         # remove all VDIs in one pass and such have sr-destroy working on first try.
         self.scan()
         max_tries = 5
         for i in range(1, max_tries + 1): # [1, 2, ..., max_tries]
             self.unplug_pbds(force)
-            logging.info(f"Destroy SR {self.uuid} (attempt {i})")
+            self.logger.info("Destroy SR", attempt=i)
             try:
                 # Note: sr-destroy triggers ONE forced GC run
                 # This may not be enough in some cases
@@ -107,7 +109,7 @@ class SR:
                 if "the SR is not empty" not in e.stdout:
                     raise
                 else:
-                    logging.info(f"SR destroy failed with message: {e.stdout}")
+                    self.logger.info("SR destroy failed", stdout=e.stdout)
                     try:
                         self.plug_pbds()
                         # rescan for an up to date list of VDIs
@@ -119,7 +121,8 @@ class SR:
                         raise Exception("SR destroy failed due to SR not empty, "
                                         "and there are indeed managed VDIs left on the SR.")
                     else:
-                        logging.info("SR destroy failed due to SR not empty but there aren't any managed VDIs left.")
+                        self.logger.info(
+                            "SR destroy failed due to SR not empty but there aren't any managed VDIs left.")
                         if i < max_tries:
                             if i == max_tries - 1:
                                 # We tried already 4 times to destroy the SR, and there still are hidden VDIs that
@@ -128,10 +131,10 @@ class SR:
                                 # The GC should kick approximately 5 minutes after the last operation we did, so let's
                                 # give it these 5 minutes plus extra time to complete.
                                 gc_delay = 600
-                                logging.warning(f"SR destroy failed {i} times in a row. "
-                                                f"Wait for {gc_delay}s, hoping GC fully runs before next try")
+                                self.logger.warning(f"SR destroy failed {i} times in a row. "
+                                                    f"Wait for {gc_delay}s, hoping GC fully runs before next try")
                                 time.sleep(gc_delay)
-                            logging.info("Retrying sr-destroy in case it previously failed due to incomplete GC.")
+                            self.logger.info("Retrying sr-destroy in case it previously failed due to incomplete GC.")
                             continue
                         else:
                             raise Exception(f"Could not destroy the SR even after {i} attempts.")
@@ -142,14 +145,14 @@ class SR:
 
     def forget(self, force: bool = False) -> None:
         self.unplug_pbds(force)
-        logging.info("Forget SR " + self.uuid)
+        self.logger.info("Forget SR")
         self.pool.master.xe('sr-forget', {'uuid': self.uuid})
 
     def exists(self) -> bool:
         return self.pool.master.xe('sr-list', {'uuid': self.uuid}, minimal=True) == self.uuid
 
     def scan(self) -> None:
-        logging.info("Scan SR " + self.uuid)
+        self.logger.info("Scan SR")
         self.pool.master.xe('sr-scan', {'uuid': self.uuid})
 
     def hosts_uuids(self) -> list[str]:
@@ -203,6 +206,7 @@ class SR:
     def get_type(self) -> str:
         if self._type is None:
             self._type = self.param_get('type')
+            self.logger = self.logger.bind(sr_type=type)
         return self._type
 
     def get_name_label(self) -> str:
@@ -212,7 +216,7 @@ class SR:
         self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
         name_label = name_label or f'test-vdi-{randid()}'
-        logging.info("Create VDI %r on SR %s", name_label, self.uuid)
+        self.logger.info("Create VDI", name_label=name_label)
         args: dict[str, str | bool | dict[str, str]] = {
             'name-label': prefix_object_name(name_label),
             'virtual-size': str(virtual_size),
@@ -224,14 +228,14 @@ class SR:
         return VDI(vdi_uuid, sr=self)
 
     def run_quicktest(self) -> None:
-        logging.info(f"Run quicktest on SR {self.uuid}")
+        self.logger.info(f"Run quicktest on SR {self.uuid}")
         # Always display the output of quicktest, failed or not.
         # This will duplicate the output in some cases, but it ensures we always have it for failure analysis,
         # even when quicktest leaves SRs in a state which makes teardown fail (in this case, pytest often doesn't
         # manage to display the details of the failed command, for a reason unknown - no usable reproducer found)
         try:
             output = self.pool.master.ssh(f'/opt/xensource/debug/quicktest -sr {self.uuid}')
-            logging.info(f"Quicktest output: {output}")
+            self.logger.info("Quicktest finished", output=output)
         except commands.SSHCommandFailed as e:
-            logging.error(f"Quicktest output: {e.stdout}")
+            self.logger.error("Quicktest failed", output=e.stdout)
             raise
