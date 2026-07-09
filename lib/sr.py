@@ -80,6 +80,13 @@ class SR:
         if verify:
             wait_for(self.all_pbds_attached, "Wait for PBDs attached")
 
+    def try_plug_pbds(self) -> bool:
+        try:
+            self.plug_pbds(verify=True)
+            return True
+        except commands.SSHCommandFailed:
+            return False
+
     def vdi_uuids(self, managed: bool = False, name_label: str | None = None) -> list[str]:
         args: dict[str, str | bool | dict[str, str]] = {
             'sr-uuid': self.uuid,

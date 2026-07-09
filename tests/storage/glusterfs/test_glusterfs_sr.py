@@ -54,8 +54,8 @@ class TestGlusterFSSR:
             except SSHCommandFailed:
                 logging.info("SR scan failed as expected.")
             host.ssh('gluster --mode=script volume start vol0')
+            wait_for(sr.try_plug_pbds, "Wait for glusterfs volume to start")
             volume_running = True
-            sr.plug_pbds(verify=True)
             sr.scan()
         finally:
             if not volume_running:
