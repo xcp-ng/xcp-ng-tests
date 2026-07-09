@@ -74,6 +74,10 @@ class TestLVMOHBASR:
         xva_export_import(vm_on_lvmohba_sr, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
+    def test_xva_export_import_with_snapshot(self, vm_on_lvmohba_sr: VM, temp_large_dir: str, defer: Defer):
+        xva_export_import(vm_on_lvmohba_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
+
+    @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, lvmohba_sr: SR, image_format: ImageFormat,
                                temp_large_dir: str, defer: Defer):
         vdi_export_import(storage_test_vm, lvmohba_sr, image_format, temp_large_dir, defer)
