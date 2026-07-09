@@ -26,11 +26,13 @@ class TestNetwork:
         vm2 = imported_vm.clone()
         defer(lambda: vm2.destroy())
 
-        vif_1_1 = vm1.create_vif(1, network_uuid=network.uuid)
-        vif_2_1 = vm2.create_vif(1, network_uuid=network.uuid)
+        n1 = len(vm1.vifs())
+        n2 = len(vm2.vifs())
+        vif_1_1 = vm1.create_vif(n1, network_uuid=network.uuid)
+        vif_2_1 = vm2.create_vif(n2, network_uuid=network.uuid)
 
-        assert len(vm1.vifs()) == 2, "VM1 should have 2 NICs"
-        assert len(vm2.vifs()) == 2, "VM2 should have 2 NICs"
+        assert len(vm1.vifs()) == n1 + 1, "VM1 should have 1 more NICs"
+        assert len(vm2.vifs()) == n2 + 1, "VM2 should have 1 more NICs"
         assert len(network.vif_uuids()) == 2, "network have 2 VIFs"
 
         vm1.start()
