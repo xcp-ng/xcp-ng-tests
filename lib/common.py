@@ -6,6 +6,7 @@ import getpass
 import inspect
 import itertools
 import logging
+import multiprocessing
 import os
 import random
 import string
@@ -214,6 +215,28 @@ def wait_for_not(
     fn: Callable[[], Any], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2
 ) -> None:
     return wait_for(fn, msg, timeout_secs, retry_delay_secs, True)
+
+def run_with_timeout(fn: Callable[[], Any], timeout_secs: int = 2 * 60) -> None:
+    queue: multiprocessing.Queue[Exception] = multiprocessing.Queue()
+
+    def fn_wrapper() -> None:
+        try:
+            fn()
+        except Exception as e:
+            queue.put(e)
+
+    proc = multiprocessing.Process(target=fn_wrapper)
+    proc.start()
+    proc.join(timeout=timeout_secs)
+
+    if proc.is_alive():
+        proc.terminate()
+        proc.join()
+
+        raise TimeoutError(f"Timeout reached while waiting for fn call to return ({timeout_secs}s).")
+
+    if not queue.empty():
+        raise queue.get(block=False)
 
 def is_uuid(maybe_uuid: str) -> bool:
     try:
