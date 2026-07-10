@@ -16,6 +16,7 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
+from lib.commands import local_cmd
 from lib.common import (
     Defer,
     DiskDevName,
@@ -279,6 +280,7 @@ def pytest_runtest_makereport(
 
     # store test results for each phase of a call, which can
     # be "setup", "call", "teardown"
+    assert rep.when is not None
     item.stash.setdefault(PHASE_REPORT_KEY, {})[rep.when] = rep
 
     return rep
@@ -323,7 +325,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
             assert len(ips) == 1
             host_vm.ip = ips[0]
 
-            wait_for(lambda: not os.system(f"nc -zw5 {host_vm.ip} 22"),
+            wait_for(lambda: local_cmd(["nc", "-zw5", str(host_vm.ip), "22"], check=False).returncode == 0,
                      "Wait for ssh up on nested host", retry_delay_secs=5)
 
             hostname_or_ip = host_vm.ip

@@ -1,19 +1,19 @@
 # generated with update_requirements.py, do not edit manually
+autopep8
 bs4>=0.0.1
-mypy
 flake8
 flake8-pyproject
+libarchive-c==5.3
+mypy
+prek>=0.4.5
 pydocstyle
 pyright
 ruff
-types-requests
-typing-extensions
-libarchive-c==5.3
-types-pygments
 types-colorama
 types-pexpect
-zizmor
-prek>=0.4.5
-autopep8
 types-passlib
+types-pygments
+types-requests
+typing-extensions
+zizmor
 -r base.txt
