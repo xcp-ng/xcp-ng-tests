@@ -95,9 +95,10 @@ class TestNested:
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_install(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+    def test_install(self, try_booting_vm_with_installer: VM | None, system_disks_names: list[str],
                      firmware: str, iso_version: str, package_source: str, local_sr: str) -> None:
-        host_vm = vm_booted_with_installer
+        assert try_booting_vm_with_installer, "Failed to boot host under installer"
+        host_vm = try_booting_vm_with_installer
         assert host_vm.ip is not None
         installer.monitor_install(ip=host_vm.ip)
 
@@ -351,10 +352,11 @@ class TestNested:
             {"TAG": "existing-installation",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_upgrade(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+    def test_upgrade(self, try_booting_vm_with_installer: VM | None, system_disks_names: list[str],
                      firmware: str, orig_version: str, iso_version: str, machine: str,
                      package_source: str, local_sr: str) -> None:
-        host_vm = vm_booted_with_installer
+        assert try_booting_vm_with_installer, "Failed to boot host under installer"
+        host_vm = try_booting_vm_with_installer
         assert host_vm.ip is not None
         installer.monitor_upgrade(ip=host_vm.ip)
 
@@ -410,9 +412,10 @@ class TestNested:
             {"TAG": "backup-disk",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_restore(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+    def test_restore(self, try_booting_vm_with_installer: VM | None, system_disks_names: list[str],
                      firmware: str, orig_version: str, iso_version: str, package_source: str, local_sr: str) -> None:
-        host_vm = vm_booted_with_installer
+        assert try_booting_vm_with_installer, "Failed to boot host under installer"
+        host_vm = try_booting_vm_with_installer
         assert host_vm.ip is not None
         installer.monitor_restore(ip=host_vm.ip)
 
