@@ -63,6 +63,34 @@ class TestEXTSR:
             vm.shutdown(verify=True)
 
     @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_ext_sr: VM) -> None:
+        vm_on_ext_sr.test_vdi_revert()
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_ext_sr: VM) -> None:
+        vm_on_ext_sr.test_vdi_revert_cbt()
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_ext_sr: VM, request: pytest.FixtureRequest):
+        vm_on_ext_sr.test_vdi_revert_journal_cbt(request, "FileSR_revert_create_src")
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_ext_sr: VM, request: pytest.FixtureRequest, fistpoint: str):
+        vm_on_ext_sr.test_vdi_revert_journal(request, fistpoint)
+
+    @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
     def test_coalesce(self, storage_test_vm: VM, vdi_on_ext_sr: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
         coalesce_integrity(storage_test_vm, vdi_on_ext_sr, vdi_op, defer)

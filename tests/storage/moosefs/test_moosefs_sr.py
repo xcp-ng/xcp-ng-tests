@@ -82,6 +82,29 @@ class TestMooseFSSR:
             if not moosefs_installed:
                 host.yum_install(['moosefs-client'])
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_moosefs_sr: VM) -> None:
+        vm_on_moosefs_sr.test_vdi_revert()
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_moosefs_sr: VM, request: pytest.FixtureRequest, fistpoint: str):
+        vm_on_moosefs_sr.test_vdi_revert_journal(request, fistpoint, vm_on_moosefs_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(self, vm_on_moosefs_sr: VM, request: pytest.FixtureRequest, hostA2: Host) -> None:
+        vm_on_moosefs_sr.test_critical_journal_revert(request, hostA2, "FileSR_revert_create_src")
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
