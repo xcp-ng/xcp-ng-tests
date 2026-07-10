@@ -95,6 +95,34 @@ class TestZFSSR:
                                defer: Defer) -> None:
         vdi_export_import(storage_test_vm, zfs_sr, image_format, temp_large_dir, defer)
 
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_zfs_sr: VM) -> None:
+        vm_on_zfs_sr.test_vdi_revert()
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_zfs_sr: VM) -> None:
+        vm_on_zfs_sr.test_vdi_revert_cbt()
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_zfs_sr: VM, request: pytest.FixtureRequest):
+        vm_on_zfs_sr.test_vdi_revert_journal_cbt(request, "FileSR_revert_create_src")
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_zfs_sr: VM, request: pytest.FixtureRequest, fistpoint: str):
+        vm_on_zfs_sr.test_vdi_revert_journal(request, fistpoint)
+
     # *** tests with reboots (longer tests).
 
     @pytest.mark.reboot
