@@ -37,7 +37,7 @@ repos:
         name: "mypy"
         language: "system"
         require_serial: true
-        entry: "uv run mypy --install-types --non-interactive ."
+        entry: "uv run mypy --install-types --non-interactive --pretty ."
         pass_filenames: false
         types: ["python"]
       - id: "pyright"

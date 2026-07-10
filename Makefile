@@ -14,7 +14,10 @@ fix: ruff-fix autopep8-fix
 data.py:
 	@test -r data.py || echo "File 'data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
 
-mypy pyright ruff: data.py
+vm_data.py:
+	@test -r vm_data.py || echo "File 'vm_data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
+
+mypy pyright ruff: data.py vm_data.py
 
 ruff ruff-fix autopep8 autopep8-fix flake8 mypy pyright:
 	uv run prek -a $@

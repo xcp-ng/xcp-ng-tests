@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-import argparse
 import dataclasses
 import itertools
 import logging
 import os
 import tempfile
+from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
 
 import git
@@ -44,7 +44,7 @@ from lib.xo import xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable, List, Optional
+from typing import Any, Dict, Generator, Iterable, Sequence
 
 # Do we cache VMs?
 try:
@@ -53,8 +53,9 @@ except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
 
-class SplitCommaAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+class SplitCommaAction(Action):
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[str] | None,
+                 option_string: str | None = None) -> None:
         items = getattr(namespace, self.dest, None)
         if items is None:
             items = []
@@ -170,11 +171,11 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
 # Used to group tests together whenever possible and limit parametrized fixture
 # "context switching" (needless teardown and setup of SRs, for example)
-SCHEDULING_AXES: List[str] = [
+SCHEDULING_AXES: list[str] = [
     "image_format",
 ]
 
-def get_axis(item: pytest.Item) -> Optional[str]:
+def get_axis(item: pytest.Item) -> str | None:
     callspec = getattr(item, "callspec", None)
     if callspec is None:
         return None
@@ -223,7 +224,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
     # -----------------------------------------------------
     # Build execution matrix: axis -> leaf package -> items
     # -----------------------------------------------------
-    axis_ordering: Dict[Optional[str], int] = defaultdict(int)
+    axis_ordering: dict[str | None, int] = defaultdict(int)
     # "None" gets the same order value as the first real axis, on purpose,
     # so that we may better retain initial test order.
     # For example, if we start with this test order:
@@ -253,7 +254,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
         grouped[axis_order][package].append(item)
 
     # Flatten back to a list of items
-    new_items: List[pytest.Item] = [
+    new_items: list[pytest.Item] = [
         item
         for axis_order in sorted(grouped) # apply axis_ordering here
         for package in grouped[axis_order]
@@ -268,7 +269,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
 # FIXME we may have to move this into lib/ if fixtures in sub-packages
 # want to make use of this feature
 
-PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.TestReport]]()
+PHASE_REPORT_KEY = pytest.StashKey[dict[str, pytest.TestReport]]()
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[Any]

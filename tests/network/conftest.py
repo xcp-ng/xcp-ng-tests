@@ -5,6 +5,7 @@ import pytest
 import logging
 
 from data import HOST_FREE_NICS
+from lib.bond import Bond
 from lib.common import PackageManagerEnum
 from lib.host import Host
 from lib.network import Network
@@ -21,7 +22,7 @@ def host_no_sdn_controller(host: Host) -> None:
 # a clone of imported_vm in which we've added tcpdump
 # not to be used by tests directly
 @pytest.fixture(scope='module')
-def vm_with_tcpdump_scope_module(imported_vm: VM):
+def vm_with_tcpdump_scope_module(imported_vm: VM) -> Generator[VM, None, None]:
     logging.info("Preparing VM with tcpdump installed")
     vm = imported_vm.clone(name=f"{imported_vm.name()} with tcpdump")
     vm.start()
@@ -45,7 +46,7 @@ def vm_with_tcpdump_scope_module(imported_vm: VM):
     vm.destroy()
 
 @pytest.fixture(scope='function')
-def vm_with_tcpdump_scope_function(vm_with_tcpdump_scope_module: VM):
+def vm_with_tcpdump_scope_function(vm_with_tcpdump_scope_module: VM) -> Generator[VM, None, None]:
     vm = vm_with_tcpdump_scope_module.clone(name=f"{vm_with_tcpdump_scope_module.name()} for tests")
     yield vm
     vm.destroy()
@@ -57,7 +58,7 @@ def empty_network(host: Host) -> Generator[Network, None, None]:
     net.destroy()
 
 @pytest.fixture(scope='function')
-def bond_lacp(host: Host, empty_network: Network):
+def bond_lacp(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
     if len(HOST_FREE_NICS) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
@@ -73,7 +74,7 @@ def bond_lacp(host: Host, empty_network: Network):
     bond.destroy()
 
 @pytest.fixture(scope='function')
-def bond_activebackup(host: Host, empty_network: Network):
+def bond_activebackup(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
     if len(HOST_FREE_NICS) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 
@@ -89,7 +90,7 @@ def bond_activebackup(host: Host, empty_network: Network):
     bond.destroy()
 
 @pytest.fixture(scope='function')
-def bond_balanceslb(host: Host, empty_network: Network):
+def bond_balanceslb(host: Host, empty_network: Network) -> Generator[Bond, None, None]:
     if len(HOST_FREE_NICS) < 2:
         pytest.fail("This fixture needs at least 2 free NICs")
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from lib.common import vm_image
+from lib.host import Host
 from lib.vdi import ImageFormat
 
 # Requirements:
@@ -16,7 +17,9 @@ class TestLVMOHBASRCreateDestroy:
     and VM import.
     """
 
-    def test_create_and_destroy_sr(self, host, lvmohba_device_config, image_format: ImageFormat):
+    def test_create_and_destroy_sr(
+        self, host: Host, lvmohba_device_config: dict[str, str], image_format: ImageFormat
+    ) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('lvmohba', "lvmohba-SR-test",
                             lvmohba_device_config | {'preferred-image-formats': image_format},
