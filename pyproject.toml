@@ -34,7 +34,7 @@ dev = [
     "types-colorama",
     "types-pexpect",
     "zizmor",
-    "prek>=0.4.5",
+    "prek>=0.4.8",
     "autopep8",
     "types-passlib",
 ]
