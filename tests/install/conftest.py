@@ -268,7 +268,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
                    "--install-patcher", img_patcher_script,
                    "--iso-patcher", iso_patcher_script,
                    iso_file, remastered_iso
-                   ])
+                   ], cwd=isotmp)
 
         yield remastered_iso
 
