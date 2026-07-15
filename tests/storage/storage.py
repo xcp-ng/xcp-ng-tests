@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import pytest
+
 import logging
 from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
 from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
+from lib.fistpoint import FistPoint
 from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
@@ -511,3 +514,323 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
     for span in spans:
         if span.checksum is not None:
             span.validate(vm, dev)
+
+def check_vdi_revert(defer: Defer, vm: VM) -> None:
+    """
+    Performs successives reverts to ensure that we can revert
+    and that the snapshot tree stays consistent across reverts
+
+    We create the following snapshot tree:
+    snap 1 -> snap 2
+      |-----> snap 3
+
+    Then, we revert in this order: 1 -> 2 -> 3 -> 1 -> 1
+
+    Args:
+        defer : fixture used for cleanup
+        vm    : virtual machine used as a base for tests (clones it to keep things tidy)
+    """
+    vm = vm.clone()
+    snapshots: list[Snapshot] = []
+
+    def cleanup(vm: VM, snapshots: list[Snapshot]):
+        for snap in snapshots:
+            snap.destroy(verify=True)
+        vm.destroy()
+
+    defer(lambda: cleanup(vm, snapshots))
+
+    if not vm.is_running():
+        vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+
+    snap_1 = vm.snapshot()
+    snapshots.append(snap_1)
+
+    snap_2_file = "/root/snap2"
+    vm.ssh_touch_file(snap_2_file)
+    snap_2 = vm.snapshot()
+    snapshots.append(snap_2)
+
+    snap_1.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(snap_2_file)
+
+    snap_3_file = "/root/snap3"
+    vm.ssh_touch_file(snap_3_file)
+    snap_3 = vm.snapshot()
+    snapshots.append(snap_3)
+
+    snap_2.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(snap_3_file)
+    assert vm.file_exists(snap_2_file)
+
+    snap_3.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(snap_2_file)
+    assert vm.file_exists(snap_3_file)
+
+    snap_1.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(snap_2_file)
+    assert not vm.file_exists(snap_3_file)
+
+    tmp_file = "/root/snap4"
+    vm.ssh_touch_file(tmp_file)
+    snap_1.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(snap_2_file)
+    assert not vm.file_exists(snap_3_file)
+    assert not vm.file_exists(tmp_file)
+
+def check_vdi_revert_cbt(defer: Defer, vm: VM):
+    """
+    Perform successives revert from snapshots with/without CBT
+    and ensure that it stays enabled in a consistent manner
+
+    CBT    -> CBT    : Keep CBT
+    CBT    -> no CBT : Disable CBT
+    no CBT -> CBT    : Enable CBT
+
+    Args:
+        defer : fixture used for cleanup
+        vm    : virtual machine used as a base for tests (clones it to keep things tidy)
+    """
+    snapshots: list[Snapshot] = []
+    vm = vm.clone()
+    sr = vm.get_sr()
+
+    def cleanup(vm: VM, snapshots: list[Snapshot]):
+        for snap in snapshots:
+            snap.destroy(verify=True)
+        vm.destroy()
+
+    defer(lambda: cleanup(vm, snapshots))
+
+    if not vm.is_running():
+        vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    snap_no_cbt_file = "/root/snap_no_cbt"
+    vm.ssh_touch_file(snap_no_cbt_file)
+    snap_no_cbt = vm.snapshot()
+    snapshots.append(snap_no_cbt)
+
+    vm.vdis[0].enable_cbt()
+    assert len(vm.vdis) == 1
+    snap_cbt_file = "/root/snap_cbt"
+    vm.ssh_touch_file(snap_cbt_file)
+    snap_cbt = vm.snapshot()
+    snapshots.append(snap_cbt)
+
+    before_revert_file = "/root/snap_before_revert"
+    vm.ssh_touch_file(before_revert_file)
+
+    # CBT -> CBT
+    snap_cbt.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(before_revert_file)
+    assert vm.file_exists(snap_no_cbt_file)
+    assert vm.file_exists(snap_cbt_file)
+    assert vm.vdis[0].is_cbt_enabled()
+    assert VDI(snap_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+    assert not VDI(snap_no_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+
+    # CBT -> no CBT
+    snap_no_cbt.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(before_revert_file)
+    assert vm.file_exists(snap_no_cbt_file)
+    assert not vm.file_exists(snap_cbt_file)
+    assert not vm.vdis[0].is_cbt_enabled()
+    assert VDI(snap_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+    assert not VDI(snap_no_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+
+    # no CBT -> CBT
+    snap_cbt.revert()
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(before_revert_file)
+    assert vm.file_exists(snap_no_cbt_file)
+    assert vm.file_exists(snap_cbt_file)
+    assert vm.vdis[0].is_cbt_enabled()
+    assert VDI(snap_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+    assert not VDI(snap_no_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+
+def check_vdi_revert_journal_cbt(defer: Defer, vm: VM, fistpoint: str, host: Host | None = None):
+    """
+    Perform successives failed revert from snapshots with/without CBT
+    and ensure that it stays enabled in a consistent manner and that
+    rollback journal runs successfully.
+
+    CBT    -> CBT    : Keep CBT
+    CBT    -> no CBT : Keep CBT
+    no CBT -> CBT    : No CBT
+
+    Warning:
+        Provided fistpoints should raise an error during the revert execution!
+        If your backend doesn't raise an error, please use the `exit_on_fistpoint` fixture.
+
+    Args:
+        defer     : fixture used for cleanup
+        vm        : virtual machine used as a base for tests (clones it to keep things tidy)
+        fistpoint : fistpoint to enable during the revert command
+        host      : Optional host to run the VM on (default None)
+    """
+    host_uuid = host.uuid if host else None
+
+    vm = vm.clone()
+    sr = vm.get_sr()
+
+    snapshots: list[Snapshot] = []
+
+    def cleanup(vm: VM, snapshots: list[Snapshot]):
+        for snap in snapshots:
+            snap.destroy(verify=True)
+        vm.destroy()
+
+    defer(lambda: cleanup(vm, snapshots))
+
+    if not vm.is_running():
+        vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+
+    snap_no_cbt_file = "/root/snap_no_cbt"
+    vm.ssh_touch_file(snap_no_cbt_file)
+    snap_no_cbt = vm.snapshot()
+    snapshots.append(snap_no_cbt)
+
+    vm.vdis[0].enable_cbt()
+    snap_cbt_file = "/root/snap_cbt"
+    vm.ssh_touch_file(snap_cbt_file)
+    snap_cbt = vm.snapshot()
+    snapshots.append(snap_cbt)
+
+    before_revert_file = "/root/snap_before_revert"
+    vm.ssh_touch_file(before_revert_file)
+
+    # CBT -> CBT
+    with FistPoint(vm.host, fistpoint), pytest.raises(SSHCommandFailed):
+        snap_cbt.revert()
+    vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+    assert vm.file_exists(before_revert_file)
+    assert vm.file_exists(snap_no_cbt_file)
+    assert vm.file_exists(snap_cbt_file)
+    assert vm.vdis[0].is_cbt_enabled()
+    assert VDI(snap_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+    assert not VDI(snap_no_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+
+    # CBT -> no CBT
+    with FistPoint(vm.host, fistpoint), pytest.raises(SSHCommandFailed):
+        snap_no_cbt.revert()
+    vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+    assert vm.file_exists(before_revert_file)
+    assert vm.file_exists(snap_no_cbt_file)
+    assert vm.file_exists(snap_cbt_file)
+    assert vm.vdis[0].is_cbt_enabled()
+    assert VDI(snap_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+    assert not VDI(snap_no_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+
+    # no CBT -> CBT
+    snap_no_cbt.revert()
+    with FistPoint(vm.host, fistpoint), pytest.raises(SSHCommandFailed):
+        snap_cbt.revert()
+    vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(before_revert_file)
+    assert vm.file_exists(snap_no_cbt_file)
+    assert not vm.file_exists(snap_cbt_file)
+    assert not vm.vdis[0].is_cbt_enabled()
+    assert VDI(snap_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+    assert not VDI(snap_no_cbt.vdi_uuids()[0], sr=sr).is_cbt_enabled()
+
+def check_vdi_revert_journal(defer: Defer, vm: VM, fistpoint: str, host: Host | None = None):
+    """
+    Perform successives failed revert from snapshots
+    and ensure that the rollback journal is able to run.
+
+    Warning:
+        Provided fistpoints should raise an error during the revert execution!
+        If your backend doesn't raise an error, please use the `exit_on_fistpoint` fixture.
+
+    Args:
+        defer     : fixture used for cleanup
+        vm        : virtual machine used as a base for tests (clones it to keep things tidy)
+        fistpoint : fistpoint to enable during the revert command
+        host      : Optional host to run the VM on (default None)
+    """
+    vm = vm.clone()
+    snap = vm.snapshot()
+    host_uuid = host.uuid if host else None
+
+    def cleanup(vm: VM, snap: Snapshot):
+        snap.destroy(verify=True)
+        vm.destroy()
+
+    defer(lambda: cleanup(vm, snap))
+
+    if not vm.is_running():
+        vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+    file = "/root/file"
+    vm.ssh_touch_file(file)
+
+    with FistPoint(host if host else vm.host, fistpoint), pytest.raises(SSHCommandFailed):
+        snap.revert()
+
+    vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+    assert vm.file_exists(file)
+
+    snap.revert()
+    vm.start(host_uuid)
+    vm.wait_for_vm_running_and_ssh_up()
+    assert not vm.file_exists(file)
+
+def check_critical_journal_revert(defer: Defer, vm: VM, host: Host, fistpoint: str):
+    """
+    Ensure that when a critical journal generated during a failed revert exists,
+    no SR operation is executed outside of the master node.
+
+    Warning:
+        Provided fistpoints should raise an error during the revert execution!
+        If your backend doesn't raise an error, please use the `exit_on_fistpoint` fixture.
+
+    Args:
+        defer     : fixture used for cleanup
+        vm        : virtual machine used as a base for tests (clones it to keep things tidy)
+        host      : second host in the pool, different from the master
+        fistpoint : fistpoint to enable during the revert command
+    """
+    vm = vm.clone()
+    sr = vm.get_sr()
+    snap = vm.snapshot()
+    sr.param_set("other-config", "false", "auto-scan") # Avoid journals being run during tests unexpectedly
+
+    def cleanup(sr: SR, vm: VM, snap: Snapshot):
+        sr.scan() # Force journals to be processed
+        sr.param_remove("other-config", "auto-scan")
+        snap.destroy(verify=True)
+        vm.destroy()
+
+    defer(lambda: cleanup(sr, vm, snap))
+
+    with FistPoint(vm.host, fistpoint), pytest.raises(SSHCommandFailed):
+        snap.revert()
+
+    with pytest.raises(
+        SSHCommandFailed,
+        check=lambda e: (
+            "The SR is not available [opterr=Critical journals are pending. A scan is required.]" in e.stdout
+        ),
+    ):
+        vm.start(on=host.uuid)

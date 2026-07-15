@@ -23,6 +23,12 @@ from tests.storage import (
     vdi_is_open,
     xva_export_import,
 )
+from tests.storage.storage import (
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
+)
 
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
@@ -64,18 +70,18 @@ class TestEXTSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert(self, vm_on_ext_sr: VM) -> None:
-        vm_on_ext_sr.test_vdi_revert()
+    def test_revert(self, vm_on_ext_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_ext_sr)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert_cbt(self, vm_on_ext_sr: VM) -> None:
-        vm_on_ext_sr.test_vdi_revert_cbt()
+    def test_revert_cbt(self, vm_on_ext_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_ext_sr)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert_journal_cbt(self, vm_on_ext_sr: VM, request: pytest.FixtureRequest):
-        vm_on_ext_sr.test_vdi_revert_journal_cbt(request, "FileSR_revert_create_src")
+    def test_revert_journal_cbt(self, vm_on_ext_sr: VM, defer: Defer, exit_on_fistpoint: None):
+        check_vdi_revert_journal_cbt(defer, vm_on_ext_sr, "FileSR_revert_create_src")
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
@@ -87,8 +93,8 @@ class TestEXTSR:
             "FileSR_revert_create_dest",
         ]
     )
-    def test_revert_journal(self, vm_on_ext_sr: VM, request: pytest.FixtureRequest, fistpoint: str):
-        vm_on_ext_sr.test_vdi_revert_journal(request, fistpoint)
+    def test_revert_journal(self, vm_on_ext_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_ext_sr, fistpoint)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])

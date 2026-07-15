@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.vdi import ImageFormat
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
+from tests.storage.storage import (
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
+)
 
 from typing import TYPE_CHECKING
 
@@ -52,18 +58,18 @@ class TestLARGEBLOCKSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert(self, vm_on_largeblock_sr: VM) -> None:
-        vm_on_largeblock_sr.test_vdi_revert()
+    def test_revert(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_largeblock_sr)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert_cbt(self, vm_on_largeblock_sr: VM) -> None:
-        vm_on_largeblock_sr.test_vdi_revert_cbt()
+    def test_revert_cbt(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_largeblock_sr)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert_journal_cbt(self, vm_on_largeblock_sr: VM, request: pytest.FixtureRequest):
-        vm_on_largeblock_sr.test_vdi_revert_journal_cbt(request, "FileSR_revert_create_src")
+    def test_revert_journal_cbt(self, vm_on_largeblock_sr: VM, defer: Defer, exit_on_fistpoint: None):
+        check_vdi_revert_journal_cbt(defer, vm_on_largeblock_sr, "FileSR_revert_create_src")
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
@@ -75,8 +81,8 @@ class TestLARGEBLOCKSR:
             "FileSR_revert_create_dest",
         ]
     )
-    def test_revert_journal(self, vm_on_largeblock_sr: VM, request: pytest.FixtureRequest, fistpoint: str):
-        vm_on_largeblock_sr.test_vdi_revert_journal(request, fistpoint)
+    def test_revert_journal(self, vm_on_largeblock_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_largeblock_sr, fistpoint)
 
     # *** tests with reboots (longer tests).
 
