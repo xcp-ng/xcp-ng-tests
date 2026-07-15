@@ -129,7 +129,7 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
     iso_remaster = TOOLS["iso-remaster"]
     assert os.access(iso_remaster, os.X_OK)
 
-    with tempfile.TemporaryDirectory() as isotmp:
+    with tempfile.TemporaryDirectory(prefix="remastered-iso-") as isotmp:
         remastered_iso = os.path.join(isotmp, "image.iso")
         img_patcher_script = os.path.join(isotmp, "img-patcher")
         iso_patcher_script = os.path.join(isotmp, "iso-patcher")
@@ -268,7 +268,7 @@ sed -i "${{SED_COMMANDS[@]}}" \
                    "--install-patcher", img_patcher_script,
                    "--iso-patcher", iso_patcher_script,
                    iso_file, remastered_iso
-                   ])
+                   ], cwd=isotmp)
 
         yield remastered_iso
 

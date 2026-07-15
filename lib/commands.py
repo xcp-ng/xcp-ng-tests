@@ -316,13 +316,22 @@ def sftp(
     return res
 
 @overload
-def local_cmd(cmd: List[str], *, check: bool = True, decode: Literal[True] = True) -> LocalCommandResult[str]:
-    ...
-@overload
-def local_cmd(cmd: List[str], *, check: bool = True, decode: Literal[False]) -> LocalCommandResult[bytes]:
-    ...
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: bool = True
+    cmd: List[str], *, check: bool = True, decode: Literal[True] = True,
+    cwd: str | os.PathLike[str] | None = None,
+) -> LocalCommandResult[str]:
+    ...
+
+@overload
+def local_cmd(
+    cmd: List[str], *, check: bool = True, decode: Literal[False],
+    cwd: str | os.PathLike[str] | None = None,
+) -> LocalCommandResult[bytes]:
+    ...
+
+def local_cmd(
+    cmd: List[str], *, check: bool = True, decode: bool = True,
+    cwd: str | os.PathLike[str] | None = None,
 ) -> LocalCommandResult[str] | LocalCommandResult[bytes]:
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
@@ -330,7 +339,8 @@ def local_cmd(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        check=False
+        check=False,
+        cwd=cwd,
     )
 
     # get a decoded version of the output in any case, replacing potential errors
