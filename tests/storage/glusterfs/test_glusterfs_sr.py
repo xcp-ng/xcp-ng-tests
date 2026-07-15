@@ -3,13 +3,14 @@ import pytest
 import logging
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import vdi_is_open
+from tests.storage.storage import check_critical_journal_revert, check_vdi_revert, check_vdi_revert_journal
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -63,8 +64,8 @@ class TestGlusterFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_revert(self, vm_on_glusterfs_sr: VM) -> None:
-        vm_on_glusterfs_sr.test_vdi_revert()
+    def test_revert(self, vm_on_glusterfs_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_glusterfs_sr)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
@@ -76,18 +77,15 @@ class TestGlusterFSSR:
             "FileSR_revert_create_dest",
         ]
     )
-    def test_revert_journal(self, vm_on_glusterfs_sr: VM, request: pytest.FixtureRequest, fistpoint: str):
-        vm_on_glusterfs_sr.test_vdi_revert_journal(request, fistpoint, vm_on_glusterfs_sr.host.pool.master)
+    def test_revert_journal(self, vm_on_glusterfs_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_glusterfs_sr, fistpoint, vm_on_glusterfs_sr.host.pool.master)
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
     def test_critical_journal_revert(
-        self,
-        vm_on_glusterfs_sr: VM,
-        request: pytest.FixtureRequest,
-        hostA2: Host,
+        self, vm_on_glusterfs_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
     ) -> None:
-        vm_on_glusterfs_sr.test_critical_journal_revert(request, hostA2, "FileSR_revert_create_src")
+        check_critical_journal_revert(defer, vm_on_glusterfs_sr, hostA2, "FileSR_revert_create_src")
 
     # *** tests with reboots (longer tests).
 
