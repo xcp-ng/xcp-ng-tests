@@ -78,7 +78,10 @@ class TestNested:
                 ),
                 "bios": (),
             }[firmware],
-            vdis=[dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0")],
+            vdis=[
+                dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0"),
+                dict(name="vm1 extra disk", size="50GiB", device="xvdb", userdevice="1")
+            ],
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
         ))
@@ -269,19 +272,11 @@ class TestNested:
                 raise
 
             logging.info("Powering off pool master")
-            try:
-                # use "poweroff" because "reboot" would cause ARP and
-                # SSH to be checked before host is down, and require
-                # ssh retries
-                # disable multiplexing to get proper info in SSHCommandFailed
-                pool.master.ssh("poweroff", multiplexing=False)
-            except commands.SSHCommandFailed as e:
-                # ignore connection closed by reboot
-                if e.returncode == 255 and "closed by remote host" in e.stdout:
-                    logging.info("sshd closed the connection")
-                    pass
-                else:
-                    raise
+
+            # use "poweroff" because "reboot" would cause ARP and
+            # SSH to be checked before host is down, and require
+            # ssh retries
+            pool.master.ssh("nohup sh -c 'sleep 2 && poweroff' >/dev/null 2>&1 &")
 
             wait_for(host_vm.is_halted, "Wait for host VM halted")
 

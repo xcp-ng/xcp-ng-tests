@@ -4,7 +4,7 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 
-from lib.commands import SSHCommandFailed, ssh
+from lib.commands import ssh
 from lib.common import wait_for
 
 from typing import Any, Self
@@ -82,16 +82,7 @@ class AnswerFile:
         return element
 
 def poweroff(ip: str) -> None:
-    try:
-        # disable multiplexing to get proper info in SSHCommandFailed
-        ssh(ip, "poweroff", multiplexing=False)
-    except SSHCommandFailed as e:
-        # ignore connection closed by reboot
-        if e.returncode == 255 and "closed by remote host" in e.stdout:
-            logging.info("sshd closed the connection")
-            pass
-        else:
-            raise
+    ssh(ip, "nohup sh -c 'sleep 2 && poweroff' >/dev/null 2>&1 &")
 
 def monitor_install(*, ip: str) -> None:
     # wait for "yum install" phase to finish

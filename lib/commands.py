@@ -163,7 +163,7 @@ def _ssh(
 
     # Even if check is False, we still raise in case of return code 255, which means a SSH error.
     if res.returncode == 255:
-        return SSHCommandFailed(255, "SSH Error: %s" % ssherr, cmd, ssherr=ssherr)
+        return SSHCommandFailed(255, "SSH Error: %s" % output_for_errors, cmd, ssherr=ssherr)
 
     output: bytes = res.stdout
     if banner_res:
