@@ -2,6 +2,7 @@ import pytest
 
 from lib.commands import SSHCommandFailed
 from lib.common import Defer, vm_image, wait_for
+from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
@@ -15,6 +16,13 @@ from tests.storage import (
     vdi_export_import,
     vdi_is_open,
     xva_export_import,
+)
+from tests.storage.storage import (
+    check_critical_journal_revert,
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
 )
 
 # Requirements:
@@ -81,6 +89,43 @@ class TestLVMOHBASR:
     def test_vdi_export_import(self, storage_test_vm: VM, lvmohba_sr: SR, image_format: ImageFormat,
                                temp_large_dir: str, defer: Defer):
         vdi_export_import(storage_test_vm, lvmohba_sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_lvmohba_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_lvmohba_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_lvmohba_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_lvmohba_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_lvmohba_sr: VM, defer: Defer, exit_on_fistpoint: None):
+        check_vdi_revert_journal_cbt(
+            defer, vm_on_lvmohba_sr, "LVM_revert_create_src", vm_on_lvmohba_sr.host.pool.master
+        )
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "LVM_revert_create_insert",
+            "LVM_revert_create_src",
+            "LVM_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_lvmohba_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_lvmohba_sr, fistpoint, vm_on_lvmohba_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(
+        self, vm_on_lvmohba_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
+    ) -> None:
+        check_critical_journal_revert(defer, vm_on_lvmohba_sr, hostA2, "LVM_revert_create_src")
 
     # *** tests with reboots (longer tests).
 
