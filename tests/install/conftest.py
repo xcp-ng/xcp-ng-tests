@@ -13,8 +13,9 @@ from lib import installer, pxe
 from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
 from lib.installer import AnswerFile
+from lib.typing import SimpleAnswerfileDict
 
-from typing import TYPE_CHECKING, Any, Generator, Sequence
+from typing import TYPE_CHECKING, Any, Generator, Literal, Sequence, TypeAlias
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -102,11 +103,47 @@ def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
                 unsigned=ISO_IMAGES[iso_key].get('unsigned', False),
                 )
 
+SystemDiskConfig: TypeAlias = Literal['disk'] | Literal['raid1'] | Literal['xsraid1']
+
 @pytest.fixture(scope='function')
-def system_disks_names(request: pytest.FixtureRequest) -> tuple[str, ...]:
+def system_disk_config(request: pytest.FixtureRequest) -> SystemDiskConfig:
+    """From test context, termine whether we're installing on raid1/etc.
+
+    On install tests where we specify the install parameters this
+    comes from the `system_disk_config` test parameter, and on later
+    tests it has to be infered from `installed_config`.
+    """
+    try:
+        system_disk_config = request.getfixturevalue("system_disk_config")
+    except pytest.FixtureLookupError:
+        installed_config = request.getfixturevalue("installed_config")
+        assert '-' in installed_config, (f"installed_config ({installed_config}) must include a dash"
+                                         " to extract system_disk_config")
+        # This heuristic is very ad-hoc, we should switch to a more
+        # formal encoding of `installed_config`... or rely on tracking
+        # by upcoming PaaS
+        for component in reversed(installed_config.split('-')):
+            if component in ('disk', 'raid1', 'xsraid1'):
+                system_disk_config = component
+                break
+        else:
+            assert False, f"No system_disk_config component found in {installed_config}"
+
+    return system_disk_config
+
+@pytest.fixture(scope='function')
+def system_disks_names(request: pytest.FixtureRequest, system_disk_config: SystemDiskConfig
+                       ) -> tuple[str, ...]:
     firmware = request.getfixturevalue("firmware")
     main_disk = {"uefi": "nvme0n1", "bios": "sda"}[firmware]
-    return (main_disk,)
+
+    extra_disks = {"raid1": {"uefi": ("nvme0n2",), "bios": ("sdb",)}[firmware],
+                   "xsraid1": {"uefi": ("nvme0n2",), "bios": ("sdb",)}[firmware],
+                   "disk": (),
+                   }[system_disk_config]
+
+    return (main_disk,) + extra_disks
+
 
 # Remasters the ISO sepecified by `installer_iso` mark, with:
 # - network and ssh support activated, and .ssh/authorized_key so tests can
@@ -137,8 +174,9 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
 
         if answerfile:
             logging.info("generating answerfile %s", answerfile_xml)
-            answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
-                                       type="url", CONTENTS="file:///root/postinstall.sh"))
+            answerfile.top_append(SimpleAnswerfileDict(TAG="script", stage="filesystem-populated",
+                                                       type="url",
+                                                       CONTENTS="file:///root/postinstall.sh"))
             if unsigned:
                 answerfile.top_setattr({'gpgcheck': "false",
                                         'repo-gpgcheck': "false",
