@@ -1196,6 +1196,7 @@ dev = [
     { name = "types-pygments" },
     { name = "types-requests" },
     { name = "typing-extensions" },
+    { name = "xenapi" },
     { name = "zizmor" },
 ]
 
@@ -1232,7 +1233,17 @@ dev = [
     { name = "types-pygments" },
     { name = "types-requests" },
     { name = "typing-extensions" },
+    { name = "xenapi" },
     { name = "zizmor" },
+]
+
+[[package]]
+name = "xenapi"
+version = "26.15.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/94/1a7ebf2d0551ee3705de78d03a49ad249a0cfbc0903b3e8f99d6717c3865/xenapi-26.15.0.tar.gz", hash = "sha256:d97a01cecf930df62f136985635c4cc91ab3f76c1009794f56f2eeae963a6bc7", size = 6747, upload-time = "2026-06-03T01:40:41.959Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/5c/4c278231b073a61b2d3860c068703a66dd20ee09e3fa08d0e238603d06a6/xenapi-26.15.0-py3-none-any.whl", hash = "sha256:d008fd5445ddb2e34d9efbfad55c569af529e23961ffc0910e4f89ed2dae1d0e", size = 5958, upload-time = "2026-06-03T01:40:40.678Z" },
 ]
 
 [[package]]
