@@ -6,13 +6,14 @@ import shlex
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import safe_split, vm_image, wait_for
+from lib.common import Defer, safe_split, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import vdi_is_open
+from tests.storage.storage import check_critical_journal_revert, check_vdi_revert, check_vdi_revert_journal
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
@@ -188,6 +189,37 @@ class TestLinstorSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_linstor_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_linstor_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "LinstorSR_revert_create_insert",
+            "LinstorSR_revert_create_src",
+            "LinstorSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_linstor_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_linstor_sr, fistpoint, vm_on_linstor_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(
+        self, vm_on_linstor_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
+    ) -> None:
+        # Linstor monitor service might run a scan during critical journal testing
+        # We disable the service while testing
+        for host in vm_on_linstor_sr.host.pool.hosts:
+            host.ssh("systemctl stop linstor-monitor.service")
+            defer(lambda: host.ssh("systemctl start linstor-monitor.service"))
+
+        check_critical_journal_revert(defer, vm_on_linstor_sr, hostA2, "LinstorSR_revert_create_src")
 
     # *** tests with reboots (longer tests).
 
