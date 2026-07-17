@@ -211,14 +211,8 @@ class TestLinstorSR:
     @pytest.mark.small_vm
     @pytest.mark.big_vm
     def test_critical_journal_revert(
-        self, vm_on_linstor_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
+        self, vm_on_linstor_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host, linstor_no_monitor: None
     ) -> None:
-        # Linstor monitor service might run a scan during critical journal testing
-        # We disable the service while testing
-        for host in vm_on_linstor_sr.host.pool.hosts:
-            host.ssh("systemctl stop linstor-monitor.service")
-            defer(lambda: host.ssh("systemctl start linstor-monitor.service"))
-
         check_critical_journal_revert(defer, vm_on_linstor_sr, hostA2, "LinstorSR_revert_create_src")
 
     # *** tests with reboots (longer tests).

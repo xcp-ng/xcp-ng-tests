@@ -211,3 +211,16 @@ def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM, N
 def vm_on_linstor_sr_function(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
     with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
         yield vm
+
+@pytest.fixture(scope='function')
+def linstor_no_monitor(linstor_sr: SR):
+    """
+    Disable linstor monitor on the linstor SR for
+    the current test to avoid unwanted scans.
+    """
+    hosts = linstor_sr.main_host().pool.hosts
+    for host in hosts:
+        host.ssh("systemctl stop linstor-monitor.service")
+    yield
+    for host in hosts:
+        host.ssh("systemctl start linstor-monitor.service")
