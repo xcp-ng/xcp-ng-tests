@@ -404,6 +404,8 @@ class Host:
                     if uri.startswith("clone+start"):
                         vm.start()
                         wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
+                else:
+                    raise RuntimeError(f"VM {filename!r} not in cache (in SR {sr_uuid})")
             else:
                 vm = self.cached_vm(uri, sr_uuid)
             if vm:
