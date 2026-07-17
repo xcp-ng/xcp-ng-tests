@@ -192,11 +192,19 @@ def callable_marker(value: T | Callable[..., T], request: pytest.FixtureRequest)
     else:
         return value
 
-def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
-             invert: bool = False) -> None:
+def wait_for(
+    fn: Callable[[], object],
+    msg: str | None = None,
+    timeout_secs: int = 2 * 60,
+    retry_delay_secs: int = 2,
+    delayed_start_secs: int = 0,
+    invert: bool = False,
+) -> None:
     if msg is not None:
         logging.info(msg)
     start_time = time.perf_counter()
+    if delayed_start_secs:
+        time.sleep(delayed_start_secs)
     while True:
         ret = fn()
         if not invert and ret:
@@ -211,9 +219,13 @@ def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int
         time.sleep(retry_delay_secs)
 
 def wait_for_not(
-    fn: Callable[[], Any], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2
+    fn: Callable[[], Any],
+    msg: str | None = None,
+    timeout_secs: int = 2 * 60,
+    retry_delay_secs: int = 2,
+    delayed_start_secs: int = 0,
 ) -> None:
-    return wait_for(fn, msg, timeout_secs, retry_delay_secs, True)
+    return wait_for(fn, msg, timeout_secs, retry_delay_secs, delayed_start_secs, True)
 
 def is_uuid(maybe_uuid: str) -> bool:
     try:
