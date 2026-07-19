@@ -13,7 +13,7 @@ types-pygments
 types-colorama
 types-pexpect
 zizmor
-prek>=0.4.8
+prek>=0.4.9
 autopep8
 types-passlib
 -r base.txt
