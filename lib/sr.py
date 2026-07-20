@@ -202,6 +202,12 @@ class SR:
     def content_type(self) -> str:
         return self.param_get('content-type')
 
+    def introduce(self, type: str, shared: bool, name_label: str, sr_uuid: str) -> str:
+        return self.pool.master.xe(
+            'sr-introduce',
+            {'uuid': sr_uuid, 'type': type, 'shared': shared, 'content-type': 'user', 'name-label': name_label},
+        )
+
     def is_shared(self) -> bool:
         if self._is_shared is None:
             self._is_shared = strtobool(self.param_get('shared'))
