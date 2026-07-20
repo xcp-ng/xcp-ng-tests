@@ -392,8 +392,7 @@ class Host:
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
         vm: VM | None = None
 
-        # Handling of 'clone://' and 'clone+start://' URI
-        if '://' in uri and uri.startswith("clone"):
+        if uri.startswith("clone://") or uri.startswith("clone+start://"):
             assert use_cache, "clone URIs require cache enabled"
             assert sr_uuid is not None
             protocol, filename = uri.split("://", maxsplit=1)
@@ -402,7 +401,7 @@ class Host:
                 raise RuntimeError(f"VM {filename!r} not in cache (in SR {sr_uuid})")
             vm = base_vm.clone()
             vm.param_clear('name-description')
-            if protocol.startswith("clone+start"):
+            if protocol == "clone+start":
                 vm.start()
                 wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
             return vm
