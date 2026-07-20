@@ -1226,7 +1226,7 @@ dev = [
     { name = "flake8-pyproject" },
     { name = "libarchive-c", specifier = "==5.3" },
     { name = "mypy" },
-    { name = "prek", specifier = ">=0.4.9" },
+    { name = "prek" },
     { name = "pydocstyle" },
     { name = "pyright" },
     { name = "ruff" },
