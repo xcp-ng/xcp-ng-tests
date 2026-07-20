@@ -137,6 +137,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Block size to align span positions to when writing in volumes."
              " Accepts sizes like '512', '4KiB', '1MiB'. A value of 1 is equivalent to no alignment."
     )
+    parser.addoption(
+        "--tracing-endpoint",
+        action="store",
+        default=None,
+        help="Specify distributed tracing endpoint."
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -284,6 +290,19 @@ def pytest_runtest_makereport(
 
 # END make test results visible from fixtures
 
+def setup_tracing(host: Host, endpoint: str):
+    logging.info(f'Enabling tracing on {host}, endpoint = {endpoint}')
+    host.ssh('printf "observer-endpoint-http-enabled=true\nobserver-experimental-components=\\"\\"\n" > /etc/xapi.conf.d/observer.conf')
+    host.restart_toolstack(verify=True)
+    observer_uuid = host.xe('observer-create', {'name-label': 'xcpng-test', 'endpoints': endpoint, 'enabled': 'true'})
+    host.restart_toolstack(verify=True)
+    return observer_uuid
+
+def teardown_tracing(host, observer):
+    logging.info(f'Disabling tracing on {host}')
+    host.xe('observer-destroy', {'uuid': observer})
+    host.ssh('rm -f /etc/xapi.conf.d/observer.conf')
+    host.restart_toolstack(verify=True)
 
 # fixtures
 
@@ -351,7 +370,19 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
     if not host_list:
         pytest.fail("This test requires at least one --hosts parameter")
+
+    tracing_endpoint = pytestconfig.getoption("--tracing-endpoint")
+    has_tracing = tracing_endpoint is not None
+    observers = []
+    if has_tracing:
+        for h in host_list:
+            observers.append(setup_tracing(h, tracing_endpoint))
+
     yield host_list
+
+    if has_tracing:
+        for h, o in zip(host_list, observers):
+            teardown_tracing(h, o)
 
     cleanup_hosts()
 
