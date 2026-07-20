@@ -20,7 +20,7 @@ from lib.common import (
 )
 from lib.vdi import VDI, ImageFormat
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, Self, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -202,10 +202,14 @@ class SR:
     def content_type(self) -> str:
         return self.param_get('content-type')
 
-    def introduce(self, type: str, shared: bool, name_label: str, sr_uuid: str) -> str:
-        return self.pool.master.xe(
-            'sr-introduce',
-            {'uuid': sr_uuid, 'type': type, 'shared': shared, 'content-type': 'user', 'name-label': name_label},
+    @classmethod
+    def introduce(cls, pool: Pool, type: str, shared: bool, name_label: str, sr_uuid: str) -> Self:
+        return cls(
+            pool.master.xe(
+                'sr-introduce',
+                {'uuid': sr_uuid, 'type': type, 'shared': shared, 'content-type': 'user', 'name-label': name_label},
+            ),
+            pool,
         )
 
     def is_shared(self) -> bool:
