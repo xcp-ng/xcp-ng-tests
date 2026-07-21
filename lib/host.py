@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
+
 def host_data(hostname_or_ip: str) -> dict[str, str]:
     # read from data.py
     from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER, HOSTS
@@ -171,7 +172,7 @@ class Host:
 
         def stringify(key: str, value: str | bool | dict[str, str]) -> str:
             if isinstance(value, bool):
-                return "{}={}".format(key, to_xapi_bool(value))
+                return f"{key}={to_xapi_bool(value)}"
             if isinstance(value, dict):
                 ret = ""
                 for key2, value2 in value.items():
