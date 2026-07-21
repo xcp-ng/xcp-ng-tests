@@ -205,8 +205,9 @@ def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int
             return
         if time.perf_counter() - start_time >= timeout_secs:
             expected = 'True' if not invert else 'False'
+            suffix = ": " + msg if msg else ""
             raise TimeoutError(
-                "Timeout reached while waiting for fn call to yield %s (%s)." % (expected, timeout_secs)
+                "Timed out after %ss waiting for condition to be %s%s" % (timeout_secs, expected, suffix)
             )
         time.sleep(retry_delay_secs)
 
