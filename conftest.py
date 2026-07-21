@@ -302,8 +302,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
             nest = Pool(nest_hostname).master
 
             protocol, rest = hostname_or_ip.split(":", 1)
-            host_vm = nest.import_vm(f"clone:{rest}", nest.main_sr_uuid(),
-                                     use_cache=True)
+            host_vm = nest.import_vm(f"clone:{rest}", nest.main_sr_uuid())
             nested_list.append(host_vm)
 
             vif = host_vm.vifs()[0]

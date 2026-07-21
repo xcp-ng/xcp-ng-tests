@@ -393,7 +393,6 @@ class Host:
         vm: VM | None = None
 
         if uri.startswith("clone://") or uri.startswith("clone+start://"):
-            assert use_cache, "clone URIs require cache enabled"
             assert sr_uuid is not None
             protocol, filename = uri.split("://", maxsplit=1)
             base_vm = self.cached_vm(filename, sr_uuid)
