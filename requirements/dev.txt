@@ -16,4 +16,5 @@ zizmor
 prek
 autopep8
 types-passlib
+types-paramiko
 -r base.txt
