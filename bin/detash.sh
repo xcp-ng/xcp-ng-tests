@@ -144,7 +144,7 @@ EOF
     echo "$status" > "$statusfile"
     cmdline=$(printf '"%s" ' "$@")  # Escape quotes
     [ "" != "$cmdline" ] || cmdline="set"
-    cmdline="status=0 ; $cmdline 2>&1 | tee --ignore-interrupts \"$logfile\" || status=\$? ; \
+    cmdline="status=0 ; teetty --out \"$logfile\" -- $cmdline || status=\$? ; \
      echo \${status} > \"$statusfile\" ; \
      sleep 1"  # Log cmdline output unbuffered and forward status to quit_
 
