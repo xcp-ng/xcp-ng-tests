@@ -5,6 +5,7 @@ import logging
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
 from lib.host import Host
+from lib.pool import Pool
 from lib.vm import VM
 
 # The pool needs a shared SR to use `host.evacuate`. All three fixtures below are needed.
@@ -23,7 +24,7 @@ from tests.storage.nfs.conftest import nfs_device_config, nfs_sr, vm_on_nfs_sr
 #   Must NOT be the network used to access the NFS SR.
 #   This network will be disconnected at some point during the tests
 
-def _host_evacuate_test(source_host: Host, dest_host: Host, network_uuid: str | None,
+def _host_evacuate_test(source_host: Host, network_uuid: str | None,
                         vm: VM, expect_error: bool = False, error: str = "") -> None:
     vm.start(on=source_host.uuid)
     vm.wait_for_os_booted()
@@ -37,8 +38,37 @@ def _host_evacuate_test(source_host: Host, dest_host: Host, network_uuid: str | 
         else:
             logging.info(f"Attempt evacuating host {source_host}. This should fail.")
         source_host.xe('host-evacuate', args)
-        wait_for(lambda: vm.all_vdis_on_host(dest_host), "Wait for all VDIs on destination host")
-        wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
+
+        dest_hosts = [h for h in source_host.pool.hosts if h != source_host]
+        assert dest_hosts, "host-evacuate needs other host(s) in pool of %s" % str(source_host)
+        logging.info("Looking for destination host, host-evacuate will select one other host among [%s]",
+                     ", ".join(str(h) for h in dest_hosts))
+
+        vdi_host = []
+        for host in dest_hosts:
+            try:
+                wait_for(lambda: vm.all_vdis_on_host(host),
+                         f"Wait for all VDIs of candidate destination host: {host}")
+                vdi_host.append(host)
+                break
+            except TimeoutError:
+                continue
+
+        assert len(vdi_host) == 1, "host_evacuate failed to relocate VDIs on any other host"
+        logging.info(f"Found destination host for VDI: {vdi_host[0]}")
+
+        vm_host = []
+        for host in dest_hosts:
+            try:
+                wait_for(lambda: vm.is_running_on_host(host),
+                         "Wait for VM to be running on destination host %s of pool" % host)
+                vm_host.append(host)
+                break
+            except TimeoutError:
+                continue
+        assert len(vm_host), "host_evacuate failed to restart VM on any other host"
+        logging.info(f"Found destination host for VM: {vm_host[0]}")
+
         vm.wait_for_os_booted()
         assert not expect_error, "host-evacuate should have raised: %s" % error
     except SSHCommandFailed as e:
@@ -66,14 +96,14 @@ def _save_ip_configuration_mode(host: Host, pif_uuid: str) -> dict[str, str | bo
 @pytest.mark.small_vm # what we test here is that evacuate works, the goal is not to test with various VMs
 class TestHostEvacuate:
     def test_host_evacuate(self, host: Host, hostA2: Host, vm_on_nfs_sr: VM) -> None:
-        _host_evacuate_test(host, hostA2, None, vm_on_nfs_sr)
+        _host_evacuate_test(host, None, vm_on_nfs_sr)
 
 @pytest.mark.complex_prerequisites # requires a special network setup.
 @pytest.mark.small_vm # what we test here is the network-uuid option, the goal is not to test with various VMs
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestHostEvacuateWithNetwork:
     def test_host_evacuate_with_network(self, host: Host, hostA2: Host, second_network: str, vm_on_nfs_sr: VM) -> None:
-        _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr)
+        _host_evacuate_test(host, second_network, vm_on_nfs_sr)
 
     def test_host_evacuate_with_network_no_ip(
         self, host: Host, hostA2: Host, second_network: str, vm_on_nfs_sr: VM
@@ -86,7 +116,7 @@ class TestHostEvacuateWithNetwork:
         host.xe(reconfigure_method, {'uuid': pif_uuid, 'mode': 'none'})
         try:
             no_ip_error = 'The specified interface cannot be used because it has no IP address'
-            _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, no_ip_error)
+            _host_evacuate_test(host, second_network, vm_on_nfs_sr, True, no_ip_error)
         finally:
             logging.info(f"Restore the configuration of PIF {pif_uuid}")
             host.xe(reconfigure_method, args)
@@ -100,7 +130,7 @@ class TestHostEvacuateWithNetwork:
         try:
             not_attached_error = \
                 'The operation you requested cannot be performed because the specified PIF is currently unplugged'
-            _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, not_attached_error)
+            _host_evacuate_test(host, second_network, vm_on_nfs_sr, True, not_attached_error)
         finally:
             logging.info(f"Re-plug PIF {pif_uuid}")
             host.xe('pif-plug', {'uuid': pif_uuid})
@@ -116,7 +146,7 @@ class TestHostEvacuateWithNetwork:
         host.xe('pif-forget', {'uuid': pif_uuid})
         try:
             not_present_error = 'This host has no PIF on the given network'
-            _host_evacuate_test(host, hostA2, second_network, vm_on_nfs_sr, True, not_present_error)
+            _host_evacuate_test(host, second_network, vm_on_nfs_sr, True, not_present_error)
         finally:
             host.xe('pif-scan', {'host-uuid': hostA2.uuid})
             pif_uuid = host.xe('pif-list', {'host-uuid': hostA2.uuid, 'network-uuid': second_network}, minimal=True)
