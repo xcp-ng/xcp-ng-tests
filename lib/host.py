@@ -391,25 +391,25 @@ class Host:
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
         vm: VM | None = None
+
+        if uri.startswith("clone://") or uri.startswith("clone+start://"):
+            assert sr_uuid is not None
+            protocol, filename = uri.split("://", maxsplit=1)
+            base_vm = self.cached_vm(filename, sr_uuid)
+            if base_vm is None:
+                raise RuntimeError(f"VM {filename!r} not in cache (in SR {sr_uuid})")
+            vm = base_vm.clone()
+            vm.param_clear('name-description')
+            if protocol == "clone+start":
+                vm.start()
+                wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
+            return vm
+
         if use_cache:
             assert sr_uuid is not None
-            if '://' in uri and uri.startswith("clone"):
-                protocol, rest = uri.split(":", 1)
-                assert rest.startswith("//")
-                filename = rest[2:] # strip "//"
-                base_vm = self.cached_vm(filename, sr_uuid)
-                if base_vm:
-                    vm = base_vm.clone()
-                    vm.param_clear('name-description')
-                    if uri.startswith("clone+start"):
-                        vm.start()
-                        wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
-            else:
-                vm = self.cached_vm(uri, sr_uuid)
+            vm = self.cached_vm(uri, sr_uuid)
             if vm:
                 return vm
-        else:
-            assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
         params: dict[str, str | bool | dict[str, str]] = {}
         msg = f"[{self}] Import VM {uri}"
