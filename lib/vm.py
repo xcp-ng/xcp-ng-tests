@@ -4,6 +4,7 @@ import pytest
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import uuid
@@ -12,6 +13,7 @@ import lib.commands as commands
 import lib.efi as efi
 from lib.basevm import BaseVM
 from lib.common import (
+    KiB,
     PackageManagerEnum,
     expand_scope_relative_nodeid,
     parse_xe_dict,
@@ -27,7 +29,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, assert_never, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -522,6 +524,36 @@ class VM(BaseVM):
         if self.file_exists('/usr/bin/zypper'):
             return PackageManagerEnum.ZYPPER
         return PackageManagerEnum.UNKNOWN
+
+    def grow_root_partition(self) -> int | None:
+        pkg_manager = self.detect_package_manager()
+        match pkg_manager:
+            case PackageManagerEnum.APK:
+                self.ssh('apk add util-linux e2fsprogs-extra')
+            case PackageManagerEnum.APT_GET:
+                self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
+            case PackageManagerEnum.DNF:
+                self.ssh('dnf install -y util-linux e2fsprogs')
+            case PackageManagerEnum.YUM:
+                self.ssh('yum install -y util-linux e2fsprogs')
+            case PackageManagerEnum.ZYPPER:
+                self.ssh('zypper --non-interactive install util-linux e2fsprogs')
+            case PackageManagerEnum.UNKNOWN:
+                return None
+            case _:
+                assert_never(pkg_manager)
+        mount_output = self.ssh('mount').strip()
+        root_match = re.search(r'/dev/(\w+?)(p?)(\d+) on / type (\w+)', mount_output)
+        assert root_match is not None
+        disk, p, partition, fs_type = root_match.groups()
+        if not fs_type.startswith('ext'):
+            logging.debug(f"Unsupported filesystem: {fs_type}")
+            return None
+        self.ssh(f'echo ", +" | sfdisk --no-reread --force -N {partition} /dev/{disk}')
+        self.ssh(f'partx -u -n {partition}:{partition} /dev/{disk}')
+        self.ssh(f'resize2fs /dev/{disk}{p}{partition}')
+        df_output = self.ssh('df /')
+        return int(df_output.splitlines()[-1].split()[3]) * KiB
 
     def insert_cd(self, vdi_name: str) -> None:
         logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
