@@ -18,6 +18,7 @@ dependencies = [
     "requests",
     "ipdb",
     "paramiko",
+    "pyte",
 ]
 
 [dependency-groups]

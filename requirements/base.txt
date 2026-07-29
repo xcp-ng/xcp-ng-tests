@@ -11,3 +11,4 @@ pytest-dependency
 requests
 ipdb
 paramiko
+pyte

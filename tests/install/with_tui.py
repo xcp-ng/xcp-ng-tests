@@ -4,12 +4,14 @@ import pytest
 
 import hashlib
 import logging
+import sys
 import tempfile
 import time
 from pathlib import Path
 from uuid import uuid4
 
 import paramiko
+import pyte
 
 from lib.common import Defer, wait_for
 from lib.host import Host
@@ -139,6 +141,9 @@ def test_install_with_tui(
     channel.settimeout(30.0)
     stdout = channel.makefile('rb', -1)
 
+    screen = pyte.Screen(columns=80, lines=24)
+    stream = pyte.ByteStream(screen)
+
     # Wait for grub to finish
     for line in stdout:
         if b"Booting `install'" in line:
@@ -146,11 +151,15 @@ def test_install_with_tui(
 
     # Wait for TUI to appear
     for line in stdout:
-        if b"Welcome to XCP-ng" in line:
-            logging.info(f"Entering TUI: {line}")
-            break
         assert isinstance(line, bytes)
-        if b"\x1b" in line:
+
+        # Start feeding the terminal emulator from here
+        stream.feed(line)
+
+        if b"Welcome to XCP-ng" in line:
+            logging.info(f"Entering TUI: {line!r}")
+            break
+        elif b"\x1b" in line:
             logging.info(f"! {line!r}")
         else:
             decoded = line.decode(errors="ignore").rstrip()
@@ -159,60 +168,190 @@ def test_install_with_tui(
     # Maybe some data already got extracted in the stdout buffer
     extra_data = getattr(stdout, "_rbuffer")
     assert isinstance(extra_data, bytes)
+    stream.feed(extra_data)
 
-    _select_keymap_dialog = wait_for_dialog(channel, b"Select Keymap")
-    channel.send(b"\t\r")  # Validate US
-    _welcome_dialog = wait_for_dialog(channel, b"Welcome to XCP-ng Setup")
-    channel.send(b"\r")  # Do not reboot, continue
-    _end_user_agreement_dialog = wait_for_dialog(channel, b"End User Agreement")
-    channel.send(b"\t\r")  # Accept the end user agreement
-    _select_primary_disk_dialog = wait_for_dialog(channel, b"Select Primary Disk")
-    channel.send(b"\t\r")  # Select first disk
-    _virtual_machine_storage_dialog = wait_for_dialog(channel, b"Virtual Machine Storage")
-    channel.send(b"\t\r")  # Select first disk
-    _virtual_machine_storage_type_dialog = wait_for_dialog(channel, b"Virtual Machine Storage Type")
-    channel.send(b"\t\t\r")  # Select EXT
-    _select_installation_source_dialog = wait_for_dialog(channel, b"Select Installation Source")
-    channel.send(b"\t\r")  # Select Local Media
-    _verify_installation_source_dialog = wait_for_dialog(channel, b"Verify Installation Source")
-    channel.send(b"\x1b[A\t\r")  # Skip the verification
-    _set_password_dialog = wait_for_dialog(channel, b"Set Password")
-    channel.send(f"{HOST_DEFAULT_PASSWORD}\t{HOST_DEFAULT_PASSWORD}\t\r".encode())  # Type root password
-    _networking_1_dialog = wait_for_dialog(channel, b"Networking")
-    channel.send(b"\t\t\t\r")  # IPv4
-    _networking_2_dialog = wait_for_dialog(channel, b"Networking")
-    channel.send(b"\t\t\t\r")  # DHCP
-    _hostname_and_dns_configuration_dialog = wait_for_dialog(channel, b"Hostname and DNS Configuration")
-    channel.send(b"\t\t\t\t\t\r")  # Random hostname and DNS set by DHCP
-    _select_time_zone_1_dialog = wait_for_dialog(channel, b"Select Time Zone")
-    channel.send(b"\x1b[6~\r")  # Page down to select Europe
-    _select_time_zone_2_dialog = wait_for_dialog(channel, b"Select Time Zone")
-    channel.send(b"\x1b[6~\x1b[6~\x1b[6~\x1b[6~\r")  # 4 Page down to select Paris
-    _system_time_dialog = wait_for_dialog(channel, b"System Time")
-    channel.send(b"\t\r")
-    _confirm_installation_dialog = wait_for_dialog(channel, b"Confirm Installation")
-    channel.send(b"\t\r")
+    def wait_for_dialog(
+        title: str,
+        discriminant: str = "",
+        delay: float = 1.0,
+    ) -> None:
+        wrapped_title = f"─┤ {title} ├─"
+        logging.info(f"Wait for {title!r} dialog title")
+        while not (
+            any(wrapped_title in line for line in screen.display)
+            and any(discriminant in line for line in screen.display)
+        ):
+            stream.feed(channel.recv(1024))
+        logging.info(f"Wait for {title!r} dialog to stabilize")
+        time.sleep(delay)
+        while channel.recv_ready():
+            stream.feed(channel.recv(1024))
+        logging.info(f"{title!r} dialog reached\n{show_screen(screen)}")
+
+    def send_tab(n: int = 1, delay: float = 1.0) -> None:
+        channel.send(b"\t" * n)
+        time.sleep(delay)
+        while channel.recv_ready():
+            stream.feed(channel.recv(1024))
+        logging.info(f"Selection updated with {n} tab(s)\n{show_screen(screen)}")
+
+    def send_up(n: int = 1, delay: float = 1.0) -> None:
+        channel.send(b"\x1b[A" * n)
+        time.sleep(delay)
+        while channel.recv_ready():
+            stream.feed(channel.recv(1024))
+        logging.info(f"Selection updated with {n} up(s)\n{show_screen(screen)}")
+
+    def send_password(n: int = 1, delay: float = 1.0) -> None:
+        channel.send(f"{HOST_DEFAULT_PASSWORD}\t".encode() * 2)
+        time.sleep(delay)
+        while channel.recv_ready():
+            stream.feed(channel.recv(1024))
+        logging.info(f"Selection updated with {n} password(s)\n{show_screen(screen)}")
+
+    def send_pagedown(n: int = 1, delay: float = 1.0) -> None:
+        channel.send(b"\x1b[6~" * n)
+        time.sleep(delay)
+        while channel.recv_ready():
+            stream.feed(channel.recv(1024))
+        logging.info(f"Selection updated with {n} pagedown(s)\n{show_screen(screen)}")
+
+    def validate(expected_selection: str | None = None, expected_validation: str = "Ok") -> None:
+        highlighted = get_highlighted(screen)
+        if expected_selection is None:
+            validation, = highlighted
+        else:
+            selected, validation = highlighted
+            assert expected_selection in selected
+        assert validation == f" {expected_validation} "
+        if expected_selection is None:
+            logging.info(f"Validate dialog using {expected_validation!r}")
+        else:
+            logging.info(f"Validate {expected_selection!r} selection using {expected_validation!r}")
+        channel.send(b"\r")
+
+    wait_for_dialog("Select Keymap")
+    send_tab()
+    validate(expected_selection="[qwerty] us")
+
+    wait_for_dialog("Welcome to XCP-ng Setup")
+    validate()
+
+    wait_for_dialog("End User Agreement")
+    send_tab()
+    validate(expected_validation="Accept EUA")
+
+    wait_for_dialog("Select Primary Disk")
+    send_tab()
+    validate(expected_selection="nvme0n1")
+
+    wait_for_dialog("Virtual Machine Storage")
+    send_tab()
+    validate(expected_selection="nvme0n1")
+
+    wait_for_dialog("Virtual Machine Storage Type")
+    send_tab(n=2)
+    validate()
+
+    wait_for_dialog("Select Installation Source")
+    send_tab()
+    validate(expected_selection="Local media")
+
+    wait_for_dialog("Verify Installation Source")
+    send_up()
+    send_tab()
+    validate(expected_selection="Skip verification")
+
+    wait_for_dialog("Set Password")
+    send_password(n=2)
+    validate()
+
+    wait_for_dialog("Networking", discriminant="IPv4")
+    send_tab(n=3)
+    validate()
+
+    wait_for_dialog("Networking", discriminant="DHCP")
+    send_tab(n=3)
+    validate()
+
+    wait_for_dialog("Hostname and DNS Configuration")
+    send_tab(n=5)
+    validate()
+
+    wait_for_dialog("Select Time Zone", discriminant="Africa")
+    send_pagedown()
+    send_tab()
+    validate(expected_selection="Europe")
+
+    wait_for_dialog("Select Time Zone", discriminant="Amsterdam")
+    send_pagedown(n=4)
+    send_tab()
+    validate(expected_selection="Paris")
+
+    wait_for_dialog("System Time")
+    send_tab()
+    validate(expected_selection="Use DHCP NTP servers")
+
+    wait_for_dialog("Confirm Installation")
+    send_tab()
+    validate(expected_validation="Install XCP-ng")
 
     channel.settimeout(600)
-    _installation_complete_dialog = wait_for_dialog(channel, b"Installation Complete")
+    wait_for_dialog("Installation Complete")
 
+def show_screen(screen: pyte.Screen) -> str:
+    ANSI_RESET = "\033[0m"
+    ANSI_BOLD = "\033[1m"
+    ANSI_REVERSE = "\033[7m"
 
-def wait_for_dialog(
-    channel: paramiko.Channel, title: bytes,
-    dialog: bytes = b"", delay: float = 1.0,
-) -> bytes:
-    logging.info(f"Wait for {title!r} dialog title")
-    while title not in dialog:
-        dialog += channel.recv(1024)
-    logging.info(f"Wait for {title!r} dialog to stabilize")
-    time.sleep(delay)
-    while channel.recv_ready():
-        dialog += channel.recv(1024)
-    return dialog
+    columns = screen.columns
 
-def show_dialog(dialog: bytes) -> None:
-    """Helper to use when debugging the dialogs"""
-    print("\x1b[2J\x1b[H" + dialog.decode() + "\x1b[24H\n")
+    # 1. Draw the top border
+    result = ["┌" + "─" * columns + "┐"]
+
+    # 2. Draw each row with left and right borders
+    for row_idx in range(screen.lines):
+        row = screen.buffer[row_idx]
+
+        # Start with the left border wall
+        row_str = "│"
+
+        for col_idx in range(columns):
+            char = row[col_idx]
+
+            fmt = ""
+            if char.bold:
+                fmt += ANSI_BOLD
+            if char.reverse:
+                fmt += ANSI_REVERSE
+
+            if fmt:
+                row_str += f"{fmt}{char.data}{ANSI_RESET}"
+            else:
+                row_str += char.data
+
+        # Cap the line with the right border wall
+        row_str += "│"
+
+        result.append(row_str)
+
+    # 3. Draw the bottom border
+    result.append("└" + "─" * columns + "┘")
+    return "\n".join(result)
+
+def get_highlighted(screen: pyte.Screen) -> list[str]:
+    highlighted = []
+    for i in range(screen.lines):
+        row = screen.buffer[i]
+        previously_reversed = False
+        for j in range(screen.columns):
+            char = row[j]
+            if char.reverse and not previously_reversed:
+                highlighted.append("")
+            if char.reverse:
+                highlighted[-1] += char.data
+            previously_reversed = char.reverse
+    return highlighted
 
 
 @pytest.mark.dependency()
