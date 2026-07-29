@@ -518,16 +518,16 @@ class Host:
 
             yum update -y
             # with enablerepos
-            yum update -y --enablerepo=extra1 --enablerepos=extra2
+            yum update -y --disablerepo='*' --enablerepo=extra1 --enablerepos=extra2
 
-        :param enablerepos: Enable one or more repositories (default: []).
+        :param enablerepos: Enable one or more repositories (default: []) if present disable other repos
         """
         base_command = "yum update -y"
 
         logging.info(f"[{self}] Updating packages...")
         if enablerepos:
             extra = " ".join(f"--enablerepo={r}" for r in enablerepos)
-            base_command = f"{base_command} {extra}"
+            base_command = f"{base_command} --disablerepo='*' {extra}"
 
         return self.ssh(base_command)
 
