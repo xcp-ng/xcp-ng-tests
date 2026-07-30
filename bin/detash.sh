@@ -49,7 +49,7 @@ About:
 Attaching running screen session:
 
   screen -ls
-  screen -r jenkins-test-42 # Ctrl+a d (to deatch again)
+  screen -r jenkins-test-42 # Ctrl+a d (to detach again)
   ssh -t $USER@$HOSTNAME screen -r
 
 Notes:
