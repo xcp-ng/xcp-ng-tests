@@ -65,7 +65,7 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize_on_inflate_after_setSize(
+    def test_failing_resize_vdi_on_inflate_after_setSize(
         self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM, exit_on_fistpoint: None
     ) -> None:
         vm = vm_on_lvm_sr
@@ -93,7 +93,7 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize_on_inflate_after_setSizePhys(
+    def test_failing_resize_vdi_on_inflate_after_setSizePhys(
         self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM, exit_on_fistpoint: None
     ) -> None:
         vm = vm_on_lvm_sr
