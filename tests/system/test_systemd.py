@@ -23,6 +23,11 @@ white_list_issues = [
 
 pytest.fixture(scope='module')
 def test_verify_default_target(host: Host) -> None:
+    # Look at what is using memory
+    # TODO: to remove
+    host.ssh('ps -eo pid,ppid,%mem,rss,args ww --sort=-rss | head -n 11')
+    host.ssh('free')
+
     analyse = host.ssh('systemd-analyze verify default.target')
     err = False
     polkit_msg = "Cannot add dependency job for unit polkit.service, ignoring: Unit not found."
