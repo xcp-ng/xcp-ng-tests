@@ -75,13 +75,14 @@ class TestGuestToolsWindows:
     def test_drivers_detected(self, vm_install_test_tools_per_test_class: VM) -> None:
         pass
 
-    def test_vif_replug(self, vm_install_test_tools_per_test_class: VM) -> None:
+    @pytest.mark.parametrize("force", (False, True))
+    def test_vif_replug(self, vm_install_test_tools_per_test_class: VM, force: bool) -> None:
         vm = vm_install_test_tools_per_test_class
         for _iter in range(3):
             vifs = vm.vifs()
             for vif in vifs:
                 assert strtobool(vif.param_get("currently-attached"))
-                vif.unplug()
+                vif.unplug(force=force)
                 # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
                 # TODO reference: XCPNG-1395
                 assert not strtobool(vif.param_get("currently-attached"))
