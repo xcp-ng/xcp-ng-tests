@@ -20,7 +20,7 @@ def _command_update(args: argparse.Namespace) -> None:
     else:
         inventory = into_inventory(args.hosts, args.repos, args.hosting_pool, disabled_repositories=args.disablerepos)
 
-    update_pools(inventory)
+    update_pools(inventory, reboot=args.reboot, parallel=args.parallel)
 
 
 def _command_clean(args: argparse.Namespace) -> None:
@@ -75,6 +75,19 @@ def cli() -> None:
         "--hosting-pool",
         type=HostAddress,
         help="Address (hostname|ip) of hosting pool's master host (nested context)",
+    )
+    subparser_cmd_update.add_argument(
+        "--no-reboot",
+        action="store_false",
+        dest="reboot",
+        default=True,
+        help="Don't reboot after update operation",
+    )
+    subparser_cmd_update.add_argument(
+        "--parallel",
+        action="store_true",
+        default=False,
+        help="Update the master and secondary hosts at the same time",
     )
     subparser_cmd_update.set_defaults(func=_command_update)
 
