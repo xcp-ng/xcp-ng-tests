@@ -50,7 +50,7 @@ def vm_with_tcpdump_scope_function(vm_with_tcpdump_scope_module: VM):
     yield vm
     vm.destroy()
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='function')
 def empty_network(host: Host) -> Generator[Network, None, None]:
     net = host.create_network(label="empty_network for tests")
     yield net
