@@ -11,6 +11,7 @@ from typing import TypeAlias, TypedDict
 
 class HostConfig(TypedDict):
     repositories: list[str]
+    disabled_repositories: list[str]
     hosting_pool: HostAddress | None
 
 
@@ -30,11 +31,13 @@ def load_inventory(inventory_path: Path) -> Inventory:
     inventory_hosts: HostConfigs = {}
     for h, config in hosts.items():
         repos = config.get("repositories", [])
+        disabled_repositories = config.get("disabled_repositories", [])
         hosting_pool = config.get("hosting_pool", None)
         if hosting_pool is None:
             hosting_pool = default.get("hosting_pool", None)
         host: HostConfig = {
             "repositories": repos or default.get("repositories", []),
+            "disabled_repositories": disabled_repositories or default.get("disabled_repositories", []),
             "hosting_pool": hosting_pool,
         }
         inventory_hosts[h] = host
@@ -44,7 +47,12 @@ def load_inventory(inventory_path: Path) -> Inventory:
     }
 
 
-def into_inventory(hosts: list[HostAddress], repositories: list[str], hosting_pool: HostAddress) -> Inventory:
+def into_inventory(
+    hosts: list[HostAddress],
+    repositories: list[str],
+    hosting_pool: HostAddress,
+    disabled_repositories: list[str] = [],
+) -> Inventory:
     """Create an inventory object from arguments.
 
     Basically, it is used as compatibility when we don't want inventory from file.
@@ -53,6 +61,7 @@ def into_inventory(hosts: list[HostAddress], repositories: list[str], hosting_po
     for h in hosts:
         host: HostConfig = {
             "repositories": repositories or [],
+            "disabled_repositories": disabled_repositories or [],
             "hosting_pool": hosting_pool or None,
         }
         inventory_hosts[h] = host

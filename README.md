@@ -654,7 +654,7 @@ For each pool target :
 
 1. Update master host of the pool:
   * Clean cached metadata
-  * Update with repository manager (yum): Optionally enables repositories
+  * Update with repository manager (yum): Optionally enables or disables repositories
   * Reboot
 2. Get other hosts of the pool
   * Repeat step `1.` for each host
@@ -679,6 +679,7 @@ Take a look at an example inventory file:
 
 [default]
 repositories = ["xcp-ng-base"]
+disabled_repositories = ["epel"]
 hosting_pool = "A"
 
 [hosts]
@@ -696,6 +697,9 @@ hosting_pool = "B"
 > * Config values under `hosts` override values under `default`. For instance, the above inventory would produce
 > the following python dict:
 >
-> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
+> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'disabled_repositories': ['epel'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
+>
+> * `disabled_repositories` disables one or more repositories during the update. It can be set under `default` or overridden per host, and can also be passed with the `-x/--disablerepo` flag.
+> * `*` as a repository value disables **all** repositories (e.g. `disabled_repositories = ["*"]`).
 >
 > * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.

@@ -18,7 +18,7 @@ def _command_update(args: argparse.Namespace) -> None:
     if args.inventory:
         inventory = load_inventory(args.inventory)
     else:
-        inventory = into_inventory(args.hosts, args.repos, args.hosting_pool)
+        inventory = into_inventory(args.hosts, args.repos, args.hosting_pool, disabled_repositories=args.disablerepos)
 
     update_pools(inventory)
 
@@ -62,6 +62,13 @@ def cli() -> None:
         action="append",
         dest="repos",
         help="repositories to enable when updating",
+    )
+    subparser_cmd_update.add_argument(
+        "-x", "--disablerepo",
+        metavar="REPO",
+        action="append",
+        dest="disablerepos",
+        help="repositories to disable when updating",
     )
     subparser_cmd_update.add_argument(
         "-P",
