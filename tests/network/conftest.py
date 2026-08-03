@@ -53,7 +53,14 @@ def vm_with_tcpdump_scope_function(vm_with_tcpdump_scope_module: VM):
 @pytest.fixture(scope='function')
 def empty_network(host: Host) -> Generator[Network, None, None]:
     net = host.create_network(label="empty_network for tests")
+
     yield net
+
+    for vif_uuid in net.vif_uuids():
+        host.xe("vif-unplug", {
+            'uuid': vif_uuid,
+        })
+
     net.destroy()
 
 @pytest.fixture(scope='function')
