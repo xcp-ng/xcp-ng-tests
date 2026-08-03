@@ -536,6 +536,9 @@ class Host:
 
         An helper function that wraps update tasks on current host.
 
+        When reboot is requested, the host is only rebooted if packages were
+        actually updated.
+
         :param list[str] enablerepos:
             Repositories to enable when updating.
         :param bool reboot:
@@ -544,10 +547,12 @@ class Host:
         logging.info(f"[{self}] Updating...")
 
         self.yum_clean_metadata()
-        self.yum_update(enablerepos=enablerepos)
-        if reboot:
+        output = self.yum_update(enablerepos=enablerepos)
+        if reboot and "No packages marked for update" not in output:
             # Everything's ok, just reboot
             self.reboot(verify=True)
+        elif reboot:
+            logging.info(f"[{self}] No packages updated, skipping reboot")
 
         logging.info(f"[{self}] Updated successfully!")
 
