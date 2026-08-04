@@ -13,8 +13,7 @@ from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import vdi_is_open
-
-from .conftest import GROUP_NAME, LINSTOR_PACKAGE
+from tests.storage.linstor.pkgfixtures import GROUP_NAME, LINSTOR_PACKAGE
 
 from typing import Tuple
 
