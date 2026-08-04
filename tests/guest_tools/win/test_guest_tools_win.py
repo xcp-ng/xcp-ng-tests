@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 import logging
-import time
 
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
@@ -83,10 +82,6 @@ class TestGuestToolsWindows:
             for vif in vifs:
                 assert strtobool(vif.param_get("currently-attached"))
                 vif.unplug(force=force)
-                # HACK: Allow some time for the unplug to settle. If not, Windows guests have a tendency to explode.
-                # TODO reference: XCPNG-1395
-                assert not strtobool(vif.param_get("currently-attached"))
-                time.sleep(5)
                 vif.plug()
             wait_for(vm.is_ssh_up, "Wait for SSH up")
 
