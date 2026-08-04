@@ -107,11 +107,11 @@ class TestGuestToolsWindows:
             check_vm_distro(vm)
             check_vm_clipboard(vm)
 
-    def test_reporting_after_suspend(self, vm_install_test_tools_per_test_class: VM) -> None:
+    def test_reporting_after_migration(self, vm_install_test_tools_per_test_class: VM) -> None:
         vm = vm_install_test_tools_per_test_class
+        residence = vm.get_residence_host()
         for _iter in range(3):
-            vm.suspend(verify=True)
-            vm.resume()
+            vm.migrate(residence)
             wait_for_vm_running_and_ssh_up_without_tools(vm)
             check_vm_distro(vm)
             check_vm_clipboard(vm)
