@@ -13,6 +13,54 @@ from lib.tools.tasks.snapshot import create_snapshots
 
 from .. import logger
 
+def _capture_packages(pools: list[Pool]) -> dict[Host, set[str]]:
+    """Snapshot the installed packages of every host in the pools."""
+    return {h: set(h.packages()) for p in pools for h in p.hosts}
+
+def _filter_packages(pkgs: set[str]) -> set[str]:
+    return {p for p in pkgs if not p.startswith("gpg-pubkey-")}
+
+def _format_packages(pkgs: list[str]) -> str:
+    return "\n".join(f"  - {p}" for p in pkgs)
+
+def _report_updated(before: dict[Host, set[str]], after: dict[Host, set[str]]) -> None:
+    """Log a summary of the packages that were updated on each host."""
+    updated = {
+        h: _filter_packages(after[h] - pkgs) for h, pkgs in before.items()
+    }
+    common_updated = set.intersection(*updated.values()) if updated else set()
+
+    if not common_updated:
+        logger.info("No packages were updated on any host.")
+        return
+    logger.info(
+        f"Updated packages on all hosts ({len(common_updated)}):\n"
+        f"{_format_packages(sorted(common_updated))}"
+    )
+    for h, pkgs in updated.items():
+        extra = sorted(pkgs - common_updated)
+        if extra:
+            logger.info(
+                f"Additional packages on [{h}] ({len(extra)}):\n"
+                f"{_format_packages(extra)}"
+            )
+
+def _check_consistency(packages: dict[Host, set[str]]) -> None:
+    """Warn if not all hosts end up with the same set of packages."""
+    common_set = set.intersection(*packages.values())
+    inconsistent = {
+        h: _filter_packages(p) - _filter_packages(common_set)
+        for h, p in packages.items() if _filter_packages(p) != _filter_packages(common_set)
+    }
+    if inconsistent:
+        lines = [
+            f"Not all hosts have the same set of packages "
+            f"(reference: common set of {len(packages)} hosts):"
+        ]
+        for h, extra_pkgs in inconsistent.items():
+            lines.append(f"  [{h}] additional packages:\n{_format_packages(sorted(extra_pkgs))}")
+        logger.warning("\n".join(lines))
+
 def update_pools(inventory: Inventory) -> None:
     """Updates hosts in pool(s).
 
@@ -42,6 +90,8 @@ def update_pools(inventory: Inventory) -> None:
                     nested_hosts[hosting_pool] = [h for h in p.hosts if h.is_nested]
         except NotAMasterHostError:
             logger.warning(f"[{host}] Skipping: not a master host")
+
+    before_packages = _capture_packages(pools)
 
     # update master hosts
     with ThreadPoolExecutor() as executor:
@@ -79,6 +129,10 @@ def update_pools(inventory: Inventory) -> None:
                     "Waiting for running updates to finish if any. ***"
                 )
                 raise exc
+
+    after_packages = _capture_packages(pools)
+    _report_updated(before_packages, after_packages)
+    _check_consistency(after_packages)
 
     # Snapshot creation
     for hosting_pool, nested in nested_hosts.items():
