@@ -11,6 +11,7 @@ from pathlib import Path
 from lib.common import HostAddress
 from lib.tools import logger
 from lib.tools.inventory import into_inventory, load_inventory
+from lib.tools.tasks.clean import clean_pools
 from lib.tools.tasks.update import update_pools
 
 def _command_update(args: argparse.Namespace) -> None:
@@ -20,6 +21,15 @@ def _command_update(args: argparse.Namespace) -> None:
         inventory = into_inventory(args.hosts, args.repos, args.hosting_pool)
 
     update_pools(inventory)
+
+
+def _command_clean(args: argparse.Namespace) -> None:
+    if args.inventory:
+        inventory = load_inventory(args.inventory)
+    else:
+        inventory = into_inventory(args.hosts, [], args.hosting_pool)
+
+    clean_pools(inventory, dry_run=args.dry_run)
 
 
 def cli() -> None:
@@ -60,6 +70,31 @@ def cli() -> None:
         help="Address (hostname|ip) of hosting pool's master host (nested context)",
     )
     subparser_cmd_update.set_defaults(func=_command_update)
+
+    # subparser - command: clean
+    subparser_cmd_clean = subparsers.add_parser(
+        name="clean",
+        description="Remove all VMs and all VDIs on local storage from target pools",
+        help="Remove all VMs and all VDIs on local storage from target pools",
+    )
+    cmd_clean_excl_grp = subparser_cmd_clean.add_mutually_exclusive_group(required=True)
+    cmd_clean_excl_grp.add_argument(
+        "-H",
+        "--hosts",
+        type=HostAddress,
+        metavar="HOST",
+        nargs="+",
+        help="Address (hostname|ip) of the master host in pool",
+    )
+    cmd_clean_excl_grp.add_argument("-i", "--inventory", type=Path, help="Use an hosts inventory file")
+    subparser_cmd_clean.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Only display what would be removed, without deleting anything",
+    )
+    subparser_cmd_clean.set_defaults(func=_command_clean)
 
     args = parser.parse_args()
 
