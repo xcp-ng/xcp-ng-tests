@@ -511,7 +511,7 @@ class Host:
         logging.info(f"[{self}] Removing cache metadata...")
         return self.ssh("yum clean metadata -q")
 
-    def yum_update(self, enablerepos: list[str] = []) -> str:
+    def yum_update(self, enablerepos: list[str] = [], disablerepos: list[str] = []) -> str:
         """Updates packages on target.
 
         Performs the following shell command::
@@ -519,19 +519,25 @@ class Host:
             yum update -y
             # with enablerepos
             yum update -y --enablerepo=extra1 --enablerepos=extra2
+            # with disablerepos
+            yum update -y --disablerepo=extra1 --disablerepos=extra2
 
-        :param enablerepos: Enable one or more repositories (default: []).
+        :param enablerepos: Enable one or more repositories (default: [])
+        :param disablerepos: Disable one or more repositories (default: [])
         """
         base_command = "yum update -y"
 
         logging.info(f"[{self}] Updating packages...")
+        if disablerepos:
+            extra = " ".join(f"--disablerepo={r}" for r in disablerepos)
+            base_command = f"{base_command} {extra}"
         if enablerepos:
             extra = " ".join(f"--enablerepo={r}" for r in enablerepos)
             base_command = f"{base_command} {extra}"
 
         return self.ssh(base_command)
 
-    def update(self, enablerepos: list[str] = [], reboot: bool = True) -> None:
+    def update(self, enablerepos: list[str] = [], disablerepos: list[str] = [], reboot: bool = True) -> None:
         """Updates current host.
 
         An helper function that wraps update tasks on current host.
@@ -541,13 +547,15 @@ class Host:
 
         :param list[str] enablerepos:
             Repositories to enable when updating.
+        :param list[str] disablerepos:
+            Repositories to disable when updating.
         :param bool reboot:
             Choose to reboot or not after update (default: True).
         """
         logging.info(f"[{self}] Updating...")
 
         self.yum_clean_metadata()
-        output = self.yum_update(enablerepos=enablerepos)
+        output = self.yum_update(enablerepos=enablerepos, disablerepos=disablerepos)
         if reboot and "No packages marked for update" not in output:
             # Everything's ok, just reboot
             self.reboot(verify=True)

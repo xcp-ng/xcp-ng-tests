@@ -96,7 +96,10 @@ def update_pools(inventory: Inventory) -> None:
     # update master hosts
     with ThreadPoolExecutor() as executor:
         future_masters = {executor.submit(
-            p.master.update, inventory_hosts[p.master.hostname_or_ip]["repositories"]): p.master for p in pools}
+            p.master.update,
+            inventory_hosts[p.master.hostname_or_ip]["repositories"],
+            disablerepos=inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"],
+        ): p.master for p in pools}
         for future in as_completed(future_masters):
             future_master = future_masters[future]
             try:
@@ -117,7 +120,8 @@ def update_pools(inventory: Inventory) -> None:
             for h in p.hosts[1:]:
                 # repos are the same as for the master host
                 repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
-                future_other_hosts[executor.submit(h.update, repos)] = h
+                disablerepos = inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"]
+                future_other_hosts[executor.submit(h.update, repos, disablerepos=disablerepos)] = h
         for future in as_completed(future_other_hosts):
             other_host = future_other_hosts[future]
             try:
