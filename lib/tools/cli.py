@@ -24,13 +24,13 @@ def _command_update(args: argparse.Namespace) -> None:
     update_pools(inventory, reboot=args.reboot, parallel=args.parallel)
 
 
-def _command_clean(args: argparse.Namespace) -> None:
+def _command_clean(args: argparse.Namespace) -> int:
     if args.inventory:
         inventory = load_inventory(args.inventory)
     else:
         inventory = into_inventory(args.hosts, [], args.hosting_pool)
 
-    clean_pools(inventory, dry_run=args.dry_run)
+    return clean_pools(inventory, dry_run=args.dry_run)
 
 
 def _command_exec(args: argparse.Namespace) -> int:
