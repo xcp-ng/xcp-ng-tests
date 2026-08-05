@@ -12,6 +12,7 @@ from lib.common import HostAddress
 from lib.tools import logger
 from lib.tools.inventory import into_inventory, load_inventory
 from lib.tools.tasks.clean import clean_pools
+from lib.tools.tasks.exec import exec_pools
 from lib.tools.tasks.update import update_pools
 
 def _command_update(args: argparse.Namespace) -> None:
@@ -30,6 +31,16 @@ def _command_clean(args: argparse.Namespace) -> None:
         inventory = into_inventory(args.hosts, [], args.hosting_pool)
 
     clean_pools(inventory, dry_run=args.dry_run)
+
+
+def _command_exec(args: argparse.Namespace) -> int:
+    if args.inventory:
+        inventory = load_inventory(args.inventory)
+    else:
+        inventory = into_inventory(args.hosts, [], None)
+
+    command = " ".join(args.command)
+    return exec_pools(inventory, command, parallel=args.parallel, dry_run=args.dry_run, reboot=args.reboot)
 
 
 def cli() -> None:
@@ -116,9 +127,55 @@ def cli() -> None:
     )
     subparser_cmd_clean.set_defaults(func=_command_clean)
 
+    # subparser - command: exec
+    subparser_cmd_exec = subparsers.add_parser(
+        name="exec",
+        description="Run the same command on all hosts of target pools",
+        help="Run the same command on all hosts of target pools",
+    )
+    cmd_exec_excl_grp = subparser_cmd_exec.add_mutually_exclusive_group(required=True)
+    cmd_exec_excl_grp.add_argument(
+        "-H",
+        "--hosts",
+        type=HostAddress,
+        metavar="HOST",
+        nargs="+",
+        help="Address (hostname|ip) of the master host in pool",
+    )
+    cmd_exec_excl_grp.add_argument("-i", "--inventory", type=Path, help="Use an hosts inventory file")
+    subparser_cmd_exec.add_argument(
+        "--parallel",
+        action="store_true",
+        default=False,
+        help="Run the command on the master and secondary hosts at the same time",
+    )
+    subparser_cmd_exec.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Only log what would be run, without running anything",
+    )
+    subparser_cmd_exec.add_argument(
+        "-r",
+        "--reboot",
+        action="store_true",
+        default=False,
+        help="Reboot each host after running the command",
+    )
+    subparser_cmd_exec.add_argument(
+        "command",
+        metavar="COMMAND",
+        nargs="+",
+        help="Command to run on every host",
+    )
+    subparser_cmd_exec.set_defaults(func=_command_exec)
+
     args = parser.parse_args()
 
     if args.debug:
         logger.setLevel(logging.DEBUG)
 
-    args.func(args)
+    exit_code = args.func(args)
+    if exit_code:
+        raise SystemExit(exit_code)
