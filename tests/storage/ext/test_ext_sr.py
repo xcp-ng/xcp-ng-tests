@@ -106,7 +106,7 @@ class TestEXTSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_resize(self, vm_on_ext_sr: VM) -> None:
+    def test_resize_vdi(self, vm_on_ext_sr: VM) -> None:
         vm = vm_on_ext_sr
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
         old_size = vdi.get_virtual_size()
@@ -118,7 +118,7 @@ class TestEXTSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize(self, host: Host, ext_sr: SR, vm_on_ext_sr: VM, exit_on_fistpoint: None) -> None:
+    def test_failing_resize_vdi(self, host: Host, ext_sr: SR, vm_on_ext_sr: VM, exit_on_fistpoint: None) -> None:
         vm = vm_on_ext_sr
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
         old_size = vdi.get_virtual_size()
