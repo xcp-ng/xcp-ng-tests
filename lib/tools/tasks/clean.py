@@ -59,6 +59,10 @@ def clean_pool(pool: Pool, dry_run: bool) -> None:
         'vm-list',
         {'is-control-domain': False, 'is-a-template': False},
         minimal=True,
+    )) + safe_split(master.xe(
+        'vm-list',
+        {'is-a-snapshot': True},
+        minimal=True,
     ))
     for vm_uuid in vm_uuids:
         vm = VM(vm_uuid, master)

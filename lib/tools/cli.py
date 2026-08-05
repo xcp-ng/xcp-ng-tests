@@ -105,8 +105,8 @@ def cli() -> None:
     # subparser - command: clean
     subparser_cmd_clean = subparsers.add_parser(
         name="clean",
-        description="Remove all VMs and all VDIs on local storage from target pools",
-        help="Remove all VMs and all VDIs on local storage from target pools",
+        description="Remove all VMs, snapshorts and VDIs on local storage from target pools",
+        help="Remove all VMs, snapshorts and VDIs on local storage from target pools",
     )
     cmd_clean_excl_grp = subparser_cmd_clean.add_mutually_exclusive_group(required=True)
     cmd_clean_excl_grp.add_argument(
