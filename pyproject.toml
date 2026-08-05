@@ -38,6 +38,7 @@ dev = [
     "prek",
     "autopep8",
     "types-passlib",
+    "icecream",
 ]
 
 [tool.pyright]
