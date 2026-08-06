@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.vm import VM
@@ -64,3 +65,72 @@ class VIF:
     def unplug(self, force: bool = False) -> None:
         logging.info("Unplugging VIF %s on VM %s", self.param_get('device'), self.vm.uuid)
         self.vm.host.xe('vif-unplug', {'uuid': self.uuid, 'force': force})
+
+    def _configure(
+        self,
+        address_family: str,
+        mode: str,
+        address: str | None = None,
+        gateway: str | None = None,
+    ) -> None:
+        args: dict[str, str | bool | dict[str, str]] = {"uuid": self.uuid, "mode": mode}
+        if address is not None:
+            args["address"] = address
+        if gateway is not None:
+            args["gateway"] = gateway
+        self.vm.host.xe(f"vif-configure-{address_family}", args)
+        # HACK: xe returns after publishing the request, before the guest has acknowledged it. Give the guest time to
+        # consume it so a following request cannot overwrite the pending one.
+        time.sleep(5)
+
+    @overload
+    def configure_ipv4(
+        self,
+        mode: Literal["static"],
+        address: str,
+        gateway: str | None = None,
+    ) -> None:  #
+        ...
+
+    @overload
+    def configure_ipv4(
+        self,
+        mode: Literal["dhcp"] | Literal["none"],
+        address: None = None,
+        gateway: None = None,
+    ) -> None:  #
+        ...
+
+    def configure_ipv4(
+        self,
+        mode: str,
+        address: str | None = None,
+        gateway: str | None = None,
+    ) -> None:
+        self._configure("ipv4", mode, address, gateway)
+
+    @overload
+    def configure_ipv6(
+        self,
+        mode: Literal["static"],
+        address: str,
+        gateway: str | None = None,
+    ) -> None:  #
+        ...
+
+    @overload
+    def configure_ipv6(
+        self,
+        mode: Literal["autoconf"] | Literal["none"],
+        address: None = None,
+        gateway: None = None,
+    ) -> None:  #
+        ...
+
+    def configure_ipv6(
+        self,
+        mode: str,
+        address: str | None = None,
+        gateway: str | None = None,
+    ) -> None:
+        self._configure("ipv6", mode, address, gateway)
