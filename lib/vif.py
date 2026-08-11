@@ -61,6 +61,6 @@ class VIF:
         logging.info("Plugging VIF %s on VM %s", self.param_get('device'), self.vm.uuid)
         self.vm.host.xe('vif-plug', {'uuid': self.uuid})
 
-    def unplug(self) -> None:
+    def unplug(self, force: bool = False) -> None:
         logging.info("Unplugging VIF %s on VM %s", self.param_get('device'), self.vm.uuid)
-        self.vm.host.xe('vif-unplug', {'uuid': self.uuid})
+        self.vm.host.xe('vif-unplug', {'uuid': self.uuid, 'force': force})
