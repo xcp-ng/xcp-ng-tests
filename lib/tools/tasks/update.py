@@ -61,7 +61,7 @@ def _check_consistency(packages: dict[Host, set[str]]) -> None:
             lines.append(f"  [{h}] additional packages:\n{_format_packages(sorted(extra_pkgs))}")
         logger.warning("\n".join(lines))
 
-def update_pools(inventory: Inventory) -> None:
+def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = False) -> None:
     """Updates hosts in pool(s).
 
     .. note::
@@ -72,6 +72,10 @@ def update_pools(inventory: Inventory) -> None:
 
     :param dict inventory:
         Each host (key) holds its own config data (values, eg: `enablerepos`).
+    :param bool reboot:
+        Choose to reboot or not after update (default: True).
+    :param bool parallel:
+        Update the master and secondary hosts at the same time (default: False).
     """
     logger.debug(f"Inventory: {inventory}")
     inventory_hosts = inventory["hosts"]
@@ -95,44 +99,55 @@ def update_pools(inventory: Inventory) -> None:
 
     # update master hosts
     with ThreadPoolExecutor() as executor:
-        future_masters = {executor.submit(
+        future_hosts = {executor.submit(
             p.master.update,
             inventory_hosts[p.master.hostname_or_ip]["repositories"],
             disablerepos=inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"],
+            reboot=reboot,
         ): p.master for p in pools}
-        for future in as_completed(future_masters):
-            future_master = future_masters[future]
+        if parallel:
+            # update other hosts at the same time as the master hosts
+            for p in pools:
+                # omit first item because it is the pool's master
+                for h in p.hosts[1:]:
+                    # repos are the same as for the master host
+                    repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
+                    disablerepos = inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"]
+                    future_hosts[executor.submit(h.update, repos, disablerepos=disablerepos, reboot=reboot)] = h
+        for future in as_completed(future_hosts):
+            updated_host = future_hosts[future]
             try:
                 future.result()
             except Exception as exc:
-                logger.error(f"Updating pool has failed! The master {future_master} cannot be updated.")
+                logger.error(f"Updating pool has failed! The host {updated_host} cannot be updated.")
                 logger.info(
                     "*** Due to previous error, the pool updating task will stop. "
                     "Waiting for running updates to finish if any. ***"
                 )
                 raise exc
 
-    # update other hosts
-    with ThreadPoolExecutor() as executor:
-        future_other_hosts = {}
-        for p in pools:
-            # omit first item because it is the pool's master
-            for h in p.hosts[1:]:
-                # repos are the same as for the master host
-                repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
-                disablerepos = inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"]
-                future_other_hosts[executor.submit(h.update, repos, disablerepos=disablerepos)] = h
-        for future in as_completed(future_other_hosts):
-            other_host = future_other_hosts[future]
-            try:
-                future.result()
-            except Exception as exc:
-                logger.error(f"Updating pool has failed! The host {other_host} cannot be updated.")
-                logger.info(
-                    "*** Due to previous error, the pool updating task will stop. "
-                    "Waiting for running updates to finish if any. ***"
-                )
-                raise exc
+    if not parallel:
+        # update other hosts
+        with ThreadPoolExecutor() as executor:
+            future_other_hosts = {}
+            for p in pools:
+                # omit first item because it is the pool's master
+                for h in p.hosts[1:]:
+                    # repos are the same as for the master host
+                    repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
+                    disablerepos = inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"]
+                    future_other_hosts[executor.submit(h.update, repos, disablerepos=disablerepos, reboot=reboot)] = h
+            for future in as_completed(future_other_hosts):
+                other_host = future_other_hosts[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    logger.error(f"Updating pool has failed! The host {other_host} cannot be updated.")
+                    logger.info(
+                        "*** Due to previous error, the pool updating task will stop. "
+                        "Waiting for running updates to finish if any. ***"
+                    )
+                    raise exc
 
     after_packages = _capture_packages(pools)
     _report_updated(before_packages, after_packages)
