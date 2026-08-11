@@ -241,6 +241,12 @@ def safe_split(text: str, sep: str = ',') -> list[str]:
     """ A split function that returns an empty list if the input string is empty. """
     return text.split(sep) if len(text) > 0 else []
 
+def join_names(names: list[str]) -> str:
+    """Join names with commas and 'and' for display."""
+    if len(names) <= 2:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + f" and {names[-1]}"
+
 def strip_prefix(string: str, prefix: str) -> str:
     if sys.version_info >= (3, 9):
         return string.removeprefix(prefix)
