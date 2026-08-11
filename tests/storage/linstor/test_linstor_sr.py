@@ -255,12 +255,11 @@ class TestLinstorSR:
 
     @pytest.mark.reboot
     @pytest.mark.small_vm
-    @pytest.mark.upgrade_test
     def test_linstor_sr_pool_update(self, linstor_sr: SR, vm_on_linstor_sr: VM) -> None:
         """
         Perform update on the Linstor SR pool hosts while ensuring VM availability.
         1. Identify all hosts in the SR pool and order them with the master first.
-        2. Update all hosts if updates are available.
+        2. Update all hosts if updates are available from xcp-ng-linstor-testing.
         3. Reboot updated hosts.
         4. Sequentially ensure that the VM can start on all hosts.
         """
@@ -274,17 +273,18 @@ class TestLinstorSR:
 
         # RPU is disabled for pools with XOSTOR SRs.
         # LINSTOR expects that we always use satellites and controllers with the same version on all hosts.
-        def install_updates_on(host: Host) -> None:
-            logging.info("Checking on host %s", host.hostname_or_ip)
-            if host.has_updates(enablerepo="xcp-ng-linstor-testing"):
-                host.install_updates(enablerepo="xcp-ng-linstor-testing")
+        def update_host(host: Host) -> None:
+            logging.info("Updating host %s", host.hostname_or_ip)
+            host.yum_clean_metadata()
+            output = host.yum_update(enablerepos=["xcp-ng-linstor-testing"])
+            if "No packages marked for update" not in output:
                 with updates_lock:
                     updates_applied.append(host)
             else:
                 logging.info("No updates available for host %s", host.hostname_or_ip)
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(install_updates_on, hosts)
+            executor.map(update_host, hosts)
 
         # Reboot updated hosts
         def reboot_updated(host: Host) -> None:
@@ -300,8 +300,6 @@ class TestLinstorSR:
             vm.start(on=h.uuid)
             vm.wait_for_os_booted()
             vm.shutdown(verify=True)
-
-        sr.scan()
 
     # *** End of tests with reboots
 
