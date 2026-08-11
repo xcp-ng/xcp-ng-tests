@@ -17,6 +17,8 @@ dependencies = [
     "pytest-dependency",
     "requests",
     "ipdb",
+    "paramiko",
+    "pyte",
 ]
 
 [dependency-groups]
@@ -38,6 +40,7 @@ dev = [
     "prek",
     "autopep8",
     "types-passlib",
+    "types-paramiko",
 ]
 
 [tool.pyright]
