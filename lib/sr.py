@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import pytest
+
+import enum
+import functools
 import logging
+import re
+import shlex
 import time
 
 import lib.commands as commands
@@ -25,6 +31,36 @@ from typing import TYPE_CHECKING, Literal, overload
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.pool import Pool
+
+QUICKTEST_BIN = "/opt/xensource/debug/quicktest"
+
+QUICKTEST_SR_SUITES = (
+    "cbt,copy,SR tests,Quicktest_vdi,Quicktest_async_calls,"
+    "Quicktest_vm_import_export,Quicktest_vm_lifecycle,Quicktest_vm_snapshot,"
+    "Quicktest_vdi_ops_data_integrity,Quicktest_max_vdi_size,Quicktest_static_vdis"
+)
+
+QUICKTEST_COMMON_SUITES = (
+    "Quicktest_example,Quicktest_message,xenstore,event,import_raw_vdi,"
+    "Quicktest_date,Quicktest_crypt_r,http,unixext,Timer"
+)
+
+class QuicktestScoping(enum.Enum):
+    WITH_TAG_PARAM = enum.auto()
+    RUN_ONLY_PARAM = enum.auto()
+    NO_PARAM = enum.auto()
+
+@functools.lru_cache(maxsize=None)
+def _quicktest_scoping(hostname_or_ip: str) -> QuicktestScoping:
+    tags_output = commands.ssh_with_result(hostname_or_ip, f"{QUICKTEST_BIN} -list-tags")
+    if tags_output.returncode == 0 and re.search(r"^sr:", tags_output.stdout, re.MULTILINE):
+        return QuicktestScoping.WITH_TAG_PARAM
+
+    help_output = commands.ssh(hostname_or_ip, f"{QUICKTEST_BIN} -help", check=False)
+    if "-run-only" in help_output:
+        return QuicktestScoping.RUN_ONLY_PARAM
+
+    return QuicktestScoping.NO_PARAM
 
 class SR:
     xe_prefix = 'sr'
@@ -230,14 +266,29 @@ class SR:
         vdi_uuid = self.pool.master.xe('vdi-create', args)
         return VDI(vdi_uuid, sr=self)
 
-    def run_quicktest(self) -> None:
-        logging.info(f"Run quicktest on SR {self.uuid}")
+    def run_quicktest(self, sr_specific: bool = True) -> None:
+        scoping = _quicktest_scoping(self.pool.master.hostname_or_ip)
+        cmd = f"{QUICKTEST_BIN} -sr {self.uuid}"
+
+        if scoping is QuicktestScoping.WITH_TAG_PARAM:
+            cmd += " -with-tag sr" if sr_specific else " -without-tag sr"
+        elif scoping is QuicktestScoping.RUN_ONLY_PARAM:
+            suites = QUICKTEST_SR_SUITES if sr_specific else QUICKTEST_COMMON_SUITES
+            cmd += f" -run-only {shlex.quote(suites)}"
+        elif not sr_specific:
+            # QuicktestScoping.NO_PARAM: no way to select just the common suites, and every
+            # per-SR pass on this host is already unfiltered, so this run adds nothing.
+            pytest.skip("quicktest has no scoping support on this host; "
+                        "common suites are already covered by the per-SR runs.")
+
+        logging.info(f"Run quicktest on SR {self.uuid}: {cmd}")
+
         # Always display the output of quicktest, failed or not.
         # This will duplicate the output in some cases, but it ensures we always have it for failure analysis,
         # even when quicktest leaves SRs in a state which makes teardown fail (in this case, pytest often doesn't
         # manage to display the details of the failed command, for a reason unknown - no usable reproducer found)
         try:
-            output = self.pool.master.ssh(f'/opt/xensource/debug/quicktest -sr {self.uuid}')
+            output = self.pool.master.ssh(cmd)
             logging.info(f"Quicktest output: {output}")
         except commands.SSHCommandFailed as e:
             logging.error(f"Quicktest output: {e.stdout}")
