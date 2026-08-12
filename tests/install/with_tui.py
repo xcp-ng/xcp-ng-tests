@@ -13,6 +13,7 @@ from uuid import uuid4
 import paramiko
 import pyte
 
+from lib.commands import ssh
 from lib.common import Defer, wait_for
 from lib.host import Host
 from lib.vm import VM
@@ -21,10 +22,18 @@ from .test import helper_vm_with_plugged_disk
 
 from typing import Generator
 
+BUFFER_READ_SIZE = 8192
+
 def sha256(path: Path) -> str:
     with path.open("rb") as f:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
+def scan_for_mac_address(address: str, ip_range: str = "10.1.1-9.0-255") -> str | None:
+    from data import ARP_SERVER
+    awk = f"/Nmap scan report for/ {{ip=$5}} tolower($0) ~ /{address}/ {{print ip}}"
+    command = f"nmap -sn {ip_range} | awk '{awk}'"
+    output = ssh(ARP_SERVER, command).strip()
+    return output or None
 
 def vm_definition(firmware: str) -> dict:
     from data import NETWORKS
@@ -116,6 +125,9 @@ def test_install_with_tui(
     from data import HOST_DEFAULT_PASSWORD
 
     vm = vm_booted_with_original_installer
+    vif = vm.vifs()[0]
+    mac_address = vif.param_get('MAC')
+    assert mac_address is not None
     residence_host = vm.get_residence_host()
     dom_id = residence_host.xe(
         'vm-param-get',
@@ -139,17 +151,46 @@ def test_install_with_tui(
     logging.info(f"Connecting to serial line with {command!r}")
     channel.exec_command(command.encode())
     channel.settimeout(30.0)
-    stdout = channel.makefile('rb', -1)
 
+    grub_screen = pyte.Screen(columns=100, lines=32)
+    grub_screen.define_charset("U", "(")
+    grub_stream = pyte.ByteStream(grub_screen)
+    grub_stream.select_other_charset("@")
+
+    # Wait for grub to appear
+    while not any("`e' to edit the commands" in line for line in grub_screen.display):
+        grub_stream.feed(channel.recv(BUFFER_READ_SIZE))
+
+    # Wait for grub to stabilize
+    time.sleep(1)
+    while channel.recv_ready():
+        grub_stream.feed(channel.recv(BUFFER_READ_SIZE))
+    logging.info(f"Grub screen:\n{show_screen(grub_screen)}")
+
+    # Send:
+    # - ctrl-n (x3): Next line
+    # - ctrl-e: End of line
+    # - space + vmlinuz extra config
+    vmlinuz_extra_config = f"network_device=all sshpassword={HOST_DEFAULT_PASSWORD}".encode()
+    for char in b"e\x0e\x0e\x0e\x05 " + vmlinuz_extra_config:
+        channel.send(bytes([char]))
+        time.sleep(0.1)
+
+    # Wait for grub to stabilize
+    time.sleep(1)
+    while channel.recv_ready():
+        grub_stream.feed(channel.recv(BUFFER_READ_SIZE))
+    logging.info(f"Grub screen after edition:\n{show_screen(grub_screen)}")
+
+    # Send ctrl-x: Save and boot
+    channel.send(b"\x18")
+
+    # Initialize new screen
     screen = pyte.Screen(columns=80, lines=24)
     stream = pyte.ByteStream(screen)
 
-    # Wait for grub to finish
-    for line in stdout:
-        if b"Booting `install'" in line:
-            break
-
     # Wait for TUI to appear
+    stdout = channel.makefile('rb', -1)
     for line in stdout:
         assert isinstance(line, bytes)
 
@@ -181,39 +222,39 @@ def test_install_with_tui(
             any(wrapped_title in line for line in screen.display)
             and any(discriminant in line for line in screen.display)
         ):
-            stream.feed(channel.recv(1024))
+            stream.feed(channel.recv(BUFFER_READ_SIZE))
         logging.info(f"Wait for {title!r} dialog to stabilize")
         time.sleep(delay)
         while channel.recv_ready():
-            stream.feed(channel.recv(1024))
+            stream.feed(channel.recv(BUFFER_READ_SIZE))
         logging.info(f"{title!r} dialog reached\n{show_screen(screen)}")
 
     def send_tab(n: int = 1, delay: float = 1.0) -> None:
         channel.send(b"\t" * n)
         time.sleep(delay)
         while channel.recv_ready():
-            stream.feed(channel.recv(1024))
+            stream.feed(channel.recv(BUFFER_READ_SIZE))
         logging.info(f"Selection updated with {n} tab(s)\n{show_screen(screen)}")
 
     def send_up(n: int = 1, delay: float = 1.0) -> None:
         channel.send(b"\x1b[A" * n)
         time.sleep(delay)
         while channel.recv_ready():
-            stream.feed(channel.recv(1024))
+            stream.feed(channel.recv(BUFFER_READ_SIZE))
         logging.info(f"Selection updated with {n} up(s)\n{show_screen(screen)}")
 
     def send_password(n: int = 1, delay: float = 1.0) -> None:
         channel.send(f"{HOST_DEFAULT_PASSWORD}\t".encode() * 2)
         time.sleep(delay)
         while channel.recv_ready():
-            stream.feed(channel.recv(1024))
+            stream.feed(channel.recv(BUFFER_READ_SIZE))
         logging.info(f"Selection updated with {n} password(s)\n{show_screen(screen)}")
 
     def send_pagedown(n: int = 1, delay: float = 1.0) -> None:
         channel.send(b"\x1b[6~" * n)
         time.sleep(delay)
         while channel.recv_ready():
-            stream.feed(channel.recv(1024))
+            stream.feed(channel.recv(BUFFER_READ_SIZE))
         logging.info(f"Selection updated with {n} pagedown(s)\n{show_screen(screen)}")
 
     def validate(expected_selection: str | None = None, expected_validation: str = "Ok") -> None:
@@ -233,6 +274,16 @@ def test_install_with_tui(
     wait_for_dialog("Select Keymap")
     send_tab()
     validate(expected_selection="[qwerty] us")
+
+    # The host should soon get an IP
+    retries = 3
+    for i in range(retries):
+        ip = scan_for_mac_address(mac_address)
+        if ip is not None:
+            vm.ip = ip
+            logging.info(f"VM IP: {ip}")
+            break
+        logging.info(f"Could not get an IP address on attempt {i}")
 
     wait_for_dialog("Welcome to XCP-ng Setup")
     validate()
