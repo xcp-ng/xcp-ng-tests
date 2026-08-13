@@ -510,7 +510,7 @@ class Host:
             yum clean metadata -q
         """
         logging.info(f"[{self}] Removing cache metadata...")
-        return self.ssh("yum clean metadata -q")
+        return self.ssh("yum clean metadata -q --enablerepo='*'")
 
     def yum_update(self, enablerepos: list[str] = [], disablerepos: list[str] = []) -> str:
         """Updates packages on target.
@@ -571,7 +571,7 @@ class Host:
         if verify:
             self.wait_for_xapi_enabled()
 
-    def wait_for_host_down(self, timeout_secs: int = 2 * 60) -> None:
+    def wait_for_host_down(self, timeout_secs: int = 3 * 60) -> None:
         wait_for_not(
             lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
             f"[{self}] Wait for host down",
