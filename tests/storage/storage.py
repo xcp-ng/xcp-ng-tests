@@ -217,6 +217,9 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
     spans[1].validate(vm, dev)
     spans[2].validate(vm, dev)
 
+    # FIXME: force the GC run in case it failed (it shouldn't)
+    vdi.sr.scan()
+
     # trigger the coalesce
     vdi.wait_for_coalesce(new_vdi.destroy)
     new_vdi = None
