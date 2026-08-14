@@ -670,8 +670,8 @@ class Host:
         return self.ssh(f'yum remove -y {" ".join(packages)}')
 
     def packages(self) -> list[str]:
-        """ Returns the list of installed RPMs - with version, release, arch and epoch. """
-        return sorted(self.ssh('rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\n"').splitlines())
+        """Returns the list of installed RPMs - with epoch, version, release, arch."""
+        return sorted(self.ssh('rpm -qa --qf "%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n"').splitlines())
 
     def check_packages_available(self, packages: list[str]) -> bool:
         """ Check if a given package list is available in the YUM repositories. """

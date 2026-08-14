@@ -4,11 +4,12 @@ This module is intended for performing update actions on existing remote targets
 """
 from __future__ import annotations
 
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
-from lib.tools.inventory import Inventory
+from lib.tools.inventory import HostConfig, Inventory
 from lib.tools.tasks.snapshot import create_snapshots
 
 from .. import logger
@@ -22,6 +23,15 @@ def _filter_packages(pkgs: set[str]) -> set[str]:
 
 def _format_packages(pkgs: list[str]) -> str:
     return "\n".join(f"  - {p}" for p in pkgs)
+
+def _nevra_to_nvra(nevra: str) -> str:
+    return re.sub(r'-\d+:', '-', nevra)
+
+def _downgrade_command(host: Host, pkgs: set[str]) -> str:
+    """Return a `yum downgrade` command for the given installed packages."""
+    specs = " ".join(_nevra_to_nvra(p) for p in sorted(pkgs))
+    names = host.ssh(f"rpm -q --qf '%{{NAME}} ' {specs}").split()
+    return "yum downgrade -y " + " ".join(names)
 
 def _report_updated(before: dict[Host, set[str]], after: dict[Host, set[str]]) -> None:
     """Log a summary of the packages that were updated on each host."""
@@ -44,6 +54,51 @@ def _report_updated(before: dict[Host, set[str]], after: dict[Host, set[str]]) -
                 f"Additional packages on [{h}] ({len(extra)}):\n"
                 f"{_format_packages(extra)}"
             )
+
+def _check_packages_available(
+    pools: list[Pool],
+    inventory_hosts: dict[str, HostConfig],
+    packages: dict[Host, set[str]],
+) -> None:
+    """Warn about installed packages not available in the selected repositories."""
+    unavailable: dict[Host, set[str]] = {}
+    for p in pools:
+        master_cfg = inventory_hosts[p.master.hostname_or_ip]
+        repoquery_cmd = "repoquery --all"
+        for r in master_cfg["disabled_repositories"]:
+            repoquery_cmd += f" --disablerepo={r}"
+        for r in master_cfg["repositories"]:
+            repoquery_cmd += f" --enablerepo={r}"
+        available = set(p.master.ssh(repoquery_cmd).splitlines())
+        for h in p.hosts:
+            pkgs = _filter_packages(packages[h]) - available
+            if pkgs:
+                unavailable[h] = pkgs
+
+    if not unavailable:
+        logger.info("All installed packages are available in the selected repositories.")
+        return
+    common = set.intersection(*unavailable.values())
+    lines = []
+    downgrades = {h: _downgrade_command(h, pkgs) for h, pkgs in unavailable.items()}
+    if common:
+        lines.append(
+            f"Installed packages not available in the selected repositories on all hosts "
+            f"({len(common)}):\n{_format_packages(sorted(common))}"
+        )
+    for h, pkgs in unavailable.items():
+        extra = sorted(pkgs - common)
+        if extra:
+            lines.append(
+                f"Additional packages on [{h}] ({len(extra)}):\n{_format_packages(extra)}"
+            )
+    common_downgrade = next(iter(downgrades.values()))
+    if set(downgrades.values()) == {common_downgrade}:
+        lines.append(f"Downgrade command on all hosts:\n  {common_downgrade}")
+    else:
+        for h, cmd in downgrades.items():
+            lines.append(f"Downgrade command on [{h}]:\n  {cmd}")
+    logger.warning("\n".join(lines))
 
 def _check_consistency(packages: dict[Host, set[str]]) -> None:
     """Warn if not all hosts end up with the same set of packages."""
@@ -152,6 +207,7 @@ def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = Fal
     after_packages = _capture_packages(pools)
     _report_updated(before_packages, after_packages)
     _check_consistency(after_packages)
+    _check_packages_available(pools, inventory_hosts, after_packages)
 
     # Snapshot creation
     for hosting_pool, nested in nested_hosts.items():
