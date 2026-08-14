@@ -50,7 +50,7 @@ def load_inventory(inventory_path: Path) -> Inventory:
 def into_inventory(
     hosts: list[HostAddress],
     repositories: list[str],
-    hosting_pool: HostAddress,
+    hosting_pool: HostAddress | None,
     disabled_repositories: list[str] = [],
 ) -> Inventory:
     """Create an inventory object from arguments.
