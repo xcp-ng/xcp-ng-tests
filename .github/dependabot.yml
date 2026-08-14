@@ -10,6 +10,8 @@ updates:
       day: "sunday"
     cooldown:
       default-days: 7
+    commit-message:
+      prefix: "uv.lock: "
     groups:
       ci-deps:
         patterns:
@@ -23,6 +25,8 @@ updates:
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    commit-message:
+      prefix: "uv.lock: "
     groups:
       base-deps:
         dependency-type: "production"
