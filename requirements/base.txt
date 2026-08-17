@@ -1,8 +1,8 @@
 # generated with update_requirements.py, do not edit manually
-cryptography>=49.0.0
+cryptography>=50.0.0
 gitpython
 legacycrypt
-packaging>=26.2
+packaging>=26.3
 passlib
 pluggy>=1.1.0
 pydantic
