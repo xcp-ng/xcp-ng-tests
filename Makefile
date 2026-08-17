@@ -1,11 +1,11 @@
 # Makefile to run static code checkers locally
 # Equivalent to the GitHub Actions workflow in .github/workflows/code-checkers.yml
 
-.PHONY: all pyright ruff ruff-fix flake8 autopep8 autopep8-fix
+.PHONY: all pyright ruff ruff-fix flake8 autopep8 autopep8-fix pyrefly
 
 # By default, only run the non-fix version of the hooks so it doesn't modify any files
 # It runs on all files managed by git (untracked files are not checked)
-check: ruff autopep8 flake8 pyright
+check: ruff autopep8 flake8 pyrefly pyright
 
 # Use the `fix` directive to let autopep8 auto-format the code and ruff sort the imports
 # It runs on all files managed by git (untracked files are not modified)
@@ -19,5 +19,5 @@ vm_data.py:
 
 pyright ruff: data.py vm_data.py
 
-ruff ruff-fix autopep8 autopep8-fix flake8 pyright:
+ruff ruff-fix autopep8 autopep8-fix flake8 pyrefly pyright:
 	uv run prek -a $@
