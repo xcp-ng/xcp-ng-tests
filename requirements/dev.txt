@@ -8,6 +8,7 @@ icecream
 libarchive-c==5.3
 prek
 pydocstyle
+pyrefly
 pyright
 ruff
 types-passlib
