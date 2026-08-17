@@ -196,8 +196,6 @@ main_()
             screen -r "$1" || list_
             ;;
         *)
-            usage_ "$@"
-            list_
             [ -z "$1" ] || run_ "$@"
             ;;
     esac
