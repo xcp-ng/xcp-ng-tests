@@ -123,6 +123,8 @@ run_()
 {
     local defcol="\e[0m"
     local purplecol="\e[1;35m"
+    local domain=".$(domainname)"
+    [ "$domain" = ".(none)" ] && domain=""
 
     echo -e "${purplecol}================================================================================${defcol}"
 
@@ -131,11 +133,11 @@ run_()
 info: Start cmdline: $@
 info: Attempt to run in detached GNU screen named "${DETASH_NAME}" and trace
 info: On hanging please cancel job $pid or troubleshoot it using:
-info: screen -r "${DETASH_NAME}" # If logged on "$HOSTNAME.$(domainname)"
-info: ssh -t "$USER@$HOSTNAME.$(domainname)" screen -rx \"${DETASH_NAME}\" # One liner
-info: ssh -t "$USER@$HOSTNAME.$(domainname)" \"$SELF\" --attach \"${DETASH_NAME}\" # Or using wrapper
+info: screen -r "${DETASH_NAME}" # If logged on "$HOSTNAME$domain"
+info: ssh -t "$USER@$HOSTNAME$domain" screen -rx \"${DETASH_NAME}\" # One liner
+info: ssh -t "$USER@$HOSTNAME$domain" \"$SELF\" --attach \"${DETASH_NAME}\" # Or using wrapper
 
-info: If hostname "${HOSTNAME}.$(domainname)" is not resolvable then try to ssh to the following IPs:
+info: If hostname "${HOSTNAME}$domain" is not resolvable then try to ssh to the following IPs:
 
 $( ip a \
   | sed -n -e 's|.*inet[6]* \([0-9a-f\:.]*\)/.*|\1|p' \
