@@ -211,6 +211,9 @@ To customize settings for your environment:
 - `tools.py dump-config` / `migrate-data-py` print only the values that differ
   from the base `config.toml`; add `--all` to include the values that are the
   same too.
+- `tools.py diff-config CONFIG1 CONFIG2` — compare two config files and print
+  a unified diff (password hashes are ignored); exit code 0 when identical,
+  1 when they differ.
 
 The `--config` flag is optional. When not specified, the `XCPNG_CONFIG` env var
 is used if set. When neither is set:

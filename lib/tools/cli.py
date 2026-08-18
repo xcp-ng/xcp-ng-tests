@@ -65,6 +65,18 @@ def _command_migrate(args: argparse.Namespace) -> int:
                            include_defaults=args.all)
 
 
+def _command_diff_config(args: argparse.Namespace) -> int:
+    from lib.config_dump import config_diff
+
+    name_a = str(args.config1)
+    name_b = str(args.config2)
+    config_a = load_config(override=args.config1, apply_value_overrides=False).model_dump(by_alias=True)
+    config_b = load_config(override=args.config2, apply_value_overrides=False).model_dump(by_alias=True)
+    diff = config_diff(config_a, config_b, name_a, name_b, as_json=args.json)
+    print(diff, end="")
+    return 1 if diff else 0
+
+
 def _command_dump_config(args: argparse.Namespace) -> int:
     import json
 
@@ -295,6 +307,31 @@ def cli() -> None:
         help="Include the values that are the same as in config.toml",
     )
     subparser_cmd_dump.set_defaults(func=_command_dump_config)
+
+    # subparser - command: diff-config
+    subparser_cmd_diff = subparsers.add_parser(
+        name="diff-config",
+        parents=[common_parser],
+        description="Compare two config files and print their differences",
+        help="Compare two config files and print their differences",
+    )
+    subparser_cmd_diff.add_argument(
+        "config1",
+        metavar="CONFIG1",
+        help="First config file (.toml path or short name)",
+    )
+    subparser_cmd_diff.add_argument(
+        "config2",
+        metavar="CONFIG2",
+        help="Second config file (.toml path or short name)",
+    )
+    subparser_cmd_diff.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Compare the JSON representations instead of TOML",
+    )
+    subparser_cmd_diff.set_defaults(func=_command_diff_config)
 
     args = parser.parse_args()
 
