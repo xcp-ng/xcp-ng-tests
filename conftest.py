@@ -66,6 +66,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Config overlay: a .toml file path or profile name (default: config.local.toml or XCPNG_CONFIG)",
     )
     parser.addoption(
+        "--config-value",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Override a config value, e.g. host.default_password=foo (repeatable; highest priority)",
+    )
+    parser.addoption(
         "--nest",
         action="store",
         default=None,
@@ -140,7 +147,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     warn_legacy_data_py()
-    apply_override(config.getoption("--config"))
+    apply_override(config.getoption("--config"), config.getoption("--config-value"))
     from lib.config_loader import config as global_config
     ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     if ignore_ssh_banner is not None:
