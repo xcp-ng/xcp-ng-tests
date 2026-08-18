@@ -63,7 +63,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--config",
         action="store",
         default=None,
-        help="Config overlay: a .toml file path or profile name (default: auto-load config.local.toml)",
+        help="Config overlay: a .toml file path or profile name (default: config.local.toml or XCPNG_CONFIG)",
     )
     parser.addoption(
         "--nest",
