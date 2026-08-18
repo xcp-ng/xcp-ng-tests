@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import sys
 from pathlib import Path
 
 from lib.common import HostAddress
-from lib.config_loader import load_config
+from lib.config_loader import base_config_dict, load_config
 from lib.tools import logger
 from lib.tools.inventory import into_inventory, inventory_from_config
 from lib.tools.tasks.clean import clean_pools
@@ -59,7 +61,27 @@ def _command_exec(args: argparse.Namespace) -> int:
 
 
 def _command_migrate(args: argparse.Namespace) -> int:
-    return migrate_data_py(data_py=args.data_py, output=args.output, force=args.force)
+    return migrate_data_py(data_py=args.data_py, output=args.output, force=args.force,
+                           include_defaults=args.all)
+
+
+def _command_dump_config(args: argparse.Namespace) -> int:
+    import json
+
+    from lib.config_dump import colorize_toml, remove_defaults, render_toml
+
+    config = load_config(override=args.config).model_dump(by_alias=True)
+    if not args.all:
+        config = remove_defaults(config, base_config_dict())
+    if args.json:
+        print(json.dumps(config, indent=2, ensure_ascii=False))
+    else:
+        out = render_toml(config, with_schema=False)
+        use_color = args.color if args.color is not None else (
+            sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+        )
+        print(colorize_toml(out) if use_color else out)
+    return 0
 
 
 def cli() -> None:
@@ -206,6 +228,7 @@ def cli() -> None:
     # subparser - command: migrate-data-py
     subparser_cmd_migrate = subparsers.add_parser(
         name="migrate-data-py",
+        parents=[common_parser],
         description="Convert a legacy data.py file to a TOML config file",
         help="Convert a legacy data.py file to a TOML config file",
     )
@@ -227,7 +250,40 @@ def cli() -> None:
         default=False,
         help="Overwrite the output file if it already exists",
     )
+    subparser_cmd_migrate.add_argument(
+        "--all",
+        action="store_true",
+        default=False,
+        help="Keep the values that are the same as in config.toml instead of writing a delta-only overlay",
+    )
     subparser_cmd_migrate.set_defaults(func=_command_migrate)
+
+    # subparser - command: dump-config
+    subparser_cmd_dump = subparsers.add_parser(
+        name="dump-config",
+        parents=[common_parser],
+        description="Print the fully resolved configuration to stdout",
+        help="Print the fully resolved configuration to stdout",
+    )
+    subparser_cmd_dump.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Dump as JSON instead of TOML",
+    )
+    subparser_cmd_dump.add_argument(
+        "--color",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Colorize TOML output (default: auto, only when stdout is a TTY)",
+    )
+    subparser_cmd_dump.add_argument(
+        "--all",
+        action="store_true",
+        default=False,
+        help="Include the values that are the same as in config.toml",
+    )
+    subparser_cmd_dump.set_defaults(func=_command_dump_config)
 
     args = parser.parse_args()
 

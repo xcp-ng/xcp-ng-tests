@@ -402,35 +402,43 @@ def warn_legacy_data_py() -> None:
         )
 
 
-def _build_config(base_data: ConfigDict) -> Config:
-    """Apply env overrides and password hash replacement, then validate with Pydantic."""
-    base_data = _apply_env_overrides(base_data)
-    if "host" in base_data and isinstance(base_data["host"], dict):
-        host = base_data["host"]
-        password = host.get("default_password", "")
-        if not isinstance(password, str):
-            raise ConfigError("host.default_password must be a string")
-        password_hash = hash_password(password)
-        host["default_password_hash"] = password_hash
-        base_data = _replace_password_hash_placeholder(base_data, password_hash)
+def _build_config(
+    base_data: ConfigDict,
+    apply_value_overrides: bool = True,
+) -> Config:
+    """Apply env overrides and password hash replacement, then validate."""
     try:
+        if apply_value_overrides:
+            base_data = _apply_env_overrides(base_data)
+        if "host" in base_data and isinstance(base_data["host"], dict):
+            host = base_data["host"]
+            password = host.get("default_password", "")
+            if not isinstance(password, str):
+                raise ConfigError("host.default_password must be a string")
+            password_hash = hash_password(password)
+            host["default_password_hash"] = password_hash
+            base_data = _replace_password_hash_placeholder(base_data, password_hash)
         return Config.model_validate(base_data)
     except Exception as e:
         raise ConfigError(f"Config validation failed:\n{e}") from e
 
 
-def load_config(config_path: Path | None = None, override: str | Path | None = None) -> Config:
+def load_config(
+    config_path: Path | None = None,
+    override: str | Path | None = None,
+    apply_value_overrides: bool = True,
+) -> Config:
     """Load and validate a merged TOML config with Pydantic, returning a Config.
 
     The main config.toml at the repo root is always used as the base (lowest
     priority). An optional override (a .toml path or a profile name) is merged
-on top. When no override is given, the XCPNG_CONFIG env var is used as one.
+    on top. When no override is given, the XCPNG_CONFIG env var is used as one.
     When neither an override nor an explicit base path is given,
     config.local.toml at the repo root is auto-merged if it exists.
     Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
     set, then in the xcp-ng-tests repository root.
-    Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
-    set, then in the xcp-ng-tests repository root.
+    apply_value_overrides can be set to False to skip the XCPNG_TESTS_*
+    overrides (used to compute the base config for diffs).
     """
     if override is None:
         override = os.environ.get("XCPNG_CONFIG") or None
@@ -449,7 +457,16 @@ on top. When no override is given, the XCPNG_CONFIG env var is used as one.
         default_path = REPO_ROOT / "config.local.toml"
         if default_path.exists():
             base_data = _merge_dicts(base_data, _load_toml_with_includes(default_path))
-    return _build_config(base_data)
+    return _build_config(base_data, apply_value_overrides)
+
+
+def base_config_dict() -> ConfigDict:
+    """Return the validated base config.toml, without value/env overrides.
+
+    Used as the reference when computing config deltas (dump-config and
+    migrate-data-py).
+    """
+    return load_config(config_path=REPO_ROOT / "config.toml", apply_value_overrides=False).model_dump(by_alias=True)
 
 
 def apply_override(config_name: str | None = None) -> None:
