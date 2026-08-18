@@ -166,3 +166,25 @@ def test_dump_config_uses_aliases() -> None:
     defn = _build_config(data).model_dump(by_alias=True)["install"]["isos"]["definitions"]["83net"]
     assert "net-url" in defn and defn["net-url"] == "http://pxe/installers/xcp-ng/8.3"
     assert "net_url" not in defn
+
+
+def test_config_value_dotted_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('XCPNG_TESTS_host__default_password', '"envpass"')
+    cfg = load_config(config_values=['host.default_password=clival'])
+    assert cfg.host.default_password == "clival"
+    assert sha512_crypt.verify("clival", cfg.host.default_password_hash)
+
+
+def test_config_value_quoted_segment() -> None:
+    cfg = load_config(config_values=['hosts."10.30.0.56".user=root'])
+    assert cfg.hosts["10.30.0.56"].user == "root"
+
+
+def test_config_value_parses_toml() -> None:
+    cfg = load_config(config_values=['network.free_nics=["eth1","eth2"]'])
+    assert cfg.network.free_nics == ["eth1", "eth2"]
+
+
+def test_config_value_invalid_key() -> None:
+    with pytest.raises(ConfigError):
+        load_config(config_values=["no_equals_sign"])
