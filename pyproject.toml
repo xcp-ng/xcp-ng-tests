@@ -17,6 +17,7 @@ dependencies = [
     "pytest-dependency",
     "requests",
     "ipdb",
+    "pygments",
     "tomli-w",
     "typing-extensions",
 ]

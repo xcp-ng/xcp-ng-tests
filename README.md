@@ -204,6 +204,9 @@ To customize settings for your environment:
   (`config.NAME.toml`); falls back to the repository root
 - `--config=NAME` — environment-specific overrides (`config.NAME.toml`)
 - `--config=<path>` — a config overlay file from anywhere on disk
+- `tools.py dump-config` / `migrate-data-py` print only the values that differ
+  from the base `config.toml`; add `--all` to include the values that are the
+  same too.
 
 The `--config` flag is optional. When not specified, the `XCPNG_CONFIG` env var
 is used if set. When neither is set:
