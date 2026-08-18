@@ -23,6 +23,9 @@ class _StrictModel(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
 class HostConfig(_StrictModel):
     default_user: str
     default_password: str
@@ -33,6 +36,9 @@ class HostOverride(_StrictModel):
     user: str | None = None
     password: str | None = None
     skip_xo_config: bool | None = None
+    repositories: list[str] | None = None
+    disabled_repositories: list[str] | None = None
+    hosting_pool: str | None = None
 
 
 class NetworkConfig(_StrictModel):
@@ -184,11 +190,22 @@ class StorageConfig(_StrictModel):
     linstor: LinstorConfig
 
 
+class UpdateDefaults(_StrictModel):
+    repositories: list[str] = Field(default_factory=list)
+    disabled_repositories: list[str] = Field(default_factory=list)
+    hosting_pool: str | None = None
+
+
+class ToolsConfig(_StrictModel):
+    update: UpdateDefaults = Field(default_factory=UpdateDefaults)
+
+
 class Config(_StrictModel):
     objects_name_prefix: str | None
     dns_server: str
     host: HostConfig
     hosts: dict[str, HostOverride]
+    tools: ToolsConfig
     network: NetworkConfig
     pxe: PXEConfig
     vm: VMConfig
@@ -243,12 +260,17 @@ def _require_str_list(value: JSONType, what: str) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
-def _load_toml_with_includes(path: Path, _seen: set[Path] | None = None) -> ConfigDict:
+def _load_toml_with_includes(
+    path: Path,
+    _seen: set[Path] | None = None,
+    fallback_dir: Path = REPO_ROOT,
+) -> ConfigDict:
     """Load a TOML file and recursively merge its includes.
 
     Files listed in the root-level ``include`` key (array of strings)
     are loaded and deep-merged before the file's own content.
-    Paths are resolved relative to the including file's directory.
+    Includes are resolved relative to the including file's directory first,
+    then relative to the main xcp-ng-tests directory (fallback_dir).
     """
     if _seen is None:
         _seen = set()
@@ -263,8 +285,8 @@ def _load_toml_with_includes(path: Path, _seen: set[Path] | None = None) -> Conf
 
         result: ConfigDict = {}
         for inc in includes:
-            inc_path = (path.parent / inc).resolve()
-            included = _load_toml_with_includes(inc_path, _seen)
+            inc_path = _resolve_include(path.parent, inc, fallback_dir)
+            included = _load_toml_with_includes(inc_path, _seen, fallback_dir)
             result = _merge_dicts(result, included)
 
         return _merge_dicts(result, data)
@@ -273,6 +295,41 @@ def _load_toml_with_includes(path: Path, _seen: set[Path] | None = None) -> Conf
         # includes (A -> [B, C], B -> D, C -> D) are allowed while true
         # cycles still raise above.
         _seen.discard(path)
+
+
+def _resolve_include(base_dir: Path, inc: str, fallback_dir: Path) -> Path:
+    """Resolve an ``include`` path: relative to base_dir, then fallback_dir."""
+    candidate = base_dir / inc
+    if candidate.is_file():
+        return candidate.resolve()
+    candidate = fallback_dir / inc
+    if candidate.is_file():
+        return candidate.resolve()
+    raise FileNotFoundError(
+        f"Included config file not found: {inc} (looked in {base_dir} and {fallback_dir})"
+    )
+
+
+def _resolve_config_override(value: str | Path) -> Path:
+    """Resolve a -c/--config value to a TOML config file path.
+
+    Tries the value as given (relative to the current directory), then relative
+    to the repo root; if neither matches a file, treats it as a profile name and
+    looks for ``config.NAME.toml`` with the same rules.
+    """
+    candidates = [Path(value), REPO_ROOT / value]
+    if not any(c.is_file() for c in candidates):
+        candidates += [
+            Path(f"config.{value}.toml"),
+            REPO_ROOT / f"config.{value}.toml",
+        ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        f"Config file not found for {value!r}: "
+        f"tried {[str(c) for c in candidates]}"
+    )
 
 
 def _merge_dicts(base: ConfigDict, override: ConfigDict) -> ConfigDict:
@@ -362,30 +419,38 @@ def _build_config(base_data: ConfigDict) -> Config:
         raise ConfigError(f"Config validation failed:\n{e}") from e
 
 
-def load_config() -> Config:
-    """Load config.toml from repo root. Validate with Pydantic and return Config."""
-    repo_root = Path(__file__).parent.parent
-    base_config_path = repo_root / "config.toml"
+def load_config(config_path: Path | None = None, override: str | Path | None = None) -> Config:
+    """Load and validate a merged TOML config with Pydantic, returning a Config.
+
+    The main config.toml at the repo root is always used as the base (lowest
+    priority). An optional override (a .toml path or a profile name) is merged
+    on top. When neither an override nor an explicit base path is given,
+    config.local.toml at the repo root is auto-merged if it exists.
+    """
+    base_path = config_path or REPO_ROOT / "config.toml"
     try:
-        base_data = _load_toml_with_includes(base_config_path)
+        base_data = _load_toml_with_includes(base_path)
     except FileNotFoundError as e:
-        raise ConfigError(f"{base_config_path} not found") from e
+        raise ConfigError(f"{e}") from e
+    if override is not None:
+        try:
+            overlay_data = _load_toml_with_includes(_resolve_config_override(override))
+        except FileNotFoundError as e:
+            raise ConfigError(f"{e}") from e
+        base_data = _merge_dicts(base_data, overlay_data)
+    elif config_path is None:
+        default_path = REPO_ROOT / "config.local.toml"
+        if default_path.exists():
+            base_data = _merge_dicts(base_data, _load_toml_with_includes(default_path))
     return _build_config(base_data)
 
 
-def apply_override(config_name: str) -> None:
-    """Load config.toml, merge config.{config_name}.toml on top, update config in place."""
-    repo_root = Path(__file__).parent.parent
-    base_config_path = repo_root / "config.toml"
-    try:
-        base_data = _load_toml_with_includes(base_config_path)
-    except FileNotFoundError as e:
-        raise ConfigError(f"{base_config_path} not found") from e
-    override_path = repo_root / f"config.{config_name}.toml"
-    if not override_path.exists():
-        raise ConfigError(f"{override_path} not found")
-    base_data = _merge_dicts(base_data, _load_toml_with_includes(override_path))
-    new = _build_config(base_data)
+def apply_override(config_name: str | None = None) -> None:
+    """Load config.toml, merge config.{config_name}.toml on top, update config in place.
+
+    When config_name is None, config.local.toml is auto-merged if it exists.
+    """
+    new = load_config(override=config_name)
     for field in Config.model_fields:
         setattr(config, field, getattr(new, field))
 

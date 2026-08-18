@@ -197,18 +197,37 @@ To customize settings for your environment:
 
 #### Configuration file paths
 
-- `config.toml` — default config (always loaded)
-- `config.default.toml` — local defaults (auto-loaded if exists and no `--config` specified)
-- `config.NAME.toml` — environment-specific overrides (loaded with `--config=NAME`)
+- `config.toml` — base config (always loaded, lowest priority)
+- `config.local.toml` — local defaults (auto-loaded if exists and no `--config` specified)
+- `--config=NAME` — environment-specific overrides (`config.NAME.toml`)
+- `--config=<path>` — a config overlay file from anywhere on disk
 
-The `--config` flag is optional. If not specified:
+The `--config` flag is optional. When not specified:
 1. `config.toml` is loaded first
-2. If `config.default.toml` exists, it is merged on top (auto-detected)
+2. If `config.local.toml` exists, it is merged on top (auto-detected)
+
+When given, the value is resolved to a file in this order:
+1. as given (absolute, or relative to the current directory)
+2. relative to the main xcp-ng-tests directory
+3. as a profile name (`config.NAME.toml`), relative to the current directory
+4. as a profile name, relative to the main xcp-ng-tests directory
+
+For example, running from another directory:
+
+```bash
+pytest foo -c ../../inventory/cgt1-qcow2.toml
+```
+
+loads `config.toml` first, then merges `../../inventory/cgt1-qcow2.toml` on top.
+The `include` key inside any config file is resolved against the file's own
+directory first, then against the main xcp-ng-tests directory, so an overlay
+in another directory can reuse files from the tests repository.
 
 This allows you to:
 - Commit `config.toml` with project defaults to version control
-- Create `config.default.toml` locally (ignored by git) for your standard environment
+- Create `config.local.toml` locally (ignored by git) for your standard environment
 - Create `config.prod.toml`, `config.ci.toml`, etc. for other environments and select with `--config=prod`
+- Point `--config` at an overlay file kept anywhere on disk
 
 ## Running tests
 
@@ -223,6 +242,7 @@ pytest tests/misc/test_vm_basic_operations.py --hosts=10.0.0.1 --vm=mini-linux-x
 
 Most tests take a `--hosts=yourtesthost` (or `--hosts=host1,host2,...` if they need several pools, e.g. crosspool migration tests).
 The `--hosts` parameter can be specified several times. Then `pytest` will run the tests on each host or group of hosts, sequentially.
+If `--hosts` is not given, the hosts listed in the `[hosts]` section of the config file are used instead.
 
 When a test requires a single pool of several hosts, only mention the master host in the `--hosts` option.
 
@@ -715,47 +735,45 @@ For each pool target :
 2. Get other hosts of the pool
   * Repeat step `1.` for each host
 
-**Inventory file**
+**Inventory**
 
-`update` command can read an inventory file in [TOML v1.0.0](https://toml.io/en/v1.0.0) format:
+By default, hosts and repository settings are read from the same config file as
+the tests (`config.toml`, auto-merged with `config.local.toml` when present).
+A different overlay can be picked with `-c/--config`, accepting a `.toml` file
+path (relative to the current directory) or a profile name
+(`config.PROFILE.toml`):
 
 ```bash
-uv run scripts/tools.py update -i my_inventory.toml
+uv run scripts/tools.py update
+uv run scripts/tools.py update -c ../../inventory/cgt1-qcow2.toml
+uv run scripts/tools.py update -c prod
+```
+
+Hosts are the keys of the `[hosts]` table, and per-host values override the
+inventory defaults from the `[tools.update]` table:
+
+```toml
+# config.toml
+
+[tools.update]
+repositories = ["xcp-ng-base"]
+disabled_repositories = ["epel"]
+hosting_pool = "10.30.0.50"
+
+[hosts]
+"10.30.0.56" = {}
+"10.30.0.59" = { repositories = ["xcp-ng-updates"] }  # overrides "[tools.update]"
 ```
 
 > [!NOTE]
-> You can use either `-i/--inventory` or `-H/--hosts`.
+> * `tools.update` is applied to all hosts
+> * Values set in a `[hosts]` entry override `tools.update`. The example above
+>   would produce the following python dict:
 >
-> **Above flags can't be used together**
-
-Take a look at an example inventory file:
-
-```toml
-# my_inventory.toml
-
-[default]
-repositories = ["xcp-ng-base"]
-disabled_repositories = ["epel"]
-hosting_pool = "A"
-
-[hosts]
-
-[hosts."ip_or_hostname-1"]
-
-[hosts."ip_or_hostname-2"]
-
-repositories = ["xcp-ng-updates"]
-hosting_pool = "B"
-```
-
-> [!IMPORTANT]
-> * `default` is applied to all hosts
-> * Config values under `hosts` override values under `default`. For instance, the above inventory would produce
-> the following python dict:
+> `{'10.30.0.56': {'repositories': ['xcp-ng-base'], 'disabled_repositories': ['epel'], 'hosting_pool': '10.30.0.50'}, '10.30.0.59': {'repositories': ['xcp-ng-updates'], 'disabled_repositories': ['epel'], 'hosting_pool': '10.30.0.50'}}`
 >
-> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'disabled_repositories': ['epel'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
->
-> * `disabled_repositories` disables one or more repositories during the update. It can be set under `default` or overridden per host, and can also be passed with the `-x/--disablerepo` flag.
+> * `disabled_repositories` disables one or more repositories during the update. It can be set under `tools.update` or overridden per host.
 > * `*` as a repository value disables **all** repositories (e.g. `disabled_repositories = ["*"]`).
 >
-> * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.
+> `-H/--hosts` and the repository flags below can be used to temporarily
+> override the config file for one-off runs.

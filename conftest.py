@@ -63,7 +63,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--config",
         action="store",
         default=None,
-        help="Config file name to load (e.g., 'prod' → config.prod.toml)",
+        help="Config overlay: a .toml file path or profile name (default: auto-load config.local.toml)",
     )
     parser.addoption(
         "--nest",
@@ -140,9 +140,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     warn_legacy_data_py()
-    config_name = config.getoption("--config")
-    if config_name:
-        apply_override(config_name)
+    apply_override(config.getoption("--config"))
     from lib.config_loader import config as global_config
     ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     if ignore_ssh_banner is not None:
@@ -344,9 +342,12 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
     # a list of master hosts, each from a different pool
     hosts_args = pytestconfig.getoption("hosts")
-    assert hosts_args is not None
-    hosts_split = [hostlist.split(',') for hostlist in hosts_args]
-    hostname_list = list(itertools.chain(*hosts_split))
+    if hosts_args:
+        hosts_split = [hostlist.split(',') for hostlist in hosts_args]
+        hostname_list = list(itertools.chain(*hosts_split))
+    else:
+        # no --hosts option: fall back to the hosts defined in the config file
+        hostname_list = list(config.hosts)
 
     try:
         host_list = [setup_host(hostname_or_ip, config=pytestconfig)
@@ -356,7 +357,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
         raise
 
     if not host_list:
-        pytest.fail("This test requires at least one --hosts parameter")
+        pytest.fail("This test requires at least one host: pass --hosts or define hosts in the config file")
     yield host_list
 
     cleanup_hosts()
