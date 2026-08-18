@@ -11,9 +11,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/uv-setup/
+      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
         with:
-          dev: false
+          version: "0.7.x"
+          activate-environment: true
+      - run: uv sync --frozen --no-dev
+        env:
+          FORCE_COLOR: "1"
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
       - run: pytest tests/unit/
