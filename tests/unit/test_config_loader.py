@@ -158,3 +158,11 @@ def test_resolve_config_override_short_name_in_repo_root(tmp_path: Path, monkeyp
     monkeypatch.setenv("XCPNG_CONFIG_DIR", str(tmp_path / "empty"))
     (tmp_path / "config.local.toml").write_text("")
     assert _resolve_config_override("local") == (tmp_path / "config.local.toml").resolve()
+
+
+def test_dump_config_uses_aliases() -> None:
+    data = _full_config_dict()
+    data["install"]["isos"]["definitions"]["83net"] = {"path": "x.iso", "net-url": "http://pxe/installers/xcp-ng/8.3"}
+    defn = _build_config(data).model_dump(by_alias=True)["install"]["isos"]["definitions"]["83net"]
+    assert "net-url" in defn and defn["net-url"] == "http://pxe/installers/xcp-ng/8.3"
+    assert "net_url" not in defn
