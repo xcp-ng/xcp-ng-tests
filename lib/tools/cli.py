@@ -8,10 +8,9 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
 
 from lib.common import HostAddress
-from lib.config_loader import base_config_dict, load_config
+from lib.config_loader import add_config_options, base_config_dict, load_config
 from lib.tools import logger
 from lib.tools.inventory import into_inventory, inventory_from_config
 from lib.tools.tasks.clean import clean_pools
@@ -101,33 +100,7 @@ def cli() -> None:
         description="Tools that help developers for running recurrent tasks on their XCP-ng sandbox."
     )
     parser.add_argument("-d", "--debug", action="store_true", default=False, help="Enable debug level")
-    parser.add_argument(
-        "-c", "--config",
-        type=Path,
-        default=None,
-        metavar="PATH",
-        help="Config overlay: a .toml file path or profile name (default: config.default.toml or XCPNG_CONFIG)",
-    )
-    common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument(
-        "-c", "--config",
-        type=Path,
-        default=None,
-        metavar="PATH",
-        help="Config overlay: a .toml file path or profile name (default: config.default.toml or XCPNG_CONFIG)",
-    )
-
-    def _add_config_value_option(target: argparse.ArgumentParser) -> None:
-        target.add_argument(
-            "--config-value",
-            action="append",
-            default=[],
-            metavar="KEY=VALUE",
-            help="Override a config value, e.g. host.default_password=foo (repeatable; highest priority)",
-        )
-
-    _add_config_value_option(parser)
-    _add_config_value_option(common_parser)
+    common_parser = add_config_options(parser)
 
     subparsers = parser.add_subparsers(required=True, metavar="COMMAND")
 

@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 from lib.commands import ssh
+from lib.config_loader import add_config_options, load_config
 
 from typing import NotRequired, TypedDict, cast
 
@@ -815,14 +816,30 @@ STDOUT: ---
     if error:
         sys.exit(1)
 
+def _config_hosts(args: argparse.Namespace) -> str | None:
+    """Return the pool masters listed in the config's [hosts], as a comma-separated string, or None."""
+    cfg = load_config(override=args.config, config_values=args.config_value)
+    hosts = list(cfg.hosts.keys())
+    return ",".join(hosts) if hosts else None
+
+
 def action_run(args: argparse.Namespace) -> None:
-    cmd = build_pytest_cmd(JOBS[args.job], args.hosts, None, args.pytest_args)
+    hosts = args.hosts or _config_hosts(args)
+    if hosts is None:
+        print("Error: no hosts provided. Pass a comma-separated list of pool masters as the positional "
+              "hosts argument, or define them in the [hosts] section of the config.", file=sys.stderr)
+        sys.exit(1)
+    cmd = build_pytest_cmd(JOBS[args.job], hosts, None, args.pytest_args)
+    if args.config is not None:
+        cmd += ["--config", str(args.config)]
+    for config_value in args.config_value:
+        cmd += ["--config-value", config_value]
     print(subprocess.list2cmdline(cmd))
     if args.print_only:
         return
 
     # check that enough pool masters have been provided
-    nb_pools = len(args.hosts.split(","))
+    nb_pools = len(hosts.split(","))
     job_nb_pools = JOBS[args.job]["nb_pools"]
     assert isinstance(job_nb_pools, int)
     if nb_pools < job_nb_pools:
@@ -841,35 +858,43 @@ def action_run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Manage test jobs")
+    common_parser = add_config_options(parser)
+
     subparsers = parser.add_subparsers(dest="action", metavar="action")
     subparsers.required = True
 
-    list_parser = subparsers.add_parser("list", help="list available jobs.")
+    list_parser = subparsers.add_parser("list", help="list available jobs.", parents=[common_parser])
     list_parser.set_defaults(func=action_list)
 
-    run_parser = subparsers.add_parser("show", help="show details about a job definition.")
-    run_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
-    run_parser.set_defaults(func=action_show)
+    show_parser = subparsers.add_parser("show", help="show details about a job definition.", parents=[common_parser])
+    show_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
+    show_parser.set_defaults(func=action_show)
 
-    run_parser = subparsers.add_parser("collect", help="show test collection based on the job definition.")
-    run_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
-    run_parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
-    run_parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
-                            help="all additional arguments after the last positional argument will "
-                                 "be passed to pytest and replace default job params if needed.")
-    run_parser.set_defaults(func=action_collect)
+    collect_parser = subparsers.add_parser("collect", help="show test collection based on the job definition.",
+                                           parents=[common_parser])
+    collect_parser.add_argument("job", help="name of the job.", choices=JOBS.keys(), metavar="job")
+    collect_parser.add_argument("-v", "--host-version", help="host version to match VM filters.")
+    collect_parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
+                                help="all additional arguments after the last positional argument will "
+                                     "be passed to pytest and replace default job params if needed.")
+    collect_parser.set_defaults(func=action_collect)
 
-    run_parser = subparsers.add_parser("check", help="run sanity checks on the tests and jobs.")
-    run_parser.set_defaults(func=action_check)
+    check_parser = subparsers.add_parser(
+        "check", help="run sanity checks on the tests and jobs.", parents=[common_parser])
+    check_parser.set_defaults(func=action_check)
 
-    run_parser = subparsers.add_parser("run", help="run a job.")
+    run_parser = subparsers.add_parser("run", help="run a job.", parents=[common_parser])
     run_parser.add_argument("--print-only", "-p", action="store_true",
                             help="print the command, but don't run it. Must be specified before positional arguments.")
     run_parser.add_argument("job", help="name of the job to run.", choices=JOBS.keys(), metavar="job")
-    run_parser.add_argument("hosts", help="master host(s) of pools to run the tests on, comma-separated.")
+    run_parser.add_argument("hosts", nargs="?", default=None,
+                            help="master host(s) of pools to run the tests on, comma-separated. When omitted, the "
+                                 "hosts from the config's [hosts] section are used.")
     run_parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
                             help="all additional arguments after the last positional argument will "
-                                 "be passed to pytest and replace default job params if needed.")
+                                 "be passed to pytest and replace default job params if needed. "
+                                 "Note: -c/--config and --config-value must be specified before the "
+                                 "positional arguments.")
     run_parser.set_defaults(func=action_run)
 
     args = parser.parse_args()
