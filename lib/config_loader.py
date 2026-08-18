@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import tomllib
@@ -534,6 +535,32 @@ def apply_override(config_name: str | None = None, config_values: list[str] | No
     new = load_config(override=config_name, config_values=config_values)
     for field in Config.model_fields:
         setattr(config, field, getattr(new, field))
+
+
+def add_config_options(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add -c/--config and --config-value to `parser`, and return a parent parser for subcommands.
+
+    Both options are attached to `parser` (so they can be given before the
+    subcommand) and to a shared ``add_help=False`` parser that subcommands use
+    as a parent.
+    """
+    common_parser = argparse.ArgumentParser(add_help=False)
+    for target in (parser, common_parser):
+        target.add_argument(
+            "-c", "--config",
+            type=Path,
+            default=None,
+            metavar="PATH",
+            help="Config overlay: a .toml file path or profile name (default: config.local.toml or XCPNG_CONFIG)",
+        )
+        target.add_argument(
+            "--config-value",
+            action="append",
+            default=[],
+            metavar="KEY=VALUE",
+            help="Override a config value, e.g. host.default_password=foo (repeatable; highest priority)",
+        )
+    return common_parser
 
 
 def sr_device_config(config_key: str, *, required: list[str] | None = None) -> dict[str, str]:
