@@ -72,7 +72,7 @@ def cli() -> None:
         type=Path,
         default=None,
         metavar="PATH",
-        help="Config overlay: a .toml file path or profile name (default: auto-load config.local.toml)",
+        help="Config overlay: a .toml file path or profile name (default: config.local.toml or XCPNG_CONFIG)",
     )
 
     common_parser = argparse.ArgumentParser(add_help=False)
@@ -81,7 +81,7 @@ def cli() -> None:
         type=Path,
         default=None,
         metavar="PATH",
-        help="Config overlay: a .toml file path or profile name (default: auto-load config.local.toml)",
+        help="Config overlay: a .toml file path or profile name (default: config.local.toml or XCPNG_CONFIG)",
     )
 
     subparsers = parser.add_subparsers(required=True, metavar="COMMAND")
