@@ -418,15 +418,18 @@ pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=ht
 
 #### Run a job
 ```
-usage: jobs.py run [-h] [--print-only] job hosts ...
+usage: jobs.py run [-h] [-c PATH] [--config-value KEY=VALUE] [--print-only] job [hosts] ...
 
 positional arguments:
   job               name of the job to run.
   hosts             master host(s) of pools to run the tests on, comma-separated.
+                    When omitted, the hosts from the config's [hosts] section are used.
   pytest_args       all additional arguments after the last positional argument will be passed to pytest and replace default job params if needed.
 
 optional arguments:
   -h, --help        show this help message and exit
+  -c PATH, --config PATH  config overlay: a .toml file path or profile name
+  --config-value KEY=VALUE  override a config value (repeatable; highest priority)
   --print-only, -p  print the command, but don't run it. Must be specified before positional arguments.
 ```
 
@@ -439,6 +442,13 @@ pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=ht
 ```
 
 Any parameter added at the end of the command will be passed to `pytest`. Any parameter added that is already defined in the job's "params" (see output of `./jobs.py show`) will replace it, and `--vm` also replaces `--vm[]` in the case of jobs designed to run tests on multiple VMs.
+
+`jobs.py` reads the same configuration as `pytest` and `tools.py`:
+`-c`/`--config`, the `XCPNG_CONFIG`/`XCPNG_CONFIG_DIR` env vars and
+`--config-value` are supported, and when no hosts are given, `jobs.py run`
+falls back to the hosts defined in the config's `[hosts]` section. The
+config options must be specified before the positional `job`/`hosts`
+arguments (like `--print-only`), otherwise they are forwarded to pytest.
 
 ```
 # same, but we override the list of VMs
