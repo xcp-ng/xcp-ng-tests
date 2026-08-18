@@ -116,7 +116,7 @@ def test_config_toml_validates_against_schema() -> None:
     schema = _schema()
     defs = schema.get("$defs", {})
     assert isinstance(defs, dict)
-    config_toml = Path(__file__).parents[2] / "config.toml"
+    config_toml = Path(__file__).parents[2] / "lib" / "config.toml"
     with open(config_toml, "rb") as f:
         data = tomllib.load(f)
     _validate_value(data, schema, defs)
