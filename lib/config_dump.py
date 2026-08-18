@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import difflib
+import json
+
 import tomli_w
 from pygments import highlight
 from pygments.formatters import TerminalFormatter
@@ -114,3 +117,29 @@ def render_toml(config: ConfigDict, with_schema: bool = True) -> str:
     if with_schema:
         data = {"$schema": "./config-schema.json", **data}
     return tomli_w.dumps(data, multiline_strings=True)
+
+
+def config_diff(
+    config_a: ConfigDict,
+    config_b: ConfigDict,
+    name_a: str = "a",
+    name_b: str = "b",
+    as_json: bool = False,
+) -> str:
+    """Return a unified diff between two configs, ignoring password hashes.
+
+    Empty string when the configs are identical (modulo $6$... password hashes).
+    """
+    norm_a = _strip_password_hashes(config_a)
+    norm_b = _strip_password_hashes(config_b)
+    if as_json:
+        text_a = json.dumps(norm_a, indent=2, ensure_ascii=False, sort_keys=True)
+        text_b = json.dumps(norm_b, indent=2, ensure_ascii=False, sort_keys=True)
+    else:
+        text_a = render_toml(norm_a, with_schema=False)
+        text_b = render_toml(norm_b, with_schema=False)
+    return "".join(difflib.unified_diff(
+        text_a.splitlines(keepends=True),
+        text_b.splitlines(keepends=True),
+        fromfile=name_a, tofile=name_b,
+    ))
