@@ -150,6 +150,10 @@ def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = Fal
         except NotAMasterHostError:
             logger.warning(f"[{host}] Skipping: not a master host")
 
+    if not pools:
+        logger.warning("No pool to update")
+        return
+
     before_packages = _capture_packages(pools)
 
     # update master hosts

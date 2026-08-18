@@ -28,12 +28,27 @@ default_user = "root"
 default_password = ""
 
 [hosts]
-# Override settings for specific hosts
-# skip_xo_config allows to not touch XO's configuration regarding the host
-# Else the default behaviour is to add the host to XO servers at the beginning
-# of the testing session and remove it at the end.
+# Hosts to run tests/tools against. Each key is the address (hostname|ip) of
+# the master host of a pool. Settings may also override the global defaults
+# below (repositories, disabled_repositories, hosting_pool) per host.
+# Connection settings (user/password/skip_xo_config) default to the `host`
+# section values.
 # "10.0.0.1" = { user = "root", password = "" }
 # "testhost1" = { user = "root", password = "", skip_xo_config = true }
+# A plain host with default settings:
+# "10.3.0.56" = {}
+# A host overriding the default repositories:
+# "10.3.0.57" = { repositories = ["xcp-ng-updates"], disabled_repositories = ["*"] }
+
+[tools.update]
+# Default settings for the `update` tool, applied to all hosts in the [hosts]
+# table. Values set per host in [hosts] override these.
+# Repositories to enable when updating.
+# repositories = ["xcp-ng-base", "xcp-ng-updates"]
+# Repositories to disable when updating. "*" disables all.
+# disabled_repositories = ["*"]
+# Address (hostname|ip) of hosting pool's master host (nested context).
+# hosting_pool = "10.30.0.50"
 
 [network]
 # Network names and descriptions

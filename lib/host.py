@@ -35,7 +35,7 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -44,16 +44,20 @@ if TYPE_CHECKING:
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
-def host_data(hostname_or_ip: str) -> dict[str, str]:
+class HostData(TypedDict):
+    user: str
+    password: str
+    skip_xo_config: bool
+
+
+def host_data(hostname_or_ip: str) -> HostData:
     # read from config loader
-    if hostname_or_ip in config.hosts:
-        h = config.hosts[hostname_or_ip]
-        return {
-            'user': h.user or config.host.default_user,
-            'password': h.password or config.host.default_password,
-        }
-    else:
-        return {'user': config.host.default_user, 'password': config.host.default_password}
+    h = config.hosts.get(hostname_or_ip)
+    return {
+        'user': h.user if h and h.user else config.host.default_user,
+        'password': h.password if h and h.password else config.host.default_password,
+        'skip_xo_config': h.skip_xo_config if h and h.skip_xo_config is not None else False,
+    }
 
 class Host:
     xe_prefix = "host"
