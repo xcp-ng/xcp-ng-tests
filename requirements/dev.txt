@@ -10,6 +10,5 @@ pydocstyle
 pyright
 ruff
 types-passlib
-typing-extensions
 zizmor
 -r base.txt

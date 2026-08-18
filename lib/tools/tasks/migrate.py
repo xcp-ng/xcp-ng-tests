@@ -6,14 +6,13 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-import tomllib
 from pathlib import Path
 
-import tomli_w
+from lib.config_dump import remove_defaults, render_toml
+from lib.config_loader import base_config_dict
+from lib.typing import ConfigDict
 
-from lib.typing import ConfigDict, JSONType
-
-from typing import Any, overload
+from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -21,13 +20,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 def normalize_dict_keys(d: ConfigDict) -> ConfigDict:
     """Normalize dict keys by replacing dashes with underscores."""
     return {k.replace("-", "_"): v for k, v in d.items()}
-
-
-def load_base_config(repo_root: Path) -> ConfigDict:
-    """Load the base config.toml to compare against."""
-    config_path = repo_root / "config.toml"
-    with open(config_path, "rb") as f:
-        return tomllib.load(f)
 
 
 def load_data_py(data_py_path: Path, repo_root: Path) -> ConfigDict:
@@ -205,99 +197,17 @@ def load_data_py(data_py_path: Path, repo_root: Path) -> ConfigDict:
     return config
 
 
-def deep_dict_equal(d1: JSONType, d2: JSONType) -> bool:
-    """Check if two values are deeply equal."""
-    if isinstance(d1, dict) and isinstance(d2, dict):
-        if set(d1.keys()) != set(d2.keys()):
-            return False
-        return all(deep_dict_equal(d1[k], d2[k]) for k in d1)
-    if isinstance(d1, list) and isinstance(d2, list):
-        return len(d1) == len(d2) and all(deep_dict_equal(a, b) for a, b in zip(d1, d2))
-    # For non-container types, check both type and value
-    return type(d1) is type(d2) and d1 == d2
-
-
-def _strip_password_hashes(obj: JSONType) -> JSONType:
-    """Recursively strip password hashes for comparison purposes.
-
-    - Replaces $6$... hashes with placeholder
-    - Replaces <PASSWORD_HASH> placeholder with itself (already normalized)
-    - Converts tuples to lists for consistent comparison
-    """
-    if isinstance(obj, str):
-        # If it looks like a password hash (starts with $6$), replace with placeholder
-        if obj.startswith("$6$"):
-            return "<PASSWORD_HASH>"
-        # Placeholder stays as is
-        return obj
-    if isinstance(obj, dict):
-        return {k: _strip_password_hashes(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        # Convert tuples to lists for consistent comparison
-        return [_strip_password_hashes(item) for item in obj]
-    return obj
-
-
-def remove_defaults(
-    config: ConfigDict, base: ConfigDict
-) -> ConfigDict:
-    """Remove fields from config that have the same value as in base.
-
-    Ignores password hash differences (strips them for comparison).
-    """
-    result: ConfigDict = {}
-
-    for key, value in config.items():
-        if key not in base:
-            # Key not in base, keep it
-            result[key] = value
-        elif isinstance(value, dict) and isinstance((base_value := base.get(key)), dict):
-            # Recursively check nested dicts
-            nested = remove_defaults(value, base_value)
-            if nested:  # Only add if there's something left
-                result[key] = nested
-        else:
-            # Strip password hashes before comparing
-            value_stripped = _strip_password_hashes(value)
-            base_stripped = _strip_password_hashes(base.get(key))
-            if not deep_dict_equal(value_stripped, base_stripped):
-                # Values differ (ignoring password hashes), keep it
-                result[key] = value
-        # else: values are the same, skip it
-
-    return result
-
-
-@overload
-def _sorted_recursive(value: ConfigDict) -> ConfigDict:
-    ...
-
-
-@overload
-def _sorted_recursive(value: JSONType) -> JSONType:
-    ...
-
-
-def _sorted_recursive(value: JSONType) -> JSONType:
-    """Recursively sort dict keys for stable output."""
-    if isinstance(value, dict):
-        return {k: _sorted_recursive(v) for k, v in sorted(value.items())}
-    if isinstance(value, list):
-        return [_sorted_recursive(item) for item in value]
-    return value
-
-
 def write_toml(config: ConfigDict, output_path: Path) -> None:
     """Write config dict to TOML file with $schema attribute."""
-    data = {"$schema": "./config-schema.json", **_sorted_recursive(config)}
-    with open(output_path, "wb") as f:
-        tomli_w.dump(data, f, multiline_strings=True)
+    with open(output_path, "w") as f:
+        f.write(render_toml(config))
 
 
 def migrate_data_py(
     data_py: Path | str | None = None,
     output: str = "config.default.toml",
     force: bool = False,
+    include_defaults: bool = False,
 ) -> int:
     """Convert a legacy data.py file to a TOML config file.
 
@@ -306,6 +216,9 @@ def migrate_data_py(
     output    Output file name. If relative, resolved against <repo_root>.
               Defaults to config.default.toml.
     force     Overwrite the output file if it already exists.
+    include_defaults
+              Keep the values that are the same as in config.toml instead of
+              writing a delta-only overlay.
     """
     repo_root = _REPO_ROOT
     if data_py is not None:
@@ -331,7 +244,7 @@ def migrate_data_py(
 
     # Load base config and data.py
     try:
-        base_config = load_base_config(repo_root)
+        base_config = base_config_dict()
     except Exception as e:
         print(f"ERROR: Failed to load base config.toml: {e}", file=sys.stderr)
         return 1
@@ -342,20 +255,22 @@ def migrate_data_py(
         print(f"ERROR: Failed to load {data_py_path}: {e}", file=sys.stderr)
         return 1
 
-    # Remove defaults
-    override_config = remove_defaults(data_config, base_config)
-
-    if not override_config:
-        print(
-            f"INFO: No differences found between {data_py_path} and config.toml",
-            file=sys.stderr,
-        )
-        print(f"      {output_path} would be empty, not creating file", file=sys.stderr)
-        return 0
+    if include_defaults:
+        out_config = data_config
+    else:
+        # Remove defaults
+        out_config = remove_defaults(data_config, base_config)
+        if not out_config:
+            print(
+                f"INFO: No differences found between {data_py_path} and config.toml",
+                file=sys.stderr,
+            )
+            print(f"      {output_path} would be empty, not creating file", file=sys.stderr)
+            return 0
 
     # Write output
     try:
-        write_toml(override_config, output_path)
+        write_toml(out_config, output_path)
         print(f"✓ Created {output_path}", file=sys.stdout)
         return 0
     except Exception as e:
