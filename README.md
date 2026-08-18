@@ -199,6 +199,8 @@ To customize settings for your environment:
 
 - `config.toml` — base config (always loaded, lowest priority)
 - `config.default.toml` — local defaults (auto-loaded if exists and no `--config` specified)
+- `XCPNG_CONFIG_DIR=DIR` — directory where profile names are looked up
+  (`config.NAME.toml`); falls back to the repository root
 - `--config=NAME` — environment-specific overrides (`config.NAME.toml`)
 - `--config=<path>` — a config overlay file from anywhere on disk
 
@@ -208,9 +210,12 @@ The `--config` flag is optional. When not specified:
 
 When given, the value is resolved to a file in this order:
 1. as given (absolute, or relative to the current directory)
-2. relative to the main xcp-ng-tests directory
-3. as a profile name (`config.NAME.toml`), relative to the current directory
-4. as a profile name, relative to the main xcp-ng-tests directory
+2. as a short name (`config.NAME.toml`), in the `XCPNG_CONFIG_DIR` directory
+   when that env var is set, then in the repository root
+
+Only values given as paths are resolved relative to the current directory;
+short names (`config.NAME.toml`) are looked up in `XCPNG_CONFIG_DIR` or the
+repository root, never in the current directory.
 
 For example, running from another directory:
 
