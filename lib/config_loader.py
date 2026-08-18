@@ -313,16 +313,16 @@ def _resolve_include(base_dir: Path, inc: str, fallback_dir: Path) -> Path:
 def _resolve_config_override(value: str | Path) -> Path:
     """Resolve a -c/--config value to a TOML config file path.
 
-    Tries the value as given (relative to the current directory), then relative
-    to the repo root; if neither matches a file, treats it as a profile name and
-    looks for ``config.NAME.toml`` with the same rules.
+    The value is first tried as given (an absolute path, or relative to the
+    current directory). When it does not match a file, it is treated as a
+    short name and ``config.NAME.toml`` is looked up in the directory given
+    by the XCPNG_CONFIG_DIR env var (when set), then in the xcp-ng-tests
+    repository root.
     """
-    candidates = [Path(value), REPO_ROOT / value]
-    if not any(c.is_file() for c in candidates):
-        candidates += [
-            Path(f"config.{value}.toml"),
-            REPO_ROOT / f"config.{value}.toml",
-        ]
+    candidates = [Path(value)]
+    if "XCPNG_CONFIG_DIR" in os.environ:
+        candidates.append(Path(os.environ["XCPNG_CONFIG_DIR"]) / f"config.{value}.toml")
+    candidates.append(REPO_ROOT / f"config.{value}.toml")
     for candidate in candidates:
         if candidate.is_file():
             return candidate.resolve()
@@ -426,6 +426,8 @@ def load_config(config_path: Path | None = None, override: str | Path | None = N
     priority). An optional override (a .toml path or a profile name) is merged
     on top. When neither an override nor an explicit base path is given,
     config.local.toml at the repo root is auto-merged if it exists.
+    Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
+    set, then in the xcp-ng-tests repository root.
     """
     base_path = config_path or REPO_ROOT / "config.toml"
     try:
@@ -446,9 +448,11 @@ def load_config(config_path: Path | None = None, override: str | Path | None = N
 
 
 def apply_override(config_name: str | None = None) -> None:
-    """Load config.toml, merge config.{config_name}.toml on top, update config in place.
+    """Load config.toml, merge the overlay (a .toml file path or profile name) on top, update config in place.
 
     When config_name is None, config.local.toml is auto-merged if it exists.
+    Short names are looked up in the XCPNG_CONFIG_DIR directory when it is set,
+    then in the xcp-ng-tests repository root.
     """
     new = load_config(override=config_name)
     for field in Config.model_fields:
