@@ -23,7 +23,7 @@ def _command_update(args: argparse.Namespace) -> None:
     if args.hosts:
         inventory = into_inventory(args.hosts, args.repos, args.hosting_pool, disabled_repositories=args.disablerepos)
     else:
-        inventory = inventory_from_config(load_config(override=args.config))
+        inventory = inventory_from_config(load_config(override=args.config, config_values=args.config_value))
         for host in inventory["hosts"].values():
             if args.repos:
                 host["repositories"] = args.repos
@@ -41,7 +41,7 @@ def _command_clean(args: argparse.Namespace) -> int:
     if args.hosts:
         inventory = into_inventory(args.hosts, [], None)
     else:
-        inventory = inventory_from_config(load_config(override=args.config))
+        inventory = inventory_from_config(load_config(override=args.config, config_values=args.config_value))
         if not inventory["hosts"]:
             logger.warning("No hosts defined: pass -H/--hosts or define them in the config file")
 
@@ -52,7 +52,7 @@ def _command_exec(args: argparse.Namespace) -> int:
     if args.hosts:
         inventory = into_inventory(args.hosts, [], None)
     else:
-        inventory = inventory_from_config(load_config(override=args.config))
+        inventory = inventory_from_config(load_config(override=args.config, config_values=args.config_value))
         if not inventory["hosts"]:
             logger.warning("No hosts defined: pass -H/--hosts or define them in the config file")
 
@@ -70,7 +70,7 @@ def _command_dump_config(args: argparse.Namespace) -> int:
 
     from lib.config_dump import colorize_toml, remove_defaults, render_toml
 
-    config = load_config(override=args.config).model_dump(by_alias=True)
+    config = load_config(override=args.config, config_values=args.config_value).model_dump(by_alias=True)
     if not args.all:
         config = remove_defaults(config, base_config_dict())
     if args.json:
@@ -96,7 +96,6 @@ def cli() -> None:
         metavar="PATH",
         help="Config overlay: a .toml file path or profile name (default: config.default.toml or XCPNG_CONFIG)",
     )
-
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument(
         "-c", "--config",
@@ -105,6 +104,18 @@ def cli() -> None:
         metavar="PATH",
         help="Config overlay: a .toml file path or profile name (default: config.default.toml or XCPNG_CONFIG)",
     )
+
+    def _add_config_value_option(target: argparse.ArgumentParser) -> None:
+        target.add_argument(
+            "--config-value",
+            action="append",
+            default=[],
+            metavar="KEY=VALUE",
+            help="Override a config value, e.g. host.default_password=foo (repeatable; highest priority)",
+        )
+
+    _add_config_value_option(parser)
+    _add_config_value_option(common_parser)
 
     subparsers = parser.add_subparsers(required=True, metavar="COMMAND")
 

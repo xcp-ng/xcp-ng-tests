@@ -204,6 +204,10 @@ To customize settings for your environment:
   (`config.NAME.toml`); falls back to the repository root
 - `--config=NAME` — environment-specific overrides (`config.NAME.toml`)
 - `--config=<path>` — a config overlay file from anywhere on disk
+- `--config-value KEY=VALUE` — override a single config value (repeatable),
+  e.g. `--config-value host.default_password=foo`. The key is a dotted path,
+  with double quotes around segments that contain dots
+  (`--config-value 'hosts."10.30.0.56".user=root'`).
 - `tools.py dump-config` / `migrate-data-py` print only the values that differ
   from the base `config.toml`; add `--all` to include the values that are the
   same too.
@@ -212,6 +216,10 @@ The `--config` flag is optional. When not specified, the `XCPNG_CONFIG` env var
 is used if set. When neither is set:
 1. `config.toml` is loaded first
 2. If `config.default.toml` exists, it is merged on top (auto-detected)
+
+Overrides stack from lowest to highest priority:
+`config.toml` < overlay (`--config`/`XCPNG_CONFIG`) < `XCPNG_TESTS_*` env vars
+< `--config-value`.
 
 When given, the value is resolved to a file in this order:
 1. as given (absolute, or relative to the current directory)

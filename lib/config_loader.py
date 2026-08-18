@@ -353,8 +353,42 @@ def _parse_env_value(raw: str) -> JSONType:
         return raw
 
 
+def _split_key_path(key: str) -> list[str]:
+    """Split a dotted key path into segments, honoring double-quoted segments.
+
+    e.g. ``hosts."10.30.0.56".user`` -> ['hosts', '10.30.0.56', 'user']
+    """
+    parts: list[str] = []
+    buf: list[str] = []
+    in_quotes = False
+    for ch in key:
+        if ch == '"':
+            in_quotes = not in_quotes
+        elif ch == "." and not in_quotes:
+            parts.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    parts.append("".join(buf))
+    return parts
+
+
+def _set_nested_path(branch: ConfigDict, path: list[str], value: JSONType) -> None:
+    """Set ``value`` at ``path`` inside ``branch`` (creating intermediate dicts)."""
+    for part in path[:-1]:
+        node = branch.get(part)
+        if not isinstance(node, dict):
+            node = {}
+            branch[part] = node
+        branch = node
+    branch[path[-1]] = value
+
+
 def _apply_env_overrides(data: ConfigDict) -> ConfigDict:
-    """Override config values from XCPNG_CFG__* env vars."""
+    """Override config values from XCPNG_TESTS_* env vars.
+
+    The part after the prefix is split on ``__`` to form the override path.
+    """
     prefix = "XCPNG_TESTS_"
     overrides: ConfigDict = {}
     for key, raw in os.environ.items():
@@ -362,14 +396,27 @@ def _apply_env_overrides(data: ConfigDict) -> ConfigDict:
             continue
         path = key.removeprefix(prefix).split("__")
         value = _parse_env_value(raw)
-        branch = overrides
-        for part in path[:-1]:
-            node = branch.get(part)
-            if not isinstance(node, dict):
-                node = {}
-                branch[part] = node
-            branch = node
-        branch[path[-1]] = value
+        _set_nested_path(overrides, path, value)
+    return _merge_dicts(data, overrides) if overrides else data
+
+
+def _apply_config_values(data: ConfigDict, key_values: list[str]) -> ConfigDict:
+    """Override config values from --config-value KEY=VALUE entries.
+
+    The KEY is a dotted path, with double quotes around segments that contain
+    dots (e.g. ``hosts."10.30.0.56".user``). Applied after env var overrides,
+    so it takes precedence over them.
+    """
+    overrides: ConfigDict = {}
+    for item in key_values:
+        key, sep, raw_value = item.partition("=")
+        if not sep:
+            raise ValueError(f"Invalid --config-value: {item!r} (expected KEY=VALUE)")
+        path = _split_key_path(key)
+        if not all(path):
+            raise ValueError(f"Invalid --config-value key: {key!r}")
+        value = _parse_env_value(raw_value)
+        _set_nested_path(overrides, path, value)
     return _merge_dicts(data, overrides) if overrides else data
 
 
@@ -410,12 +457,15 @@ def warn_legacy_data_py() -> None:
 
 def _build_config(
     base_data: ConfigDict,
+    config_values: list[str] | None = None,
     apply_value_overrides: bool = True,
 ) -> Config:
-    """Apply env overrides and password hash replacement, then validate."""
+    """Apply value/env overrides and password hash replacement, then validate."""
     try:
         if apply_value_overrides:
             base_data = _apply_env_overrides(base_data)
+            if config_values:
+                base_data = _apply_config_values(base_data, config_values)
         if "host" in base_data and isinstance(base_data["host"], dict):
             host = base_data["host"]
             password = host.get("default_password", "")
@@ -432,19 +482,21 @@ def _build_config(
 def load_config(
     config_path: Path | None = None,
     override: str | Path | None = None,
+    config_values: list[str] | None = None,
     apply_value_overrides: bool = True,
 ) -> Config:
     """Load and validate a merged TOML config with Pydantic, returning a Config.
 
     The main config.toml at the repo root is always used as the base (lowest
     priority). An optional override (a .toml path or a profile name) is merged
-    on top. When no override is given, the XCPNG_CONFIG env var is used as one.
+    on top, then XCPNG_TESTS_* env vars, then --config-value entries (highest
+    priority). When no override is given, the XCPNG_CONFIG env var is used as
+    one. Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
+    set, then in the xcp-ng-tests repository root.
     When neither an override nor an explicit base path is given,
     config.default.toml at the repo root is auto-merged if it exists.
-    Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
-    set, then in the xcp-ng-tests repository root.
-    apply_value_overrides can be set to False to skip the XCPNG_TESTS_*
-    overrides (used to compute the base config for diffs).
+    apply_value_overrides can be set to False to skip the XCPNG_TESTS_* and
+    --config-value overrides (used to compute the base config for diffs).
     """
     if override is None:
         override = os.environ.get("XCPNG_CONFIG") or None
@@ -463,7 +515,7 @@ def load_config(
         default_path = REPO_ROOT / "config.default.toml"
         if default_path.exists():
             base_data = _merge_dicts(base_data, _load_toml_with_includes(default_path))
-    return _build_config(base_data, apply_value_overrides)
+    return _build_config(base_data, config_values, apply_value_overrides)
 
 
 def base_config_dict() -> ConfigDict:
@@ -475,15 +527,15 @@ def base_config_dict() -> ConfigDict:
     return load_config(config_path=REPO_ROOT / "config.toml", apply_value_overrides=False).model_dump(by_alias=True)
 
 
-def apply_override(config_name: str | None = None) -> None:
+def apply_override(config_name: str | None = None, config_values: list[str] | None = None) -> None:
     """Load config.toml, merge the overlay (a .toml file path or profile name) on top, update config in place.
 
     When config_name is None, the XCPNG_CONFIG env var is used if set, else
     config.default.toml is auto-merged if it exists. Short names are looked up
     in the XCPNG_CONFIG_DIR directory when it is set, then in the xcp-ng-tests
-    repository root.
+    repository root. config_values is passed to load_config (see its docstring).
     """
-    new = load_config(override=config_name)
+    new = load_config(override=config_name, config_values=config_values)
     for field in Config.model_fields:
         setattr(config, field, getattr(new, field))
 
