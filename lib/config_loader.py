@@ -430,11 +430,14 @@ def load_config(config_path: Path | None = None, override: str | Path | None = N
 
     The main config.toml at the repo root is always used as the base (lowest
     priority). An optional override (a .toml path or a profile name) is merged
-    on top. When neither an override nor an explicit base path is given,
+    on top. When no override is given, the XCPNG_CONFIG env var is used as one.
+    When neither an override nor an explicit base path is given,
     config.default.toml at the repo root is auto-merged if it exists.
     Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
     set, then in the xcp-ng-tests repository root.
     """
+    if override is None:
+        override = os.environ.get("XCPNG_CONFIG") or None
     base_path = config_path or REPO_ROOT / "config.toml"
     try:
         base_data = _load_toml_with_includes(base_path)
@@ -456,9 +459,10 @@ def load_config(config_path: Path | None = None, override: str | Path | None = N
 def apply_override(config_name: str | None = None) -> None:
     """Load config.toml, merge the overlay (a .toml file path or profile name) on top, update config in place.
 
-    When config_name is None, config.default.toml is auto-merged if it exists.
-    Short names are looked up in the XCPNG_CONFIG_DIR directory when it is set,
-    then in the xcp-ng-tests repository root.
+    When config_name is None, the XCPNG_CONFIG env var is used if set, else
+    config.default.toml is auto-merged if it exists. Short names are looked up
+    in the XCPNG_CONFIG_DIR directory when it is set, then in the xcp-ng-tests
+    repository root.
     """
     new = load_config(override=config_name)
     for field in Config.model_fields:

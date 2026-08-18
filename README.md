@@ -198,13 +198,15 @@ To customize settings for your environment:
 #### Configuration file paths
 
 - `config.toml` — base config (always loaded, lowest priority)
-- `config.default.toml` — local defaults (auto-loaded if exists and no `--config` specified)
+- `config.default.toml` — local defaults (auto-loaded if exists and no `--config`/`XCPNG_CONFIG` specified)
+- `XCPNG_CONFIG=NAME` or `XCPNG_CONFIG=<path>` — env var equivalent of `--config`
 - `XCPNG_CONFIG_DIR=DIR` — directory where profile names are looked up
   (`config.NAME.toml`); falls back to the repository root
 - `--config=NAME` — environment-specific overrides (`config.NAME.toml`)
 - `--config=<path>` — a config overlay file from anywhere on disk
 
-The `--config` flag is optional. When not specified:
+The `--config` flag is optional. When not specified, the `XCPNG_CONFIG` env var
+is used if set. When neither is set:
 1. `config.toml` is loaded first
 2. If `config.default.toml` exists, it is merged on top (auto-detected)
 
@@ -231,8 +233,8 @@ in another directory can reuse files from the tests repository.
 This allows you to:
 - Commit `config.toml` with project defaults to version control
 - Create `config.default.toml` locally (ignored by git) for your standard environment
-- Create `config.prod.toml`, `config.ci.toml`, etc. for other environments and select with `--config=prod`
-- Point `--config` at an overlay file kept anywhere on disk
+- Create `config.prod.toml`, `config.ci.toml`, etc. for other environments and select with `--config=prod` (or `XCPNG_CONFIG=prod`)
+- Point `--config` (or `XCPNG_CONFIG`) at an overlay file kept anywhere on disk
 
 ## Running tests
 
@@ -744,9 +746,9 @@ For each pool target :
 
 By default, hosts and repository settings are read from the same config file as
 the tests (`config.toml`, auto-merged with `config.default.toml` when present).
-A different overlay can be picked with `-c/--config`, accepting a `.toml` file
-path (relative to the current directory) or a profile name
-(`config.PROFILE.toml`):
+A different overlay can be picked with `-c/--config` (or the `XCPNG_CONFIG`
+env var), accepting a `.toml` file path (relative to the current directory) or
+a profile name (`config.PROFILE.toml`):
 
 ```bash
 uv run scripts/tools.py update
