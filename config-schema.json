@@ -190,6 +190,33 @@
     "HostOverride": {
       "additionalProperties": false,
       "properties": {
+        "disabled_repositories": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disabled Repositories"
+        },
+        "hosting_pool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hosting Pool"
+        },
         "password": {
           "anyOf": [
             {
@@ -201,6 +228,21 @@
           ],
           "default": null,
           "title": "Password"
+        },
+        "repositories": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repositories"
         },
         "skip_xo_config": {
           "anyOf": [
@@ -734,6 +776,49 @@
       "title": "StorageConfig",
       "type": "object"
     },
+    "ToolsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "update": {
+          "$ref": "#/$defs/UpdateDefaults"
+        }
+      },
+      "title": "ToolsConfig",
+      "type": "object"
+    },
+    "UpdateDefaults": {
+      "additionalProperties": false,
+      "properties": {
+        "disabled_repositories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Disabled Repositories",
+          "type": "array"
+        },
+        "hosting_pool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hosting Pool"
+        },
+        "repositories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Repositories",
+          "type": "array"
+        }
+      },
+      "title": "UpdateDefaults",
+      "type": "object"
+    },
     "VMConfig": {
       "additionalProperties": false,
       "properties": {
@@ -884,6 +969,9 @@
     },
     "storage": {
       "$ref": "#/$defs/StorageConfig"
+    },
+    "tools": {
+      "$ref": "#/$defs/ToolsConfig"
     },
     "vm": {
       "$ref": "#/$defs/VMConfig"

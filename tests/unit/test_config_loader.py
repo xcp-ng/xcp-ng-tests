@@ -121,3 +121,18 @@ def test_env_override_preserves_key_case(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_env_override_preserves_value_case(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XCPNG_TESTS_network__mgmt", '"MgmtNet"')
     assert load_config().network.mgmt == "MgmtNet"
+
+
+def test_inventory_from_config_empty_list_override() -> None:
+    from lib.tools.inventory import inventory_from_config
+    data = _full_config_dict()
+    data["tools"]["update"] = {"repositories": ["xcp-ng-base"], "disabled_repositories": ["epel"]}
+    data["hosts"] = {
+        "h1": {"repositories": [], "disabled_repositories": ["*"]},
+        "h2": {"repositories": ["xcp-ng-updates"]},
+    }
+    inv = inventory_from_config(_build_config(data))
+    assert inv["hosts"]["h1"]["repositories"] == []
+    assert inv["hosts"]["h1"]["disabled_repositories"] == ["*"]
+    assert inv["hosts"]["h2"]["repositories"] == ["xcp-ng-updates"]
+    assert inv["hosts"]["h2"]["disabled_repositories"] == ["epel"]
