@@ -11,6 +11,7 @@ from lib.config_loader import (
     _build_config,
     _load_toml_file,
     _load_toml_with_includes,
+    _resolve_config_override,
     load_config,
 )
 
@@ -136,3 +137,24 @@ def test_inventory_from_config_empty_list_override() -> None:
     assert inv["hosts"]["h1"]["disabled_repositories"] == ["*"]
     assert inv["hosts"]["h2"]["repositories"] == ["xcp-ng-updates"]
     assert inv["hosts"]["h2"]["disabled_repositories"] == ["epel"]
+
+
+def test_resolve_config_override_as_path(tmp_path: Path) -> None:
+    f = tmp_path / "my.toml"
+    f.write_text("")
+    assert _resolve_config_override(str(f)) == f.resolve()
+
+
+def test_resolve_config_override_short_name_in_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    (cfg_dir / "config.prod.toml").write_text("")
+    monkeypatch.setenv("XCPNG_CONFIG_DIR", str(cfg_dir))
+    assert _resolve_config_override("prod") == (cfg_dir / "config.prod.toml").resolve()
+
+
+def test_resolve_config_override_short_name_in_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("lib.config_loader.REPO_ROOT", tmp_path)
+    monkeypatch.setenv("XCPNG_CONFIG_DIR", str(tmp_path / "empty"))
+    (tmp_path / "config.local.toml").write_text("")
+    assert _resolve_config_override("local") == (tmp_path / "config.local.toml").resolve()
