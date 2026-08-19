@@ -190,7 +190,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "VHD_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -209,7 +209,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "VHD_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -227,7 +227,9 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "VHD_MAX",
+            "--write-volume-cap": "VHD_MAX",
+            "--write-volume-align": "4KiB",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
