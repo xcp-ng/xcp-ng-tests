@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from lib.host import Host
     from lib.pool import Pool
     from lib.sr import SR
-    from lib.vdi import VDI
+    from lib.vdi import VDI, ImageFormat
     from lib.vm import VM
 
 # explicit import for package-scope fixtures
@@ -271,8 +271,8 @@ def glusterfs_sr(
         raise pytest.fail("Could not destroy glusterfs SR, leaving packages in place for manual cleanup") from e
 
 @pytest.fixture(scope='module')
-def vdi_on_glusterfs_sr(glusterfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test', virtual_size=config.volume_size)
+def vdi_on_glusterfs_sr(glusterfs_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = glusterfs_sr.create_vdi('GlusterFS-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

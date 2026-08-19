@@ -67,8 +67,8 @@ def xfs_sr(
         raise pytest.fail("Could not destroy xfs SR, leaving packages in place for manual cleanup") from e
 
 @pytest.fixture(scope='module')
-def vdi_on_xfs_sr(xfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = xfs_sr.create_vdi('XFS-local-VDI-test', virtual_size=config.volume_size)
+def vdi_on_xfs_sr(xfs_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = xfs_sr.create_vdi('XFS-local-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

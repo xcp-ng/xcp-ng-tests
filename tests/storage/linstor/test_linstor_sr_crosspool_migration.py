@@ -2,6 +2,7 @@ import pytest
 
 from lib.host import Host
 from lib.sr import SR
+from lib.vdi import ImageFormat
 from lib.vm import VM
 from tests.storage import cold_migration_then_come_back, live_storage_migration_then_come_back
 
@@ -17,12 +18,10 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally on a big VM to test it scales
 class Test:
-    def test_cold_crosspool_migration(
-        self, host: Host, hostB1: Host, vm_on_linstor_sr: VM, xfs_sr_on_hostB1: SR
-    ) -> None:
-        cold_migration_then_come_back(vm_on_linstor_sr, host, hostB1, xfs_sr_on_hostB1)
+    def test_cold_crosspool_migration(self, host: Host, hostB1: Host, vm_on_linstor_sr: VM, xfs_sr_on_hostB1: SR,
+                                      image_format: ImageFormat) -> None:
+        cold_migration_then_come_back(vm_on_linstor_sr, host, hostB1, xfs_sr_on_hostB1, image_format)
 
-    def test_live_crosspool_migration(
-        self, host: Host, hostB1: Host, vm_on_linstor_sr: VM, xfs_sr_on_hostB1: SR
-    ) -> None:
-        live_storage_migration_then_come_back(vm_on_linstor_sr, host, hostB1, xfs_sr_on_hostB1)
+    def test_live_crosspool_migration(self, host: Host, hostB1: Host, vm_on_linstor_sr: VM, xfs_sr_on_hostB1: SR,
+                                      image_format: ImageFormat) -> None:
+        live_storage_migration_then_come_back(vm_on_linstor_sr, host, hostB1, xfs_sr_on_hostB1, image_format)

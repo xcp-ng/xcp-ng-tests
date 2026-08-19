@@ -7,7 +7,7 @@ from lib.common import exec_nofail, raise_errors
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 # explicit import for package-scope fixtures
@@ -51,8 +51,8 @@ def cephfs_sr(host: Host, cephfs_device_config: dict[str, str], pool_with_ceph: 
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_cephfs_sr(cephfs_sr) -> Generator[VDI, None, None]:
-    vdi = cephfs_sr.create_vdi('CephFS-VDI-test', virtual_size=config.volume_size)
+def vdi_on_cephfs_sr(cephfs_sr, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = cephfs_sr.create_vdi('CephFS-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

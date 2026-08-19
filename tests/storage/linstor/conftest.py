@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from lib.host import Host
     from lib.pool import Pool
     from lib.sr import SR
-    from lib.vdi import VDI
+    from lib.vdi import VDI, ImageFormat
     from lib.vm import VM
 
 GROUP_NAME = 'linstor_group'
@@ -186,8 +186,8 @@ linstor_sr = pytest.fixture(_linstor_sr, scope='package')
 linstor_sr_ephemeral = pytest.fixture(_linstor_sr, scope='function')
 
 @pytest.fixture(scope='module')
-def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI, None, None]:
-    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test', virtual_size=config.volume_size)
+def vdi_on_linstor_sr(linstor_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

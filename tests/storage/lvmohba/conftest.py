@@ -30,8 +30,8 @@ def lvmohba_sr(host, lvmohba_device_config, image_format: ImageFormat):
     sr.destroy()
 
 @pytest.fixture()
-def vdi_on_lvmohba_sr(lvmohba_sr: SR):
-    vdi = lvmohba_sr.create_vdi('lvmohba-VDI-test', virtual_size=config.volume_size)
+def vdi_on_lvmohba_sr(lvmohba_sr: SR, image_format: ImageFormat):
+    vdi = lvmohba_sr.create_vdi('lvmohba-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

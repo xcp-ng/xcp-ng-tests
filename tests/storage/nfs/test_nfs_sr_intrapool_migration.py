@@ -2,6 +2,7 @@ import pytest
 
 from lib.host import Host
 from lib.sr import SR
+from lib.vdi import ImageFormat
 from lib.vm import VM
 from tests.storage import cold_migration_then_come_back, live_storage_migration_then_come_back
 
@@ -19,14 +20,17 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.usefixtures('image_format')
 class Test:
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM) -> None:
+    def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM,
+                                             image_format: ImageFormat) -> None:
         sr = dispatch_nfs.get_sr()
-        live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, sr)
+        live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, sr, image_format)
 
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_cold_intrapool_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM, xfs_sr_on_hostA2: SR) -> None:
-        cold_migration_then_come_back(dispatch_nfs, host, hostA2, xfs_sr_on_hostA2)
+    def test_cold_intrapool_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM, xfs_sr_on_hostA2: SR,
+                                      image_format: ImageFormat) -> None:
+        cold_migration_then_come_back(dispatch_nfs, host, hostA2, xfs_sr_on_hostA2, image_format)
 
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_live_intrapool_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM, xfs_sr_on_hostA2: SR) -> None:
-        live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, xfs_sr_on_hostA2)
+    def test_live_intrapool_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM, xfs_sr_on_hostA2: SR,
+                                      image_format: ImageFormat) -> None:
+        live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, xfs_sr_on_hostA2, image_format)
