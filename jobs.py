@@ -229,6 +229,8 @@ JOBS: dict[str, JobData] = {
         "params": {
             "--vm": "single/small_vm",
             "--volume-size": "FORMAT_MAX",
+            "--write-volume-cap": "100%",
+            "--write-volume-align": "4KiB",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
