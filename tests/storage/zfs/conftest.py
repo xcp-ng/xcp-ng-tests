@@ -67,8 +67,8 @@ def zfs_sr(host: Host, image_format: ImageFormat, zpool_vol0: None) -> Generator
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_zfs_sr(zfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = zfs_sr.create_vdi('ZFS-local-VDI-test', virtual_size=config.volume_size)
+def vdi_on_zfs_sr(zfs_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = zfs_sr.create_vdi('ZFS-local-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

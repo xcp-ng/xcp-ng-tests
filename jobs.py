@@ -195,7 +195,8 @@ JOBS: dict[str, JobData] = {
     },
     "storage-main-large-thin": {
         "description":
-            "same as storage-main with 3TiB VDIs, no large gzip XVAs creation and no test requiring 3TiB allocation",
+            "same as storage-main with per-format max VDIs, no large gzip XVAs creation"
+            " and no test requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -205,7 +206,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -214,7 +215,7 @@ JOBS: dict[str, JobData] = {
     },
     "storage-main-large-thick": {
         "description":
-            "same as storage-main with 3TiB VDIs, no gzip XVAs and tests requiring 3TiB allocation",
+            "same as storage-main with per-format max VDIs, no gzip XVAs and tests requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -224,7 +225,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -232,7 +233,7 @@ JOBS: dict[str, JobData] = {
         "name_filter": "not migration and not linstor and not gzip",
     },
     "storage-main-large-full-write": {
-        "description": "storage tests actually writing the full 3TiB volumes",
+        "description": "storage tests actually writing the full per-format max volumes",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -242,7 +243,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -267,7 +268,8 @@ JOBS: dict[str, JobData] = {
         "name_filter": "migration and not linstor and not glusterfs", # FIXME: glusterfs temporarily excluded
     },
     "storage-migrations-large-thin": {
-        "description": "same as storage-migrations with 3TiB VDIs, and no test requiring 3TiB allocation",
+        "description": "same as storage-migrations with per-format max VDIs,"
+                       " and no test requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -278,14 +280,15 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks and not thick_provisioned",
         "name_filter": "migration and not linstor",
     },
     "storage-migrations-large-thick": {
-        "description": "same as storage-migrations with 3TiB VDIs, and tests requiring 3TiB allocation",
+        "description": "same as storage-migrations with per-format max VDIs,"
+                       " and tests requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -296,7 +299,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks and thick_provisioned",
