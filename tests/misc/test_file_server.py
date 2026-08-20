@@ -3,6 +3,7 @@ import pytest
 import re
 
 import lib.commands as commands
+from lib.common import wait_for
 from lib.host import Host
 from lib.netutil import wrap_ip
 
@@ -31,10 +32,15 @@ class TestHSTS:
 
     @staticmethod
     def __get_header(host: Host) -> list[str]:
-        res = commands.local_cmd(
-            ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
-        )
-        return res.stdout.splitlines()
+        def get_or_none():
+            res = commands.local_cmd(["curl", "-s", "-XGET", "-k", "-I", "https://"
+                                      + wrap_ip(host.hostname_or_ip)], check=False)
+            if res.returncode != 0:
+                return None
+            return res.stdout.splitlines()
+        headers = wait_for(get_or_none)
+        assert headers is not None
+        return headers
 
     def test_fileserver_hsts_default(self, host: Host) -> None:
         # By default HSTS header should not be set

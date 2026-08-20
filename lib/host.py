@@ -55,6 +55,7 @@ def host_data(hostname_or_ip: str) -> dict[str, str]:
 class Host:
     xe_prefix = "host"
     pool: "Pool"
+    package_manager: str
 
     # Data extraction is automatic, no conversion from str is done.
     @dataclass
@@ -89,6 +90,13 @@ class Host:
         self._dom0: VM | None = None
 
         self.rescan_block_devices_info()
+
+        if self.file_exists('/usr/bin/yum'):
+            self.package_manager = 'yum'
+        elif self.file_exists('/usr/bin/dnf'):
+            self.package_manager = 'dnf'
+        else:
+            raise Exception("No yum or dnf on the host")
 
     def __str__(self) -> str:
         return self.hostname_or_ip
@@ -509,7 +517,7 @@ class Host:
             yum clean metadata -q
         """
         logging.info(f"[{self}] Removing cache metadata...")
-        return self.ssh("yum clean metadata -q")
+        return self.ssh(f'{self.package_manager} clean metadata -q')
 
     def yum_update(self, enablerepos: list[str] = [], disablerepos: list[str] = []) -> str:
         """Updates packages on target.
@@ -525,7 +533,7 @@ class Host:
         :param enablerepos: Enable one or more repositories (default: [])
         :param disablerepos: Disable one or more repositories (default: [])
         """
-        base_command = "yum update -y"
+        base_command = f'{self.package_manager} update -y'
 
         logging.info(f"[{self}] Updating packages...")
         if disablerepos:
@@ -609,7 +617,7 @@ class Host:
     def has_updates(self) -> bool:
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
-            self.ssh('yum check-update')
+            self.ssh(f'{self.package_manager} check-update')
             # returned 0, else there would have been a SSHCommandFailed
             return False
         except commands.SSHCommandFailed as e:
@@ -633,41 +641,52 @@ class Host:
         [...]
         """
         try:
-            history_str = self.ssh('yum history list --noplugins')
+            history_str = self.ssh(f'{self.package_manager} history list --noplugins')
         except commands.SSHCommandFailed:
-            # yum history list fails if the list is empty, and it's also not possible to rollback
-            # to before the first transaction, so "0" would not be appropriate as last transaction.
-            # To workaround this, create transactions: install and remove a small package.
+            # yum history list fails on xcp-ng 8 if the list is empty, but dnf history list works properly on xcp-ng 9.
+            # Just use a fake empty value to deal with both versions in the same way.
+            if self.package_manager == 'yum':
+                history_str = '''ID     | Command line             | Date and time    | Action(s)      | Altered
+-------------------------------------------------------------------------------'''
+            else:
+                raise
+
+        def split_history(history_str: str) -> list[str]:
+            history = history_str.splitlines()
+            line_index = None
+            for i in range(len(history)):
+                if history[i].startswith('--------'):
+                    line_index = i
+                    break
+            if line_index is None:
+                raise Exception('Unable to get yum transactions')
+            return history[line_index + 1:]
+
+        history = split_history(history_str)
+        if not history:
+            # we need a transaction to already exist. Install a small package with no deps, and remove it immediately.
             logging.info(f"[{self}] Install and remove a small package to workaround empty yum history.")
-            self.yum_install(['gpm-libs'])
-            self.yum_remove(['gpm-libs'])
-            history_str = self.ssh('yum history list --noplugins')
-
-        history = history_str.splitlines()
-        line_index = None
-        for i in range(len(history)):
-            if history[i].startswith('--------'):
-                line_index = i
-                break
-
-        if line_index is None:
-            raise Exception('Unable to get yum transactions')
+            small_pkg = 'gpm-libs' if self.xcp_version.major == 8 else 'bubblewrap'
+            self.yum_install([small_pkg])
+            self.yum_remove([small_pkg])
+            history = split_history(self.ssh(f'{self.package_manager} history list --noplugins'))
 
         try:
-            return int(history[line_index + 1].split()[0])
+            return int(history[0].split()[0])
         except ValueError:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
     def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
         logging.info(f"[{self}] Install packages: {' '.join(packages)} on host")
-        cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
+        opts = '--setopt=skip_missing_names_on_install=False' if self.package_manager == 'yum' else ''
+        cmd = f'{self.package_manager} install {opts} -y'
         if enablerepo is not None:
             cmd = f'{cmd} --enablerepo={enablerepo}'
         return self.ssh(f'{cmd} {" ".join(packages)}')
 
     def yum_remove(self, packages: list[str]) -> str:
         logging.info(f"[{self}] Remove packages: {' '.join(packages)} from host")
-        return self.ssh(f'yum remove -y {" ".join(packages)}')
+        return self.ssh(f'{self.package_manager} remove -y {" ".join(packages)}')
 
     def packages(self) -> list[str]:
         """Returns the list of installed RPMs - with epoch, version, release, arch."""
@@ -700,9 +719,12 @@ class Host:
 
         assert isinstance(self.saved_rollback_id, int)
 
-        self.ssh(
-            f'yum history rollback --enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates {self.saved_rollback_id} -y'
-        )
+        repositories = ['xcp-ng-base']
+        if self.xcp_version.major == 8:
+            # TODO: activate those repositories in xcp-ng 9. For now they are not available.
+            repositories += ['xcp-ng-testing', 'xcp-ng-updates']
+        self.ssh(f'{self.package_manager} history rollback'
+                 f' --enablerepo={",".join(repositories)} {self.saved_rollback_id} -y')
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
             missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
