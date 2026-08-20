@@ -4,6 +4,7 @@ import logging
 import time
 
 from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.network import Network
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -134,3 +135,8 @@ class VIF:
         gateway: str | None = None,
     ) -> None:
         self._configure("ipv6", mode, address, gateway)
+
+    def network(self) -> Network:
+        network_uuid = self.param_get('network-uuid')
+        assert network_uuid is not None, "VIF must have a network-uuid"
+        return Network(self.vm.host, network_uuid)

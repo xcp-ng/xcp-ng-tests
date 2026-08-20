@@ -997,6 +997,18 @@ wheels = [
 ]
 
 [[package]]
+name = "rpm-version"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/f9/f4042715f9cba089926c76858c424fd9701b34f55d748a565d9d726abddb/rpm_version-0.5.1.tar.gz", hash = "sha256:8f55e499bd93d878f98d9cb5e53ccbb19794997941ebd5f3848133a9bdfadb4a", size = 29855, upload-time = "2026-07-24T21:06:12.94Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/28/5f/a90090877736926af5572f45d59155a3f4db3d444c0d6a3556c572af7734/rpm_version-0.5.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:fcdb88d85541a54d337daf18070e978f06df653a4ebfb08da0cb9f49cfcb5a59", size = 282363, upload-time = "2026-07-24T21:06:06.653Z" },
+    { url = "https://files.pythonhosted.org/packages/26/5f/c7b6c6dd759abac18bf2634a8e9d40b95ff414fbfc91cfebeb9c3e8bc06b/rpm_version-0.5.1-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:1381a3dce1713a8320da21e193b95593989b7bf5c01559a81881e0c9f318436f", size = 312904, upload-time = "2026-07-24T21:06:08.362Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/56/58f114ccd1687d49bd2987bd3c911132d392a5166107e9862c92c535023e/rpm_version-0.5.1-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:54619ce73b9b8d23460a5e73fd0be1b3c2923f32252e6b42c4988b91f6ad3102", size = 315585, upload-time = "2026-07-24T21:06:09.883Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/45/03e4e3c0384874100ed308682a157fadc45e58b2262a54a0caf452baf295/rpm_version-0.5.1-cp310-abi3-win_amd64.whl", hash = "sha256:78fa7ed2f588a164b87c4ee2e814445aaf4932f3dc82ab82ba07e574e585f1d2", size = 167962, upload-time = "2026-07-24T21:06:11.423Z" },
+]
+
+[[package]]
 name = "ruff"
 version = "0.16.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1183,6 +1195,7 @@ dependencies = [
     { name = "pytest" },
     { name = "pytest-dependency" },
     { name = "requests" },
+    { name = "rpm-version" },
 ]
 
 [package.dev-dependencies]
@@ -1220,6 +1233,7 @@ requires-dist = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-dependency" },
     { name = "requests" },
+    { name = "rpm-version", specifier = ">=0.5.1" },
 ]
 
 [package.metadata.requires-dev]
