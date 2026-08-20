@@ -20,8 +20,17 @@ from pathlib import Path
 from uuid import UUID
 
 import requests
-from passlib.hash import sha512_crypt
 from pydantic import TypeAdapter
+
+from lib.config_loader import config
+from lib.passwords import hash_password as hash_password
+from lib.sizes import QCOW2_MAX as QCOW2_MAX
+from lib.sizes import VHD_MAX as VHD_MAX
+from lib.sizes import GiB as GiB
+from lib.sizes import KiB as KiB
+from lib.sizes import MiB as MiB
+from lib.sizes import TiB as TiB
+from lib.sizes import parse_size as parse_size
 
 from typing import (
     TYPE_CHECKING,
@@ -36,42 +45,6 @@ from typing import (
 
 if TYPE_CHECKING:
     from lib.host import Host
-
-
-KiB = 2**10
-MiB = KiB**2
-GiB = KiB**3
-TiB = KiB**4
-
-VHD_MAX = 2040 * GiB
-QCOW2_MAX = 16 * TiB - 2561 * MiB
-
-_SYMBOLIC_SIZES: dict[str, int] = {
-    'VHD_MAX': VHD_MAX,
-    'QCOW2_MAX': QCOW2_MAX,
-}
-
-def parse_size(size_str: str) -> int:
-    """
-    Parse a size string like "2.5TiB", "1GiB", "1024", "VHD_MAX", or "QCOW2_MAX".
-    """
-    symbolic = _SYMBOLIC_SIZES.get(size_str.strip().upper())
-    if symbolic is not None:
-        return symbolic
-    try:
-        return int(size_str)
-    except ValueError:
-        pass
-
-    size_str = size_str.strip()
-    for unit, multiplier in [('TiB', TiB), ('GiB', GiB), ('MiB', MiB), ('KiB', KiB)]:
-        if size_str.endswith(unit):
-            try:
-                return int(float(size_str[:-len(unit)].strip()) * multiplier)
-            except ValueError:
-                pass
-
-    raise ValueError(f"Cannot parse size: {size_str}")
 
 T = TypeVar("T")
 
@@ -89,21 +62,15 @@ class PackageManagerEnum(Enum):
 
 # Common VM images used in tests
 def vm_image(vm_key: str) -> str:
-    from data import DEF_VM_URL, VM_IMAGES
-    url = VM_IMAGES[vm_key]
+    url = config.vm.images.get(vm_key)
+    if url is None:
+        raise KeyError(f"VM image key {vm_key} not found")
     if not url.startswith('http'):
-        url = DEF_VM_URL + url
+        url = config.vm.def_url + url
     return url
 
 def prefix_object_name(label: str) -> str:
-    name_prefix = None
-    try:
-        from data import OBJECTS_NAME_PREFIX
-        name_prefix = OBJECTS_NAME_PREFIX
-    except ImportError:
-        pass
-    if name_prefix is None:
-        name_prefix = f"[{getpass.getuser()}]"
+    name_prefix = config.objects_name_prefix or f"[{getpass.getuser()}]"
     return f"{name_prefix} {label}"
 
 def shortened_nodeid(nodeid: str) -> str:
@@ -420,8 +387,3 @@ def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None
     """ Common implementation for param_clear. """
     args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)
-
-def hash_password(password: str) -> str:
-    """Hash password for /etc/shadow."""
-    # XCP-ng uses sha512 with 5000 rounds by default
-    return sha512_crypt.using(rounds=5000).hash(password)  # type: ignore[no-untyped-call]
