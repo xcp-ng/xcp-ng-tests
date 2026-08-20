@@ -23,6 +23,8 @@ R = TypeVar("R")
 
 ImageFormat = Literal['qcow2', 'raw', 'vhd']
 
+QCOW2_IMAGE_FORMAT: ImageFormat = 'qcow2'
+
 class VDI:
     xe_prefix = "vdi"
     sr: SR
