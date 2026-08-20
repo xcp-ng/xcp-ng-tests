@@ -22,6 +22,12 @@ from tests.storage import (
     vdi_is_open,
     xva_export_import,
 )
+from tests.storage.storage import (
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
+)
 
 from .conftest import POOL_NAME
 
@@ -94,6 +100,34 @@ class TestZFSSR:
     def test_vdi_export_import(self, storage_test_vm: VM, zfs_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
         vdi_export_import(storage_test_vm, zfs_sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_zfs_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_zfs_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_zfs_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_zfs_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_zfs_sr: VM, defer: Defer, exit_on_fistpoint: None):
+        check_vdi_revert_journal_cbt(defer, vm_on_zfs_sr, "FileSR_revert_create_src")
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_zfs_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_zfs_sr, fistpoint)
 
     # *** tests with reboots (longer tests).
 
