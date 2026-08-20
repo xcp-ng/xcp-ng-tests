@@ -1,0 +1,5 @@
+tests/install/test.py::TestNested::test_install[bios-81-iso-ext]
+tests/install/test.py::TestNested::test_tune_firstboot[None-bios-81-host2-iso-ext]
+tests/install/test.py::TestNested::test_boot_inst[bios-81-host2-iso-ext]
+tests/install/test.py::TestNested::test_upgrade[bios-81-83nightly-host2-iso-ext]
+tests/install/test.py::TestNested::test_boot_upg[bios-81-83nightly-host2-iso-ext]
