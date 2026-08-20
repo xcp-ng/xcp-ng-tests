@@ -11,9 +11,12 @@ from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import (
     MAX_VDI_SIZE,
+    CBTTest,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
+    assert_cbt_log_does_not_exist_file_sr,
+    assert_cbt_log_exists_file_sr,
     coalesce_integrity,
     full_vdi_write,
     vdi_export_import,
@@ -25,6 +28,8 @@ from tests.storage import (
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
 
 # Make sure this fixture is called before the parametrized one
+
+
 @pytest.mark.usefixtures('image_format')
 class TestNFSSR:
     @pytest.mark.quicktest
@@ -168,3 +173,59 @@ class TestNFSSR:
         vm.shutdown(verify=True)
 
     # *** End of tests with reboots
+
+
+class TestNFSCBT(CBTTest):
+    """Test CBT functionality on NFS SR"""
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_exists_file_sr(host, sr, vdi)
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_does_not_exist_file_sr(host, sr, vdi)
+
+    def test_enable_disable_cbt(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_enable_disable_cbt(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_cbt_log_creation(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_cbt_log_creation(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_snapshot_with_cbt(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_snapshot_with_cbt(host, nfs_sr, vdi_on_nfs_sr)
+
+    @pytest.mark.small_vm
+    def test_changed_blocks_tracking(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI, vm_on_nfs_sr: VM) -> None:
+        self._test_changed_blocks_tracking(host, nfs_sr, vdi_on_nfs_sr, vm_on_nfs_sr)
+
+    @pytest.mark.small_vm
+    def test_cbt_after_coalesce(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI, vm_on_nfs_sr: VM) -> None:
+        self._test_cbt_after_coalesce(host, nfs_sr, vdi_on_nfs_sr, vm_on_nfs_sr)
+
+    @pytest.mark.small_vm
+    def test_incremental_snap_scenario(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI, vm_on_nfs_sr: VM) -> None:
+        self._test_incremental_snap_scenario(host, nfs_sr, vdi_on_nfs_sr, vm_on_nfs_sr)
+
+    def test_disable_cbt_removes_log(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_disable_cbt_removes_log(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_destroy_vdi_removes_cbt_log(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_destroy_vdi_removes_cbt_log(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_cbt_persist_after_sr_reboot(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_cbt_persist_after_sr_reboot(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_cbt_on_snapshot_chain(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_cbt_on_snapshot_chain(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_cbt_parent_disable_does_not_affect_snapshot(host, nfs_sr, vdi_on_nfs_sr)
+
+    @pytest.mark.small_vm
+    def test_cbt_bitmap_non_zero_after_write(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI,
+                                             vm_on_nfs_sr: VM) -> None:
+        self._test_cbt_bitmap_non_zero_after_write(host, nfs_sr, vdi_on_nfs_sr, vm_on_nfs_sr)
+
+    def test_cbt_data_destroy(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_cbt_data_destroy(host, nfs_sr, vdi_on_nfs_sr)
