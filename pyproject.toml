@@ -21,28 +21,28 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "autopep8",
     "bs4>=0.0.1",
-    "mypy",
     "flake8",
     "flake8-pyproject",
+    "icecream",
+    "libarchive-c==5.3",
+    "prek",
     "pydocstyle",
     "pyright",
     "ruff",
-    "types-requests",
-    "typing-extensions",
-    "libarchive-c==5.3",
-    "types-pygments",
-    "types-colorama",
-    "types-pexpect",
-    "zizmor",
-    "prek",
-    "autopep8",
     "types-passlib",
-    "icecream",
+    "typing-extensions",
+    "zizmor",
 ]
 
 [tool.pyright]
 typeCheckingMode = "standard"
+reportMissingParameterType = "error"
+reportUnknownParameterType = "error"
+
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
 
 [tool.ruff]
 preview = true
@@ -54,15 +54,21 @@ quote-style = "preserve"
 
 [tool.ruff.lint]
 select = [
+  "ANN",  # flake8-annotations
   "D",  # pydocstyle
+  "FA",  # future-annotations
   "F",  # Pyflakes
   "I",  # isort
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
+  "UP006",  # non-pep585-annotation
   "UP007",  # non-pep604-annotation-union
+  "UP037",  # quoted-annotation
+  "UP045",  # non-pep604-annotation-optional
 ]
 # don't use some of the default D and SIM rules
 ignore = [
+  "ANN204",  # missing-return-type-special-method
   "D100",  # undocumented-public-module
   "D101",  # undocumented-public-class
   "D102",  # undocumented-public-method
@@ -86,6 +92,9 @@ ignore = [
 
 # restrict to the PEP 257 rules
 pydocstyle.convention = "pep257"
+
+# let ruff require future annotations where it can be useful
+future-annotations = true
 
 [tool.ruff.lint.extend-per-file-ignores]
 # Pytest fixtures are often flagged as unused imports (F401) or 
@@ -148,5 +157,5 @@ python-preference = "managed"
 
 [tool.pytest-language-server]
 # pytest-language-server shows some internal variables, like host, as undeclared fixture.
-# An undeclared fixture would be cought by pyright/mypy. Just disable that diagnostic.
+# An undeclared fixture would be cought by pyright. Just disable that diagnostic.
 disabled_diagnostics = ["undeclared-fixture"]

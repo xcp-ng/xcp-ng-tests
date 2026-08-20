@@ -46,7 +46,7 @@ class Network:
         _param_clear(self.host, self.xe_prefix, self.uuid,
                      param_name)
 
-    def destroy(self):
+    def destroy(self) -> None:
         logging.info(f"Destroying network '{self.param_get('name-label')}': {self.uuid}")
         self.host.xe('network-destroy', {'uuid': self.uuid})
 
