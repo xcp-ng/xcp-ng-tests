@@ -15,7 +15,7 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
 
 def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_json: bool = False) -> JSONType | str:
     cmd = [TOOLS.get('xo-cli', 'xo-cli'), action]
-    if use_json:
+    if action != 'list-objects' and use_json:
         cmd += ['--json']
     cmd += ["%s=%s" % (key, value) for key, value in args.items()]
 
