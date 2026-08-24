@@ -5,7 +5,7 @@ import pytest
 import logging
 
 from data import HOST_FREE_NICS
-from lib.common import PackageManagerEnum
+from lib.common import PackageManagerEnum, safe_split
 from lib.host import Host
 from lib.network import Network
 from lib.vm import VM
@@ -13,10 +13,34 @@ from lib.vm import VM
 from typing import Generator
 
 @pytest.fixture(scope='package')
-def host_no_sdn_controller(host: Host) -> None:
+def host_no_sdn_controller(host: Host) -> Generator[Host, None, None]:
     """ An XCP-ng with no SDN controller. """
-    if host.xe('sdn-controller-list', minimal=True):
-        pytest.fail("This test requires an XCP-ng with no SDN controller")
+    sdn_configured: list[dict[str, str | bool | dict[str, str]]] = []
+
+    for uuid in safe_split(host.xe('sdn-controller-list', minimal=True), ','):
+        logging.info(f"Forgetting sdn-controller: {uuid}")
+
+        sdn_configured.append({
+            'protocol': host.xe('sdn-controller-param-get', {'uuid': uuid, 'param-name': 'protocol'}),
+            'address': host.xe('sdn-controller-param-get', {'uuid': uuid, 'param-name': 'address'}),
+            'tcp-port': host.xe('sdn-controller-param-get', {'uuid': uuid, 'param-name': 'port'}),
+        })
+
+        host.xe('sdn-controller-forget', {'uuid': uuid})
+
+    # when using sdn-controller, we are usually using OpenFlow11 only
+    # but allow-id is using OpenFlow10 and it fails to sets rules if OpenFlow11 is enabled only.
+    host.ssh("set -o pipefail; ovs-vsctl list-br "
+             "| xargs -n1 -d '\n' -r -I{} ovs-vsctl add bridge {} protocols OpenFlow10")
+
+    yield host
+
+    host.ssh("set -o pipefail; ovs-vsctl list-br "
+             "| xargs -n1 -d '\n' -r -I{} ovs-vsctl remove bridge {} protocols OpenFlow10")
+
+    for cfg in sdn_configured:
+        logging.info("Re-introducing sdn-controller")
+        host.xe('sdn-controller-introduce', cfg)
 
 # a clone of imported_vm in which we've added tcpdump
 # not to be used by tests directly
