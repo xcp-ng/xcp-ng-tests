@@ -6,7 +6,7 @@ import os
 import tomllib
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from lib.passwords import hash_password
 from lib.sizes import parse_size
@@ -14,26 +14,45 @@ from lib.typing import ConfigDict, JSONType
 
 from typing import cast, overload
 
+logger = logging.getLogger(__name__)
+
 class ConfigError(Exception):
     """Raised when the TOML configuration cannot be loaded or validated."""
 
 
-class _StrictModel(BaseModel):
-    """Reject unknown keys at load time (extra="forbid")."""
+class WarnOnExtraModel(BaseModel):
+    """Drop unknown config keys, warning about them instead of failing (extra="ignore")."""
+    model_config = {"extra": "ignore"}
 
-    model_config = {"extra": "forbid"}
+    @model_validator(mode="before")
+    @classmethod
+    def _warn_unknown_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if cls.model_config.get("extra") == "allow":
+            return data
+        expected = set(cls.model_fields) | {
+            f.alias for f in cls.model_fields.values() if f.alias
+        }
+        unknown = set(data) - expected
+        if unknown:
+            logger.warning(
+                "[%s] Unknown config key(s) ignored (config may be from a newer project version): %s",
+                cls.__name__, ", ".join(sorted(unknown)),
+            )
+        return data
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-class HostConfig(_StrictModel):
+class HostConfig(WarnOnExtraModel):
     default_user: str
     default_password: str
     default_password_hash: str = ""
 
 
-class HostOverride(_StrictModel):
+class HostOverride(WarnOnExtraModel):
     user: str | None = None
     password: str | None = None
     skip_xo_config: bool | None = None
@@ -42,17 +61,17 @@ class HostOverride(_StrictModel):
     hosting_pool: str | None = None
 
 
-class NetworkConfig(_StrictModel):
+class NetworkConfig(WarnOnExtraModel):
     mgmt: str
     free_nics: list[str]
 
 
-class PXEConfig(_StrictModel):
+class PXEConfig(WarnOnExtraModel):
     config_server: str
     arp_server: str
 
 
-class VMConfig(_StrictModel):
+class VMConfig(WarnOnExtraModel):
     def_url: str
     cache_imported: bool
     default_sr: str
@@ -60,7 +79,7 @@ class VMConfig(_StrictModel):
     equivalents: dict[str, str]
 
 
-class IsoImageDef(_StrictModel):
+class IsoImageDef(WarnOnExtraModel):
     path: str
     net_url: str | None = Field(default=None, alias="net-url")
     net_only: bool | None = Field(default=None, alias="net-only")
@@ -69,26 +88,26 @@ class IsoImageDef(_StrictModel):
     model_config = {"populate_by_name": True}
 
 
-class InstallIsosConfig(_StrictModel):
+class InstallIsosConfig(WarnOnExtraModel):
     base_url: str
     cache_dir: str
     definitions: dict[str, IsoImageDef]
 
 
-class AnswerFileDef(_StrictModel):
+class AnswerFileDef(WarnOnExtraModel):
     model_config = {"extra": "allow"}
 
     TAG: str
     CONTENTS: str | list[AnswerFileDef] | None = None
 
 
-class InstallConfig(_StrictModel):
+class InstallConfig(WarnOnExtraModel):
     answerfiles: dict[str, AnswerFileDef]
     isos: InstallIsosConfig
     iso_remaster: str = ""
 
 
-class WinGuestToolDef(_StrictModel):
+class WinGuestToolDef(WarnOnExtraModel):
     name: str
     download: bool
     package: str
@@ -97,12 +116,12 @@ class WinGuestToolDef(_StrictModel):
     onboard_family: str | None = None
 
 
-class OtherGuestToolDef(_StrictModel):
+class OtherGuestToolDef(WarnOnExtraModel):
     name: str
     download: bool
 
 
-class InstalledGuestToolDef(_StrictModel):
+class InstalledGuestToolDef(WarnOnExtraModel):
     type: str | None = None
     path: str | None = None
     package: str | None = None
@@ -112,43 +131,43 @@ class InstalledGuestToolDef(_StrictModel):
     onboarding_phase: str | None = None
 
 
-class GuestToolsConfig(_StrictModel):
+class GuestToolsConfig(WarnOnExtraModel):
     download_url: str
     win: dict[str, WinGuestToolDef]
     other: OtherGuestToolDef
     installed: dict[str, InstalledGuestToolDef]
 
 
-class XOConfig(_StrictModel):
+class XOConfig(WarnOnExtraModel):
     cli: str
 
 
-class SSHConfig(_StrictModel):
+class SSHConfig(WarnOnExtraModel):
     pubkey: str
     output_max_lines: int
     ignore_banner: bool
 
 
-class LinstorConfig(_StrictModel):
+class LinstorConfig(WarnOnExtraModel):
     redundancy: int
 
 
-class NFSConfig(_StrictModel):
+class NFSConfig(WarnOnExtraModel):
     server: str | None = None
     serverpath: str | None = None
 
 
-class NFS4Config(_StrictModel):
+class NFS4Config(WarnOnExtraModel):
     server: str | None = None
     serverpath: str | None = None
     nfsversion: str | None = None
 
 
-class NFSISOConfig(_StrictModel):
+class NFSISOConfig(WarnOnExtraModel):
     location: str | None = None
 
 
-class CIFSISOConfig(_StrictModel):
+class CIFSISOConfig(WarnOnExtraModel):
     location: str | None = None
     username: str | None = None
     cifspassword: str | None = None
@@ -156,30 +175,30 @@ class CIFSISOConfig(_StrictModel):
     vers: str | None = None
 
 
-class CephFSConfig(_StrictModel):
+class CephFSConfig(WarnOnExtraModel):
     server: str | None = None
     serverpath: str | None = None
     options: str | None = None
 
 
-class MooseFSConfig(_StrictModel):
+class MooseFSConfig(WarnOnExtraModel):
     masterhost: str | None = None
     masterport: str | None = None
     rootpath: str | None = None
 
 
-class LVMoHBAConfig(_StrictModel):
+class LVMoHBAConfig(WarnOnExtraModel):
     SCSIid: str | None = None
 
 
-class LVMoISCSIConfig(_StrictModel):
+class LVMoISCSIConfig(WarnOnExtraModel):
     target: str | None = None
     port: str | None = None
     targetIQN: str | None = None
     SCSIid: str | None = None
 
 
-class StorageConfig(_StrictModel):
+class StorageConfig(WarnOnExtraModel):
     nfs: NFSConfig
     nfs4: NFS4Config
     nfs_iso: NFSISOConfig
@@ -191,17 +210,17 @@ class StorageConfig(_StrictModel):
     linstor: LinstorConfig
 
 
-class UpdateDefaults(_StrictModel):
+class UpdateDefaults(WarnOnExtraModel):
     repositories: list[str] = Field(default_factory=list)
     disabled_repositories: list[str] = Field(default_factory=list)
     hosting_pool: str | None = None
 
 
-class ToolsConfig(_StrictModel):
+class ToolsConfig(WarnOnExtraModel):
     update: UpdateDefaults = Field(default_factory=UpdateDefaults)
 
 
-class Config(_StrictModel):
+class Config(WarnOnExtraModel):
     objects_name_prefix: str | None
     dns_server: str
     host: HostConfig

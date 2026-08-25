@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import logging
 from pathlib import Path
 
 from passlib.hash import sha512_crypt
@@ -24,6 +25,14 @@ def _full_config_dict() -> dict[str, Any]:
     return load_config().model_dump()
 
 
+def _config_warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "lib.config_loader" and record.levelno >= logging.WARNING
+    ]
+
+
 def test_base_config_loads() -> None:
     cfg = load_config()
     assert cfg.host.default_user == "root"
@@ -42,34 +51,54 @@ def test_default_password_hash_matches_password() -> None:
     assert sha512_crypt.verify(cfg.host.default_password, cfg.host.default_password_hash)
 
 
-def test_unknown_section_rejected() -> None:
+def test_unknown_section_warned(caplog: pytest.LogCaptureFixture) -> None:
     data = _full_config_dict()
     data["not_a_section"] = 1
-    with pytest.raises(ConfigError):
+    with caplog.at_level(logging.WARNING, logger="lib.config_loader"):
         _build_config(data)
+    assert any("not_a_section" in m for m in _config_warnings(caplog))
 
 
-def test_unknown_key_rejected() -> None:
+def test_unknown_key_warned(caplog: pytest.LogCaptureFixture) -> None:
     data = _full_config_dict()
     data["host"]["defalt_password"] = "typo"
-    with pytest.raises(ConfigError):
+    with caplog.at_level(logging.WARNING, logger="lib.config_loader"):
         _build_config(data)
+    assert any("defalt_password" in m for m in _config_warnings(caplog))
 
 
-def test_unknown_host_override_key_rejected() -> None:
+def test_unknown_host_override_key_warned(caplog: pytest.LogCaptureFixture) -> None:
     data = _full_config_dict()
     data["hosts"]["1.2.3.4"] = {"pasword": "typo"}
-    with pytest.raises(ConfigError):
+    with caplog.at_level(logging.WARNING, logger="lib.config_loader"):
         _build_config(data)
+    assert any("pasword" in m for m in _config_warnings(caplog))
 
 
-def test_unknown_storage_key_rejected() -> None:
+def test_unknown_storage_key_warned(caplog: pytest.LogCaptureFixture) -> None:
     data = _full_config_dict()
     data["storage"]["lvmoiscsi"]["targetIQN"] = "ok"
     data["storage"]["lvmoiscsi"]["SCSIid"] = "ok"
     data["storage"]["lvmoiscsi"]["targetiqn"] = "typo"
-    with pytest.raises(ConfigError):
+    with caplog.at_level(logging.WARNING, logger="lib.config_loader"):
         _build_config(data)
+    assert any("targetiqn" in m for m in _config_warnings(caplog))
+
+
+def test_iso_alias_keys_not_warned(caplog: pytest.LogCaptureFixture) -> None:
+    data = _full_config_dict()
+    data["install"]["isos"]["definitions"]["83net"] = {"path": "x.iso", "net-url": "http://pxe/installers/xcp-ng/8.3"}
+    with caplog.at_level(logging.WARNING, logger="lib.config_loader"):
+        _build_config(data)
+    assert _config_warnings(caplog) == []
+
+
+def test_answerfiles_extra_keys_not_warned(caplog: pytest.LogCaptureFixture) -> None:
+    data = _full_config_dict()
+    data["install"]["answerfiles"]["INSTALL"]["mode"] = "upgrade"
+    with caplog.at_level(logging.WARNING, logger="lib.config_loader"):
+        _build_config(data)
+    assert _config_warnings(caplog) == []
 
 
 def test_answerfiles_allow_extra_keys() -> None:
