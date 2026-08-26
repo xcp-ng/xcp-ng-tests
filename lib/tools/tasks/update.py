@@ -5,7 +5,9 @@ This module is intended for performing update actions on existing remote targets
 from __future__ import annotations
 
 import re
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 
 from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
@@ -69,7 +71,8 @@ def _check_packages_available(
             repoquery_cmd += f" --disablerepo={r}"
         for r in master_cfg["repositories"]:
             repoquery_cmd += f" --enablerepo={r}"
-        available = set(p.master.ssh(repoquery_cmd).splitlines())
+        with _pinned_updates_repo(p.master):
+            available = set(p.master.ssh(repoquery_cmd).splitlines())
         for h in p.hosts:
             pkgs = _filter_packages(packages[h]) - available
             if pkgs:
@@ -116,6 +119,26 @@ def _check_consistency(packages: dict[Host, set[str]]) -> None:
             lines.append(f"  [{h}] additional packages:\n{_format_packages(sorted(extra_pkgs))}")
         logger.warning("\n".join(lines))
 
+@contextmanager
+def _pinned_updates_repo(host: Host) -> Generator[None]:
+    """Temporarily drop the mirrors.xcp-ng.org baseurls, restoring the file on exit."""
+    repo_file = '/etc/yum.repos.d/xcp-ng.repo'
+    backup_file = f'{repo_file}.bak'
+    logger.info(f"[{host}] Removing mirrors.xcp-ng.org from {repo_file}")
+    host.ssh(f'cp -f {repo_file} {backup_file}')
+    host.ssh(f"sed -i 's|http://mirrors\\.xcp-ng\\.org/[^ ]*[ ]*||g' {repo_file}")
+    try:
+        yield
+    finally:
+        logger.info(f"[{host}] Restoring {repo_file}")
+        host.ssh(f'mv -f {backup_file} {repo_file}')
+
+def _update_host(host: Host, enablerepos: list[str], disablerepos: list[str] = [],
+                 reboot: bool = True) -> None:
+    """Update a host, with the mirrors.xcp-ng.org baseurl removed during the update."""
+    with _pinned_updates_repo(host):
+        host.update(enablerepos, disablerepos=disablerepos, reboot=reboot)
+
 def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = False) -> None:
     """Updates hosts in pool(s).
 
@@ -155,7 +178,8 @@ def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = Fal
     # update master hosts
     with ThreadPoolExecutor() as executor:
         future_hosts = {executor.submit(
-            p.master.update,
+            _update_host,
+            p.master,
             inventory_hosts[p.master.hostname_or_ip]["repositories"],
             disablerepos=inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"],
             reboot=reboot,
@@ -168,7 +192,7 @@ def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = Fal
                     # repos are the same as for the master host
                     repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
                     disablerepos = inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"]
-                    future_hosts[executor.submit(h.update, repos, disablerepos=disablerepos, reboot=reboot)] = h
+                    future_hosts[executor.submit(_update_host, h, repos, disablerepos=disablerepos, reboot=reboot)] = h
         for future in as_completed(future_hosts):
             updated_host = future_hosts[future]
             try:
@@ -191,7 +215,8 @@ def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = Fal
                     # repos are the same as for the master host
                     repos = inventory_hosts[p.master.hostname_or_ip]["repositories"]
                     disablerepos = inventory_hosts[p.master.hostname_or_ip]["disabled_repositories"]
-                    future_other_hosts[executor.submit(h.update, repos, disablerepos=disablerepos, reboot=reboot)] = h
+                    future_other_hosts[executor.submit(
+                        _update_host, h, repos, disablerepos=disablerepos, reboot=reboot)] = h
             for future in as_completed(future_other_hosts):
                 other_host = future_other_hosts[future]
                 try:
