@@ -8,11 +8,13 @@ from lib.config_loader import Config
 from lib.config_schema import editor_schema
 from lib.typing import JSONType
 
+from typing import cast
+
 _SCHEMA_PATH = Path(__file__).parents[2] / "config-schema.json"
 
 
 def _schema() -> dict[str, JSONType]:
-    return json.loads(_SCHEMA_PATH.read_text())
+    return cast(dict[str, JSONType], json.loads(_SCHEMA_PATH.read_text()))
 
 
 def _collect_refs(obj: JSONType, refs: list[str]) -> None:
@@ -92,6 +94,20 @@ def test_schema_defs_match_model() -> None:
         "config-schema.json $defs are out of sync with the Config model. "
         "Regenerate with: uv run scripts/gen-config-schema.py"
     )
+
+
+def test_schema_includes_list_merge_operators() -> None:
+    defs = _schema()["$defs"]
+    assert isinstance(defs, dict)
+    network = cast(dict[str, JSONType], defs["NetworkConfig"])
+    update = cast(dict[str, JSONType], defs["UpdateDefaults"])
+    host = cast(dict[str, JSONType], defs["HostOverride"])
+    network_properties = cast(dict[str, JSONType], network["properties"])
+    update_properties = cast(dict[str, JSONType], update["properties"])
+    host_properties = cast(dict[str, JSONType], host["properties"])
+    assert "+free_nics" in network_properties
+    assert "-repositories" in update_properties
+    assert "+disabled_repositories" in host_properties
 
 
 def test_schema_refs_resolve() -> None:

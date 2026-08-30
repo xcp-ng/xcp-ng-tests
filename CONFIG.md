@@ -162,8 +162,10 @@ Include paths are resolved relative to the including file first, then relative
 to the xcp-ng-tests repository root. Dictionaries are deep-merged. A later
 include overrides an earlier include, and the including file overrides all of
 its includes. Lists and scalar values are replaced rather than appended.
-Cyclic includes are rejected. A file included through two different paths is
-allowed as long as the paths do not form a cycle.
+For the supported string-list fields, explicit `+field` and `-field` keys add
+or remove items from the current merged list. Cyclic includes are rejected. A
+file included through two different paths is allowed as long as the paths do
+not form a cycle.
 
 This lets several overlays share common settings without copying them. For
 example, credentials and repository defaults can live in one file, datacenter
@@ -221,6 +223,30 @@ highest source for every command: dedicated pytest options such as
 `--volume-size`, `--write-volume-cap`, and `--write-volume-align` are applied
 after configuration loading. Target-selection options such as `--hosts` are
 separate from value precedence.
+
+### List overrides
+
+Ordinary list assignments replace the current list. For the supported
+set-like lists, a quoted `+` or `-` key changes that behavior:
+
+```toml
+[network]
+"+free_nics" = ["eth2"]
+"-free_nics" = ["eth0"]
+
+[tools.update]
+"+repositories" = ["xcp-ng-updates"]
+```
+
+`+field` adds items that are not already present, preserving list order.
+`-field` removes matching items. The operators are supported for
+`network.free_nics`, `tools.update.repositories`,
+`tools.update.disabled_repositories`, and the corresponding `repositories` and
+`disabled_repositories` fields under each `[hosts."host"]` entry. An operator
+on a missing host list can create it with `+`; removing from a missing list is
+a no-op. If a configuration source contains both an ordinary assignment and an operator for
+the same field, the ordinary assignment is applied first. Other lists,
+including answer-file contents, retain replacement semantics.
 
 ## Short names select overlays
 

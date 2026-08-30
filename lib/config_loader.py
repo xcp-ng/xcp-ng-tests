@@ -268,7 +268,7 @@ class Config(WarnOnExtraModel):
 def _load_toml_file(path: Path) -> ConfigDict:
     """Load TOML file, dropping loader-level pseudo-keys, and return dict."""
     with open(path, "rb") as f:
-        data = cast(ConfigDict, tomllib.load(f))
+        data: ConfigDict = cast(ConfigDict, tomllib.load(f))
     data.pop("$schema", None)
     return data
 
@@ -277,15 +277,43 @@ def _require_str_list(value: JSONType, what: str) -> list[str]:
     """Return ``value`` as a list of strings, raising ConfigError otherwise."""
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ConfigError(f"{what} must be a list of file paths")
-    return [item for item in value if isinstance(item, str)]
+    return cast(list[str], value)
+
+
+_LIST_MERGE_PATHS: set[tuple[str, ...]] = {
+    ("network", "free_nics"),
+    ("tools", "update", "repositories"),
+    ("tools", "update", "disabled_repositories"),
+}
+_HOST_LIST_MERGE_KEYS: set[str] = {"repositories", "disabled_repositories"}
+
+
+def _list_merge_allowed(path: tuple[str, ...], key: str) -> bool:
+    """Return whether a list merge operator is allowed at ``path.key``."""
+    return path + (key,) in _LIST_MERGE_PATHS or (
+        len(path) == 2 and path[0] == "hosts" and key in _HOST_LIST_MERGE_KEYS
+    )
+
+
+def _list_merge_context(path: tuple[str, ...]) -> bool:
+    """Return whether ``path`` contains fields with list merge operators."""
+    return path in {("network",), ("tools", "update")} or (len(path) == 2 and path[0] == "hosts")
+
+
+def _require_string_list(value: JSONType, what: str) -> list[str]:
+    """Return ``value`` as a list of strings, raising ConfigError otherwise."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ConfigError(f"{what} must be a list of strings")
+    return cast(list[str], value)
 
 
 def _load_toml_with_includes(
     path: Path,
     _seen: set[Path] | None = None,
     fallback_dir: Path = REPO_ROOT,
+    _base: ConfigDict | None = None,
 ) -> ConfigDict:
-    """Load a TOML file and recursively merge its includes.
+    """Load a TOML file and recursively merge its includes onto ``_base``.
 
     Files listed in the root-level ``include`` key (array of strings)
     are loaded and deep-merged before the file's own content.
@@ -294,6 +322,8 @@ def _load_toml_with_includes(
     """
     if _seen is None:
         _seen = set()
+    if _base is None:
+        _base = {}
     path = path.resolve()
     if path in _seen:
         raise ConfigError(f"Cyclic include detected: {path}")
@@ -303,13 +333,10 @@ def _load_toml_with_includes(
         data = _load_toml_file(path)
         includes = _require_str_list(data.pop("include", None) or [], f"'include' in {path}")
 
-        result: ConfigDict = {}
         for inc in includes:
             inc_path = _resolve_include(path.parent, inc, fallback_dir)
-            included = _load_toml_with_includes(inc_path, _seen, fallback_dir)
-            result = _merge_dicts(result, included)
-
-        return _merge_dicts(result, data)
+            _load_toml_with_includes(inc_path, _seen, fallback_dir, _base)
+        return _merge_dicts(_base, data)
     finally:
         # Track the recursion stack, not all visited files, so diamond
         # includes (A -> [B, C], B -> D, C -> D) are allowed while true
@@ -352,14 +379,48 @@ def _resolve_config_override(value: str | Path) -> Path:
     )
 
 
-def _merge_dicts(base: ConfigDict, override: ConfigDict) -> ConfigDict:
-    """Deep merge override into base (recursive)."""
+def _merge_dicts(
+    base: ConfigDict,
+    override: ConfigDict,
+    path: tuple[str, ...] = (),
+) -> ConfigDict:
+    """Deep merge override into base, applying supported list operators."""
     for key, value in override.items():
+        if key.startswith(("+", "-")) and _list_merge_context(path):
+            target = key[1:]
+            if not target or not _list_merge_allowed(path, target):
+                raise ConfigError(
+                    f"List merge operator '{key}' is not supported at {'.'.join(path + (target,))}"
+                )
+            continue
         existing = base.get(key)
-        if isinstance(existing, dict) and isinstance(value, dict):
-            base[key] = _merge_dicts(existing, value)
+        if isinstance(value, dict):
+            if not isinstance(existing, dict):
+                existing = {}
+            base[key] = _merge_dicts(existing, value, path + (key,))
         else:
             base[key] = value
+
+    for key, value in override.items():
+        if not key.startswith(("+", "-")) or not _list_merge_context(path):
+            continue
+        target = key[1:]
+        values = _require_string_list(value, f"'{key}' at {'.'.join(path + (target,))}")
+        current_value = base.get(target)
+        if target not in base or current_value is None:
+            if key[0] == "+":
+                base[target] = cast(JSONType, list(dict.fromkeys(values)))
+            continue
+        current = _require_string_list(current_value, f"existing '{'.'.join(path + (target,))}'")
+        if key[0] == "+":
+            updated = current.copy()
+            for item in values:
+                if item not in updated:
+                    updated.append(item)
+            base[target] = cast(JSONType, updated)
+        else:
+            base[target] = cast(JSONType, [item for item in current if item not in values])
+
     return base
 
 
@@ -523,14 +584,13 @@ def load_config(
         raise ConfigError(f"{e}") from e
     if override is not None:
         try:
-            overlay_data = _load_toml_with_includes(_resolve_config_override(override))
+            _load_toml_with_includes(_resolve_config_override(override), _base=base_data)
         except FileNotFoundError as e:
             raise ConfigError(f"{e}") from e
-        base_data = _merge_dicts(base_data, overlay_data)
     elif config_path is None:
         default_path = REPO_ROOT / "config.local.toml"
         if default_path.exists():
-            base_data = _merge_dicts(base_data, _load_toml_with_includes(default_path))
+            _load_toml_with_includes(default_path, _base=base_data)
     return _build_config(base_data, config_values, apply_value_overrides)
 
 
@@ -540,7 +600,9 @@ def base_config_dict() -> ConfigDict:
     Used as the reference when computing config deltas (dump-config and
     migrate-data-py).
     """
-    return load_config(config_path=REPO_ROOT / "lib" / "config.toml", apply_value_overrides=False).model_dump(by_alias=True)
+    return load_config(
+        config_path=REPO_ROOT / "lib" / "config.toml", apply_value_overrides=False
+    ).model_dump(by_alias=True)
 
 
 def apply_override(config_name: str | None = None, config_values: list[str] | None = None) -> None:
