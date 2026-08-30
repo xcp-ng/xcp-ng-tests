@@ -56,6 +56,7 @@ mgmt = "Pool-wide network associated with eth0"
 
 # List of NICs available on host for network tests.
 # example: free_nics = ["eth1", "eth2"]
+# In an overlay, "+free_nics" and "-free_nics" can add or remove individual NICs.
 free_nics = []
 
 [pxe]

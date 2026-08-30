@@ -12,11 +12,13 @@ from lib.config_loader import (
     _build_config,
     _load_toml_file,
     _load_toml_with_includes,
+    _merge_dicts,
     _resolve_config_override,
     load_config,
 )
+from lib.typing import ConfigDict
 
-from typing import Any
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).parents[2]
 
@@ -136,6 +138,85 @@ def test_include_diamond_allowed(tmp_path: Path) -> None:
     (tmp_path / "c.toml").write_text('include = ["d.toml"]\nc = 1\n')
     (tmp_path / "a.toml").write_text('include = ["b.toml", "c.toml"]\n')
     assert _load_toml_with_includes(tmp_path / "a.toml") == {"d": 1, "b": 1, "c": 1}
+
+
+def test_list_merge_operators() -> None:
+    data = cast(ConfigDict, {
+        "network": {"free_nics": ["eth1", "eth2"]},
+        "tools": {"update": {"repositories": ["base"], "disabled_repositories": ["old"]}},
+        "hosts": {"host": {"repositories": ["host-base"]}},
+    })
+    override = cast(ConfigDict, {
+        "network": {"+free_nics": ["eth2", "eth3"], "-free_nics": ["eth1"]},
+        "tools": {"update": {"+repositories": ["updates"], "-disabled_repositories": ["missing"]}},
+        "hosts": {"host": {"+repositories": ["host-updates"]}},
+    })
+    assert _merge_dicts(data, override) == {
+        "network": {"free_nics": ["eth2", "eth3"]},
+        "tools": {"update": {"repositories": ["base", "updates"], "disabled_repositories": ["old"]}},
+        "hosts": {"host": {"repositories": ["host-base", "host-updates"]}},
+    }
+
+
+def test_list_merge_operator_applies_after_replacement() -> None:
+    data = cast(ConfigDict, {"network": {"free_nics": ["eth1"]}})
+    override = cast(ConfigDict, {"network": {"+free_nics": ["eth3"], "free_nics": ["eth2"]}})
+    assert _merge_dicts(data, override) == {"network": {"free_nics": ["eth2", "eth3"]}}
+
+
+def test_list_merge_operator_can_create_missing_list() -> None:
+    data = cast(ConfigDict, {"hosts": {}})
+    override = cast(ConfigDict, {"hosts": {"host": {"+repositories": ["updates"]}}})
+    assert _merge_dicts(data, override) == {"hosts": {"host": {"repositories": ["updates"]}}}
+
+
+def test_list_merge_operator_through_loader(tmp_path: Path) -> None:
+    fragment = tmp_path / "fragment.toml"
+    fragment.write_text('[network]\n"+free_nics" = ["eth1"]\n')
+    overlay = tmp_path / "overlay.toml"
+    overlay.write_text('include = ["fragment.toml"]\n[network]\n"+free_nics" = ["eth2"]\n')
+    cfg = load_config(config_path=REPO_ROOT / "lib" / "config.toml", override=overlay)
+    assert cfg.network.free_nics == ["eth1", "eth2"]
+
+
+def test_list_merge_operator_precedence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    overlay = tmp_path / "overlay.toml"
+    overlay.write_text('[network]\nfree_nics = ["eth1"]\n')
+    monkeypatch.setenv('XCPNG_TESTS_network__+free_nics', '["eth2"]')
+    cfg = load_config(
+        config_path=REPO_ROOT / "lib" / "config.toml",
+        override=overlay,
+        config_values=['network.+free_nics=["eth3"]'],
+    )
+    assert cfg.network.free_nics == ["eth1", "eth2", "eth3"]
+
+
+def test_list_merge_operator_remove_missing_list_is_noop() -> None:
+    data = cast(ConfigDict, {"hosts": {"host": {}}})
+    override = cast(ConfigDict, {"hosts": {"host": {"-repositories": ["updates"]}}})
+    assert _merge_dicts(data, override) == {"hosts": {"host": {}}}
+
+
+def test_operator_key_in_dynamic_map_is_not_special() -> None:
+    data = cast(ConfigDict, {"vm": {"images": {}}})
+    override = cast(ConfigDict, {"vm": {"images": {"+custom": "image.xva"}}})
+    assert _merge_dicts(data, override) == {"vm": {"images": {"+custom": "image.xva"}}}
+
+
+def test_list_merge_operator_rejects_unsupported_key() -> None:
+    with pytest.raises(ConfigError, match="not supported"):
+        _merge_dicts(
+            cast(ConfigDict, {"network": {"free_nics": []}}),
+            cast(ConfigDict, {"network": {"+mgmt": ["eth1"]}}),
+        )
+
+
+def test_list_merge_operator_requires_string_list() -> None:
+    with pytest.raises(ConfigError, match="list of strings"):
+        _merge_dicts(
+            cast(ConfigDict, {"network": {"free_nics": []}}),
+            cast(ConfigDict, {"network": {"+free_nics": [1]}}),
+        )
 
 
 def test_env_override_parses_toml(monkeypatch: pytest.MonkeyPatch) -> None:

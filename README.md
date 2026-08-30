@@ -209,7 +209,7 @@ To customize settings for your environment:
   with double quotes around segments that contain dots
   (`--config-value 'hosts."10.30.0.56".user=root'`).
 - `tools.py dump-config` / `migrate-data-py` print only the values that differ
-  from the base `config.toml`; add `--all` to include the values that are the
+  from the base `lib/config.toml`; add `--all` to include the values that are the
   same too.
 - `tools.py diff-config CONFIG1 CONFIG2` — compare two config files and print
   a unified diff (password hashes are ignored); exit code 0 when identical,
@@ -221,8 +221,22 @@ is used if set. When neither is set:
 2. If `config.local.toml` exists, it is merged on top (auto-detected)
 
 Overrides stack from lowest to highest priority:
-`config.toml` < overlay (`--config`/`XCPNG_CONFIG`) < `XCPNG_TESTS_*` env vars
+`lib/config.toml` < overlay (`--config`/`XCPNG_CONFIG`) < `XCPNG_TESTS_*` env vars
 < `--config-value`.
+
+List values normally replace the value from a lower-priority layer. Overlays
+can add or remove items from the supported list fields with quoted `+field` or
+`-field` keys, for example:
+
+```toml
+[network]
+"+free_nics" = ["eth2"]
+"-free_nics" = ["eth0"]
+```
+
+This is supported for `network.free_nics`, repository lists under
+`tools.update`, and repository lists under individual `hosts` entries. `+`
+preserves existing order and ignores duplicates; `-` removes matching items.
 
 When given, the value is resolved to a file in this order:
 1. as given (absolute, or relative to the current directory)
@@ -769,7 +783,7 @@ For each pool target :
 **Inventory**
 
 By default, hosts and repository settings are read from the same config file as
-the tests (`config.toml`, auto-merged with `config.local.toml` when present).
+the tests (`lib/config.toml`, auto-merged with `config.local.toml` when present).
 A different overlay can be picked with `-c/--config` (or the `XCPNG_CONFIG`
 env var), accepting a `.toml` file path (relative to the current directory) or
 a profile name (`config.PROFILE.toml`):
@@ -784,7 +798,7 @@ Hosts are the keys of the `[hosts]` table, and per-host values override the
 inventory defaults from the `[tools.update]` table:
 
 ```toml
-# config.toml
+# lib/config.toml
 
 [tools.update]
 repositories = ["xcp-ng-base"]

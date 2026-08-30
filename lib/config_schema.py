@@ -38,6 +38,14 @@ _EXTRA_PROPERTIES: dict[str, Any] = {
 # string alternative added by hand.
 _SIZE_FIELDS = {"volume_size", "write_volume_cap"}
 
+# List fields where config files may use "+field" or "-field" to add or
+# remove items instead of replacing the whole list.
+_LIST_OPERATOR_FIELDS = {
+    "HostOverride": {"repositories", "disabled_repositories"},
+    "NetworkConfig": {"free_nics"},
+    "UpdateDefaults": {"repositories", "disabled_repositories"},
+}
+
 
 def editor_schema() -> dict[str, Any]:
     """Return the editor-oriented schema for the current Config model."""
@@ -68,4 +76,13 @@ def editor_schema() -> dict[str, Any]:
     schema["$schema"] = "http://json-schema.org/draft-07/schema#"
     schema.setdefault("additionalProperties", False)
     schema["properties"] = {**_EXTRA_PROPERTIES, **schema.get("properties", {})}
+    for model_name, fields in _LIST_OPERATOR_FIELDS.items():
+        properties = schema["$defs"][model_name]["properties"]
+        for field in fields:
+            for operator, action in (("+", "Add items to"), ("-", "Remove items from")):
+                properties[f"{operator}{field}"] = {
+                    "description": f"{action} {field} in the merged configuration.",
+                    "items": {"type": "string"},
+                    "type": "array",
+                }
     return schema
