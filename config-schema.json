@@ -190,6 +190,34 @@
     "HostOverride": {
       "additionalProperties": false,
       "properties": {
+        "+disabled_repositories": {
+          "description": "Add items to disabled_repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "+repositories": {
+          "description": "Add items to repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "-disabled_repositories": {
+          "description": "Remove items from disabled_repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "-repositories": {
+          "description": "Remove items from repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "disabled_repositories": {
           "anyOf": [
             {
@@ -678,6 +706,20 @@
     "NetworkConfig": {
       "additionalProperties": false,
       "properties": {
+        "+free_nics": {
+          "description": "Add items to free_nics in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "-free_nics": {
+          "description": "Remove items from free_nics in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "free_nics": {
           "items": {
             "type": "string"
@@ -789,6 +831,34 @@
     "UpdateDefaults": {
       "additionalProperties": false,
       "properties": {
+        "+disabled_repositories": {
+          "description": "Add items to disabled_repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "+repositories": {
+          "description": "Add items to repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "-disabled_repositories": {
+          "description": "Remove items from disabled_repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "-repositories": {
+          "description": "Remove items from repositories in the merged configuration.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "disabled_repositories": {
           "items": {
             "type": "string"
@@ -1009,4 +1079,3 @@
   "title": "XCP-ng Tests Configuration Schema",
   "type": "object"
 }
-
