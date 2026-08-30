@@ -147,10 +147,108 @@ For Guest UEFI Secure Boot tests, the requirements are:
     * `efitools` for uefistored (in 8.2) or varstored (in 8.3+) auth var tests
     * `util-linux` for uefistored (in 8.2) or varstored (in 8.3+) auth var tests in Alpine VMs
 
-Many tests have specific requirements, detailed in a comment at the top of the test file: minimal number of hosts in a pool, number of pools, VMs with specific characteristics (OS, BIOS vs UEFI, additional tools installed in the VM, additional networks in the pool, presence of an unused disk on one host or every host...). Markers, jobs defined in `jobs.py` (`./jobs.py show JOBNAME` will display the requirements and the reference to a VM or VM group), VMs and VM groups defined in `vm-data.py-dist` may all help understanding what tests can run with what VMs.
+Many tests have specific requirements, detailed in a comment at the top of the test file: minimal number of hosts in a pool, number of pools, VMs with specific characteristics (OS, BIOS vs UEFI, additional tools installed in the VM, additional networks in the pool, presence of an unused disk on one host or every host...). Markers, jobs defined in `jobs.py` (`./jobs.py show JOBNAME` will display the requirements and the reference to a VM or VM group), VMs and VM groups defined in `vm_data.py` may all help understanding what tests can run with what VMs.
 
 ## Configuration
-The main configuration file is data.py. Copy data.py-dist to data.py and modify it if needed.
+
+### Using config.toml
+
+Test configuration is managed via TOML files. The project includes a `config.toml` file with all default settings.
+
+#### Default configuration
+
+The `config.toml` file in the repository contains all default settings for:
+- Host SSH credentials and per-host overrides
+- Network definitions
+- PXE server configuration
+- VM images and ISO definitions
+- Storage device configurations (NFS, CIFS, CephFS, MooseFS, LVM iSCSI)
+- Guest tools (Windows, other)
+- Test utilities and SSH keys
+
+#### Custom configuration
+
+To customize settings for your environment:
+
+1. **Create a custom config file** (e.g., `config.local.toml`):
+   ```toml
+   [host]
+   default_user = "root"
+   default_password = "your-password"
+
+   [host.per_host]
+   "192.168.1.10" = { user = "custom_user", password = "custom_pass" }
+
+   [pxe]
+   config_server = "pxe.example.com"
+   arp_server = "pxe.example.com"
+
+   [storage.nfs]
+   server = "10.0.0.2"
+   serverpath = "/mnt/shared"
+   ```
+
+2. **Run tests with custom config**:
+   ```bash
+   pytest --config=local --hosts=10.0.0.1
+   ```
+
+   This loads `config.toml` first, then merges `config.local.toml` on top.
+
+#### Configuration file paths
+
+- `config.toml` — base config (always loaded, lowest priority)
+- `config.local.toml` — local defaults (auto-loaded if exists and no `--config`/`XCPNG_CONFIG` specified)
+- `XCPNG_CONFIG=NAME` or `XCPNG_CONFIG=<path>` — env var equivalent of `--config`
+- `XCPNG_CONFIG_DIR=DIR` — directory where profile names are looked up
+  (`config.NAME.toml`); falls back to the repository root
+- `--config=NAME` — environment-specific overrides (`config.NAME.toml`)
+- `--config=<path>` — a config overlay file from anywhere on disk
+- `--config-value KEY=VALUE` — override a single config value (repeatable),
+  e.g. `--config-value host.default_password=foo`. The key is a dotted path,
+  with double quotes around segments that contain dots
+  (`--config-value 'hosts."10.30.0.56".user=root'`).
+- `tools.py dump-config` / `migrate-data-py` print only the values that differ
+  from the base `config.toml`; add `--all` to include the values that are the
+  same too.
+- `tools.py diff-config CONFIG1 CONFIG2` — compare two config files and print
+  a unified diff (password hashes are ignored); exit code 0 when identical,
+  1 when they differ.
+
+The `--config` flag is optional. When not specified, the `XCPNG_CONFIG` env var
+is used if set. When neither is set:
+1. `config.toml` is loaded first
+2. If `config.local.toml` exists, it is merged on top (auto-detected)
+
+Overrides stack from lowest to highest priority:
+`config.toml` < overlay (`--config`/`XCPNG_CONFIG`) < `XCPNG_TESTS_*` env vars
+< `--config-value`.
+
+When given, the value is resolved to a file in this order:
+1. as given (absolute, or relative to the current directory)
+2. as a short name (`config.NAME.toml`), in the `XCPNG_CONFIG_DIR` directory
+   when that env var is set, then in the repository root
+
+Only values given as paths are resolved relative to the current directory;
+short names (`config.NAME.toml`) are looked up in `XCPNG_CONFIG_DIR` or the
+repository root, never in the current directory.
+
+For example, running from another directory:
+
+```bash
+pytest foo -c ../../inventory/cgt1-qcow2.toml
+```
+
+loads `config.toml` first, then merges `../../inventory/cgt1-qcow2.toml` on top.
+The `include` key inside any config file is resolved against the file's own
+directory first, then against the main xcp-ng-tests directory, so an overlay
+in another directory can reuse files from the tests repository.
+
+This allows you to:
+- Commit `config.toml` with project defaults to version control
+- Create `config.local.toml` locally (ignored by git) for your standard environment
+- Create `config.prod.toml`, `config.ci.toml`, etc. for other environments and select with `--config=prod` (or `XCPNG_CONFIG=prod`)
+- Point `--config` (or `XCPNG_CONFIG`) at an overlay file kept anywhere on disk
 
 ## Running tests
 
@@ -165,12 +263,13 @@ pytest tests/misc/test_vm_basic_operations.py --hosts=10.0.0.1 --vm=mini-linux-x
 
 Most tests take a `--hosts=yourtesthost` (or `--hosts=host1,host2,...` if they need several pools, e.g. crosspool migration tests).
 The `--hosts` parameter can be specified several times. Then `pytest` will run the tests on each host or group of hosts, sequentially.
+If `--hosts` is not given, the hosts listed in the `[hosts]` section of the config file are used instead.
 
 When a test requires a single pool of several hosts, only mention the master host in the `--hosts` option.
 
 Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those are tests that will import a VM before testing stuff on it:
-* `OVA_URL` is a URL to download an OVA. It can also be simply a filename, if your `data.py`'s `DEF_VM_URL` is correctly defined.
-* `VM_key` refers to a key in `data.py`'s `VM_IMAGES` dict. Example: `mini-linux-x86_64-uefi`.
+* `OVA_URL` is a URL to download an OVA. It can also be simply a filename, if your `config.toml`'s `vm.def_url` is correctly defined.
+* `VM_key` refers to a key in `config.toml`'s `vm.images` section. Example: `mini-linux-x86_64-uefi`.
 * `IP_address` allows you to reuse an existing running VM, skipping the whole import, start, wait for VM to be up setup. Can be useful as a development tool. Some tests that accept `--vm` do not support it.
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
@@ -236,8 +335,6 @@ Options `-m` and `-k` are heavily used in `jobs.py`.
 We wanted the job definitions to be in this git repository, that's why the job definitions are in the `jobs.py` file itself (plus `vm_data.py` for VM selection).
 
 To use `./jobs.py`, you also need to populate `vm_data.py` to define the VM groups that are necessary to run jobs (unless `--vm` is provided on the command line to override the defaults).
-
-The output of commands below is given as example and may not reflect the current state of the jobs definitions.
 
 #### List jobs
 ```
@@ -321,15 +418,18 @@ pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=ht
 
 #### Run a job
 ```
-usage: jobs.py run [-h] [--print-only] job hosts ...
+usage: jobs.py run [-h] [-c PATH] [--config-value KEY=VALUE] [--print-only] job [hosts] ...
 
 positional arguments:
   job               name of the job to run.
   hosts             master host(s) of pools to run the tests on, comma-separated.
+                    When omitted, the hosts from the config's [hosts] section are used.
   pytest_args       all additional arguments after the last positional argument will be passed to pytest and replace default job params if needed.
 
 optional arguments:
   -h, --help        show this help message and exit
+  -c PATH, --config PATH  config overlay: a .toml file path or profile name
+  --config-value KEY=VALUE  override a config value (repeatable; highest priority)
   --print-only, -p  print the command, but don't run it. Must be specified before positional arguments.
 ```
 
@@ -342,6 +442,13 @@ pytest tests/uefi_sb -m "multi_vms and unix_vm" --hosts=ip_of_poolmaster --vm=ht
 ```
 
 Any parameter added at the end of the command will be passed to `pytest`. Any parameter added that is already defined in the job's "params" (see output of `./jobs.py show`) will replace it, and `--vm` also replaces `--vm[]` in the case of jobs designed to run tests on multiple VMs.
+
+`jobs.py` reads the same configuration as `pytest` and `tools.py`:
+`-c`/`--config`, the `XCPNG_CONFIG`/`XCPNG_CONFIG_DIR` env vars and
+`--config-value` are supported, and when no hosts are given, `jobs.py run`
+falls back to the hosts defined in the config's `[hosts]` section. The
+config options must be specified before the positional `job`/`hosts`
+arguments (like `--print-only`), otherwise they are forwarded to pytest.
 
 ```
 # same, but we override the list of VMs
@@ -602,10 +709,10 @@ python scripts/test_install_xcpng.py 10.0.0.2 f0f5f010-80c6-25ae-44a2-1fb154e32d
 ```
 Note: in case of restore, the version must be that of the installer (here 8.2.1), not the version of XCP-ng that will be restored.
 
-The script requires the addressable name or IP of the PXE config server to be defined in `data.py`:
-```
-# PXE config server for automated XCP-ng installation
-PXE_CONFIG_SERVER = 'pxe'
+The script requires the addressable name or IP of the PXE config server to be defined in `config.toml`:
+```toml
+[pxe]
+config_server = "pxe"
 ```
 
 The `installer` parameter is optional. If you leave it empty it will be automatically defined as `http://<PXE_CONFIG_SERVER>/installers/xcp-ng/<version>/`.
@@ -659,47 +766,45 @@ For each pool target :
 2. Get other hosts of the pool
   * Repeat step `1.` for each host
 
-**Inventory file**
+**Inventory**
 
-`update` command can read an inventory file in [TOML v1.0.0](https://toml.io/en/v1.0.0) format:
+By default, hosts and repository settings are read from the same config file as
+the tests (`config.toml`, auto-merged with `config.local.toml` when present).
+A different overlay can be picked with `-c/--config` (or the `XCPNG_CONFIG`
+env var), accepting a `.toml` file path (relative to the current directory) or
+a profile name (`config.PROFILE.toml`):
 
 ```bash
-uv run scripts/tools.py update -i my_inventory.toml
+uv run scripts/tools.py update
+uv run scripts/tools.py update -c ../../inventory/cgt1-qcow2.toml
+uv run scripts/tools.py update -c prod
+```
+
+Hosts are the keys of the `[hosts]` table, and per-host values override the
+inventory defaults from the `[tools.update]` table:
+
+```toml
+# config.toml
+
+[tools.update]
+repositories = ["xcp-ng-base"]
+disabled_repositories = ["epel"]
+hosting_pool = "10.30.0.50"
+
+[hosts]
+"10.30.0.56" = {}
+"10.30.0.59" = { repositories = ["xcp-ng-updates"] }  # overrides "[tools.update]"
 ```
 
 > [!NOTE]
-> You can use either `-i/--inventory` or `-H/--hosts`.
+> * `tools.update` is applied to all hosts
+> * Values set in a `[hosts]` entry override `tools.update`. The example above
+>   would produce the following python dict:
 >
-> **Above flags can't be used together**
-
-Take a look at an example inventory file:
-
-```toml
-# my_inventory.toml
-
-[default]
-repositories = ["xcp-ng-base"]
-disabled_repositories = ["epel"]
-hosting_pool = "A"
-
-[hosts]
-
-[hosts."ip_or_hostname-1"]
-
-[hosts."ip_or_hostname-2"]
-
-repositories = ["xcp-ng-updates"]
-hosting_pool = "B"
-```
-
-> [!IMPORTANT]
-> * `default` is applied to all hosts
-> * Config values under `hosts` override values under `default`. For instance, the above inventory would produce
-> the following python dict:
+> `{'10.30.0.56': {'repositories': ['xcp-ng-base'], 'disabled_repositories': ['epel'], 'hosting_pool': '10.30.0.50'}, '10.30.0.59': {'repositories': ['xcp-ng-updates'], 'disabled_repositories': ['epel'], 'hosting_pool': '10.30.0.50'}}`
 >
-> `{'ip_or_hostname-1': {'repositories': ['xcp-ng-base'], 'disabled_repositories': ['epel'], 'hosting_pool': 'A'}, 'ip_or_hostname-2': {'repositories': ['xcp-ng-updates'], 'hosting_pool': 'B'}}`
->
-> * `disabled_repositories` disables one or more repositories during the update. It can be set under `default` or overridden per host, and can also be passed with the `-x/--disablerepo` flag.
+> * `disabled_repositories` disables one or more repositories during the update. It can be set under `tools.update` or overridden per host.
 > * `*` as a repository value disables **all** repositories (e.g. `disabled_repositories = ["*"]`).
 >
-> * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.
+> `-H/--hosts` and the repository flags below can be used to temporarily
+> override the config file for one-off runs.

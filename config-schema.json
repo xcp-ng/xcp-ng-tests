@@ -1,0 +1,1012 @@
+{
+  "$defs": {
+    "AnswerFileDef": {
+      "additionalProperties": true,
+      "properties": {
+        "CONTENTS": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/AnswerFileDef"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contents"
+        },
+        "TAG": {
+          "title": "Tag",
+          "type": "string"
+        }
+      },
+      "title": "AnswerFileDef",
+      "type": "object"
+    },
+    "CIFSISOConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cifspassword": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cifspassword"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Username"
+        },
+        "vers": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vers"
+        }
+      },
+      "title": "CIFSISOConfig",
+      "type": "object"
+    },
+    "CephFSConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "server": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server"
+        },
+        "serverpath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Serverpath"
+        }
+      },
+      "title": "CephFSConfig",
+      "type": "object"
+    },
+    "GuestToolsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "download_url": {
+          "title": "Download Url",
+          "type": "string"
+        },
+        "installed": {
+          "additionalProperties": {
+            "$ref": "#/$defs/InstalledGuestToolDef"
+          },
+          "title": "Installed",
+          "type": "object"
+        },
+        "other": {
+          "$ref": "#/$defs/OtherGuestToolDef"
+        },
+        "win": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WinGuestToolDef"
+          },
+          "title": "Win",
+          "type": "object"
+        }
+      },
+      "title": "GuestToolsConfig",
+      "type": "object"
+    },
+    "HostConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "default_password": {
+          "title": "Default Password",
+          "type": "string"
+        },
+        "default_password_hash": {
+          "default": "",
+          "title": "Default Password Hash",
+          "type": "string"
+        },
+        "default_user": {
+          "title": "Default User",
+          "type": "string"
+        }
+      },
+      "title": "HostConfig",
+      "type": "object"
+    },
+    "HostOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "disabled_repositories": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disabled Repositories"
+        },
+        "hosting_pool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hosting Pool"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password"
+        },
+        "repositories": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repositories"
+        },
+        "skip_xo_config": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skip Xo Config"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User"
+        }
+      },
+      "title": "HostOverride",
+      "type": "object"
+    },
+    "InstallConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "answerfiles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AnswerFileDef"
+          },
+          "title": "Answerfiles",
+          "type": "object"
+        },
+        "iso_remaster": {
+          "default": "",
+          "title": "Iso Remaster",
+          "type": "string"
+        },
+        "isos": {
+          "$ref": "#/$defs/InstallIsosConfig"
+        }
+      },
+      "title": "InstallConfig",
+      "type": "object"
+    },
+    "InstallIsosConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "cache_dir": {
+          "title": "Cache Dir",
+          "type": "string"
+        },
+        "definitions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/IsoImageDef"
+          },
+          "title": "Definitions",
+          "type": "object"
+        }
+      },
+      "title": "InstallIsosConfig",
+      "type": "object"
+    },
+    "InstalledGuestToolDef": {
+      "additionalProperties": false,
+      "properties": {
+        "onboarding_phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Onboarding Phase"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "testsign_cert": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Testsign Cert"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "upgradable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Upgradable"
+        },
+        "vendor_device": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vendor Device"
+        }
+      },
+      "title": "InstalledGuestToolDef",
+      "type": "object"
+    },
+    "IsoImageDef": {
+      "additionalProperties": false,
+      "properties": {
+        "net-only": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Net-Only"
+        },
+        "net-url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Net-Url"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "unsigned": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unsigned"
+        }
+      },
+      "title": "IsoImageDef",
+      "type": "object"
+    },
+    "LVMoHBAConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "SCSIid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scsiid"
+        }
+      },
+      "title": "LVMoHBAConfig",
+      "type": "object"
+    },
+    "LVMoISCSIConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "SCSIid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scsiid"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "targetIQN": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetiqn"
+        }
+      },
+      "title": "LVMoISCSIConfig",
+      "type": "object"
+    },
+    "LinstorConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "redundancy": {
+          "title": "Redundancy",
+          "type": "integer"
+        }
+      },
+      "title": "LinstorConfig",
+      "type": "object"
+    },
+    "MooseFSConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "masterhost": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Masterhost"
+        },
+        "masterport": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Masterport"
+        },
+        "rootpath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rootpath"
+        }
+      },
+      "title": "MooseFSConfig",
+      "type": "object"
+    },
+    "NFS4Config": {
+      "additionalProperties": false,
+      "properties": {
+        "nfsversion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nfsversion"
+        },
+        "server": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server"
+        },
+        "serverpath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Serverpath"
+        }
+      },
+      "title": "NFS4Config",
+      "type": "object"
+    },
+    "NFSConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server"
+        },
+        "serverpath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Serverpath"
+        }
+      },
+      "title": "NFSConfig",
+      "type": "object"
+    },
+    "NFSISOConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        }
+      },
+      "title": "NFSISOConfig",
+      "type": "object"
+    },
+    "NetworkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "free_nics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Free Nics",
+          "type": "array"
+        },
+        "mgmt": {
+          "title": "Mgmt",
+          "type": "string"
+        }
+      },
+      "title": "NetworkConfig",
+      "type": "object"
+    },
+    "OtherGuestToolDef": {
+      "additionalProperties": false,
+      "properties": {
+        "download": {
+          "title": "Download",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "title": "OtherGuestToolDef",
+      "type": "object"
+    },
+    "PXEConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "arp_server": {
+          "title": "Arp Server",
+          "type": "string"
+        },
+        "config_server": {
+          "title": "Config Server",
+          "type": "string"
+        }
+      },
+      "title": "PXEConfig",
+      "type": "object"
+    },
+    "SSHConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "ignore_banner": {
+          "title": "Ignore Banner",
+          "type": "boolean"
+        },
+        "output_max_lines": {
+          "title": "Output Max Lines",
+          "type": "integer"
+        },
+        "pubkey": {
+          "title": "Pubkey",
+          "type": "string"
+        }
+      },
+      "title": "SSHConfig",
+      "type": "object"
+    },
+    "StorageConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cephfs": {
+          "$ref": "#/$defs/CephFSConfig"
+        },
+        "cifs_iso": {
+          "$ref": "#/$defs/CIFSISOConfig"
+        },
+        "linstor": {
+          "$ref": "#/$defs/LinstorConfig"
+        },
+        "lvmohba": {
+          "$ref": "#/$defs/LVMoHBAConfig"
+        },
+        "lvmoiscsi": {
+          "$ref": "#/$defs/LVMoISCSIConfig"
+        },
+        "moosefs": {
+          "$ref": "#/$defs/MooseFSConfig"
+        },
+        "nfs": {
+          "$ref": "#/$defs/NFSConfig"
+        },
+        "nfs4": {
+          "$ref": "#/$defs/NFS4Config"
+        },
+        "nfs_iso": {
+          "$ref": "#/$defs/NFSISOConfig"
+        }
+      },
+      "title": "StorageConfig",
+      "type": "object"
+    },
+    "ToolsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "update": {
+          "$ref": "#/$defs/UpdateDefaults"
+        }
+      },
+      "title": "ToolsConfig",
+      "type": "object"
+    },
+    "UpdateDefaults": {
+      "additionalProperties": false,
+      "properties": {
+        "disabled_repositories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Disabled Repositories",
+          "type": "array"
+        },
+        "hosting_pool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hosting Pool"
+        },
+        "repositories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Repositories",
+          "type": "array"
+        }
+      },
+      "title": "UpdateDefaults",
+      "type": "object"
+    },
+    "VMConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_imported": {
+          "title": "Cache Imported",
+          "type": "boolean"
+        },
+        "def_url": {
+          "title": "Def Url",
+          "type": "string"
+        },
+        "default_sr": {
+          "title": "Default Sr",
+          "type": "string"
+        },
+        "equivalents": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Equivalents",
+          "type": "object"
+        },
+        "images": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Images",
+          "type": "object"
+        }
+      },
+      "title": "VMConfig",
+      "type": "object"
+    },
+    "WinGuestToolDef": {
+      "additionalProperties": false,
+      "properties": {
+        "download": {
+          "title": "Download",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "onboard_family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Onboard Family"
+        },
+        "package": {
+          "title": "Package",
+          "type": "string"
+        },
+        "testsign_cert": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Testsign Cert"
+        },
+        "xenclean_path": {
+          "title": "Xenclean Path",
+          "type": "string"
+        }
+      },
+      "title": "WinGuestToolDef",
+      "type": "object"
+    },
+    "XOConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cli": {
+          "title": "Cli",
+          "type": "string"
+        }
+      },
+      "title": "XOConfig",
+      "type": "object"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "JSON Schema for validating config.toml, config.local.toml, and config.NAME.toml files. Properties are all optional since overlay files only carry the keys they override; the base config.toml provides the rest.",
+  "properties": {
+    "$schema": {
+      "description": "Path to the JSON schema used by the editor for validation and autocompletion.",
+      "type": "string"
+    },
+    "dns_server": {
+      "title": "Dns Server",
+      "type": "string"
+    },
+    "guest_tools": {
+      "$ref": "#/$defs/GuestToolsConfig"
+    },
+    "host": {
+      "$ref": "#/$defs/HostConfig"
+    },
+    "hosts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/HostOverride"
+      },
+      "title": "Hosts",
+      "type": "object"
+    },
+    "include": {
+      "default": [],
+      "description": "List of TOML files to load and deep-merge before this file's content. Paths are relative to this file's directory.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "install": {
+      "$ref": "#/$defs/InstallConfig"
+    },
+    "network": {
+      "$ref": "#/$defs/NetworkConfig"
+    },
+    "objects_name_prefix": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Objects Name Prefix"
+    },
+    "pxe": {
+      "$ref": "#/$defs/PXEConfig"
+    },
+    "ssh": {
+      "$ref": "#/$defs/SSHConfig"
+    },
+    "storage": {
+      "$ref": "#/$defs/StorageConfig"
+    },
+    "tools": {
+      "$ref": "#/$defs/ToolsConfig"
+    },
+    "vm": {
+      "$ref": "#/$defs/VMConfig"
+    },
+    "volume_size": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Volume Size"
+    },
+    "write_volume_align": {
+      "title": "Write Volume Align",
+      "type": "integer"
+    },
+    "write_volume_cap": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Write Volume Cap"
+    },
+    "xo": {
+      "$ref": "#/$defs/XOConfig"
+    }
+  },
+  "title": "XCP-ng Tests Configuration Schema",
+  "type": "object"
+}
+

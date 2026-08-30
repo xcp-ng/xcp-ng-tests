@@ -27,6 +27,7 @@ from lib.common import (
     wait_for,
     wait_for_not,
 )
+from lib.config_loader import config
 from lib.netutil import wrap_ip
 from lib.network import Network
 from lib.pif import PIF
@@ -34,7 +35,7 @@ from lib.sr import SR
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -43,15 +44,20 @@ if TYPE_CHECKING:
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
+class HostData(TypedDict):
+    user: str
+    password: str
+    skip_xo_config: bool
 
-def host_data(hostname_or_ip: str) -> dict[str, str]:
-    # read from data.py
-    from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER, HOSTS
-    if hostname_or_ip in HOSTS:
-        h_data = HOSTS[hostname_or_ip]
-        return h_data
-    else:
-        return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
+
+def host_data(hostname_or_ip: str) -> HostData:
+    # read from config loader
+    h = config.hosts.get(hostname_or_ip)
+    return {
+        'user': h.user if h and h.user else config.host.default_user,
+        'password': h.password if h and h.password else config.host.default_password,
+        'skip_xo_config': h.skip_xo_config if h and h.skip_xo_config is not None else False,
+    }
 
 class Host:
     xe_prefix = "host"
@@ -924,11 +930,8 @@ class Host:
         return srs
 
     def main_sr_uuid(self) -> str:
-        """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
-        try:
-            from data import DEFAULT_SR
-        except ImportError:
-            DEFAULT_SR = 'default'
+        """ Main SR is the default SR, the first local SR, or a specific SR depending on config. """
+        DEFAULT_SR = config.vm.default_sr
 
         sr_uuid = None
         if DEFAULT_SR == 'local':

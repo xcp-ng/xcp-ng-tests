@@ -4,8 +4,9 @@ import pytest
 
 import logging
 
-from data import OTHER_GUEST_TOOLS, OTHER_GUEST_TOOLS_ISO, WIN_GUEST_TOOLS_ISOS
+from lib import config
 from lib.common import wait_for
+from lib.config_loader import InstalledGuestToolDef, OtherGuestToolDef, WinGuestToolDef
 from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
@@ -20,7 +21,16 @@ from lib.windows import (
 from lib.windows.guest_tools import install_guest_tools
 from lib.windows.other_tools import install_other_drivers
 
-from typing import Any, Generator
+from typing import Generator
+
+# Bind config sub-objects at import time. These are used as pytest parameters
+# (ids=..., params=...), so they must be fixed when this conftest is imported.
+# Sub-conftests are imported during collection, i.e. after pytest_configure has
+# applied --config / XCPNG_TESTS_* / --config-value overrides to the global
+# `config`, so these reflect the effective configuration.
+WIN_GUEST_TOOLS_ISOS = config.guest_tools.win
+OTHER_GUEST_TOOLS_ISO = config.guest_tools.other
+OTHER_GUEST_TOOLS = config.guest_tools.installed
 
 @pytest.fixture(scope="module")
 def running_windows_vm_without_tools(imported_vm: VM) -> VM:
@@ -60,7 +70,7 @@ def running_unsealed_windows_vm(unsealed_windows_vm_and_snapshot: tuple[VM, Snap
 
 @pytest.fixture(scope="class")
 def vm_install_test_tools_per_test_class(
-    unsealed_windows_vm_and_snapshot: tuple[VM, Snapshot], guest_tools_iso: dict[str, Any]
+    unsealed_windows_vm_and_snapshot: tuple[VM, Snapshot], guest_tools_iso: WinGuestToolDef
 ) -> Generator[VM, None, None]:
     vm, snapshot = unsealed_windows_vm_and_snapshot
     vm.start()
@@ -72,7 +82,7 @@ def vm_install_test_tools_per_test_class(
 
 
 @pytest.fixture
-def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]) -> VM:
+def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools_iso: WinGuestToolDef) -> VM:
     install_guest_tools(running_unsealed_windows_vm, guest_tools_iso, PowerAction.Nothing)
     return running_unsealed_windows_vm
 
@@ -84,23 +94,23 @@ def vm_install_test_tools_no_reboot(running_unsealed_windows_vm: VM, guest_tools
 )
 def guest_tools_iso(
     host: Host, request: pytest.FixtureRequest, nfs_iso_sr: SR
-) -> Generator[dict[str, Any], None, None]:
+) -> Generator[WinGuestToolDef, None, None]:
     yield from iso_create(host, nfs_iso_sr, request.param)
 
 
 @pytest.fixture(scope="module")
-def other_tools_iso(host: Host, nfs_iso_sr: SR) -> Generator[dict[str, Any], None, None]:
+def other_tools_iso(host: Host, nfs_iso_sr: SR) -> Generator[OtherGuestToolDef, None, None]:
     yield from iso_create(host, nfs_iso_sr, OTHER_GUEST_TOOLS_ISO)
 
 
 @pytest.fixture(ids=list(OTHER_GUEST_TOOLS.keys()), params=list(OTHER_GUEST_TOOLS.values()))
 def vm_install_other_drivers(
     unsealed_windows_vm_and_snapshot: tuple[VM, Snapshot],
-    other_tools_iso: dict[str, Any],
+    other_tools_iso: OtherGuestToolDef,
     request: pytest.FixtureRequest,
-) -> Generator[tuple[VM, dict[str, Any]], None, None]:
+) -> Generator[tuple[VM, InstalledGuestToolDef], None, None]:
     vm, snapshot = unsealed_windows_vm_and_snapshot
     param = request.param
-    install_other_drivers(vm, other_tools_iso["name"], param)
+    install_other_drivers(vm, other_tools_iso.name, param)
     yield vm, param
     snapshot.revert()

@@ -1,0 +1,590 @@
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+import tomllib
+from pathlib import Path
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from lib.passwords import hash_password
+from lib.sizes import parse_size
+from lib.typing import ConfigDict, JSONType
+
+from typing import cast, overload
+
+logger = logging.getLogger(__name__)
+
+class ConfigError(Exception):
+    """Raised when the TOML configuration cannot be loaded or validated."""
+
+
+class WarnOnExtraModel(BaseModel):
+    """Drop unknown config keys, warning about them instead of failing (extra="ignore")."""
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _warn_unknown_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if cls.model_config.get("extra") == "allow":
+            return data
+        expected = set(cls.model_fields) | {
+            f.alias for f in cls.model_fields.values() if f.alias
+        }
+        unknown = set(data) - expected
+        if unknown:
+            logger.warning(
+                "[%s] Unknown config key(s) ignored (config may be from a newer project version): %s",
+                cls.__name__, ", ".join(sorted(unknown)),
+            )
+        return data
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+class HostConfig(WarnOnExtraModel):
+    default_user: str
+    default_password: str
+    default_password_hash: str = ""
+
+
+class HostOverride(WarnOnExtraModel):
+    user: str | None = None
+    password: str | None = None
+    skip_xo_config: bool | None = None
+    repositories: list[str] | None = None
+    disabled_repositories: list[str] | None = None
+    hosting_pool: str | None = None
+
+
+class NetworkConfig(WarnOnExtraModel):
+    mgmt: str
+    free_nics: list[str]
+
+
+class PXEConfig(WarnOnExtraModel):
+    config_server: str
+    arp_server: str
+
+
+class VMConfig(WarnOnExtraModel):
+    def_url: str
+    cache_imported: bool
+    default_sr: str
+    images: dict[str, str]
+    equivalents: dict[str, str]
+
+
+class IsoImageDef(WarnOnExtraModel):
+    path: str
+    net_url: str | None = Field(default=None, alias="net-url")
+    net_only: bool | None = Field(default=None, alias="net-only")
+    unsigned: bool | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class InstallIsosConfig(WarnOnExtraModel):
+    base_url: str
+    cache_dir: str
+    definitions: dict[str, IsoImageDef]
+
+
+class AnswerFileDef(WarnOnExtraModel):
+    model_config = {"extra": "allow"}
+
+    TAG: str
+    CONTENTS: str | list[AnswerFileDef] | None = None
+
+
+class InstallConfig(WarnOnExtraModel):
+    answerfiles: dict[str, AnswerFileDef]
+    isos: InstallIsosConfig
+    iso_remaster: str = ""
+
+
+class WinGuestToolDef(WarnOnExtraModel):
+    name: str
+    download: bool
+    package: str
+    xenclean_path: str
+    testsign_cert: str | None = None
+    onboard_family: str | None = None
+
+
+class OtherGuestToolDef(WarnOnExtraModel):
+    name: str
+    download: bool
+
+
+class InstalledGuestToolDef(WarnOnExtraModel):
+    type: str | None = None
+    path: str | None = None
+    package: str | None = None
+    testsign_cert: str | None = None
+    vendor_device: bool | None = None
+    upgradable: bool | None = None
+    onboarding_phase: str | None = None
+
+
+class GuestToolsConfig(WarnOnExtraModel):
+    download_url: str
+    win: dict[str, WinGuestToolDef]
+    other: OtherGuestToolDef
+    installed: dict[str, InstalledGuestToolDef]
+
+
+class XOConfig(WarnOnExtraModel):
+    cli: str
+
+
+class SSHConfig(WarnOnExtraModel):
+    pubkey: str
+    output_max_lines: int
+    ignore_banner: bool
+
+
+class LinstorConfig(WarnOnExtraModel):
+    redundancy: int
+
+
+class NFSConfig(WarnOnExtraModel):
+    server: str | None = None
+    serverpath: str | None = None
+
+
+class NFS4Config(WarnOnExtraModel):
+    server: str | None = None
+    serverpath: str | None = None
+    nfsversion: str | None = None
+
+
+class NFSISOConfig(WarnOnExtraModel):
+    location: str | None = None
+
+
+class CIFSISOConfig(WarnOnExtraModel):
+    location: str | None = None
+    username: str | None = None
+    cifspassword: str | None = None
+    type: str | None = None
+    vers: str | None = None
+
+
+class CephFSConfig(WarnOnExtraModel):
+    server: str | None = None
+    serverpath: str | None = None
+    options: str | None = None
+
+
+class MooseFSConfig(WarnOnExtraModel):
+    masterhost: str | None = None
+    masterport: str | None = None
+    rootpath: str | None = None
+
+
+class LVMoHBAConfig(WarnOnExtraModel):
+    SCSIid: str | None = None
+
+
+class LVMoISCSIConfig(WarnOnExtraModel):
+    target: str | None = None
+    port: str | None = None
+    targetIQN: str | None = None
+    SCSIid: str | None = None
+
+
+class StorageConfig(WarnOnExtraModel):
+    nfs: NFSConfig
+    nfs4: NFS4Config
+    nfs_iso: NFSISOConfig
+    cifs_iso: CIFSISOConfig
+    cephfs: CephFSConfig
+    moosefs: MooseFSConfig
+    lvmohba: LVMoHBAConfig
+    lvmoiscsi: LVMoISCSIConfig
+    linstor: LinstorConfig
+
+
+class UpdateDefaults(WarnOnExtraModel):
+    repositories: list[str] = Field(default_factory=list)
+    disabled_repositories: list[str] = Field(default_factory=list)
+    hosting_pool: str | None = None
+
+
+class ToolsConfig(WarnOnExtraModel):
+    update: UpdateDefaults = Field(default_factory=UpdateDefaults)
+
+
+class Config(WarnOnExtraModel):
+    objects_name_prefix: str | None
+    dns_server: str
+    host: HostConfig
+    hosts: dict[str, HostOverride]
+    tools: ToolsConfig
+    network: NetworkConfig
+    pxe: PXEConfig
+    vm: VMConfig
+    install: InstallConfig
+    guest_tools: GuestToolsConfig
+    xo: XOConfig
+    ssh: SSHConfig
+    storage: StorageConfig
+    volume_size: int
+    write_volume_cap: int
+    write_volume_align: int
+
+    @field_validator("volume_size", "write_volume_cap", mode="before")
+    @classmethod
+    def parse_size_str(cls, v: int | str) -> int:
+        if isinstance(v, str):
+            return parse_size(v)
+        return v
+
+    @field_validator("objects_name_prefix", mode="before")
+    @classmethod
+    def normalize_objects_name_prefix(cls, v: str | None) -> str | None:
+        """Convert empty string to None."""
+        return None if v == "" else v
+
+    def sr_device_config(self, config_key: str, *, required: list[str] | None = None) -> dict[str, str]:
+        """Get storage config by key name. Validate required fields."""
+        if required is None:
+            required = []
+        storage_cfg = getattr(self.storage, config_key.replace("_DEVICE_CONFIG", "").lower(), None)
+        if storage_cfg is None:
+            return {}
+        cfg = storage_cfg.model_dump(exclude_none=True)
+        for required_field in required:
+            if required_field not in cfg:
+                raise ConfigError(f"Storage config '{config_key}' lacks mandatory '{required_field}'")
+        return cfg
+
+
+def _load_toml_file(path: Path) -> ConfigDict:
+    """Load TOML file, dropping loader-level pseudo-keys, and return dict."""
+    with open(path, "rb") as f:
+        data = cast(ConfigDict, tomllib.load(f))
+    data.pop("$schema", None)
+    return data
+
+
+def _require_str_list(value: JSONType, what: str) -> list[str]:
+    """Return ``value`` as a list of strings, raising ConfigError otherwise."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ConfigError(f"{what} must be a list of file paths")
+    return [item for item in value if isinstance(item, str)]
+
+
+def _load_toml_with_includes(
+    path: Path,
+    _seen: set[Path] | None = None,
+    fallback_dir: Path = REPO_ROOT,
+) -> ConfigDict:
+    """Load a TOML file and recursively merge its includes.
+
+    Files listed in the root-level ``include`` key (array of strings)
+    are loaded and deep-merged before the file's own content.
+    Includes are resolved relative to the including file's directory first,
+    then relative to the main xcp-ng-tests directory (fallback_dir).
+    """
+    if _seen is None:
+        _seen = set()
+    path = path.resolve()
+    if path in _seen:
+        raise ConfigError(f"Cyclic include detected: {path}")
+    _seen.add(path)
+
+    try:
+        data = _load_toml_file(path)
+        includes = _require_str_list(data.pop("include", None) or [], f"'include' in {path}")
+
+        result: ConfigDict = {}
+        for inc in includes:
+            inc_path = _resolve_include(path.parent, inc, fallback_dir)
+            included = _load_toml_with_includes(inc_path, _seen, fallback_dir)
+            result = _merge_dicts(result, included)
+
+        return _merge_dicts(result, data)
+    finally:
+        # Track the recursion stack, not all visited files, so diamond
+        # includes (A -> [B, C], B -> D, C -> D) are allowed while true
+        # cycles still raise above.
+        _seen.discard(path)
+
+
+def _resolve_include(base_dir: Path, inc: str, fallback_dir: Path) -> Path:
+    """Resolve an ``include`` path: relative to base_dir, then fallback_dir."""
+    candidate = base_dir / inc
+    if candidate.is_file():
+        return candidate.resolve()
+    candidate = fallback_dir / inc
+    if candidate.is_file():
+        return candidate.resolve()
+    raise FileNotFoundError(
+        f"Included config file not found: {inc} (looked in {base_dir} and {fallback_dir})"
+    )
+
+
+def _resolve_config_override(value: str | Path) -> Path:
+    """Resolve a -c/--config value to a TOML config file path.
+
+    The value is first tried as given (an absolute path, or relative to the
+    current directory). When it does not match a file, it is treated as a
+    short name and ``config.NAME.toml`` is looked up in the directory given
+    by the XCPNG_CONFIG_DIR env var (when set), then in the xcp-ng-tests
+    repository root.
+    """
+    candidates = [Path(value)]
+    if "XCPNG_CONFIG_DIR" in os.environ:
+        candidates.append(Path(os.environ["XCPNG_CONFIG_DIR"]) / f"config.{value}.toml")
+    candidates.append(REPO_ROOT / f"config.{value}.toml")
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        f"Config file not found for {value!r}: "
+        f"tried {[str(c) for c in candidates]}"
+    )
+
+
+def _merge_dicts(base: ConfigDict, override: ConfigDict) -> ConfigDict:
+    """Deep merge override into base (recursive)."""
+    for key, value in override.items():
+        existing = base.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            base[key] = _merge_dicts(existing, value)
+        else:
+            base[key] = value
+    return base
+
+
+def _parse_env_value(raw: str) -> JSONType:
+    """Parse env var value as TOML, falling back to plain string."""
+    try:
+        return tomllib.loads(f"x = {raw}")["x"]
+    except tomllib.TOMLDecodeError:
+        return raw
+
+
+def _split_key_path(key: str) -> list[str]:
+    """Split a dotted key path into segments, honoring double-quoted segments.
+
+    e.g. ``hosts."10.30.0.56".user`` -> ['hosts', '10.30.0.56', 'user']
+    """
+    parts: list[str] = []
+    buf: list[str] = []
+    in_quotes = False
+    for ch in key:
+        if ch == '"':
+            in_quotes = not in_quotes
+        elif ch == "." and not in_quotes:
+            parts.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    parts.append("".join(buf))
+    return parts
+
+
+def _set_nested_path(branch: ConfigDict, path: list[str], value: JSONType) -> None:
+    """Set ``value`` at ``path`` inside ``branch`` (creating intermediate dicts)."""
+    for part in path[:-1]:
+        node = branch.get(part)
+        if not isinstance(node, dict):
+            node = {}
+            branch[part] = node
+        branch = node
+    branch[path[-1]] = value
+
+
+def _apply_env_overrides(data: ConfigDict) -> ConfigDict:
+    """Override config values from XCPNG_TESTS_* env vars.
+
+    The part after the prefix is split on ``__`` to form the override path.
+    """
+    prefix = "XCPNG_TESTS_"
+    overrides: ConfigDict = {}
+    for key, raw in os.environ.items():
+        if not key.startswith(prefix):
+            continue
+        path = key.removeprefix(prefix).split("__")
+        value = _parse_env_value(raw)
+        _set_nested_path(overrides, path, value)
+    return _merge_dicts(data, overrides) if overrides else data
+
+
+def _apply_config_values(data: ConfigDict, key_values: list[str]) -> ConfigDict:
+    """Override config values from --config-value KEY=VALUE entries.
+
+    The KEY is a dotted path, with double quotes around segments that contain
+    dots (e.g. ``hosts."10.30.0.56".user``). Applied after env var overrides,
+    so it takes precedence over them.
+    """
+    overrides: ConfigDict = {}
+    for item in key_values:
+        key, sep, raw_value = item.partition("=")
+        if not sep:
+            raise ValueError(f"Invalid --config-value: {item!r} (expected KEY=VALUE)")
+        path = _split_key_path(key)
+        if not all(path):
+            raise ValueError(f"Invalid --config-value key: {key!r}")
+        value = _parse_env_value(raw_value)
+        _set_nested_path(overrides, path, value)
+    return _merge_dicts(data, overrides) if overrides else data
+
+
+@overload
+def _replace_password_hash_placeholder(obj: ConfigDict, password_hash: str) -> ConfigDict:
+    ...
+
+@overload
+def _replace_password_hash_placeholder(obj: JSONType, password_hash: str) -> JSONType:
+    ...
+
+def _replace_password_hash_placeholder(obj: JSONType, password_hash: str) -> JSONType:
+    """Recursively replace <PASSWORD_HASH> placeholders with actual hash."""
+    if isinstance(obj, str):
+        return password_hash if obj == "<PASSWORD_HASH>" else obj
+    if isinstance(obj, dict):
+        return {k: _replace_password_hash_placeholder(v, password_hash) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_replace_password_hash_placeholder(item, password_hash) for item in obj]
+    return obj
+
+
+def warn_legacy_data_py() -> None:
+    """Warn if legacy data.py still exists."""
+    data_py_path = Path(__file__).parent.parent / "data.py"
+    if data_py_path.exists():
+        logging.warning(
+            f"Legacy {data_py_path} file found but is NOT used anymore. "
+            "Configuration is now loaded from TOML files. "
+            "Please run: uv run scripts/tools.py migrate-data-py\n"
+            f"And then remove {data_py_path}",
+        )
+
+
+def _build_config(
+    base_data: ConfigDict,
+    config_values: list[str] | None = None,
+    apply_value_overrides: bool = True,
+) -> Config:
+    """Apply value/env overrides and password hash replacement, then validate."""
+    try:
+        if apply_value_overrides:
+            base_data = _apply_env_overrides(base_data)
+            if config_values:
+                base_data = _apply_config_values(base_data, config_values)
+        if "host" in base_data and isinstance(base_data["host"], dict):
+            host = base_data["host"]
+            password = host.get("default_password", "")
+            if not isinstance(password, str):
+                raise ConfigError("host.default_password must be a string")
+            password_hash = hash_password(password)
+            host["default_password_hash"] = password_hash
+            base_data = _replace_password_hash_placeholder(base_data, password_hash)
+        return Config.model_validate(base_data)
+    except Exception as e:
+        raise ConfigError(f"Config validation failed:\n{e}") from e
+
+
+def load_config(
+    config_path: Path | None = None,
+    override: str | Path | None = None,
+    config_values: list[str] | None = None,
+    apply_value_overrides: bool = True,
+) -> Config:
+    """Load and validate a merged TOML config with Pydantic, returning a Config.
+
+    The main config.toml at the repo root is always used as the base (lowest
+    priority). An optional override (a .toml path or a profile name) is merged
+    on top, then XCPNG_TESTS_* env vars, then --config-value entries (highest
+    priority). When no override is given, the XCPNG_CONFIG env var is used as
+    one. Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
+    set, then in the xcp-ng-tests repository root.
+    When neither an override nor an explicit base path is given,
+    config.local.toml at the repo root is auto-merged if it exists.
+    Short names are looked up in the XCPNG_CONFIG_DIR directory when it is
+    set, then in the xcp-ng-tests repository root.
+    apply_value_overrides can be set to False to skip the XCPNG_TESTS_* and
+    --config-value overrides (used to compute the base config for diffs).
+    """
+    if override is None:
+        override = os.environ.get("XCPNG_CONFIG") or None
+    base_path = config_path or REPO_ROOT / "config.toml"
+    try:
+        base_data = _load_toml_with_includes(base_path)
+    except FileNotFoundError as e:
+        raise ConfigError(f"{e}") from e
+    if override is not None:
+        try:
+            overlay_data = _load_toml_with_includes(_resolve_config_override(override))
+        except FileNotFoundError as e:
+            raise ConfigError(f"{e}") from e
+        base_data = _merge_dicts(base_data, overlay_data)
+    elif config_path is None:
+        default_path = REPO_ROOT / "config.local.toml"
+        if default_path.exists():
+            base_data = _merge_dicts(base_data, _load_toml_with_includes(default_path))
+    return _build_config(base_data, config_values, apply_value_overrides)
+
+
+def base_config_dict() -> ConfigDict:
+    """Return the validated base config.toml, without value/env overrides.
+
+    Used as the reference when computing config deltas (dump-config and
+    migrate-data-py).
+    """
+    return load_config(config_path=REPO_ROOT / "config.toml", apply_value_overrides=False).model_dump(by_alias=True)
+
+
+def apply_override(config_name: str | None = None, config_values: list[str] | None = None) -> None:
+    """Load config.toml, merge the overlay (a .toml file path or profile name) on top, update config in place.
+
+    When config_name is None, the XCPNG_CONFIG env var is used if set, else
+    config.local.toml is auto-merged if it exists. Short names are looked up
+    in the XCPNG_CONFIG_DIR directory when it is set, then in the xcp-ng-tests
+    repository root. config_values is passed to load_config (see its docstring).
+    """
+    new = load_config(override=config_name, config_values=config_values)
+    for field in Config.model_fields:
+        setattr(config, field, getattr(new, field))
+
+
+def add_config_options(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add -c/--config and --config-value to `parser`, and return a parent parser for subcommands.
+
+    Both options are attached to `parser` (so they can be given before the
+    subcommand) and to a shared ``add_help=False`` parser that subcommands use
+    as a parent.
+    """
+    common_parser = argparse.ArgumentParser(add_help=False)
+    for target in (parser, common_parser):
+        target.add_argument(
+            "-c", "--config",
+            type=Path,
+            default=None,
+            metavar="PATH",
+            help="Config overlay: a .toml file path or profile name (default: config.local.toml or XCPNG_CONFIG)",
+        )
+        target.add_argument(
+            "--config-value",
+            action="append",
+            default=[],
+            metavar="KEY=VALUE",
+            help="Override a config value, e.g. host.default_password=foo (repeatable; highest priority)",
+        )
+    return common_parser
+
+
+def sr_device_config(config_key: str, *, required: list[str] | None = None) -> dict[str, str]:
+    """Delegate to config.sr_device_config() for backward compat."""
+    return config.sr_device_config(config_key, required=required)
+
+
+config: Config = load_config()
