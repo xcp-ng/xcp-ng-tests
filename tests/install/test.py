@@ -91,7 +91,7 @@ class TestNested:
         .top_append(
             {"iso": {"TAG": "source", "type": "local"},
              "net": {"TAG": "source", "type": "url",
-                     "CONTENTS": ISO_IMAGES[iso_version]['net-url']},  # type: ignore
+                     "CONTENTS": ISO_IMAGES[iso_version].get("net-url")},  # type: ignore
              }[package_source],
             {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
@@ -341,7 +341,7 @@ class TestNested:
         lambda system_disks_names, package_source, iso_version: AnswerFile("UPGRADE").top_append(
             {"iso": {"TAG": "source", "type": "local"},
              "net": {"TAG": "source", "type": "url",
-                     "CONTENTS": ISO_IMAGES[iso_version]['net-url']},  # type: ignore
+                     "CONTENTS": ISO_IMAGES[iso_version].get('net-url')},  # type: ignore
              }[package_source],
             {"TAG": "existing-installation",
              "CONTENTS": system_disks_names[0]},

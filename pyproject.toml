@@ -18,6 +18,8 @@ dependencies = [
     "requests",
     "ipdb",
     "rpm-version>=0.5.1",
+    "paramiko",
+    "pyte",
 ]
 
 [dependency-groups]
@@ -40,6 +42,7 @@ dev = [
     "autopep8",
     "types-passlib",
     "icecream",
+    "types-paramiko",
 ]
 
 [tool.pyright]
@@ -89,7 +92,7 @@ ignore = [
 pydocstyle.convention = "pep257"
 
 [tool.ruff.lint.extend-per-file-ignores]
-# Pytest fixtures are often flagged as unused imports (F401) or 
+# Pytest fixtures are often flagged as unused imports (F401) or
 # redefined variables (F811) because they are injected by name.
 "tests/**/*.py" = [
   "F401",  # F401 unused-import

@@ -17,4 +17,5 @@ prek
 autopep8
 types-passlib
 icecream
+types-paramiko
 -r base.txt
