@@ -25,9 +25,6 @@ JOBS: dict[str, JobData] = {
             "Minimal set of tests to run after an installation or an upgrade.",
         "requirements": [
             "A pool master with a local SR. Can be a single-host pool.",
-            "A second one-host pool with a SR to receive cross-pool migrated VMs.",
-            "(If you can't provide a second pool, add `-m 'not hostB1'`, and specify the pool master of the first "
-            "pool twice.) Config in data.py for a NFS SR.",
             "A VM (small and fast-booting).",
         ],
         "nb_pools": 1,
