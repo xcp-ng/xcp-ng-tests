@@ -8,6 +8,7 @@ import re
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
+from textwrap import dedent
 
 from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
@@ -142,11 +143,24 @@ def _sync_users_repo(host: Host) -> None:
     logger.info(f"[{host}] Downloading {repo_url} to {repo_file}")
     host.ssh(f"curl -fsS -o {repo_file} '{repo_url}'")
 
+def _install_tmp_ci_repo(host: Host) -> None:
+    """Install the tmp-ci.repo file on the host."""
+    repo_file = '/etc/yum.repos.d/tmp-ci.repo'
+    logger.info(f"[{host}] Writing {repo_file}")
+    host.create_file(repo_file, dedent("""\
+        [xcp-ng-tmp-ci]
+        name=XCP-ng tmp CI
+        baseurl=http://repos.lyon.vates.team/repos/tmp-ci/8.3/
+        enabled=0
+        gpgcheck=0
+    """))
+
 def _update_host(host: Host, enablerepos: list[str], disablerepos: list[str] = [],
                  reboot: bool = True) -> None:
     """Update a host, with the mirrors.xcp-ng.org baseurl removed during the update."""
     with _pinned_updates_repo(host):
         _sync_users_repo(host)
+        _install_tmp_ci_repo(host)
         host.update(enablerepos, disablerepos=disablerepos, reboot=reboot)
 
 def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = False) -> None:
