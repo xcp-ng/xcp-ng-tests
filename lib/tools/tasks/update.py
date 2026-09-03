@@ -133,10 +133,20 @@ def _pinned_updates_repo(host: Host) -> Generator[None]:
         logger.info(f"[{host}] Restoring {repo_file}")
         host.ssh(f'mv -f {backup_file} {repo_file}')
 
+def _sync_users_repo(host: Host) -> None:
+    """Copy the koji xcpng-users.repo file on the host to keep repository definitions in sync."""
+    repo_url = (
+        f'https://koji.xcp-ng.org/repos/user/{host.xcp_version.major}/{host.xcp_version_short}/xcpng-users.repo'
+    )
+    repo_file = '/etc/yum.repos.d/xcpng-users.repo'
+    logger.info(f"[{host}] Downloading {repo_url} to {repo_file}")
+    host.ssh(f"curl -fsS -o {repo_file} '{repo_url}'")
+
 def _update_host(host: Host, enablerepos: list[str], disablerepos: list[str] = [],
                  reboot: bool = True) -> None:
     """Update a host, with the mirrors.xcp-ng.org baseurl removed during the update."""
     with _pinned_updates_repo(host):
+        _sync_users_repo(host)
         host.update(enablerepos, disablerepos=disablerepos, reboot=reboot)
 
 def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = False) -> None:
