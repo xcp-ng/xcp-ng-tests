@@ -44,7 +44,8 @@ JOBS: dict[str, JobData] = {
             "tests/xapi_plugins",
             "tests/install/test_fixtures.py",
         ],
-        "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
+        "markers": "(small_vm or no_vm) and not flaky and not reboot "
+        "and not hosts_with_xo and not complex_prerequisites",
     },
     "main-multi-unix": {
         "description": "a group of tests that need to run on the largest variety of VMs - unix split",
@@ -82,13 +83,14 @@ JOBS: dict[str, JobData] = {
             "A pool with at least 1 host (if more, with same network configuration).",
             "At least 2 free NICs on every host.",
             "A small VM that can be imported on the SRs.",
+            "xo-cli locally installed, in $PATH, and registered to an XO instance.",
         ],
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/network"],
-        "markers": "complex_prerequisites",
+        "markers": "complex_prerequisites or hosts_with_xo",
     },
     "packages": {
         "description": "tests that packages can be installed correctly",

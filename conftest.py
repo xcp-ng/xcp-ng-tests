@@ -37,7 +37,7 @@ from lib.sr import SR
 from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vm import VM, vm_cache_key_from_def
-from lib.xo import xo_cli
+from lib.xo import _allow_xo_cli, xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
@@ -202,6 +202,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
         'hostB1',
         'unused_512B_disks',
         'unused_4k_disks',
+        'hosts_with_xo',
     ]
 
     # -------------
@@ -367,12 +368,15 @@ def registered_xo_cli() -> None:
     # The fixture is not responsible for establishing the connection.
     # We just check that xo-cli is currently registered
     try:
+        old_allow_xo_cli = _allow_xo_cli(True)
         xo_cli('server.getAll')
+        _allow_xo_cli(old_allow_xo_cli)
     except Exception as e:
-        raise Exception(f"Check for registered xo_cli failed: {e}")
+        pytest.fail(f"Check for registered xo_cli failed: {e}")
 
 @pytest.fixture(scope='session')
 def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[Host], None, None]:
+    old_allow_xo_cli = _allow_xo_cli(True)
     for h in hosts:
         logging.info(">>> Connect host %s" % h)
         if not h.skip_xo_config:
@@ -386,6 +390,7 @@ def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[
         if not h.skip_xo_config:
             logging.info("<<< Disconnect host %s" % h)
             h.xo_server_remove()
+    _allow_xo_cli(old_allow_xo_cli)
 
 @pytest.fixture(scope='session')
 def hostA1(hosts: list[Host]) -> Generator[Host, None, None]:
