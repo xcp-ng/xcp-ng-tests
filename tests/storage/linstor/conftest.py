@@ -113,9 +113,10 @@ def pool_with_linstor(
     hostA2: Host,
     lvm_disks: None,
     pool_with_saved_yum_state: Pool,
-    _linstor_config: LinstorConfig
+    _linstor_config: LinstorConfig,
 ) -> Generator[Pool, None, None]:
     import concurrent.futures
+
     pool = pool_with_saved_yum_state
 
     def ensure_linstor_not_installed(host: Host) -> None:
