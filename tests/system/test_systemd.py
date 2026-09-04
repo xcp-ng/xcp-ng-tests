@@ -3,6 +3,7 @@ import pytest
 import logging
 import re
 
+from lib.common import wait_for
 from lib.host import Host
 
 # Requirements:
@@ -23,14 +24,20 @@ white_list_issues = [
 
 pytest.fixture(scope='module')
 def test_verify_default_target(host: Host) -> None:
-    analyse = host.ssh('systemd-analyze verify default.target')
-    err = False
-    polkit_msg = "Cannot add dependency job for unit polkit.service, ignoring: Unit not found."
-    for line in analyse.splitlines():
-        if line == polkit_msg:
-            pytest.xfail(f"drbd-reactor package must be fixed to remove dep to polkit: {polkit_msg}")
-        if line not in white_list_issues:
-            logging.error(f"{line}")
-            err = True
+    def analyse_default_target() -> bool:
+        # Look at what is using memory
+        # TODO: to remove
+        host.ssh('ps -eo pid,ppid,%mem,rss,args ww --sort=-rss | head -n 11')
+        host.ssh('free')
 
-    assert not err
+        analyse = host.ssh('systemd-analyze verify default.target')
+        polkit_msg = "Cannot add dependency job for unit polkit.service, ignoring: Unit not found."
+        for line in analyse.splitlines():
+            if line == polkit_msg:
+                pytest.xfail(f"drbd-reactor package must be fixed to remove dep to polkit: {polkit_msg}")
+            if line not in white_list_issues:
+                logging.error(f"{line}")
+                return False
+        return True
+
+    wait_for(analyse_default_target, "Wait for systemd-analyze verify default.target to be clean")
