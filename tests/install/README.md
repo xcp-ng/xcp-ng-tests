@@ -68,7 +68,7 @@ The above command instructs `pytest` to:
 * run the test sequences as defined by the specified `.lst` files
   (which were specially written to chain an installation, an upgrade
   to same version, and a restore, all using a single nightly image)
-* specify 
+* specify
 * to save detailed logs in a file, while during execution only
   high-level progress messages are shown to avoid flooding
 
