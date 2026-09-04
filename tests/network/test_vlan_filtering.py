@@ -35,8 +35,9 @@ def start_vm_on_trunk(
 
 @pytest.mark.small_vm
 class TestBasic:
-
-    def test_passing(self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM):
+    def test_passing(
+        self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM
+    ) -> None:
         vm_writer, ifaceW = start_vm_on_trunk(
             defer,
             vm=imported_vm,
@@ -72,7 +73,9 @@ class TestBasic:
             "test -s /tmp/out"
         )
 
-    def test_filtered(self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM):
+    def test_filtered(
+        self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM
+    ) -> None:
         vm_writer, ifaceW = start_vm_on_trunk(
             defer,
             vm=imported_vm,

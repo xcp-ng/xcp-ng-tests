@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import pytest
 
 import json
 import logging
 import shlex
 import time
+
+from pydantic import BaseModel, Field, TypeAdapter
 
 from lib.commands import SSHCommandFailed
 from lib.common import safe_split, vm_image, wait_for
@@ -16,42 +20,57 @@ from tests.storage import vdi_is_open
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
-from typing import Tuple
+from typing import Generator, Tuple
 
 # Requirements:
 # - two or more XCP-ng hosts >= 8.2 with additional unused disk(s) for the SR
 # - access to XCP-ng RPM repository from the host
 
 
-def get_drbd_status(host: Host, resource: str):
-    logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
-    return json.loads(host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"])))
+class DrbdPeerDevice(BaseModel):
+    out_of_sync: int = Field(default=0, alias="out-of-sync")
+    peer_disk_state: str = Field(default="", alias="peer-disk-state")
 
-def get_corrupted_resources(host: Host, resource: str):
+
+class DrbdConnection(BaseModel):
+    name: str = ""
+    peer_devices: list[DrbdPeerDevice] = Field(default=[], alias="peer-devices")
+
+
+class DrbdResource(BaseModel):
+    name: str = ""
+    connections: list[DrbdConnection] = Field(default=[], alias="connections")
+
+
+_drbd_status_adapter = TypeAdapter(list[DrbdResource])
+
+
+def get_drbd_status(host: Host, resource: str) -> list[DrbdResource]:
+    logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
+    return _drbd_status_adapter.validate_json(host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"])))
+
+
+def get_corrupted_resources(host: Host, resource: str) -> list[tuple[str, str, int]]:
     return [
         (
-            res.get("name", ""),
-            conn.get("name", ""),
-            peer.get("out-of-sync", 0),
+            res.name,
+            conn.name,
+            peer.out_of_sync,
         )
         for res in get_drbd_status(host, resource)
-        for conn in res.get("connections", [])
-        for peer in conn.get("peer_devices", [])
-        if peer.get("out-of-sync", 0) > 0
+        for conn in res.connections
+        for peer in conn.peer_devices
+        if peer.out_of_sync > 0
     ]
 
-def wait_drbd_sync(host: Host, resource: str):
+
+def wait_drbd_sync(host: Host, resource: str) -> None:
     logging.info("[%s] Waiting for DRBD sync on resource `%s`...", host, resource)
     host.ssh(shlex.join(["drbdadm", "wait-sync", resource]))
 
 
 def get_vdi_volume_name_from_linstor(master: Host, vdi_uuid: str) -> str:
-    result = master.ssh(shlex.join([
-        "linstor-kv-tool",
-        "--dump-volumes",
-        "-g",
-        f"xcp-sr-{GROUP_NAME}_thin_device"
-    ]))
+    result = master.ssh(shlex.join(["linstor-kv-tool", "--dump-volumes", "-g", f"xcp-sr-{GROUP_NAME}_thin_device"]))
     volumes = json.loads(result)
     for k, v in volumes.items():
         path = safe_split(k, "/")
@@ -81,7 +100,7 @@ class TestLinstorSR:
         except Exception:
             if provisioning_type == "thick":
                 pytest.xfail(reason="Known failure for thick provisioning")
-            raise # Let thin failures fail test
+            raise  # Let thin failures fail test
         else:
             if provisioning_type == "thick":
                 pytest.fail("Expected failure for thick provisioning did not occur (XPASS)")
@@ -89,8 +108,8 @@ class TestLinstorSR:
     def test_vdi_is_not_open(self, vdi_on_linstor_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_linstor_sr)
 
-    @pytest.mark.small_vm # run with a small VM to test the features
-    @pytest.mark.big_vm # and ideally with a big VM to test it scales
+    @pytest.mark.small_vm  # run with a small VM to test the features
+    @pytest.mark.big_vm  # and ideally with a big VM to test it scales
     def test_start_and_shutdown_VM(self, vm_on_linstor_sr: VM) -> None:
         vm = vm_on_linstor_sr
         vm.start()
@@ -109,43 +128,43 @@ class TestLinstorSR:
             vm.shutdown(verify=True)
 
     @pytest.fixture(scope='function')
-    def host_and_vm_with_corrupted_vdi_on_linstor_sr(self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM):
+    def host_and_vm_with_corrupted_vdi_on_linstor_sr(
+        self, host: Host, linstor_sr: SR, vm_on_linstor_sr_function: VM
+    ) -> Generator[tuple[Host, VM, str], None, None]:
         vm: VM = vm_on_linstor_sr_function
         pool: Pool = host.pool
         master: Host = pool.master
 
-        vdi_uuid: str = next((
-            vdi.uuid for vdi in vm.vdis if vdi.sr.uuid == linstor_sr.uuid
-        ))
+        vdi_uuid: str = next((vdi.uuid for vdi in vm.vdis if vdi.sr.uuid == linstor_sr.uuid))
 
         volume_name = get_vdi_volume_name_from_linstor(master, vdi_uuid)
         lv_path = f"/dev/{GROUP_NAME}/{volume_name}_00000"
         vdi_host = get_vdi_host(pool, vdi_uuid, lv_path)
         logging.info("[%s]: corrupting `%s`", host, lv_path)
-        vdi_host.ssh(shlex.join([
-            "dd",
-            "if=/dev/urandom",
-            f"of={lv_path}",
-            "bs=4096",
-            # Lower values seem to go undetected sometimes
-            "count=10000"  # ~40MB
-        ]))
+        vdi_host.ssh(
+            shlex.join([
+                "dd",
+                "if=/dev/urandom",
+                f"of={lv_path}",
+                "bs=4096",
+                # Lower values seem to go undetected sometimes
+                "count=10000",  # ~40MB
+            ])
+        )
         yield vdi_host, vm, volume_name
 
     @pytest.mark.small_vm
-    def test_resynchronization(
-        self, host_and_vm_with_corrupted_vdi_on_linstor_sr: Tuple[Host, VM, str]
-    ):
+    def test_resynchronization(self, host_and_vm_with_corrupted_vdi_on_linstor_sr: tuple[Host, VM, str]) -> None:
         (host, vm, resource_name) = host_and_vm_with_corrupted_vdi_on_linstor_sr
         hostname = host.hostname()
 
         try:
             other_host = next(
-                next(h for h in host.pool.hosts if h.hostname() == conn.get("name", ""))
+                next(h for h in host.pool.hosts if h.hostname() == conn.name)
                 for res in get_drbd_status(host, resource_name)
-                for conn in res.get("connections", [])
-                for peer in conn.get("peer_devices", [])
-                if peer.get("peer-disk-state", "") == "UpToDate"
+                for conn in res.connections
+                for peer in conn.peer_devices
+                if peer.peer_disk_state == "UpToDate"
             )
             logging.info("Elected `%s` as peer for verification and repair", other_host)
         except StopIteration:
@@ -173,11 +192,9 @@ class TestLinstorSR:
             pytest.fail(f"Failed to identify corrupted resource after {max_attempts} attempts")
 
         logging.info("Invalidating remote resource `%s`...", resource_name)
-        other_host.ssh(shlex.join([
-            "drbdadm", "invalidate-remote",
-            f"{resource_name}:{hostname}/0",
-            "--reset-bitmap=no"
-        ]))
+        other_host.ssh(
+            shlex.join(["drbdadm", "invalidate-remote", f"{resource_name}:{hostname}/0", "--reset-bitmap=no"])
+        )
         wait_drbd_sync(other_host, resource_name)
         if get_corrupted_resources(other_host, resource_name):
             pytest.fail("Corrupted resource did not get fixed")
@@ -206,7 +223,7 @@ class TestLinstorSR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
-    def test_forget_and_introduce_sr(self, linstor_sr: SR):
+    def test_forget_and_introduce_sr(self, linstor_sr: SR) -> None:
         sr = linstor_sr
         sr_name = sr.param_get('name-label')
         all_pbds = sr.pbd_uuids()
@@ -224,8 +241,8 @@ class TestLinstorSR:
         logging.info(f"Forgot SR {sr.uuid} successfully")
 
         with pytest.raises(Exception):
-            sr_type = sr.param_get('type') # Expecting exception as sr should not exist
-            sr.plug_pbds() # Plug back pbds and let teardown handle SR destroy
+            sr_type = sr.param_get('type')  # Expecting exception as sr should not exist
+            sr.plug_pbds()  # Plug back pbds and let teardown handle SR destroy
             pytest.fail(f"SR still exists; returned type: {sr_type}")
 
         logging.info(f"Introducing SR {sr.uuid} back")
@@ -300,7 +317,9 @@ class TestLinstorSR:
 
     # *** End of tests with reboots
 
+
 # --- Test diskless resources --------------------------------------------------
+
 
 def _get_diskful_hosts(host: Host, controller_option: str, sr_group_name: str, vdi_uuid: str) -> list[str]:
     # TODO: If any resource is in a temporary creation state or unknown, then need to wait intelligently.
@@ -312,9 +331,12 @@ def _get_diskful_hosts(host: Host, controller_option: str, sr_group_name: str, v
         try:
             # Get volume name from VDI UUID
             # "xcp/volume/{vdi_uuid}/volume-name": "{volume_name}"
-            volume_name = host.ssh(
-                f'linstor-kv-tool --dump-volumes -g {sr_group_name} | grep volume-name | grep /{vdi_uuid}/'
-            ).split(': ')[1].split('"')[1]
+            volume_name = (
+                host
+                .ssh(f'linstor-kv-tool --dump-volumes -g {sr_group_name} | grep volume-name | grep /{vdi_uuid}/')
+                .split(': ')[1]
+                .split('"')[1]
+            )
 
             # Find host where volume is UpToDate
             # | {volume_name} | {host} | 7017 | Unused | Ok    |   UpToDate | 2023-10-24 18:52:05 |
@@ -334,12 +356,14 @@ def _get_diskful_hosts(host: Host, controller_option: str, sr_group_name: str, v
             time.sleep(sleep_sec)
     return []
 
+
 def _ensure_resource_remain_diskless(
     host: Host, controller_option: str, sr_group_name: str, vdi_uuid: str, diskless: list[Host]
 ) -> None:
     diskfuls = _get_diskful_hosts(host, controller_option, sr_group_name, vdi_uuid)
     for diskless_host in diskless:
         assert diskless_host.name().lower() not in diskfuls
+
 
 class TestLinstorDisklessResource:
     @pytest.mark.small_vm

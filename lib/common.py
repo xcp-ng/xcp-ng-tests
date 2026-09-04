@@ -133,7 +133,7 @@ def expand_scope_relative_nodeid(scoped_nodeid: str, scope: str, ref_nodeid: str
     return "::".join(itertools.chain(base, (scoped_nodeid,)))
 
 @lru_cache(maxsize=None)
-def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:
+def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:  # noqa: ANN401
     return TypeAdapter(tp)
 
 @overload
@@ -141,7 +141,7 @@ def ensure_type(tp: type[T], v: object) -> T:
     ...
 
 @overload
-def ensure_type(tp: Any, v: object) -> Any:
+def ensure_type(tp: Any, v: object) -> Any:  # noqa: ANN401
     ...
 
 def ensure_type(tp: Any, v: object) -> Any:
@@ -424,4 +424,4 @@ def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None
 def hash_password(password: str) -> str:
     """Hash password for /etc/shadow."""
     # XCP-ng uses sha512 with 5000 rounds by default
-    return sha512_crypt.using(rounds=5000).hash(password)
+    return sha512_crypt.using(rounds=5000).hash(password)  # type: ignore[no-untyped-call]
