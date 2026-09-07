@@ -6,6 +6,8 @@ from lib.common import Defer
 from lib.network import Network
 from lib.vm import VM
 
+from . import tcpdump
+
 # Requirements:
 # From --hosts parameter:
 # - host(A1): an XCP-ng host
@@ -59,18 +61,12 @@ class TestBasic:
         vm_writer.ssh(f"ip addr add 192.168.42.1/24 dev {ifaceW}.42")
         vm_writer.ssh(f"ip link set {ifaceW}.42 up")
 
-        # send some packets on VLAN 42 (ARP packets will be send)
-        # the ping process could be still running after the test,
-        # but vm_writer will be destroyed, so it isn't a problem.
-        vm_writer.ssh("ping -c1 -w1 192.168.42.2", background=True, check=False)
+        with tcpdump(defer, "tcpdump.pcap", vm_reader, ifaceR, "vlan 42 and arp", count=1):
+            # send some packets on VLAN 42 (ARP packets will be send)
+            vm_writer.ssh("ping -c1 -w1 192.168.42.2", check=False)
 
-        # check packets are seen on vm_reader
-        # fail if /tmp/out is empty
-        vm_reader.ssh(
-            f"tcpdump -i {ifaceR} -w /tmp/out -c1 -n 'vlan 42 and arp' &"
-            "pid=$! ; sleep 5 ; kill $pid ;"
-            "test -s /tmp/out"
-        )
+        # check packets are seen on vm_reader (trunks=42)
+        vm_reader.ssh("test $(tcpdump -n -r tcpdump.pcap | wc -l) -gt 0")
 
     def test_filtered(self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM):
         vm_writer, ifaceW = start_vm_on_trunk(
@@ -95,15 +91,9 @@ class TestBasic:
         vm_writer.ssh(f"ip addr add 192.168.42.1/24 dev {ifaceW}.42")
         vm_writer.ssh(f"ip link set {ifaceW}.42 up")
 
-        # send some packets on VLAN 42 (ARP packets will be send)
-        # the ping process could be still running after the test,
-        # but vm_writer will be destroyed, so it isn't a problem.
-        vm_writer.ssh("ping -c1 -w1 192.168.42.2", background=True, check=False)
+        with tcpdump(defer, "tcpdump.pcap", vm_reader, ifaceR, "vlan 42 and arp", count=1):
+            # send some packets on VLAN 42 (ARP packets will be send)
+            vm_writer.ssh("ping -c1 -w1 192.168.42.2", check=False)
 
-        # check packets are seen on vm_reader
-        # fail if /tmp/out is not empty
-        vm_reader.ssh(
-            f"tcpdump -i {ifaceR} -w /tmp/out -c1 -n 'vlan 42 and arp' &"
-            "pid=$! ; sleep 5 ; kill $pid ;"
-            "test ! -s /tmp/out"
-        )
+        # check packets are *NOT* seen on vm_reader (trunks=52)
+        vm_reader.ssh("test $(tcpdump -n -r tcpdump.pcap | wc -l) -eq 0")
