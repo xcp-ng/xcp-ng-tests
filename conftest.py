@@ -15,6 +15,7 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
+from lib.commands import SSHCommandFailed
 from lib.common import (
     Defer,
     DiskDevName,
@@ -33,6 +34,7 @@ from lib.host import Host
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
+from lib.tracing import Tracing
 from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vm import VM, vm_cache_key_from_def
@@ -136,6 +138,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Block size to align span positions to when writing in volumes."
              " Accepts sizes like '512', '4KiB', '1MiB'. A value of 1 is equivalent to no alignment."
     )
+    parser.addoption(
+        "--tracing-endpoint",
+        action="store",
+        default=None,
+        help="Specify distributed tracing observer endpoint."
+        "Example: http://<jaeger-ip>:9411/api/v2/spans"
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -151,6 +160,9 @@ def pytest_configure(config: pytest.Config) -> None:
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
+    tracing_endpoint = config.getoption('--tracing-endpoint')
+    assert tracing_endpoint is not None
+    global_config.tracing_endpoint = tracing_endpoint
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
@@ -853,6 +865,41 @@ def cifs_iso_sr(host: Host, cifs_iso_device_config: dict[str, Any]) -> Generator
     yield sr
     # teardown
     sr.forget()
+
+# TODO unsure about the fixture scope
+@pytest.fixture(scope='function')
+def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None, None]:
+    """ Doesn't care if there are other observers enabled in the pool. """
+    enabled = False
+    observer_name = prefix_object_name("xcp-ng-tests").replace(' ', '_')
+    observer_uuid = host.xe('observer-create', {'name-label': observer_name})
+
+    endpoint = pytestconfig.getoption('--tracing-endpoint')
+    if endpoint is not None:
+        logging.info(f"Setting up tracing with endpoint {endpoint}")
+        try:
+            # can fail if an endpoint is invalid or unreachable
+            host.xe('observer-param-set', {'uuid': observer_uuid,
+                    'endpoints': endpoint, 'components': 'xapi,xenopsd,smapi'})
+            for host_uuid in host.pool.hosts_uuids():
+                host_i = host.pool.get_host_by_uuid(host_uuid)
+                # TODO what happens if http was already enabled in xapi.conf and we also add it in observer.conf?
+                # TODO make a backup of modified conf files to restore them in teardown
+                host_i.ssh(
+                    'printf "observer-experimental-components=\"\"\nobserver-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
+                host_i.restart_toolstack(verify=True)
+            host.xe('observer-param-set', {'uuid': observer_uuid, 'enabled': 'true'})
+            enabled = True
+        except SSHCommandFailed as e:
+            logging.error(f"Failed to provide tracing endpoint {endpoint} with error {e}")
+
+    tracing = Tracing(enabled, endpoint)
+    yield tracing
+    # teardown
+    logging.info(f"Tearing down tracing with observer {observer_uuid}")
+    host.xe('observer-destroy', {'uuid': observer_uuid})
+    if enabled:
+        # TODO restore previous conf files and restart the toolstack
 
 @pytest.fixture()
 def defer(request: pytest.FixtureRequest) -> Defer:
