@@ -96,7 +96,7 @@ def wait_for_install_failure_or(ip: str, cmd: Callable[[], bool], msg: str | Non
         if failed:
             raise InstallationFailed(failed)
         return cmd()
-    return wait_for(inner, msg, timeout_secs=timeout_secs)
+    wait_for(inner, msg, timeout_secs=timeout_secs)
 
 def monitor_install(*, ip: str) -> None:
     # wait for "yum install" phase to finish

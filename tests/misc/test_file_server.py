@@ -3,14 +3,23 @@ import pytest
 import re
 
 import lib.commands as commands
+from lib.common import wait_for
 from lib.host import Host
 from lib.netutil import wrap_ip
+
+from typing import Generator
 
 # These tests are meant to test an host fileserver behavior.
 #
 # Requirements:
 # - an XCP-ng host >= 8.2 with latest updates (and >= 8.3 for the HSTS test).
 #   The host must be configured with `website-https-only` set to true (which is the default config).
+
+@pytest.fixture(scope='function')
+def host_with_hsts(host: Host) -> Generator[Host, None, None]:
+    host.enable_hsts_header()
+    yield host
+    host.disable_hsts_header()
 
 def _header_equal(header: str, name: str, value: str) -> bool:
     regex = fr"{name}:\s?{re.escape(value)}"
@@ -31,10 +40,15 @@ class TestHSTS:
 
     @staticmethod
     def __get_header(host: Host) -> list[str]:
-        res = commands.local_cmd(
-            ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
-        )
-        return res.stdout.splitlines()
+        def get_or_none():
+            res = commands.local_cmd(["curl", "-s", "-XGET", "-k", "-I", "https://"
+                                      + wrap_ip(host.hostname_or_ip)], check=False)
+            if res.returncode != 0:
+                return None
+            return res.stdout.splitlines()
+        headers = wait_for(get_or_none)
+        assert headers is not None
+        return headers
 
     def test_fileserver_hsts_default(self, host: Host) -> None:
         # By default HSTS header should not be set
