@@ -162,8 +162,7 @@ def pool_with_linstor(
 def linstor_redundancy(pool_with_linstor: Pool) -> int:
     return min(len(pool_with_linstor.hosts), LINSTOR_REDUNDANCY)
 
-@pytest.fixture(scope='package')
-def linstor_sr(
+def _linstor_sr(
     pool_with_linstor: Pool,
     linstor_redundancy: int,
     provisioning_type: str,
@@ -182,6 +181,9 @@ def linstor_sr(
     except Exception as e:
         _linstor_config.uninstall_linstor = False
         raise pytest.fail("Could not destroy linstor SR, leaving packages in place for manual cleanup") from e
+
+linstor_sr = pytest.fixture(_linstor_sr, scope='package')
+linstor_sr_ephemeral = pytest.fixture(_linstor_sr, scope='function')
 
 @pytest.fixture(scope='module')
 def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI, None, None]:
