@@ -7,6 +7,8 @@ import logging
 import shlex
 import time
 
+from pydantic import BaseModel, Field, TypeAdapter
+
 from lib.commands import SSHCommandFailed
 from lib.common import safe_split, vm_image, wait_for
 from lib.host import Host
@@ -25,21 +27,35 @@ from typing import Generator, Tuple
 # - access to XCP-ng RPM repository from the host
 
 
-def get_drbd_status(host: Host, resource: str):
+class DrbdPeerDevice(BaseModel):
+    out_of_sync: int = Field(default=0, alias="out-of-sync")
+    peer_disk_state: str = Field(default="", alias="peer-disk-state")
+
+class DrbdConnection(BaseModel):
+    name: str = ""
+    peer_devices: list[DrbdPeerDevice] = Field(default=[], alias="peer-devices")
+
+class DrbdResource(BaseModel):
+    name: str = ""
+    connections: list[DrbdConnection] = Field(default=[])
+
+_drbd_status_adapter = TypeAdapter(list[DrbdResource])
+
+def get_drbd_status(host: Host, resource: str) -> list[DrbdResource]:
     logging.debug("[%s] Fetching DRBD status for resource `%s`...", host, resource)
-    return json.loads(host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"])))
+    return _drbd_status_adapter.validate_json(host.ssh(shlex.join(["drbdsetup", "status", resource, "--json"])))
 
 def get_corrupted_resources(host: Host, resource: str) -> list[tuple[str, str, int]]:
     return [
         (
-            res.get("name", ""),
-            conn.get("name", ""),
-            peer.get("out-of-sync", 0),
+            res.name,
+            conn.name,
+            peer.out_of_sync,
         )
         for res in get_drbd_status(host, resource)
-        for conn in res.get("connections", [])
-        for peer in conn.get("peer_devices", [])
-        if peer.get("out-of-sync", 0) > 0
+        for conn in res.connections
+        for peer in conn.peer_devices
+        if peer.out_of_sync > 0
     ]
 
 def wait_drbd_sync(host: Host, resource: str) -> None:
@@ -143,11 +159,11 @@ class TestLinstorSR:
 
         try:
             other_host = next(
-                next(h for h in host.pool.hosts if h.hostname() == conn.get("name", ""))
+                next(h for h in host.pool.hosts if h.hostname() == conn.name)
                 for res in get_drbd_status(host, resource_name)
-                for conn in res.get("connections", [])
-                for peer in conn.get("peer_devices", [])
-                if peer.get("peer-disk-state", "") == "UpToDate"
+                for conn in res.connections
+                for peer in conn.peer_devices
+                if peer.peer_disk_state == "UpToDate"
             )
             logging.info("Elected `%s` as peer for verification and repair", other_host)
         except StopIteration:
