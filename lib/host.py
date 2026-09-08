@@ -152,33 +152,44 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
+    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
             -> str | commands.SSHResult[str]:
         maybe_param_minimal = '--minimal' if minimal else ''
         maybe_param_force = '--force' if force else ''
 
-        def stringify(key: str, value: str | bool | dict[str, str]) -> str:
+        def stringify(key: str, value: str | bool | dict[str, str], vars: bool) -> str:
             if isinstance(value, bool):
                 return "{}={}".format(key, to_xapi_bool(value))
             if isinstance(value, dict):
                 ret = ""
-                for key2, value2 in value.items():
-                    ret += f'{key}:{key2}={shlex.quote(value2)} '
+                if vars:
+                    for key2, value2 in value.items():
+                        ret += f'{key}:{key2}={shlex.quote(value2)} '
+                else:
+                    # key: 'BAGGAGE'
+                    # value: {'foo': 'bar', 'baz': 'foo'}
+                    # return: shell escaped version of sub-string in BAGGAGE="foo=bar;baz=foo"
+                    value_str = ';'.join(f'{key2}={value2}' for key2, value2 in value.items())
+                    ret += f'{key}={shlex.quote(value_str)}'
                 return ret.rstrip()
+            # key: 'BAGGAGE'
+            # value: 'foo=bar'
+            # return: shell escaped version of sub-string in BAGGAGE="foo=bar"
             return f'{key}={shlex.quote(value)}'
 
-        command: str = f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
-            ' '.join(stringify(key, value) for key, value in args.items())
+        command: str = ' '.join(stringify(key, value, vars=True) for key, value in vars.items()) + \
+            f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
+            ' '.join(stringify(key, value, vars=False) for key, value in args.items())
         if simple_output:
             return self.ssh(command, check=check, simple_output=True)
         else:
