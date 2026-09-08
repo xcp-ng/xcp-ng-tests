@@ -6,6 +6,7 @@ import time
 import lib.commands as commands
 from lib.common import (
     GiB,
+    XeParams,
     _param_add,
     _param_clear,
     _param_get,
@@ -88,7 +89,7 @@ class SR:
             return False
 
     def vdi_uuids(self, managed: bool = False, name_label: str | None = None) -> list[str]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'sr-uuid': self.uuid,
             'managed': managed
         }
@@ -230,7 +231,7 @@ class SR:
     ) -> VDI:
         name_label = name_label or f'test-vdi-{randid()}'
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'name-label': prefix_object_name(name_label),
             'virtual-size': str(virtual_size),
             'sr-uuid': self.uuid,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -73,7 +73,7 @@ class VIF:
         address: str | None = None,
         gateway: str | None = None,
     ) -> None:
-        args: dict[str, str | bool | dict[str, str]] = {"uuid": self.uuid, "mode": mode}
+        args: XeParams = {"uuid": self.uuid, "mode": mode}
         if address is not None:
             args["address"] = address
         if gateway is not None:
