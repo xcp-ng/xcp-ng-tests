@@ -137,6 +137,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Block size to align span positions to when writing in volumes."
              " Accepts sizes like '512', '4KiB', '1MiB'. A value of 1 is equivalent to no alignment."
     )
+    parser.addoption(
+        "--no-fail-if-no-tests",
+        action="store_true",
+        default=False,
+        help="Do not fail when no test is selected (exit code 0 instead of 5)"
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -283,6 +289,11 @@ def pytest_runtest_makereport(
     return rep
 
 # END make test results visible from fixtures
+
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED \
+            and session.config.getoption("--no-fail-if-no-tests"):
+        session.exitstatus = pytest.ExitCode.OK
 
 
 # fixtures
