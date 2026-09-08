@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from textwrap import dedent
 
+from lib.common import join_names
 from lib.host import Host
 from lib.pool import NotAMasterHostError, Pool
 from lib.tools.inventory import HostConfig, Inventory
@@ -198,6 +199,17 @@ def update_pools(inventory: Inventory, reboot: bool = True, parallel: bool = Fal
             logger.warning(f"[{host}] Skipping: not a master host")
 
     before_packages = _capture_packages(pools)
+
+    masters = [p.master for p in pools]
+    secondaries = [h for p in pools for h in p.hosts[1:]]
+    if parallel:
+        logger.info(f"Updating {join_names([str(h) for h in masters + secondaries])}.")
+    else:
+        logger.info(f"Updating masters {join_names([str(h) for h in masters])}.")
+        if secondaries:
+            logger.info(
+                f"Secondary {join_names([str(h) for h in secondaries])} will be updated in a second time."
+            )
 
     # update master hosts
     with ThreadPoolExecutor() as executor:
