@@ -286,6 +286,11 @@ wheels = [
 ]
 
 [[package]]
+name = "flake8-plugins"
+version = "0.1.0"
+source = { editable = "flake8_plugins" }
+
+[[package]]
 name = "flake8-pyproject"
 version = "1.2.4"
 source = { registry = "https://pypi.org/simple" }
@@ -965,6 +970,7 @@ dev = [
     { name = "autopep8" },
     { name = "bs4" },
     { name = "flake8" },
+    { name = "flake8-plugins" },
     { name = "flake8-pyproject" },
     { name = "icecream" },
     { name = "libarchive-c" },
@@ -997,6 +1003,7 @@ dev = [
     { name = "autopep8" },
     { name = "bs4", specifier = ">=0.0.1" },
     { name = "flake8" },
+    { name = "flake8-plugins", editable = "flake8_plugins" },
     { name = "flake8-pyproject" },
     { name = "icecream" },
     { name = "libarchive-c", specifier = "==5.3" },

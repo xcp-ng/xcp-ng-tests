@@ -17,3 +17,7 @@ jobs:
       - name: Create a dummy data.py
         run: cp data.py-dist data.py
       - run: pytest tests/unit/
+      # the flake8 plugins unit tests require the dev dependencies (the
+      # editable flake8-plugins package), so they are run in a separate step
+      - uses: ./.github/actions/uv-setup/
+      - run: pytest flake8_plugins/
