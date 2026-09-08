@@ -12,12 +12,15 @@ class Tracing:
         self.endpoint: str | None = endpoint # not None if enabled is true
         # an observer uuid could be passed by the tracing fixture if needed by some tests, but no need for now
 
-    def locate_span(self, operation, tag) -> Any:
-        url = urlparse(self.endpoint)
-        api = f"{url.scheme}://{url.netloc}/api/v2/traces"
+    def locate_span(self, operation, tag, tag_value) -> Any:
+        # url = urlparse(self.endpoint)
+        # api = f"{url.scheme}://{url.netloc}/api/v2/traces"
+        if not self.enabled or not self.endpoint:
+            return None
+
         retries = 15
         for _ in range(retries):
-            response = requests.get(api, params={"spanName": operation})
+            response = requests.get(self.endpoint, params={"spanName": operation})
             data = response.json()
             if not data:
                 return None
@@ -25,7 +28,7 @@ class Tracing:
             for spans in data:
                 for span in spans:
                     if span.get('name') == operation:
-                        if span.get('tags', {}).get('test.tag') == tag:
+                        if span.get('tags', {}).get(tag) == tag_value:
                             return span
             time.sleep(5)
         return None
