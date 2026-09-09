@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 
 from lib import config
@@ -500,3 +501,25 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
     for span in spans:
         if span.checksum is not None:
             span.validate(vm, dev)
+
+
+def vdi_on_boot_reset(vm: VM, defer: Defer) -> None:
+    """
+    Apply the `on-boot: reset` parameter on the first VDI of the VM, and check
+    whether the VDI contents are actually reset when starting up the VM.
+    """
+    vdi = vm.vdis[0]
+    vdi.param_set("on-boot", "reset")
+    defer(lambda: vdi.param_set("on-boot", "persist"))
+
+    vm.start()
+    vm.wait_for_os_booted()
+
+    tmp_file = f"/dummy-{int(time.time())}.tmp"
+    vm.ssh_touch_file(tmp_file)
+    assert vm.file_exists(tmp_file)
+
+    vm.reboot(verify=True)
+    assert not vm.file_exists(tmp_file)
+
+    vm.shutdown()
