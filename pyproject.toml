@@ -24,6 +24,7 @@ dev = [
     "autopep8",
     "bs4>=0.0.1",
     "flake8",
+    "flake8-plugins",
     "flake8-pyproject",
     "icecream",
     "libarchive-c==5.3",
@@ -154,6 +155,9 @@ exclude=".git,.venv,data.py,vm_data.py"
 # We force them back to the upstream value, so we can just download the expected python version
 python-downloads = "automatic"
 python-preference = "managed"
+
+[tool.uv.sources]
+flake8-plugins = { path = "flake8_plugins", editable = true }
 
 [tool.pytest-language-server]
 # pytest-language-server shows some internal variables, like host, as undeclared fixture.
