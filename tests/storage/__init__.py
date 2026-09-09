@@ -13,4 +13,5 @@ from .storage import (
     vdi_export_import,
     vdi_is_open,
     xva_export_import,
+    test_vdi_reset_on_boot_reset,
 )
