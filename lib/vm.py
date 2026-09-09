@@ -15,6 +15,7 @@ from lib.basevm import BaseVM
 from lib.common import (
     KiB,
     PackageManagerEnum,
+    XeParams,
     expand_scope_relative_nodeid,
     parse_xe_dict,
     safe_split,
@@ -62,7 +63,7 @@ class VM(BaseVM):
     def start(self, on: str | None = None) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
-        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid}
+        args: XeParams = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
         return self.host.xe('vm-start', args)
@@ -258,7 +259,7 @@ class VM(BaseVM):
 
     def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None) -> None:
         msg = "Migrate VM to host %s" % target_host
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'uuid': self.uuid,
             'host-uuid': target_host.uuid,
             'live': self.is_running()
@@ -310,7 +311,7 @@ class VM(BaseVM):
         logging.info("Snapshot VM")
 
         name_label = name or f"Snapshot of {self.uuid}"
-        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid, 'new-name-label': name_label}
+        args: XeParams = {'uuid': self.uuid, 'new-name-label': name_label}
         if ignore_vdis:
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         snap_uuid = self.host.xe('vm-snapshot', args)
@@ -582,7 +583,7 @@ class VM(BaseVM):
             snapshot.destroy(verify=True)
 
     def get_messages(self, name: str) -> List[str]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'obj-uuid': self.uuid,
             'name': name,
             'params': 'uuid',

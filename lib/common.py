@@ -78,6 +78,7 @@ T = TypeVar("T")
 HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
 Defer: TypeAlias = Callable[[Callable[[], object]], None]
+XeParams: TypeAlias = dict[str, str | bool | dict[str, str]]
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
@@ -380,7 +381,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str 
                accept_unknown_key: bool = False) -> str | None:
     """ Common implementation for param_get. """
     import lib.commands as commands
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
     try:
@@ -395,7 +396,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str 
 def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str | bool | dict[str, str],
                key: str | None = None) -> None:
     """ Common implementation for param_set. """
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid}
+    args: XeParams = {'uuid': uuid}
 
     if key is not None:
         param_name = '{}:{}'.format(param_name, key)
@@ -407,7 +408,7 @@ def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: st
 def _param_add(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str, key: str | None = None) -> None:
     """ Common implementation for param_add. """
     param_key = f'{key}={value}' if key is not None else value
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
 
     host.xe(f'{xe_prefix}-param-add', args)
 
@@ -415,7 +416,7 @@ def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: s
                   accept_unknown_key: bool = False) -> None:
     """ Common implementation for param_remove. """
     import lib.commands as commands
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
     try:
         host.xe(f'{xe_prefix}-param-remove', args)
     except commands.SSHCommandFailed as e:
@@ -424,7 +425,7 @@ def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: s
 
 def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None:
     """ Common implementation for param_clear. """
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)
 
 def hash_password(password: str) -> str:

@@ -14,6 +14,7 @@ from packaging import version
 import lib.commands as commands
 from lib.bond import Bond
 from lib.common import (
+    XeParams,
     _param_add,
     _param_clear,
     _param_get,
@@ -155,16 +156,16 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = {}, *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = {}, *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
+    def xe(self, action: str, args: XeParams = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
             -> str | commands.SSHResult[str]:
         maybe_param_minimal = ' --minimal' if minimal else ''
@@ -412,7 +413,7 @@ class Host:
             if vm:
                 return vm
 
-        params: dict[str, str | bool | dict[str, str]] = {}
+        params: XeParams = {}
         msg = f"[{self}] Import VM {uri}"
         if '://' in uri:
             params['url'] = uri
@@ -449,7 +450,7 @@ class Host:
 
         download_path = None
         try:
-            params: dict[str, str | bool | dict[str, str]] = {'uuid': vdi_uuid}
+            params: XeParams = {'uuid': vdi_uuid}
             if '://' in uri:
                 logging.info(f"[{self}] Download ISO {uri}")
                 download_path = f'/tmp/{vdi_uuid}'
@@ -467,7 +468,7 @@ class Host:
         return VDI(vdi_uuid, sr=sr)
 
     def vm_from_template(self, name: str, template: str) -> VM:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             "new-name-label": prefix_object_name(name),
             "template": template,
             "sr-uuid": self.main_sr_uuid(),
@@ -892,7 +893,7 @@ class Host:
 
     def sr_create(self, sr_type: str, label: str, device_config: dict[str, str], shared: bool = False,
                   verify: bool = False) -> SR:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': prefix_object_name(label),
@@ -959,7 +960,7 @@ class Host:
 
     def call_plugin(self, plugin_name: str, function: str,
                     args: dict[str, str] | None = None) -> str:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'host-uuid': self.uuid,
             'plugin': plugin_name,
             'fn': function
@@ -1042,7 +1043,7 @@ class Host:
         return ret
 
     def pifs(self, device: str | None = None) -> list[PIF]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             "host-uuid": self.uuid,
         }
 
@@ -1052,7 +1053,7 @@ class Host:
         return [PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
 
     def create_bond(self, network: Network, pifs: list[PIF], mode: str | None = None) -> Bond:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'network-uuid': network.uuid,
             'pif-uuids': ','.join([pif.uuid for pif in pifs]),
         }
@@ -1066,7 +1067,7 @@ class Host:
         return Bond(self, uuid)
 
     def create_network(self, label: str, description: str | None = None) -> Network:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'name-label': label,
         }
 
