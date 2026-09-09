@@ -20,6 +20,7 @@ from tests.storage import (
     full_vdi_write,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -162,5 +163,9 @@ class TestZFSSR:
         finally:
             if not zpool_imported:
                 host.ssh(f'zpool import {POOL_NAME}')
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_zfs_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_zfs_sr, defer)
 
     # *** End of tests with reboots

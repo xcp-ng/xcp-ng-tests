@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import pytest
 
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
-from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
+from tests.storage import (
+    try_to_create_sr_with_missing_device,
+    vdi_is_open,
+    vdi_on_boot_reset,
+)
 
 # Requirements:
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
@@ -58,5 +62,9 @@ class TestLARGEBLOCKSR:
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_largeblock_sr, defer)
 
     # *** End of tests with reboots

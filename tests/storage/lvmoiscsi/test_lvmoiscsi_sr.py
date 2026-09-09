@@ -17,6 +17,7 @@ from tests.storage import (
     full_vdi_write,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -99,5 +100,9 @@ class TestLVMOISCSISR:
         vm.start(on=host.uuid)
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_lvmoiscsi_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_lvmoiscsi_sr, defer)
 
     # *** End of tests with reboots

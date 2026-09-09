@@ -20,6 +20,7 @@ from tests.storage import (
     full_vdi_write,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -131,5 +132,9 @@ class TestXFSSR:
         finally:
             if not xfsprogs_installed:
                 host.yum_install(['xfsprogs'])
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_xfs_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_xfs_sr, defer)
 
     # *** End of tests with reboots

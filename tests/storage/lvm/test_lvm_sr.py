@@ -21,6 +21,7 @@ from tests.storage import (
     try_to_create_sr_with_missing_device,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -163,5 +164,9 @@ class TestLVMSR:
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_lvm_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_lvm_sr, defer)
 
     # *** End of tests with reboots

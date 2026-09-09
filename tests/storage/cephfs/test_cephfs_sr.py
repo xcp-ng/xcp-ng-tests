@@ -4,18 +4,19 @@ import logging
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import vdi_is_open
+from tests.storage import vdi_is_open, vdi_on_boot_reset
 
 # Requirements:
 # - one XCP-ng host >= 8.2
 # - remote cephfs mountpoint
 # - access to XCP-ng RPM repository from the host
+
 
 @pytest.mark.usefixtures("cephfs_sr")
 class TestCephFSSR:
@@ -83,5 +84,9 @@ class TestCephFSSR:
         finally:
             if not ceph_installed:
                 host.yum_install(['ceph-common'])
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_cephfs_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_cephfs_sr, defer)
 
     # *** End of tests with reboots

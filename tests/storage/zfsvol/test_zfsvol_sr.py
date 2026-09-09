@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations  # ruff: ignore[unsorted-imports]
 
 import pytest
 
@@ -20,6 +20,7 @@ from tests.storage import (
     full_vdi_write,
     vdi_export_import,
     xva_export_import,
+    vdi_on_boot_reset,
 )
 
 # Requirements:
@@ -114,5 +115,9 @@ class TestZfsvolVm:
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_zfsvol_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_zfsvol_sr, defer)
 
     # *** End of tests with reboots
