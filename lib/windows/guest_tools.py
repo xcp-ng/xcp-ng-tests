@@ -45,7 +45,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
     vm.eject_cd()
 
     logging.info("Install Windows PV drivers")
-    msiexec_args = f"/i {GUEST_TOOLS_COPY_PATH} /log C:\\tools_install.log /passive /norestart"
+    msiexec_args = f"/i {GUEST_TOOLS_COPY_PATH} /l*vx C:\\tools_install.log /passive /norestart"
 
     if action == PowerAction.Nothing:
         exitcode = vm.run_powershell_command("msiexec.exe", msiexec_args)
@@ -71,7 +71,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
 
 
 def uninstall_guest_tools(vm: VM, action: PowerAction) -> None:
-    msiexec_args = f"/x {GUEST_TOOLS_COPY_PATH} /log C:\\tools_uninstall.log /passive /norestart"
+    msiexec_args = f"/x {GUEST_TOOLS_COPY_PATH} /l*vx C:\\tools_uninstall.log /passive /norestart"
     uninstall_cmd = f"Start-Process -Wait msiexec.exe -ArgumentList '{msiexec_args}';"
     if action != PowerAction.Nothing:
         uninstall_cmd += WINDOWS_SHUTDOWN_COMMAND
