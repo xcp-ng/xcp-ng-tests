@@ -30,13 +30,14 @@ def host_no_sdn_controller(host: Host) -> Generator[Host, None, None]:
 
     # when using sdn-controller, we are usually using OpenFlow11 only
     # but allow-id is using OpenFlow10 and it fails to sets rules if OpenFlow11 is enabled only.
+    # use --if-exists as list-br output contains also fake-bridge
     host.ssh("set -o pipefail; ovs-vsctl list-br "
-             "| xargs -n1 -d '\n' -r -I{} ovs-vsctl add bridge {} protocols OpenFlow10")
+             "| xargs -n1 -d '\n' -r -I{} ovs-vsctl --if-exists add bridge {} protocols OpenFlow10")
 
     yield host
 
     host.ssh("set -o pipefail; ovs-vsctl list-br "
-             "| xargs -n1 -d '\n' -r -I{} ovs-vsctl remove bridge {} protocols OpenFlow10")
+             "| xargs -n1 -d '\n' -r -I{} ovs-vsctl --if-exists remove bridge {} protocols OpenFlow10")
 
     for cfg in sdn_configured:
         logging.info("Re-introducing sdn-controller")
