@@ -34,7 +34,7 @@ if ($DriverPath) {
 elseif ($MsiPath) {
     $resolvedMsiPath = (Resolve-Path $MsiPath).Path
     Write-Output "Attempting install $resolvedMsiPath"
-    $msiexecProcess = Start-Process -Wait -PassThru msiexec.exe -ArgumentList "/i", "$resolvedMsiPath", "/l*", "C:\other-install.log", "/passive", "/norestart"
+    $msiexecProcess = Start-Process -Wait -PassThru msiexec.exe -ArgumentList "/i", "$resolvedMsiPath", "/l*vx", "C:\other-install.log", "/passive", "/norestart"
     if ($msiexecProcess.ExitCode -ne 0 -and $msiexecProcess.ExitCode -ne 1641 -and $msiexecProcess.ExitCode -ne 3010) {
         throw "msiexec.exe $($msiexecProcess.ExitCode)"
     }
