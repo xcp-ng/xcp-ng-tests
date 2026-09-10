@@ -64,3 +64,4 @@ def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, An
         # TODO: XCPNG-3038
         time.sleep(30)
         wait_for_vm_running_and_ssh_up_without_tools(vm)
+        assert vm.are_windows_tools_working()
