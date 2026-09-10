@@ -23,6 +23,7 @@ R = TypeVar("R")
 
 ImageFormat = Literal['qcow2', 'raw', 'vhd']
 
+
 class VDI:
     xe_prefix = "vdi"
     sr: SR
@@ -52,6 +53,10 @@ class VDI:
     def destroy(self) -> None:
         logging.info("Destroy %s", self)
         self.sr.pool.master.xe('vdi-destroy', {'uuid': self.uuid})
+
+    def data_destroy(self) -> None:
+        logging.info("Data-destroy %s", self)
+        self.sr.pool.master.xe('vdi-data-destroy', {'uuid': self.uuid})
 
     def clone(self) -> VDI:
         uuid = self.sr.pool.master.xe('vdi-clone', {'uuid': self.uuid})
@@ -124,3 +129,25 @@ class VDI:
         wait_for(lambda: self.get_parent() != previous_parent, msg="Waiting for coalesce", timeout_secs=10 * 60)
         logging.info("Coalesce done")
         return ret
+
+    def enable_cbt(self) -> None:
+        logging.info(f"Enabling CBT on VDI {self.uuid}")
+        self.sr.pool.master.xe('vdi-enable-cbt', {'uuid': self.uuid})
+
+    def disable_cbt(self) -> None:
+        logging.info(f"Disabling CBT on VDI {self.uuid}")
+        self.sr.pool.master.xe('vdi-disable-cbt', {'uuid': self.uuid})
+
+    def get_cbt_enabled(self) -> str:
+        return self.param_get('cbt-enabled')
+
+    def is_cbt_enabled(self) -> bool:
+        return self.get_cbt_enabled() == 'true'
+
+    def list_changed_blocks(self, vdi_to: 'VDI') -> str:
+
+        logging.info(f"Listing changed blocks from VDI {self.uuid} to {vdi_to.uuid}")
+        return self.sr.pool.master.xe('vdi-list-changed-blocks', {
+            'vdi-from-uuid': self.uuid,
+            'vdi-to-uuid': vdi_to.uuid
+        })
