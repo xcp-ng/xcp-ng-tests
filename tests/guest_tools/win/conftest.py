@@ -17,7 +17,7 @@ from lib.windows import (
     vm_shutdown_without_tools,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
-from lib.windows.guest_tools import install_guest_tools
+from lib.windows.guest_tools import check_vm_driver_versions, install_guest_tools
 from lib.windows.other_tools import install_other_drivers
 
 from typing import Any, Dict, Generator, Tuple
@@ -66,7 +66,7 @@ def vm_install_test_tools_per_test_class(
     vm.start()
     wait_for_vm_running_and_ssh_up_without_tools(vm)
     install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
-    assert vm.are_windows_tools_working()
+    check_vm_driver_versions(vm, guest_tools_iso)
     yield vm
     snapshot.revert()
 

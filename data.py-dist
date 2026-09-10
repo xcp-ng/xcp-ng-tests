@@ -71,6 +71,19 @@ WIN_GUEST_TOOLS_ISOS = {
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
         # What's the onboard family of our tools? This is equal to the WinPV VENDOR_NAME value
         "onboard_family": "XCP-ng",
+        # What are the expected driver version reporting via PV-drivers-version?
+        "expected_versions": {
+            "major": "9",
+            "minor": "1",
+            "micro": "2",
+            "build": "3",
+            "xenbus": "XCP_ng 9.1.2.3",
+            "xencons": "XCP_ng 9.1.2.3",
+            "xeniface": "XCP_ng 9.1.2.3",
+            "xennet": "XCP_ng 9.1.2.3",
+            "xenvbd": "XCP_ng 9.1.2.3",
+            "xenvif": "XCP_ng 9.1.2.3",
+        },
     },
     # Add more guest tool ISOs here as needed
 }

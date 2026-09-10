@@ -82,3 +82,15 @@ def uninstall_guest_tools(vm: VM, action: PowerAction) -> None:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
         wait_for_vm_xenvif_offboard(vm)
+
+
+def check_vm_driver_versions(vm: VM, guest_tools_iso: Dict[str, Any]) -> None:
+    assert vm.are_windows_tools_working()
+    expected_versions = guest_tools_iso.get("expected_versions")
+    if not expected_versions:
+        return
+
+    logging.info("Check driver versions")
+    for key, expected in expected_versions.items():
+        actual = vm.param_get("PV-drivers-version", key).strip()
+        assert expected == actual
