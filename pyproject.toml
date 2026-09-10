@@ -17,6 +17,7 @@ dependencies = [
     "pytest-dependency",
     "requests",
     "ipdb",
+    "rpm-version>=0.5.1",
 ]
 
 [dependency-groups]
