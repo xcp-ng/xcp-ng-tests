@@ -140,8 +140,11 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
             answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
                                        type="url", CONTENTS="file:///root/postinstall.sh"))
             if unsigned:
+                # *gpgcheck is 8.3+ syntax, netinstall-gpg-check is 8.2 syntax;
+                # installers ignore attributes they don't know
                 answerfile.top_setattr({'gpgcheck': "false",
                                         'repo-gpgcheck': "false",
+                                        'netinstall-gpg-check': "false",
                                         })
             answerfile.write_xml(answerfile_xml)
         else:
