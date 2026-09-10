@@ -32,11 +32,18 @@ def install_other_drivers(vm: VM, other_tools_iso_name: str, param: Dict[str, An
                 logging.warning("CD drive not detected, retrying")
                 insert_cd_safe(vm, other_tools_iso_name)
 
-        package_path = PureWindowsPath("D:\\") / param["path"] / param["package"]
+        root_path = PureWindowsPath("D:\\") / param["path"]
+        package_path = root_path / param["package"]
         install_cmd = "D:\\install-drivers.ps1 "
         if driver_type == "msi":
             logging.info(f"Install MSI drivers: {package_path}")
             install_cmd += f"-MsiPath '{package_path}' "
+
+            patches = param.get("patches", [])
+            if patches:
+                logging.info("Install MSP patches")
+                patch_paths = [f"'{root_path / patch}'" for patch in patches]
+                install_cmd += f"-Patches {','.join(patch_paths)}"
         elif driver_type == "inf":
             logging.info(f"Install drivers: {package_path}")
             install_cmd += f"-DriverPath '{package_path}' "
