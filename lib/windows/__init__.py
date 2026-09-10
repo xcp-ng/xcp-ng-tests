@@ -4,15 +4,16 @@ import re
 import time
 from pathlib import PureWindowsPath
 
-from data import ISO_DOWNLOAD_URL, TEST_DNS_SERVER
+from lib import config
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
+from lib.config_loader import OtherGuestToolDef, WinGuestToolDef
 from lib.host import Host
 from lib.sr import SR
 from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Generator
+from typing import Generator, TypeVar
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -25,16 +26,16 @@ class PowerAction(enum.Enum):
     Reboot = "reboot"
 
 
-def iso_create(host: Host, sr: SR, param: dict[str, Any]) -> Generator[dict[str, Any], None, None]:
-    if param["download"]:
-        vdi = host.import_iso(ISO_DOWNLOAD_URL + param["name"], sr)
-        new_param = param.copy()
-        new_param["name"] = vdi.name()
-        yield new_param
+T = TypeVar("T", WinGuestToolDef, OtherGuestToolDef)
+
+
+def iso_create(host: Host, sr: SR, param: T) -> Generator[T, None, None]:
+    if param.download:
+        vdi = host.import_iso(config.guest_tools.download_url + param.name, sr)
+        yield param.model_copy(update={"name": vdi.name()})
         vdi.destroy()
     else:
         yield param
-
 
 def try_get_and_store_vm_ip_serial(vm: VM, timeout: int) -> bool:
     domid = vm.param_get("dom-id")
@@ -255,18 +256,18 @@ def wait_for_vm_xenvif_offboard(vm: VM) -> None:
 
 
 def set_vm_dns(vm: VM) -> None:
-    logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
+    logging.info(f"Set VM DNS to {config.dns_server}")
     vif = vm.vifs()[0]
-    assert TEST_DNS_SERVER not in vif_get_dns(vif)
-    vif_set_dns(vif, [TEST_DNS_SERVER])
+    assert config.dns_server not in vif_get_dns(vif)
+    vif_set_dns(vif, [config.dns_server])
 
 
 def check_vm_dns(vm: VM) -> None:
     # The restore task takes time to fire so wait for it
     vif = vm.vifs()[0]
     wait_for(
-        lambda: TEST_DNS_SERVER in vif_get_dns(vif),
-        f"Check VM DNS contains {TEST_DNS_SERVER}",
+        lambda: config.dns_server in vif_get_dns(vif),
+        f"Check VM DNS contains {config.dns_server}",
         timeout_secs=300,
         retry_delay_secs=30,
     )

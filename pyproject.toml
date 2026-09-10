@@ -17,6 +17,9 @@ dependencies = [
     "pytest-dependency",
     "requests",
     "ipdb",
+    "pygments",
+    "tomli-w",
+    "typing-extensions",
 ]
 
 [dependency-groups]
@@ -33,7 +36,6 @@ dev = [
     "pyright",
     "ruff",
     "types-passlib",
-    "typing-extensions",
     "zizmor",
 ]
 
@@ -41,6 +43,7 @@ dev = [
 typeCheckingMode = "standard"
 reportMissingParameterType = "error"
 reportUnknownParameterType = "error"
+exclude = ["data.py", ".venv"]
 
 [tool.ty.rules]
 unused-type-ignore-comment = "ignore"
