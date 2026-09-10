@@ -91,6 +91,8 @@ OTHER_GUEST_TOOLS = {
         "path": "xcp-ng-9.0.9000",
         # "path"-relative path of MSI or driver files to be installed
         "package": "package\\XenDrivers-x64.msi",
+        # For MSI, MSP patches if any (optional)
+        "patches": ["XenDrivers-patch.msp"],
         # Relative path of root cert file (optional)
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
         # Whether this guest tool version wants vendor device to be activated (optional, defaults to False)
