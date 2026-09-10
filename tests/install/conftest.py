@@ -273,61 +273,87 @@ sed -i "${{SED_COMMANDS[@]}}" \
         yield remastered_iso
 
 @pytest.fixture(scope='function')
-def vm_booted_with_installer(host: Host, create_vms: list[VM], remastered_iso: str) -> Generator[VM, None, None]:
+def iso_in_pool_isosr(host: Host, remastered_iso: str) -> Generator[str, None, None]:
+    """Make a remastered_iso available in host's pool's ISO SR"""
+    remote_iso = host.pool.push_iso(remastered_iso)
+    yield remote_iso
+    host.pool.remove_iso(remote_iso)
+
+@pytest.fixture(scope='function')
+def try_booting_vm_with_installer(host: Host, create_vms: list[VM], iso_in_pool_isosr: str
+                                  ) -> Generator[VM | None, None, None]:
+    """Provide a VM booted using remastered installer ISO.
+
+    The VM may fail to boot if the we encounter an early bug, in which
+    case `None` is returned.  Caller test is expected to assert when
+    this is the case, and this fixture's cleanup step will then kill
+    the VM.
+    """
     host_vm, = create_vms # one single VM
-    iso = remastered_iso
+    remote_iso = iso_in_pool_isosr
 
     vif = host_vm.vifs()[0]
     mac_address = vif.param_get('MAC')
     assert mac_address is not None
     logging.info("Host VM has MAC %s", mac_address)
 
-    remote_iso = None
+    host_vm.insert_cd(os.path.basename(remote_iso))
+
+    vm_running = False
     try:
-        remote_iso = host.pool.push_iso(iso)
-        host_vm.insert_cd(os.path.basename(remote_iso))
+        host_vm.start()
+        wait_for(host_vm.is_running, "Wait for host VM running")
+
+        # catch host-vm IP address
+        wait_for(lambda: pxe.arp_addresses_for(mac_address),
+                 "Wait for DHCP server to see Host VM in ARP tables",
+                 timeout_secs=10 * 60)
+        ips = pxe.arp_addresses_for(mac_address)
+        logging.info("Host VM has IPs %s", ips)
+        assert len(ips) == 1
+        host_vm.ip = ips[0]
+        ip = host_vm.ip
+        assert ip is not None
+
+        # host may not be up if ARP cache was filled
+        wait_for(lambda: local_cmd(["ping", "-c1", ip], check=False),
+                 "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
+        wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
+                 "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
+
+    except Exception as e:
+        logging.critical("incomplete vm startup: caught exception %s", e)
+    except KeyboardInterrupt:
+        logging.warning("incomplete vm startup: keyboard interrupt")
+    else:
+        # test can proceed
+        vm_running = True
+
+    if vm_running:
+        yield host_vm
 
         try:
-            host_vm.start()
-            wait_for(host_vm.is_running, "Wait for host VM running")
-
-            # catch host-vm IP address
-            wait_for(lambda: pxe.arp_addresses_for(mac_address),
-                     "Wait for DHCP server to see Host VM in ARP tables",
-                     timeout_secs=10 * 60)
-            ips = pxe.arp_addresses_for(mac_address)
-            logging.info("Host VM has IPs %s", ips)
-            assert len(ips) == 1
-            host_vm.ip = ips[0]
-            ip = host_vm.ip
-            assert ip is not None
-
-            # host may not be up if ARP cache was filled
-            wait_for(lambda: local_cmd(["ping", "-c1", ip], check=False),
-                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: local_cmd(["nc", "-zw5", ip, "22"], check=False),
-                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
-
-            yield host_vm
-
             logging.info("Shutting down Host VM")
             assert host_vm.ip is not None
             installer.poweroff(host_vm.ip)
             wait_for(host_vm.is_halted, "Wait for host VM halted")
+            # VM properly stopped
+            vm_running = False
 
         except Exception as e:
             logging.critical("caught exception %s", e)
-            host_vm.shutdown(force=True)
-            raise
         except KeyboardInterrupt:
             logging.warning("keyboard interrupt")
-            host_vm.shutdown(force=True)
-            raise
+    else:
+        # communicate that VM could not be booted as requested
+        yield None
 
-        host_vm.eject_cd()
-    finally:
-        if remote_iso:
-            host.pool.remove_iso(remote_iso)
+    if not vm_running:
+        # not able to start or shutdown the VM properly
+        logging.critical("Forcing VM shutdown")
+        host_vm.shutdown(force=True)
+
+    host_vm.eject_cd()
 
 @pytest.fixture(scope='function')
 def xcpng_chained(request: pytest.FixtureRequest) -> None:
