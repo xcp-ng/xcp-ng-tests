@@ -89,7 +89,7 @@ class VIF:
         self,
         mode: Literal["static"],
         address: str,
-        gateway: str | None = None,
+        gateway: str | None = ...,
     ) -> None:  #
         ...
 
@@ -97,8 +97,8 @@ class VIF:
     def configure_ipv4(
         self,
         mode: Literal["dhcp"] | Literal["none"],
-        address: None = None,
-        gateway: None = None,
+        address: None = ...,
+        gateway: None = ...,
     ) -> None:  #
         ...
 
@@ -115,7 +115,7 @@ class VIF:
         self,
         mode: Literal["static"],
         address: str,
-        gateway: str | None = None,
+        gateway: str | None = ...,
     ) -> None:  #
         ...
 
@@ -123,8 +123,8 @@ class VIF:
     def configure_ipv6(
         self,
         mode: Literal["autoconf"] | Literal["none"],
-        address: None = None,
-        gateway: None = None,
+        address: None = ...,
+        gateway: None = ...,
     ) -> None:  #
         ...
 

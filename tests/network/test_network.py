@@ -11,14 +11,14 @@ from lib.vm import VM
 
 class TestNetwork:
     @pytest.mark.no_vm
-    def test_empty_network(self, host: Host, empty_network: Network):
+    def test_empty_network(self, host: Host, empty_network: Network) -> None:
         assert empty_network.pif_uuids() == [], "PIF list must be empty"
         assert empty_network.vif_uuids() == [], "VIF list must be empty"
         assert empty_network.is_private(), "empty_network must be private"
         assert empty_network.MTU() == 1500, "expected MTU is 1500"
 
     @pytest.mark.small_vm
-    def test_private_network(self, host: Host, empty_network: Network, imported_vm: VM, defer: Defer):
+    def test_private_network(self, host: Host, empty_network: Network, imported_vm: VM, defer: Defer) -> None:
         network = empty_network
 
         vm1 = imported_vm.clone()

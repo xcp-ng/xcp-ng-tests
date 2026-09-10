@@ -1,5 +1,7 @@
 import os
 
+from lib.host import Host
+
 # Requirements:
 # From --hosts parameter:
 # - A XCP-ng >= 8.2 host
@@ -14,7 +16,7 @@ FIRSTBOOT_FILES = [
 
 FIRSTBOOT_DIR = '/var/lib/misc'
 
-def test_firstboot_ran(host):
+def test_firstboot_ran(host: Host) -> None:
     for name in FIRSTBOOT_FILES:
         filepath = os.path.join(FIRSTBOOT_DIR, name)
         assert host.file_exists(filepath)

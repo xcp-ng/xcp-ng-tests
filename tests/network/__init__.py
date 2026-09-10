@@ -24,7 +24,7 @@ def tcpdump(
     Run tcpdump on the vm with specific interface.
     tcpdump is running only in the returned context.
     """
-    def cleanup():
+    def cleanup() -> None:
         # if vm is gone, do not fail
         if vm.exists() and vm.is_running():
             vm.ssh(f"xargs kill < {pcapfile}.pid; rm -f -- {pcapfile}.pid")
