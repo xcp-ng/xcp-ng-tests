@@ -60,7 +60,7 @@ def vm_shutdown_without_tools(vm: VM) -> None:
 
 def wait_for_vm_running_and_ssh_up_without_tools(vm: VM) -> None:
     wait_for(vm.is_running, "Wait for VM running")
-    wait_for(vm.is_ssh_up, "Wait for SSH up")
+    wait_for(vm.is_ssh_up, "Wait for SSH up", timeout_secs=4 * 60)
 
 
 def enable_testsign(vm: VM, rootcert: PureWindowsPath | None) -> None:
