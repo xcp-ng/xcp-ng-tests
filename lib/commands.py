@@ -90,6 +90,7 @@ def _ssh(
     opts = list(options)
     opts += ['-o', 'BatchMode yes']
     opts += ['-o', 'PubkeyAcceptedKeyTypes +ssh-rsa']
+    opts += ['-o', 'ConnectTimeout 15']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
