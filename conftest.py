@@ -875,10 +875,13 @@ def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None,
     hosts_setup = False
 
     endpoint = pytestconfig.getoption('--tracing-endpoint')
-    if endpoint is not None:
-        logging.info(f"Setting up tracing with endpoint {endpoint}")
-        try:
-            # can fail if an endpoint is invalid
+    logging.info(f"Setting up tracing with endpoint {endpoint}")
+    if endpoint:
+        # a http endpoint can be valid even if currently unreachable, check that it is reachable
+        # this step assumes only one endpoint was provided, as mentioned in the option's help message
+        if 'http' in endpoint and host.ssh_with_result(f'curl -f -I {endpoint} --connect-timeout 10').returncode != 22:
+            logging.error(f'Tracing endpoint {endpoint} unreachable')
+        else:
             host.xe('observer-param-set', {'uuid': observer_uuid,
                     'endpoints': endpoint, 'components': 'xapi,xenopsd,smapi'})
             for host_uuid in host.pool.hosts_uuids():
@@ -889,17 +892,10 @@ def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None,
                     'printf "observer-experimental-components=\"\"\nobserver-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
                 host_i.restart_toolstack(verify=True)
             hosts_setup = True
-            # a http endpoint can be valid even if currently unreachable, check that it is reachable
-            # this step assumes only one endpoint was provided, as mentioned in the option's help message
-            if 'http' in endpoint and host.ssh_with_result(f'curl -f -I {endpoint} --connect-timeout 10').returncode != 22:
-                logging.error(f'Tracing endpoint {endpoint} unreachable')
-            else:
-                host.xe('observer-param-set', {'uuid': observer_uuid, 'enabled': 'true'})
-        except SSHCommandFailed as e:
-            logging.error(f"Failed to provide tracing endpoint {endpoint} with error {e.stdout}")
+            host.xe('observer-param-set', {'uuid': observer_uuid, 'enabled': 'true'})
 
-    enabled = host.xe('observer-param-get', {"uuid": observer_uuid, "param-name": "enabled"})
-    tracing = Tracing(enabled, endpoint)
+    enabled = host.xe('observer-param-get', {"uuid": observer_uuid, "param-name": "enabled"}) == 'true'
+    tracing = Tracing(endpoint, enabled)
     yield tracing
     # teardown
     host.xe('observer-destroy', {'uuid': observer_uuid})

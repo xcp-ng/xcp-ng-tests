@@ -171,23 +171,30 @@ class Host:
             if isinstance(value, bool):
                 return "{}={}".format(key, to_xapi_bool(value))
             if isinstance(value, dict):
-                ret = ""
                 if vars:
+                    # key: 'BAGGAGE'
+                    # value: {tag: tag_value}, {'foo': 'bar', 'baz': 'foo'}
+                    # return: shell escaped version of sub-string in BAGGAGE="foo=bar;baz=foo"
+                    # NOTE maybe values without quotes are accepted in baggages?
+                    # NOTE not using shlex.quote, maybe not needed or is it accepted and better do it now than fix later?
+                    value_str = ';'.join(f'{key2}={value2}' for key2, value2 in value.items())
+                    return f'{key}="{value_str}" '
+                else:
+                    ret = ""
                     for key2, value2 in value.items():
                         ret += f'{key}:{key2}={shlex.quote(value2)} '
-                else:
-                    # key: 'BAGGAGE'
-                    # value: {'foo': 'bar', 'baz': 'foo'}
-                    # return: shell escaped version of sub-string in BAGGAGE="foo=bar;baz=foo"
-                    value_str = ';'.join(f'{key2}={value2}' for key2, value2 in value.items())
-                    ret += f'{key}={shlex.quote(value_str)}'
-                return ret.rstrip()
+                    return ret.rstrip()
             # key: 'BAGGAGE'
             # value: 'foo=bar'
             # return: shell escaped version of sub-string in BAGGAGE="foo=bar"
-            return f'{key}={shlex.quote(value)}'
+            # NOTE maybe values without quotes are accepted in baggages?
+            # NOTE not using shlex.quote, maybe not needed or is it accepted and better do it now than fix later?
+            if vars:
+                return f'{key}="{value}" '
+            else:
+                return f'{key}={shlex.quote(value)}'
 
-        command: str = ' '.join(stringify(key, value, vars=True) for key, value in vars.items()) + \
+        command: str = ''.join(stringify(key, value, vars=True) for key, value in vars.items()) + \
             f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
             ' '.join(stringify(key, value, vars=False) for key, value in args.items())
         if simple_output:
