@@ -143,6 +143,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Do not fail when no test is selected (exit code 0 instead of 5)"
     )
+    parser.addoption(
+        "--linstor-hosts-without-vg",
+        action="append",
+        default=[],
+        help="List of hosts (comma-separated) that will skip VG creation during linstor tests."
+             " Those are indexes starting from 0 (pool master).",
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
