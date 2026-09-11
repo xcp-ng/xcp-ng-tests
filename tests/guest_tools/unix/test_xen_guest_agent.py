@@ -55,15 +55,21 @@ class TestXenGuestAgent:
 
         if pkg_mgr == PackageManagerEnum.DNF:
             rpm_repo = xen_guest_agent_urls['rpm_repo']
-            vm.ssh(f"echo -e '[xen-guest-agent]\\nbaseurl={rpm_repo}main/\\ngpgcheck=0'"
-                   f" > /etc/yum.repos.d/xen-guest-agent.repo")
+            vm.create_file(
+                "/etc/yum.repos.d/xen-guest-agent.repo",
+                f"""[xen-guest-agent]
+baseurl={rpm_repo}main/
+gpgcheck=0""",
+            )
             vm.ssh('dnf install -y xen-guest-agent')
         elif pkg_mgr == PackageManagerEnum.APT_GET:
             # DEB packages are published to a stable APT repo in the GitLab
             # Generic Package Registry after each push to main.
             deb_repo = xen_guest_agent_urls['deb_repo']
-            vm.ssh(f"echo 'deb [trusted=yes] {deb_repo} main/' "
-                   f"> /etc/apt/sources.list.d/xen-guest-agent.list")
+            vm.create_file(
+                "/etc/apt/sources.list.d/xen-guest-agent.list",
+                f"deb [trusted=yes] {deb_repo} main/",
+            )
             vm.ssh('apt-get update')
             vm.ssh('apt-get install -y xen-guest-agent')
 

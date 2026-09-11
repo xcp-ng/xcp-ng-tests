@@ -526,6 +526,13 @@ class VM(BaseVM):
             return PackageManagerEnum.ZYPPER
         return PackageManagerEnum.UNKNOWN
 
+    def create_file(self, filepath: str, content: str) -> None:
+        """Create a file with provided content."""
+        with tempfile.NamedTemporaryFile(mode='w') as f:
+            f.write(content)
+            f.flush()
+            self.sftp_put(f.name, filepath)
+
     def grow_root_partition(self) -> int | None:
         pkg_manager = self.detect_package_manager()
         match pkg_manager:
