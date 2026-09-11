@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import functools
+import itertools
 import json
 import logging
 import os
@@ -52,10 +53,26 @@ def _linstor_config() -> LinstorConfig:
     return LinstorConfig()
 
 @pytest.fixture(scope='package')
-def lvm_disks(
+def linstor_host_indexes_without_vg(pytestconfig: pytest.Config) -> list[int]:
+    args = pytestconfig.getoption("--linstor-hosts-without-vg")
+    assert args is not None
+    return [
+        int(host_index) - 1 # Input indexes starts at 1
+        for host_index in itertools.chain(*[arg.split(',') for arg in args])
+    ]
+
+@pytest.fixture(scope='package')
+def linstor_hosts_with_lvm_disks(
     pool_with_unused_512B_disk: Pool,
+    linstor_host_indexes_without_vg: list[int],
+) -> list[Host]:
+    return [host for i, host in enumerate(pool_with_unused_512B_disk.hosts) if i not in linstor_host_indexes_without_vg]
+
+@pytest.fixture(scope='package')
+def lvm_disks(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     provisioning_type: str,
+    linstor_hosts_with_lvm_disks: list[Host]
 ) -> Generator[None, None, None]:
     """
     Common LVM PVs on which a LV is created on each host of the pool.
@@ -67,7 +84,8 @@ def lvm_disks(
     Return the list of device node paths for that list of devices
     used in all hosts.
     """
-    hosts = pool_with_unused_512B_disk.hosts
+    hosts = linstor_hosts_with_lvm_disks
+    assert len(hosts) >= 1
 
     @functools.cache
     def host_devices(host: Host) -> list[str]:
@@ -159,8 +177,8 @@ def pool_with_linstor(
         executor.map(remove_linstor, pool.hosts)
 
 @pytest.fixture(scope='package')
-def linstor_redundancy(pool_with_linstor: Pool) -> int:
-    return min(len(pool_with_linstor.hosts), LINSTOR_REDUNDANCY)
+def linstor_redundancy(linstor_hosts_with_lvm_disks: list[Host]) -> int:
+    return min(len(linstor_hosts_with_lvm_disks), LINSTOR_REDUNDANCY)
 
 def _linstor_sr(
     pool_with_linstor: Pool,
