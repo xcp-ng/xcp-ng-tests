@@ -22,6 +22,7 @@ from tests.storage import (
     vdi_export_import,
     vdi_is_open,
     xva_export_import,
+    vdi_on_boot_reset,
 )
 
 # Requirements:
@@ -144,5 +145,8 @@ class TestEXTSR:
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    def test_vdi_on_boot_reset(self, vm_on_ext_sr: VM) -> None:
+        vdi_on_boot_reset(vm_on_ext_sr)
 
     # *** End of tests with reboots

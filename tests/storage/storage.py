@@ -506,17 +506,12 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
             span.validate(vm, dev)
 
 
-def test_vdi_reset_on_boot_reset(imported_vm: VM) -> None:
+def vdi_on_boot_reset(vm: VM) -> None:
     """
-    Requirement:
-        - a host (--hosts=<IP>)
-        - a VM   (--vm=<UUID> or it uses PXE)
-
     Provided test VM can be either booted or not
     VDI param "on-boot" will be rolled back
     """
 
-    vm = imported_vm
     was_running = vm.is_running()
     vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
     original_param_value = vdi.param_get("on-boot")
