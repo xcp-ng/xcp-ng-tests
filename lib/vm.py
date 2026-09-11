@@ -707,11 +707,14 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name: str | None = None) -> "VM":
+    def clone(self, *, name: str | None = None, description: str | None = None) -> VM:
         if name is None:
             name = self.name() + '_clone_for_tests'
         logging.info("Clone VM")
-        uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
+        values: XeParams = {'uuid': self.uuid, 'new-name-label': name}
+        if description is not None:
+            values['new-name-description'] = description
+        uuid = self.host.xe('vm-clone', values)
         return VM(uuid, self.host)
 
     def set_variable_from_file(
