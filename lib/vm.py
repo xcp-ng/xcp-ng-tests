@@ -14,7 +14,6 @@ import lib.efi as efi
 from lib.basevm import BaseVM
 from lib.common import (
     KiB,
-    PackageManagerEnum,
     XeParams,
     expand_scope_relative_nodeid,
     parse_xe_dict,
@@ -24,13 +23,14 @@ from lib.common import (
     wait_for,
     wait_for_not,
 )
+from lib.packagemanager import Package, PackageManager
 from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, assert_never, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -512,20 +512,6 @@ class VM(BaseVM):
         option = '-f' if regular_file else '-e'
         return self.ssh_with_result(f'test {option} {filepath}').returncode == 0
 
-    def detect_package_manager(self) -> PackageManagerEnum:
-        """ Heuristic to determine the package manager on a unix distro. """
-        if self.file_exists('/usr/bin/dnf'):
-            return PackageManagerEnum.DNF
-        if self.file_exists('/usr/bin/yum'):
-            return PackageManagerEnum.YUM
-        if self.file_exists('/usr/bin/apt-get'):
-            return PackageManagerEnum.APT_GET
-        if self.file_exists('/sbin/apk'):
-            return PackageManagerEnum.APK
-        if self.file_exists('/usr/bin/zypper'):
-            return PackageManagerEnum.ZYPPER
-        return PackageManagerEnum.UNKNOWN
-
     def create_file(self, filepath: str, content: str) -> None:
         """Create a file with provided content."""
         with tempfile.NamedTemporaryFile(mode='w') as f:
@@ -533,23 +519,14 @@ class VM(BaseVM):
             f.flush()
             self.sftp_put(f.name, filepath)
 
+    def package_manager(self) -> PackageManager:
+        return PackageManager.detect(self)
+
     def grow_root_partition(self) -> int | None:
-        pkg_manager = self.detect_package_manager()
-        match pkg_manager:
-            case PackageManagerEnum.APK:
-                self.ssh('apk add util-linux e2fsprogs-extra')
-            case PackageManagerEnum.APT_GET:
-                self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
-            case PackageManagerEnum.DNF:
-                self.ssh('dnf install -y util-linux e2fsprogs')
-            case PackageManagerEnum.YUM:
-                self.ssh('yum install -y util-linux e2fsprogs')
-            case PackageManagerEnum.ZYPPER:
-                self.ssh('zypper --non-interactive install util-linux e2fsprogs')
-            case PackageManagerEnum.UNKNOWN:
-                return None
-            case _:
-                assert_never(pkg_manager)
+        pkg_manager = self.package_manager()
+        pkg_manager.install(Package.util_linux)
+        pkg_manager.install(Package.e2fsprogs)
+
         mount_output = self.ssh('mount').strip()
         root_match = re.search(r'/dev/(\w+?)(p?)(\d+) on / type (\w+)', mount_output)
         assert root_match is not None
