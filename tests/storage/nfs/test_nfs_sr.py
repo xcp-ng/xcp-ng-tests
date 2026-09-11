@@ -19,6 +19,7 @@ from tests.storage import (
     vdi_export_import,
     vdi_is_open,
     xva_export_import,
+    vdi_on_boot_reset,
 )
 
 # Requirements:
@@ -166,5 +167,12 @@ class TestNFSSR:
         vm.start(on=host.uuid)
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_vdi_on_boot_reset(self, dispatch_nfs: VM) -> None:
+        vdi_on_boot_reset(dispatch_nfs)
 
     # *** End of tests with reboots
