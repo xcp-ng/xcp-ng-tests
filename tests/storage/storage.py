@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
+from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, strtobool, wait_for
 from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
