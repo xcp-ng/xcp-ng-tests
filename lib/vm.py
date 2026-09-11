@@ -59,6 +59,9 @@ class VM(BaseVM):
     def is_paused(self) -> bool:
         return self.power_state() == 'paused'
 
+    def is_cached(self) -> bool:
+        return self.description().startswith("[Cache for ")
+
     # `on` can be an host name-label or UUID
     def start(self, on: str | None = None) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
@@ -707,11 +710,21 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name: str | None = None) -> "VM":
+    def clone(self, *, name: str | None = None, description: str | None = None) -> VM:
+        is_cached = self.is_cached()
         if name is None:
-            name = self.name() + '_clone_for_tests'
-        logging.info("Clone VM")
-        uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
+            suffix = "_clone_from_cache" if is_cached else "_clone_for_tests"
+            name = self.name() + suffix
+        if description is None and is_cached:
+            # Updating the description is mandatory here, so that the cloned VM is not detected as a cached VM
+            # Note that the new description is passed directly to `xe vm-clone` to avoid race conditions.
+            cached_vm_description = self.description()
+            description = f"Clone of cached VM {self.uuid} with key {cached_vm_description}"
+        values: XeParams = {'uuid': self.uuid, 'new-name-label': name}
+        if description is not None:
+            values['new-name-description'] = description
+        logging.info("Clone cached VM" if is_cached else "Clone VM")
+        uuid = self.host.xe('vm-clone', values)
         return VM(uuid, self.host)
 
     def set_variable_from_file(

@@ -646,8 +646,6 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
         # Clone the VM before running tests, so that the original VM remains untouched
         logging.info(">> Clone cached VM before running tests")
         vm = vm_orig.clone()
-        # Remove the description, which may contain a cache identifier
-        vm.param_set('name-description', "")
     else:
         vm = vm_orig
 
@@ -822,8 +820,6 @@ def _vm_from_cache(
     # Clone the VM before running tests, so that the original VM remains untouched
     logging.info("Cloning VM from cache")
     vm = base_vm.clone(name=prefix_object_name(_vm_name(request, vm_def)))
-    # Remove the description, which may contain a cache identifier
-    vm.param_set('name-description', "")
 
     vms.append(vm)
 
