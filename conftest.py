@@ -645,9 +645,7 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
     if CACHE_IMPORTED_VM:
         # Clone the VM before running tests, so that the original VM remains untouched
         logging.info(">> Clone cached VM before running tests")
-        vm = vm_orig.clone()
-        # Remove the description, which may contain a cache identifier
-        vm.param_set('name-description', "")
+        vm = vm_orig.clone(name_description="")
     else:
         vm = vm_orig
 
