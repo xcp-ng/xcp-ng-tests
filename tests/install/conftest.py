@@ -7,8 +7,8 @@ import hashlib
 import logging
 import os
 import tempfile
-import time
 import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path
 
 import paramiko
@@ -23,11 +23,11 @@ from data import (
     TOOLS,
 )
 from lib import installer, pxe
+from lib.boot import customize_grub, customize_isolinux
 from lib.commands import local_cmd, scp, ssh
 from lib.common import Defer, callable_marker, url_download, wait_for
-from lib.installer import AnswerFile
+from lib.installer import AnswerFile, InstallerVM
 
-from .boot import customize_grub, customize_isolinux
 from .postinstall import make_postinstall_script
 
 from typing import TYPE_CHECKING, Iterator, Sequence
@@ -177,6 +177,7 @@ def vmlinuz_config(uploaded_answerfile: str) -> str:
     assert " " not in uploaded_answerfile
     vmlinuz_config = "/boot/vmlinuz install"
     vmlinuz_config += " console=tty0"
+    vmlinuz_config += " console=hvc0"  # hvc0 goes last so it's used in non-interactive mode
     vmlinuz_config += " network_device=all"
     vmlinuz_config += f" sshpassword={HOST_DEFAULT_PASSWORD}"
     vmlinuz_config += f" answerfile={uploaded_answerfile}"
@@ -368,7 +369,7 @@ def vm_booted_with_installer(
     defer: Defer,
     vmlinuz_config: str,
     unplug_second_disk_during_restore: str | None,
-) -> Iterator[VM]:
+) -> Iterator[InstallerVM]:
     # Get host mac address
     (host_vm,) = create_vms
     vif = host_vm.vifs()[0]
@@ -426,9 +427,6 @@ def vm_booted_with_installer(
             vmlinuz_config,
         )
 
-    # The channel on residence host has served its purpose
-    residence_channel.close()
-
     # Wait for IP address to appear in the PXE AEP table
     wait_for(
         lambda: pxe.arp_addresses_for(mac_address),
@@ -458,7 +456,11 @@ def vm_booted_with_installer(
         exit_status = stdout.channel.recv_exit_status()
         assert exit_status == 0
 
-    yield host_vm
+    # Connect with pubkey authentication
+    with paramiko.SSHClient() as client:
+        client.set_missing_host_key_policy(IgnorePolicy())
+        client.connect(host_vm.ip, username='root')
+        yield InstallerVM(host_vm, residence_channel, client)
 
     logging.info("Shutting down Host VM")
     assert host_vm.ip is not None

@@ -6,7 +6,7 @@ from uuid import uuid4
 from data import ISO_IMAGES, NETWORKS
 from lib import commands, installer, pxe
 from lib.common import safe_split, wait_for
-from lib.installer import AnswerFile
+from lib.installer import AnswerFile, InstallerVM
 from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
@@ -98,11 +98,9 @@ class TestNested:
              "guest-storage": "no" if local_sr == "nosr" else "yes",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_install(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+    def test_install(self, vm_booted_with_installer: InstallerVM, system_disks_names: list[str],
                      firmware: str, iso_version: str, package_source: str, local_sr: str) -> None:
-        host_vm = vm_booted_with_installer
-        assert host_vm.ip is not None
-        installer.monitor_install(ip=host_vm.ip)
+        installer.monitor_install(vm_booted_with_installer)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
@@ -346,12 +344,10 @@ class TestNested:
             {"TAG": "existing-installation",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_upgrade(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+    def test_upgrade(self, vm_booted_with_installer: InstallerVM, system_disks_names: list[str],
                      firmware: str, orig_version: str, iso_version: str, machine: str,
                      package_source: str, local_sr: str) -> None:
-        host_vm = vm_booted_with_installer
-        assert host_vm.ip is not None
-        installer.monitor_upgrade(ip=host_vm.ip)
+        installer.monitor_install(vm_booted_with_installer)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))
@@ -405,11 +401,9 @@ class TestNested:
             {"TAG": "backup-disk",
              "CONTENTS": system_disks_names[0]},
         ))
-    def test_restore(self, vm_booted_with_installer: VM, system_disks_names: list[str],
+    def test_restore(self, vm_booted_with_installer: InstallerVM, system_disks_names: list[str],
                      firmware: str, orig_version: str, iso_version: str, package_source: str, local_sr: str) -> None:
-        host_vm = vm_booted_with_installer
-        assert host_vm.ip is not None
-        installer.monitor_restore(ip=host_vm.ip)
+        installer.monitor_restore(vm_booted_with_installer)
 
     @pytest.mark.usefixtures("xcpng_chained")
     @pytest.mark.parametrize("local_sr", ("nosr", "ext", "lvm"))

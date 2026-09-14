@@ -1,16 +1,55 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from itertools import islice
 
+import paramiko
+import pyte
+
+from lib.boot import BUFFER_READ_SIZE, show_screen
 from lib.commands import ssh
-from lib.common import wait_for
+from lib.vm import VM
 
-from typing import Any, Callable, Self
+from typing import Any, Iterator, Self
+
+INSTALL_FAILED = re.compile(r"INFO\s+\[[-0-9 :]+\] INSTALL FAILED\.")
+NEW_PHASE_READING_PACKAGE_INFORMATION = re.compile(r"DISPATCH: NEW PHASE: Reading package information")
+NEW_PHASE_COMPLETING_INSTALLATION = re.compile(r"DISPATCH: NEW PHASE: Completing installation")
+INSTALLATION_COMPLETED_SUCCESSFULLY = re.compile(r"The installation completed successfully")
+RESTORING_BACKUP = re.compile(r"Restoring backup")
+DATA_RESTORATION_COMPLETE = re.compile(r"Data restoration complete.  About to re-install bootloader.")
+
+
+@dataclass
+class InstallerVM:
+    vm: VM
+    console_channel: paramiko.Channel
+    ssh_client: paramiko.SSHClient
+
+class IgnorePolicy(paramiko.MissingHostKeyPolicy):
+    def missing_host_key(self, client, hostname, key):
+        pass
+
 
 class InstallationFailed(Exception):
-    pass
+    @classmethod
+    def check(cls, line: str, following_lines: Iterator[str]) -> None:
+        if not INSTALL_FAILED.search(line):
+            return
+        lines = [line]
+        if isinstance(following_lines, paramiko.ChannelFile):
+            following_lines.channel.settimeout(1)
+        try:
+            for line in following_lines:
+                lines.append(line)
+        except TimeoutError:
+            pass
+        raise cls("\n".join(lines))
+
 
 class AnswerFile:
     def __init__(self, kind: str, /):
@@ -87,83 +126,143 @@ class AnswerFile:
 def poweroff(ip: str) -> None:
     ssh(ip, "nohup sh -c 'sleep 2 && poweroff' >/dev/null 2>&1 &")
 
-def wait_for_install_failure_or(ip: str, cmd: Callable[[], bool], msg: str | None = None, timeout_secs=2 * 60) -> None:
-    def inner():
-        # Scans the logs for a failure entry formatted as: INFO [<timestamp>] INSTALL FAILED.
-        # If found, it returns that line and the rest of the file (to capture stack traces/errors).
-        # If not found, it returns an empty string.
-        failed = ssh(ip, r"sed -En '/INFO[[:space:]]+\[[-0-9 :]+\] INSTALL FAILED\./,$p' /tmp/install-log")
-        if failed:
-            raise InstallationFailed(failed)
-        return cmd()
-    return wait_for(inner, msg, timeout_secs=timeout_secs)
 
-def monitor_install(*, ip: str) -> None:
-    # wait for "yum install" phase to finish
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'DISPATCH: NEW PHASE: Completing installation' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for rpm installation to succeed", timeout_secs=40 * 60)  # FIXME too big
+def monitor_install(installer: InstallerVM) -> None:
+    logging.info("Get the PID of the installer")
+    stdin, stdout, stderr = installer.ssh_client.exec_command("pgrep -f -n 'python /opt/xensource/installer/init'")
+    pid_string = stdout.read().decode().strip()
+    assert stdout.channel.recv_exit_status() == 0, stderr.read().decode()
+    pid = int(pid_string)
 
-    # wait for install to finish
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'The installation completed successfully' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for system installation to succeed", timeout_secs=40 * 60)  # FIXME too big
+    logging.info("Check content of /tmp/install-log")
+    stdin, stdout, stderr = installer.ssh_client.exec_command("cat /tmp/install-log")
+    content = stdout.read()
+    length = len(content)
+    assert stdout.channel.recv_exit_status() == 0, stderr.read().decode()
 
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "ps a|grep '[0-9]. python /opt/xensource/installer/init'",
-                        check=False, simple_output=False).returncode == 1,
-        "Wait for installer to terminate")
+    lines = [raw_line.decode() for raw_line in content.splitlines()]
+    package_phase_started = False
+    for i, line in enumerate(lines):
+        logging.debug(f"> {line.rstrip()}")
+        if NEW_PHASE_READING_PACKAGE_INFORMATION.search(line):
+            package_phase_started = True
+        InstallationFailed.check(line, islice(lines, i + 1, None))
 
+    if package_phase_started:
+        logging.info("Install preparation succeeded")
 
-def monitor_upgrade(*, ip: str) -> None:
-    # wait for "yum install" phase to start
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip,
-                        "grep 'DISPATCH: NEW PHASE: Reading package information' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for upgrade preparations to finish", timeout_secs=40 * 60)  # FIXME too big
+    logging.info(f"Start monitoring /tmp/install-log with PID {pid} on {installer.vm.ip}")
+    stdin, stdout, stderr = installer.ssh_client.exec_command(
+        f"tail -f /tmp/install-log --pid {pid} -c +{length+1}",
+        timeout=2 * 60,
+        bufsize=1,
+    )
 
-    # wait for "yum install" phase to finish
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'DISPATCH: NEW PHASE: Completing installation' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for rpm installation to succeed", timeout_secs=40 * 60)  # FIXME too big
+    if not package_phase_started:
+        for line in stdout:
+            logging.debug(f"> {line.rstrip()}")
+            InstallationFailed.check(line, stdout)
+            if NEW_PHASE_READING_PACKAGE_INFORMATION.search(line):
+                break
+        logging.info("Install preparation succeeded")
 
-    # wait for install to finish
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'The installation completed successfully' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for system installation to succeed", timeout_secs=40 * 60)  # FIXME too big
+    for line in stdout:
+        logging.debug(f"> {line.rstrip()}")
+        InstallationFailed.check(line, stdout)
+        if NEW_PHASE_COMPLETING_INSTALLATION.search(line):
+            break
+    logging.info("RPM installation succeeded")
 
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "ps a|grep '[0-9]. python /opt/xensource/installer/init'",
-                        check=False, simple_output=False).returncode == 1,
-        "Wait for installer to terminate")
+    # Increase timeout to 8 minutes for this section
+    stdout.channel.settimeout(8 * 60)
 
-def monitor_restore(*, ip: str) -> None:
-    # wait for "yum install" phase to start
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'Restoring backup' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for data restoration to start", timeout_secs=40 * 60)  # FIXME too big
+    for line in stdout:
+        logging.debug(f"> {line.rstrip()}")
+        InstallationFailed.check(line, stdout)
+        if INSTALLATION_COMPLETED_SUCCESSFULLY.search(line):
+            break
+    logging.info("System installation succeeded")
 
-    # wait for "yum install" phase to finish
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'Data restoration complete.  About to re-install bootloader.' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for data restoration to complete", timeout_secs=40 * 60)  # FIXME too big
+    # Decrease back to 1 minute
+    stdout.channel.settimeout(60)
 
-    # The installer will not terminate in restore mode, it
-    # requires human interaction and does not even log it, so
-    # wait for last known action log (tested with 8.3b2)
-    wait_for_install_failure_or(
-        ip, lambda: ssh(ip, "grep 'ran .*swaplabel.*rc 0' /tmp/install-log",
-                        check=False, simple_output=False).returncode == 0,
-        "Wait for installer to hopefully finish", timeout_secs=40 * 60)  # FIXME too big
+    for line in stdout:
+        logging.debug(f"> {line.rstrip()}")
+        InstallationFailed.check(line, stdout)
+    logging.info("The installer process has terminated")
 
-    # "wait a bit to be extra sure".  Yuck.
-    time.sleep(30)
+def monitor_restore(installer: InstallerVM) -> None:
+    logging.info("Get the PID of the installer")
+    stdin, stdout, stderr = installer.ssh_client.exec_command("pgrep -f -n 'python /opt/xensource/installer/init'")
+    pid_string = stdout.read().decode().strip()
+    assert stdout.channel.recv_exit_status() == 0, stderr.read().decode()
+    pid = int(pid_string)
 
-    logging.info("Shutting down Host VM after successful restore")
+    logging.info("Check content of /tmp/install-log")
+    stdin, stdout, stderr = installer.ssh_client.exec_command("cat /tmp/install-log")
+    content = stdout.read()
+    length = len(content)
+    assert stdout.channel.recv_exit_status() == 0, stderr.read().decode()
+
+    lines = [raw_line.decode() for raw_line in content.splitlines()]
+    restoring_backup_started = False
+    for i, line in enumerate(lines):
+        logging.debug(f"> {line.rstrip()}")
+        if RESTORING_BACKUP.search(line):
+            restoring_backup_started = True
+        InstallationFailed.check(line, islice(lines, i + 1, None))
+
+    if restoring_backup_started:
+        logging.info("Restoring backup started")
+
+    logging.info(f"Start monitoring /tmp/install-log with PID {pid} on {installer.vm.ip}")
+    stdin, stdout, stderr = installer.ssh_client.exec_command(
+        f"tail -f /tmp/install-log --pid {pid} -c +{length+1}",
+        timeout=2 * 60,
+        bufsize=1,
+    )
+
+    if not restoring_backup_started:
+        for line in stdout:
+            logging.debug(f"> {line.rstrip()}")
+            InstallationFailed.check(line, stdout)
+            if RESTORING_BACKUP.search(line):
+                break
+        logging.info("Restoring backup started")
+
+    # Increase timeout to 5 minutes for this section
+    stdout.channel.settimeout(5 * 60)
+
+    for line in stdout:
+        logging.debug(f"> {line.rstrip()}")
+        InstallationFailed.check(line, stdout)
+        if DATA_RESTORATION_COMPLETE.search(line):
+            break
+    logging.info("Data restoration succeeded")
+
+    # Plug screen (#TODO re-use older screen)
+    screen = pyte.Screen(columns=80, lines=24)
+    stream = pyte.ByteStream(screen)
+    while installer.console_channel.recv_ready():
+        stream.feed(installer.console_channel.recv(BUFFER_READ_SIZE))
+    logging.debug(f"Restore completing screen:\n{show_screen(screen)}")
+
+    # Wait for restore completed screen
+    logging.info("Wait for restore completed screen")
+    while not any("┤ Restore Complete ├" in line for line in screen.display):
+        stream.feed(installer.console_channel.recv(BUFFER_READ_SIZE))
+
+    # Wait for screen to stabilize
+    time.sleep(1)
+    while installer.console_channel.recv_ready():
+        stream.feed(installer.console_channel.recv(BUFFER_READ_SIZE))
+    logging.debug(f"Restore completed screen:\n{show_screen(screen)}")
+    installer.console_channel.send(b"\r")
+
+    # Decrease back to 1 minute
+    stdout.channel.settimeout(60)
+
+    for line in stdout:
+        logging.debug(f"> {line.rstrip()}")
+        InstallationFailed.check(line, stdout)
+    logging.info("The installer process has terminated")
