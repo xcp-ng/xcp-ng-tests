@@ -61,7 +61,12 @@ class TestIrqBalance:
 
         logging.info("Create some network traffic for each VM")
         with tempfile.NamedTemporaryFile() as f:
-            f.write(os.urandom(2000000))
+            # Empirical measurements, using iperf3, between two VMs in the same pool resulted
+            # in ~37 MB/s, shared by four parallel copies (~9.2 MB/s each): 250 MB keeps the copies
+            # running for ~2 irqbalance intervals
+            # (10s is the interval in irqbalance-1.0.7-15.xcpng8.3.x86_64).
+            traffic_bytes = 250_000_000
+            f.write(os.urandom(traffic_bytes))
             f.flush()
 
             def copy_and_clean(vm: VM) -> None:
