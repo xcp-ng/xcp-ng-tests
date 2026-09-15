@@ -3,6 +3,7 @@ import pytest
 import logging
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 from lib.common import exec_nofail, raise_errors
 from lib.host import Host
@@ -61,9 +62,15 @@ class TestIrqBalance:
         logging.info("Create some network traffic for each VM")
         with tempfile.NamedTemporaryFile() as f:
             f.write(os.urandom(2000000))
-            for vm in four_vms:
+            f.flush()
+
+            def copy_and_clean(vm: VM) -> None:
                 vm.scp(f.name, f.name)
                 vm.ssh(f'rm -f {f.name}')
+
+            with ThreadPoolExecutor(max_workers=len(four_vms)) as executor:
+                # consume results to re-raise exceptions
+                list(executor.map(copy_and_clean, four_vms))
 
         logging.info("Check that the IRQs of the VMs VIFs are not all on the same CPU on dom0")
         cpus = set()
