@@ -212,3 +212,17 @@ class TestLVMCBT(CBTTest):
 
     def test_cbt_data_destroy(self, host: Host, lvm_sr: SR, vdi_cbt_on_lvm_sr: VDI, defer: Defer) -> None:
         self._test_cbt_data_destroy(host, lvm_sr, vdi_cbt_on_lvm_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_changed_blocks_tracking(self, host: Host, lvm_sr: SR, vdi_cbt_on_lvm_sr: VDI, vm_on_lvm_sr: VM,
+                                     defer: Defer) -> None:
+        self._test_changed_blocks_tracking(host, lvm_sr, vdi_cbt_on_lvm_sr, vm_on_lvm_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_incremental_snap_scenario(self, host: Host, lvm_sr: SR, vdi_cbt_on_lvm_sr: VDI, vm_on_lvm_sr: VM,
+                                       defer: Defer) -> None:
+        self._test_incremental_snap_scenario(host, lvm_sr, vdi_cbt_on_lvm_sr, vm_on_lvm_sr, defer)
+
+    def test_changed_blocks_empty_after_snapshot(self, host: Host, lvm_sr: SR,
+                                                 vdi_cbt_on_lvm_sr: VDI, defer: Defer) -> None:
+        self._test_changed_blocks_empty_after_snapshot(host, lvm_sr, vdi_cbt_on_lvm_sr, defer)

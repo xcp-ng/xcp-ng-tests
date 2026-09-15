@@ -702,3 +702,56 @@ class CBTTest:
         assert_cbt_enabled(snapshot_vdi)
         self.assert_cbt_log_exists(host, sr, snapshot_vdi)
         logging.info("CBT log persists after data_destroy")
+
+    def _test_changed_blocks_tracking(self, host: Host, sr: SR, vdi: VDI, vm: VM, defer: Defer) -> None:
+        import base64
+        if not vm.is_running():
+            vm.start()
+            vm.wait_for_os_booted()
+        baseline = vdi.snapshot()
+        defer(baseline.destroy)
+        vbd = vm.connect_vdi(vdi)
+        dev = f'/dev/{vbd.param_get("device")}'
+        install_randstream(vm)
+        vm.ssh(f'randstream generate --size 1048576 {dev}')
+        vm.ssh('sync')
+        vm.disconnect_vdi(vdi)
+        second = vdi.snapshot()
+        defer(second.destroy)
+        assert_changed_blocks_exist(baseline, second)
+        changed = list_changed_blocks(baseline, second)
+        bitmap = base64.b64decode(changed.strip())
+        assert any(b != 0 for b in bitmap), "CBT bitmap should be non-zero after write"
+        logging.info("Changed blocks detected and bitmap is non-zero")
+
+    def _test_incremental_snap_scenario(self, host: Host, sr: SR, vdi: VDI, vm: VM, defer: Defer) -> None:
+        snapshots = []
+        if not vm.is_running():
+            vm.start()
+            vm.wait_for_os_booted()
+        vbd = vm.connect_vdi(vdi)
+        dev = f'/dev/{vbd.param_get("device")}'
+        install_randstream(vm)
+        for i in range(3):
+            snap = vdi.snapshot()
+            snapshots.append(snap)
+            defer(snap.destroy)
+            assert_cbt_enabled(snap)
+            if i < 2:
+                vm.ssh(f'randstream generate --size 1048576 {dev}')
+                vm.ssh('sync')
+        vm.disconnect_vdi(vdi)
+        for i in range(len(snapshots) - 1):
+            assert verify_changed_blocks_detected(snapshots[i], snapshots[i + 1])
+            logging.info(f"Changes detected: snap{i} -> snap{i + 1}")
+
+    def _test_changed_blocks_empty_after_snapshot(self, host: Host, sr: SR, vdi: VDI, defer: Defer) -> None:
+        import base64
+        snap1 = vdi.snapshot()
+        defer(snap1.destroy)
+        snap2 = vdi.snapshot()
+        defer(snap2.destroy)
+        changed = list_changed_blocks(snap1, snap2)
+        bitmap = base64.b64decode(changed.strip())
+        assert all(b == 0 for b in bitmap), "CBT bitmap should be empty between snapshots with no writes"
+        logging.info("CBT bitmap should be empty between snapshots with no writes")
