@@ -2,7 +2,9 @@ import pytest
 
 import logging
 import os
-import tempfile
+import socket
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from lib.common import exec_nofail, raise_errors
 from lib.host import Host
@@ -16,6 +18,7 @@ from typing import Generator
 # - a VM (--vm)
 # - enough space to import 4 VMs on default SR
 # - the default SR must be either shared or local on master host, so that VMs can all start on the same host
+# - guests need `nc`, with port 5001 reachable from the test runner
 
 @pytest.fixture(scope='module')
 def four_vms(imported_vm: VM) -> Generator[tuple[VM, VM, VM, VM], None, None]:
@@ -42,6 +45,17 @@ def host_with_multi_vcpu_dom0(host: Host) -> Host:
         pytest.fail(f"dom0 needs at least 2 vCPUs, found {dom0_vcpus}")
     return host
 
+def connect(vm: VM, port: int) -> socket.socket:
+    assert vm.ip is not None
+    timeout = time.monotonic() + 10
+    while True:
+        try:
+            return socket.create_connection((vm.ip, port), timeout=10)
+        except ConnectionRefusedError:
+            if time.monotonic() >= timeout:
+                raise
+            time.sleep(0.5)
+
 @pytest.mark.flaky # sometimes IRQs are not balanced and we don't know why. And sometimes a VM doesn't report an IP.
 @pytest.mark.small_vm
 class TestIrqBalance:
@@ -55,15 +69,27 @@ class TestIrqBalance:
         for vm in four_vms:
             vm.start(on=host_with_multi_vcpu_dom0.uuid)
 
+        port = 5001
         for vm in four_vms:
             vm.wait_for_vm_running_and_ssh_up()
+            vm.ssh(f'nc -l -p {port} > /dev/null', background=True)
 
         logging.info("Create some network traffic for each VM")
-        with tempfile.NamedTemporaryFile() as f:
-            f.write(os.urandom(2000000))
-            for vm in four_vms:
-                vm.scp(f.name, f.name)
-                vm.ssh(f'rm -f {f.name}')
+        # Generate a traffic stream for about 2 irqbalance intervals
+        # (10s is the interval in irqbalance-1.0.7-15.xcpng8.3.x86_64).
+        stream_duration = 2 * 10
+        stream_data = bytes(64 * 1024)
+
+        def generate_stream(vm: VM) -> None:
+            with connect(vm, port) as sock:
+                deadline = time.monotonic() + stream_duration
+
+                while time.monotonic() < deadline:
+                    sock.sendall(stream_data)
+
+        with ThreadPoolExecutor(max_workers=len(four_vms)) as executor:
+            # consume results to re-raise exceptions
+            list(executor.map(generate_stream, four_vms))
 
         logging.info("Check that the IRQs of the VMs VIFs are not all on the same CPU on dom0")
         cpus = set()
