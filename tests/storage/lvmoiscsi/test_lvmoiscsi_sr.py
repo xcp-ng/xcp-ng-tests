@@ -8,9 +8,12 @@ from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 from tests.storage import (
     MAX_VDI_SIZE,
+    CBTTest,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
+    assert_cbt_log_does_not_exist_lvm_sr,
+    assert_cbt_log_exists_lvm_sr,
     coalesce_integrity,
     full_vdi_write,
     vdi_export_import,
@@ -99,3 +102,39 @@ class TestLVMOISCSISR:
         vm.shutdown(verify=True)
 
     # *** End of tests with reboots
+
+
+class TestLVMoISCSICBT(CBTTest):
+    """Test CBT functionality on LVMOISCSI SR"""
+
+    @staticmethod
+    def cbt_log_path(host: Host, sr: SR, vdi: VDI) -> str:
+        return f'/dev/VG_XenStorage-{sr.uuid}/{vdi.uuid}.cbtlog'
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_exists_lvm_sr(host, sr, vdi)
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_does_not_exist_lvm_sr(host, sr, vdi)
+
+    def test_enable_disable_cbt(self, host: Host, lvmoiscsi_sr: SR, vdi_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_enable_disable_cbt(host, lvmoiscsi_sr, vdi_on_lvmoiscsi_sr)
+
+    def test_cbt_log_creation(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_cbt_log_creation(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_disable_cbt_removes_log(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_disable_cbt_removes_log(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_destroy_vdi_removes_cbt_log(self, host: Host, lvmoiscsi_sr: SR,
+                                         vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_destroy_vdi_removes_cbt_log(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_cbt_disabled_after_vdi_copy(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                                         defer: Defer) -> None:
+        self._test_cbt_disabled_after_vdi_copy(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    def test_cbt_log_recreated_after_reenable(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_cbt_log_recreated_after_reenable(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)

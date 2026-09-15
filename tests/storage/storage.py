@@ -623,3 +623,43 @@ class CBTTest:
     @staticmethod
     def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
         raise NotImplementedError
+
+    def _test_enable_disable_cbt(self, host: Host, sr: SR, vdi: VDI) -> None:
+        enable_cbt_with_wait(vdi)
+        assert_cbt_enabled(vdi)
+        disable_cbt_with_wait(vdi)
+        assert_cbt_disabled(vdi)
+
+    def _test_cbt_log_creation(self, host: Host, sr: SR, vdi: VDI) -> None:
+        self.assert_cbt_log_exists(host, sr, vdi)
+
+    def _test_disable_cbt_removes_log(self, host: Host, sr: SR, vdi: VDI) -> None:
+        self.assert_cbt_log_exists(host, sr, vdi)
+        disable_cbt_with_wait(vdi)
+        self.assert_cbt_log_does_not_exist(host, sr, vdi)
+
+    def _test_destroy_vdi_removes_cbt_log(self, host: Host, sr: SR, vdi: VDI) -> None:
+        snapshot_vdi = vdi.snapshot()
+        self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+        vdi.wait_for_coalesce(snapshot_vdi.destroy)
+        self.assert_cbt_log_does_not_exist(host, sr, snapshot_vdi)
+
+    def _test_cbt_disabled_after_vdi_copy(self, host: Host, sr: SR, vdi: VDI, defer: Defer) -> None:
+        """CBT must not be propagated to a VDI copy."""
+        assert_cbt_enabled(vdi)
+        copy_uuid = host.xe('vdi-copy', {'uuid': vdi.uuid, 'sr-uuid': sr.uuid})
+        copy_vdi = VDI(copy_uuid, sr=sr)
+        defer(copy_vdi.destroy)
+        assert_cbt_disabled(copy_vdi)
+        self.assert_cbt_log_does_not_exist(host, sr, copy_vdi)
+        logging.info("CBT correctly disabled on VDI copy")
+
+    def _test_cbt_log_recreated_after_reenable(self, host: Host, sr: SR, vdi: VDI) -> None:
+        """Disabling then re-enabling CBT must create a fresh log."""
+        self.assert_cbt_log_exists(host, sr, vdi)
+        disable_cbt_with_wait(vdi)
+        self.assert_cbt_log_does_not_exist(host, sr, vdi)
+        enable_cbt_with_wait(vdi)
+        assert_cbt_enabled(vdi)
+        self.assert_cbt_log_exists(host, sr, vdi)
+        logging.info("CBT log correctly recreated after re-enable")

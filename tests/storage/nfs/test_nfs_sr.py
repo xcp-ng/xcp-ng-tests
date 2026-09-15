@@ -11,9 +11,12 @@ from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import (
     MAX_VDI_SIZE,
+    CBTTest,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
+    assert_cbt_log_does_not_exist_file_sr,
+    assert_cbt_log_exists_file_sr,
     coalesce_integrity,
     full_vdi_write,
     vdi_export_import,
@@ -168,3 +171,37 @@ class TestNFSSR:
         vm.shutdown(verify=True)
 
     # *** End of tests with reboots
+
+
+class TestNFSCBT(CBTTest):
+    """Test CBT functionality on NFS SR"""
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_exists_file_sr(host, sr, vdi)
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_does_not_exist_file_sr(host, sr, vdi)
+
+    @staticmethod
+    def cbt_log_path(host: Host, sr: SR, vdi: VDI) -> str:
+        return f'/var/run/sr-mount/{sr.uuid}/{vdi.uuid}.cbtlog'
+
+    def test_enable_disable_cbt(self, host: Host, nfs_sr: SR, vdi_on_nfs_sr: VDI) -> None:
+        self._test_enable_disable_cbt(host, nfs_sr, vdi_on_nfs_sr)
+
+    def test_cbt_log_creation(self, host: Host, nfs_sr: SR, vdi_cbt_on_nfs_sr: VDI) -> None:
+        self._test_cbt_log_creation(host, nfs_sr, vdi_cbt_on_nfs_sr)
+
+    def test_disable_cbt_removes_log(self, host: Host, nfs_sr: SR, vdi_cbt_on_nfs_sr: VDI) -> None:
+        self._test_disable_cbt_removes_log(host, nfs_sr, vdi_cbt_on_nfs_sr)
+
+    def test_destroy_vdi_removes_cbt_log(self, host: Host, nfs_sr: SR, vdi_cbt_on_nfs_sr: VDI) -> None:
+        self._test_destroy_vdi_removes_cbt_log(host, nfs_sr, vdi_cbt_on_nfs_sr)
+
+    def test_cbt_disabled_after_vdi_copy(self, host: Host, nfs_sr: SR, vdi_cbt_on_nfs_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_disabled_after_vdi_copy(host, nfs_sr, vdi_cbt_on_nfs_sr, defer)
+
+    def test_cbt_log_recreated_after_reenable(self, host: Host, nfs_sr: SR, vdi_cbt_on_nfs_sr: VDI) -> None:
+        self._test_cbt_log_recreated_after_reenable(host, nfs_sr, vdi_cbt_on_nfs_sr)
