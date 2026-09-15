@@ -12,7 +12,7 @@ from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
-from typing import Literal
+from typing import Generator, Literal
 
 MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
@@ -503,3 +503,123 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
     for span in spans:
         if span.checksum is not None:
             span.validate(vm, dev)
+
+
+def wait_for_cbt_enabled(vdi: VDI, timeout: int = 60) -> None:
+    wait_for(
+        lambda: vdi.is_cbt_enabled(),
+        msg=f"Waiting for CBT to be enabled on VDI {vdi.uuid}",
+        timeout_secs=timeout
+    )
+
+
+def wait_for_cbt_disabled(vdi: VDI, timeout: int = 60) -> None:
+    wait_for(
+        lambda: not vdi.is_cbt_enabled(),
+        msg=f"Waiting for CBT to be disabled on VDI {vdi.uuid}",
+        timeout_secs=timeout
+    )
+
+
+def assert_cbt_enabled(vdi: VDI) -> None:
+    assert vdi.is_cbt_enabled(), f"CBT should be enabled on VDI {vdi.uuid}"
+
+
+def assert_cbt_disabled(vdi: VDI) -> None:
+    assert not vdi.is_cbt_enabled(), f"CBT should be disabled on VDI {vdi.uuid}"
+
+
+def list_changed_blocks(vdi_from: VDI, vdi_to: VDI) -> str:
+    logging.info(f"Listing changed blocks from VDI {vdi_from.uuid} to {vdi_to.uuid}")
+    return vdi_from.sr.pool.master.xe('vdi-list-changed-blocks', {
+        'vdi-from-uuid': vdi_from.uuid,
+        'vdi-to-uuid': vdi_to.uuid
+    })
+
+
+def verify_changed_blocks_detected(vdi_from: VDI, vdi_to: VDI) -> bool:
+    changed = list_changed_blocks(vdi_from, vdi_to)
+    return bool(changed and changed.strip())
+
+
+def assert_changed_blocks_exist(vdi_from: VDI, vdi_to: VDI) -> None:
+    changed = list_changed_blocks(vdi_from, vdi_to)
+    assert changed and changed.strip(), \
+        f"Expected changed blocks between {vdi_from.uuid} and {vdi_to.uuid}"
+
+
+def assert_no_changed_blocks(vdi_from: VDI, vdi_to: VDI) -> None:
+    changed = list_changed_blocks(vdi_from, vdi_to)
+    assert not changed or not changed.strip(), \
+        f"Expected no changed blocks between {vdi_from.uuid} and {vdi_to.uuid}"
+
+
+def enable_cbt_with_wait(vdi: VDI, timeout: int = 60) -> None:
+    vdi.enable_cbt()
+    wait_for_cbt_enabled(vdi, timeout)
+
+
+def disable_cbt_with_wait(vdi: VDI, timeout: int = 60) -> None:
+    vdi.disable_cbt()
+    wait_for_cbt_disabled(vdi, timeout)
+
+
+def assert_cbt_log_consistent(host: Host, log_path: str, *, activate: bool = False) -> None:
+    """Assert that a CBT log file is consistent (consistent flag = 1)."""
+    if activate:
+        host.ssh(f'lvchange -ay {log_path}')
+    consistent = host.ssh(f'cbt-util get -n {log_path} -f').strip()
+    if activate:
+        host.ssh(f'lvchange -an {log_path}')
+    assert consistent == '1', f"CBT log at {log_path} is inconsistent"
+
+
+def assert_cbt_log_exists_file_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    log_path = f"/var/run/sr-mount/{sr.uuid}/{vdi.uuid}.cbtlog"
+    assert host.file_exists(log_path), f"CBT log not found at {log_path}"
+    log_size = int(host.ssh(f'stat -c %s {log_path}').strip())
+    assert log_size > 0, f"CBT log at {log_path} is empty"
+    assert_cbt_log_consistent(host, log_path)
+    logging.info(f"CBT log exists and is consistent: {log_path} ({log_size} bytes)")
+
+
+def assert_cbt_log_exists_lvm_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    vg_name = f"VG_XenStorage-{sr.uuid}"
+    cbt_log_name = f"{vdi.uuid}.cbtlog"
+    log_path = f"/dev/{vg_name}/{cbt_log_name}"
+    result = host.ssh(f'lvs --noheadings -o lv_name {vg_name}')
+    assert cbt_log_name in result, f"CBT log LV {cbt_log_name} not found in VG {vg_name}"
+    assert_cbt_log_consistent(host, log_path, activate=True)
+    logging.info(f"CBT log LV exists and is consistent: {vg_name}/{cbt_log_name}")
+
+
+def assert_cbt_log_does_not_exist_file_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    log_path = f"/var/run/sr-mount/{sr.uuid}/{vdi.uuid}.cbtlog"
+    assert not host.file_exists(log_path), f"CBT log should not exist at {log_path}"
+    logging.info(f"CBT log correctly absent: {log_path}")
+
+
+def assert_cbt_log_does_not_exist_lvm_sr(host: Host, sr: SR, vdi: VDI) -> None:
+    vg_name = f"VG_XenStorage-{sr.uuid}"
+    cbt_log_name = f"{vdi.uuid}.cbtlog"
+    result = host.ssh(f'lvs --noheadings -o lv_name {vg_name}')
+    assert cbt_log_name not in result, f"CBT log LV {cbt_log_name} should not exist in VG {vg_name}"
+    logging.info(f"CBT log LV correctly absent: {vg_name}/{cbt_log_name}")
+
+
+class CBTTest:
+    """
+    Base class for CBT tests on a given SR.
+    """
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        raise NotImplementedError
+
+    @staticmethod
+    def cbt_log_path(host: Host, sr: SR, vdi: VDI) -> str:
+        raise NotImplementedError
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        raise NotImplementedError
