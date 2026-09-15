@@ -11,7 +11,8 @@ from lib.vm import VM
 from typing import Generator
 
 # Requirements:
-# - an XCP-ng host (--hosts) >= 8.2
+# - an XCP-ng host (--hosts) >= 8.2 with at least 2 CPUs
+# - dom0 with at least 2 vCPUs
 # - a VM (--vm)
 # - enough space to import 4 VMs on default SR
 # - the default SR must be either shared or local on master host, so that VMs can all start on the same host
@@ -33,6 +34,14 @@ def four_vms(imported_vm: VM) -> Generator[tuple[VM, VM, VM, VM], None, None]:
     errors += exec_nofail(lambda: vm2.destroy())
     raise_errors(errors)
 
+@pytest.fixture(scope='module')
+def dom0_with_multiple_vcpus(host: Host) -> None:
+    logging.info("Ensure that dom0 has at least 2 vCPUs")
+    dom0_vcpus = int(host.ssh("nproc"))
+    if dom0_vcpus < 2:
+        pytest.fail(f"dom0 needs at least 2 vCPUs, found {dom0_vcpus}")
+
+@pytest.mark.usefixtures("dom0_with_multiple_vcpus")
 @pytest.mark.flaky # sometimes IRQs are not balanced and we don't know why. And sometimes a VM doesn't report an IP.
 @pytest.mark.small_vm
 class TestIrqBalance:
