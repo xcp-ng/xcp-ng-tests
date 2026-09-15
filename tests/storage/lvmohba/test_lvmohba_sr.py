@@ -132,3 +132,18 @@ class TestLVMoHBACBT(CBTTest):
 
     def test_cbt_log_recreated_after_reenable(self, host: Host, lvmohba_sr: SR, vdi_cbt_on_lvmohba_sr: VDI) -> None:
         self._test_cbt_log_recreated_after_reenable(host, lvmohba_sr, vdi_cbt_on_lvmohba_sr)
+
+    def test_snapshot_with_cbt(self, host: Host, lvmohba_sr: SR, vdi_cbt_on_lvmohba_sr: VDI,
+                               defer: Defer) -> None:
+        self._test_snapshot_with_cbt(host, lvmohba_sr, vdi_cbt_on_lvmohba_sr, defer)
+
+    def test_cbt_on_snapshot_chain(self, host: Host, lvmohba_sr: SR, vdi_cbt_on_lvmohba_sr: VDI,
+                                   defer: Defer) -> None:
+        self._test_cbt_on_snapshot_chain(host, lvmohba_sr, vdi_cbt_on_lvmohba_sr, defer)
+
+    def test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, lvmohba_sr: SR,
+                                                         vdi_cbt_on_lvmohba_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_parent_disable_does_not_affect_snapshot(host, lvmohba_sr, vdi_cbt_on_lvmohba_sr, defer)
+
+    def test_cbt_data_destroy(self, host: Host, lvmohba_sr: SR, vdi_cbt_on_lvmohba_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_data_destroy(host, lvmohba_sr, vdi_cbt_on_lvmohba_sr, defer)

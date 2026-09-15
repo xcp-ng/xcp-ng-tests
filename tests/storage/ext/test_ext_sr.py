@@ -183,3 +183,16 @@ class TestEXTCBT(CBTTest):
 
     def test_cbt_log_recreated_after_reenable(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI) -> None:
         self._test_cbt_log_recreated_after_reenable(host, ext_sr, vdi_cbt_on_ext_sr)
+
+    def test_snapshot_with_cbt(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_snapshot_with_cbt(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_on_snapshot_chain(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_on_snapshot_chain(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, ext_sr: SR,
+                                                         vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_parent_disable_does_not_affect_snapshot(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_data_destroy(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_data_destroy(host, ext_sr, vdi_cbt_on_ext_sr, defer)

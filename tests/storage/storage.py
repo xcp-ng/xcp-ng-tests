@@ -663,3 +663,42 @@ class CBTTest:
         assert_cbt_enabled(vdi)
         self.assert_cbt_log_exists(host, sr, vdi)
         logging.info("CBT log correctly recreated after re-enable")
+
+    def _test_snapshot_with_cbt(self, host: Host, sr: SR, vdi: VDI, defer: Defer) -> None:
+        snapshot_vdi = vdi.snapshot()
+        defer(lambda: vdi.wait_for_coalesce(snapshot_vdi.destroy))
+        assert_cbt_enabled(snapshot_vdi)
+        self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+        logging.info(f"Snapshot with CBT: {snapshot_vdi.uuid}")
+
+    def _test_cbt_on_snapshot_chain(self, host: Host, sr: SR, vdi: VDI, defer: Defer) -> None:
+        snap1 = vdi.snapshot()
+        defer(snap1.destroy)
+        assert_cbt_enabled(snap1)
+        snap2 = snap1.snapshot()
+        defer(snap2.destroy)
+        assert_cbt_enabled(snap2)
+        snap3 = snap2.snapshot()
+        defer(snap3.destroy)
+        assert_cbt_enabled(snap3)
+        logging.info("CBT enabled on full snapshot chain")
+
+    def _test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, sr: SR, vdi: VDI, defer: Defer) -> None:
+        snapshot_vdi = vdi.snapshot()
+        defer(lambda: vdi.wait_for_coalesce(snapshot_vdi.destroy))
+        assert_cbt_enabled(snapshot_vdi)
+        disable_cbt_with_wait(vdi)
+        assert_cbt_disabled(vdi)
+        assert_cbt_enabled(snapshot_vdi)
+        logging.info("Disabling CBT on parent did not affect snapshot")
+        enable_cbt_with_wait(vdi)
+
+    def _test_cbt_data_destroy(self, host: Host, sr: SR, vdi: VDI, defer: Defer) -> None:
+        snapshot_vdi = vdi.snapshot()
+        defer(snapshot_vdi.destroy)
+        assert_cbt_enabled(snapshot_vdi)
+        self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+        snapshot_vdi.data_destroy()
+        assert_cbt_enabled(snapshot_vdi)
+        self.assert_cbt_log_exists(host, sr, snapshot_vdi)
+        logging.info("CBT log persists after data_destroy")

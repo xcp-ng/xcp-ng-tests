@@ -201,3 +201,16 @@ class TestZFSCBT(CBTTest):
 
     def test_cbt_log_recreated_after_reenable(self, host: Host, zfs_sr: SR, vdi_cbt_on_zfs_sr: VDI) -> None:
         self._test_cbt_log_recreated_after_reenable(host, zfs_sr, vdi_cbt_on_zfs_sr)
+
+    def test_snapshot_with_cbt(self, host: Host, zfs_sr: SR, vdi_cbt_on_zfs_sr: VDI, defer: Defer) -> None:
+        self._test_snapshot_with_cbt(host, zfs_sr, vdi_cbt_on_zfs_sr, defer)
+
+    def test_cbt_on_snapshot_chain(self, host: Host, zfs_sr: SR, vdi_cbt_on_zfs_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_on_snapshot_chain(host, zfs_sr, vdi_cbt_on_zfs_sr, defer)
+
+    def test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, zfs_sr: SR,
+                                                         vdi_cbt_on_zfs_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_parent_disable_does_not_affect_snapshot(host, zfs_sr, vdi_cbt_on_zfs_sr, defer)
+
+    def test_cbt_data_destroy(self, host: Host, zfs_sr: SR, vdi_cbt_on_zfs_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_data_destroy(host, zfs_sr, vdi_cbt_on_zfs_sr, defer)
