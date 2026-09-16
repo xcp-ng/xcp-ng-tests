@@ -3,6 +3,7 @@ import pytest
 import logging
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 from lib.common import exec_nofail, raise_errors
 from lib.host import Host
@@ -11,7 +12,8 @@ from lib.vm import VM
 from typing import Generator
 
 # Requirements:
-# - an XCP-ng host (--hosts) >= 8.2
+# - an XCP-ng host (--hosts) >= 8.2 with at least 2 CPUs
+# - dom0 with at least 2 vCPUs
 # - a VM (--vm)
 # - enough space to import 4 VMs on default SR
 # - the default SR must be either shared or local on master host, so that VMs can all start on the same host
@@ -33,6 +35,14 @@ def four_vms(imported_vm: VM) -> Generator[tuple[VM, VM, VM, VM], None, None]:
     errors += exec_nofail(lambda: vm2.destroy())
     raise_errors(errors)
 
+@pytest.fixture(scope='module')
+def dom0_with_multiple_vcpus(host: Host) -> None:
+    logging.info("Ensure that dom0 has at least 2 vCPUs")
+    dom0_vcpus = int(host.ssh("nproc"))
+    if dom0_vcpus < 2:
+        pytest.fail(f"dom0 needs at least 2 vCPUs, found {dom0_vcpus}")
+
+@pytest.mark.usefixtures("dom0_with_multiple_vcpus")
 @pytest.mark.flaky # sometimes IRQs are not balanced and we don't know why. And sometimes a VM doesn't report an IP.
 @pytest.mark.small_vm
 class TestIrqBalance:
@@ -51,10 +61,21 @@ class TestIrqBalance:
 
         logging.info("Create some network traffic for each VM")
         with tempfile.NamedTemporaryFile() as f:
-            f.write(os.urandom(2000000))
-            for vm in four_vms:
+            # Empirical measurements, using iperf3, between two VMs in the same pool resulted
+            # in ~37 MB/s, shared by four parallel copies (~9.2 MB/s each): 250 MB keeps the copies
+            # running for ~2 irqbalance intervals
+            # (10s is the interval in irqbalance-1.0.7-15.xcpng8.3.x86_64).
+            traffic_bytes = 250_000_000
+            f.write(os.urandom(traffic_bytes))
+            f.flush()
+
+            def copy_and_clean(vm: VM) -> None:
                 vm.scp(f.name, f.name)
                 vm.ssh(f'rm -f {f.name}')
+
+            with ThreadPoolExecutor(max_workers=len(four_vms)) as executor:
+                # consume results to re-raise exceptions
+                list(executor.map(copy_and_clean, four_vms))
 
         logging.info("Check that the IRQs of the VMs VIFs are not all on the same CPU on dom0")
         cpus = set()
