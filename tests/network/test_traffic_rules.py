@@ -112,7 +112,7 @@ def sync_sdnController_action(
 ) -> str:
     def log_date(host: Host) -> str:
         # %y : file modification date, example: "2026-08-24 15:15:58.982053917 +0200"
-        return host.ssh("stat -c %y /var/log/sdn-controller-plugin.log")
+        return host.ssh("stat -c %y /var/log/sdn-controller-plugin.log", check=False)
 
     hosts = {}
 
