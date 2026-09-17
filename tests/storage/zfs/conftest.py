@@ -21,11 +21,13 @@ from pkgfixtures import (
     xfs_sr_on_hostA2,
     xfs_sr_on_hostB1,
 )
+from tests.storage.storage import disable_cbt_with_wait, enable_cbt_with_wait
 
 from typing import Generator
 
 POOL_NAME = 'pool0'
 POOL_PATH = '/' + POOL_NAME
+
 
 @pytest.fixture(scope='package')
 def host_without_zfs(host: Host) -> Generator[Host, None, None]:
@@ -79,3 +81,10 @@ def vm_on_zfs_sr(host: Host, zfs_sr: SR, vm_ref: str) -> Generator[VM, None, Non
     # teardown
     logging.info("<< Destroy VM")
     vm.destroy(verify=True)
+
+@pytest.fixture()
+def vdi_cbt_on_zfs_sr(vdi_on_zfs_sr: VDI) -> Generator[VDI, None, None]:
+    """ A VDI on ZFS SR with CBT enabled. """
+    enable_cbt_with_wait(vdi_on_zfs_sr)
+    yield vdi_on_zfs_sr
+    disable_cbt_with_wait(vdi_on_zfs_sr)
