@@ -755,3 +755,26 @@ class CBTTest:
         bitmap = base64.b64decode(changed.strip())
         assert all(b == 0 for b in bitmap), "CBT bitmap should be empty between snapshots with no writes"
         logging.info("CBT bitmap should be empty between snapshots with no writes")
+
+    def _test_cbt_after_coalesce(self, host: Host, sr: SR, vdi: VDI, vm: VM) -> None:
+        if not vm.is_running():
+            vm.start()
+            vm.wait_for_os_booted()
+        vbd = vm.connect_vdi(vdi)
+        dev = f'/dev/{vbd.param_get("device")}'
+        install_randstream(vm)
+        vm.ssh(f'randstream generate --size 1048576 {dev}')
+        vm.ssh('sync')
+        vm.disconnect_vdi(vdi)
+        vm.shutdown(verify=True)
+        snap = vdi.snapshot()
+        vdi.wait_for_coalesce(snap.destroy)
+        assert_cbt_enabled(vdi)
+        logging.info("CBT survived coalesce and coalesce completed without error")
+
+    def _test_cbt_persist_after_pbd_replug(self, host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_enabled(vdi)
+        sr.unplug_pbds()
+        sr.plug_pbds(verify=True)
+        assert_cbt_enabled(vdi)
+        logging.info("CBT persisted after SR unplug/replug")

@@ -226,3 +226,11 @@ class TestLVMCBT(CBTTest):
     def test_changed_blocks_empty_after_snapshot(self, host: Host, lvm_sr: SR,
                                                  vdi_cbt_on_lvm_sr: VDI, defer: Defer) -> None:
         self._test_changed_blocks_empty_after_snapshot(host, lvm_sr, vdi_cbt_on_lvm_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_cbt_after_coalesce(self, host: Host, lvm_sr: SR, vdi_cbt_on_lvm_sr: VDI, vm_on_lvm_sr: VM) -> None:
+        self._test_cbt_after_coalesce(host, lvm_sr, vdi_cbt_on_lvm_sr, vm_on_lvm_sr)
+
+    def test_cbt_persist_after_pbd_replug(self, host: Host, lvm_sr: SR, vdi_cbt_on_lvm_sr: VDI,
+                                          ) -> None:
+        self._test_cbt_persist_after_pbd_replug(host, lvm_sr, vdi_cbt_on_lvm_sr)
