@@ -105,9 +105,10 @@ def hosts_with_traffic_rules(hosts_with_xo: list[Host]) -> Generator[list[Host],
             'other-config',
             key='xo:sdn-controller:of-method',
             accept_unknown_key=True,
-        ) or 'channel'
+        )
 
-        return of_method == 'xapi-plugin'
+        # if sdn-controller was never activated, the propertry is uninitialized
+        return (of_method is None) or (of_method == 'xapi-plugin')
 
     hosts = list(filter(host_with_xapiplugin, hosts))
     if len(hosts) == 0:
