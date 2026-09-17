@@ -344,8 +344,10 @@ class Host:
                 'password': password,
                 'allowUnauthorized': 'true',
                 'label': label
-            }
+            },
+            use_json=True,
         )
+        assert isinstance(xo_srv_id, str)
         self.xo_srv_id = xo_srv_id
 
     def xo_server_status(self) -> str | None:
