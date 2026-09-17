@@ -10,12 +10,20 @@ from itertools import islice
 import paramiko
 import pyte
 
-from lib.boot import BUFFER_READ_SIZE, show_screen
+from lib.boot import customize_grub, customize_isolinux
 from lib.commands import ssh
 from lib.vm import VM
 
 from typing import Any, Iterator, Self
 
+BUFFER_READ_SIZE = 4096
+logging.getLogger("paramiko").setLevel(logging.WARNING)
+
+class IgnorePolicy(paramiko.MissingHostKeyPolicy):
+    def missing_host_key(self, client, hostname, key):
+        pass
+
+# Regex for `/tmp/install-log``
 INSTALL_FAILED = re.compile(r"INFO\s+\[[-0-9 :]+\] INSTALL FAILED\.")
 NEW_PHASE_READING_PACKAGE_INFORMATION = re.compile(r"DISPATCH: NEW PHASE: Reading package information")
 NEW_PHASE_COMPLETING_INSTALLATION = re.compile(r"DISPATCH: NEW PHASE: Completing installation")
@@ -23,17 +31,155 @@ INSTALLATION_COMPLETED_SUCCESSFULLY = re.compile(r"The installation completed su
 RESTORING_BACKUP = re.compile(r"Restoring backup")
 DATA_RESTORATION_COMPLETE = re.compile(r"Data restoration complete.  About to re-install bootloader.")
 
+class ScreenError(Exception):
+    pass
 
 @dataclass
 class InstallerVM:
     vm: VM
+    residence_client: paramiko.SSHClient
     console_channel: paramiko.Channel
-    ssh_client: paramiko.SSHClient
+    console_screen: pyte.Screen
+    console_stream: pyte.ByteStream
+    ssh_client: paramiko.SSHClient | None = None
+    stabilize_time: float = 1.0
 
-class IgnorePolicy(paramiko.MissingHostKeyPolicy):
-    def missing_host_key(self, client, hostname, key):
-        pass
+    @classmethod
+    def connect(cls, vm: VM):
+        # Get the domain corresponding to the host VM
+        residence_host = vm.get_residence_host()
+        dom_id = int(residence_host.xe(
+            'vm-param-get',
+            {'uuid': vm.uuid, 'param-name': 'dom-id'},
+        ))
 
+        # Connect to residence host
+        residence_client = paramiko.SSHClient()
+        logging.info(f"Open an SSH channel to {residence_host.hostname_or_ip}")
+        residence_client.set_missing_host_key_policy(IgnorePolicy())
+        residence_client.connect(residence_host.hostname_or_ip, username='root')
+        residence_transport = residence_client.get_transport()
+        assert residence_transport is not None
+
+        # Allocate a pty and connect it to the serial line of the installer VM
+        logging.info(f"Connecting to installer VM using serial line in domain {dom_id} on {residence_host}")
+        console_channel = residence_transport.open_session()
+        columns, lines = (100, 32) if vm.is_uefi else (80, 24)
+        console_channel.get_pty(term='vt100', width=columns, height=lines)
+        command = f"xl console -t serial {dom_id}"
+        logging.debug(f"Run command {command!r}")
+        console_channel.exec_command(command.encode())
+        console_channel.settimeout(30.0)
+
+        # Prepare terminal emulator
+        screen = pyte.Screen(columns=columns, lines=lines)
+        screen.define_charset("U", "(")
+        stream = pyte.ByteStream(screen)
+        stream.select_other_charset("@")
+
+        return cls(vm, residence_client, console_channel, screen, stream)
+
+    def cleanup(self):
+        if self.ssh_client is not None:
+            self.ssh_client.close()
+        self.console_channel.close()
+        self.residence_client.close()
+
+    def customize_boot(self, vmlinuz_config: str) -> None:
+        if self.vm.is_uefi:
+            customize_grub(self, vmlinuz_config)
+        else:
+            customize_isolinux(self, vmlinuz_config)
+
+    def ssh_connect_with_ci_key(self):
+        from data import HOST_DEFAULT_PASSWORD, TEST_SSH_PUBKEY
+
+        # Add CI key
+        assert self.vm.ip is not None
+        logging.info(f"Add CI keys to {self.vm.ip}")
+        with paramiko.SSHClient() as password_client:
+            password_client.set_missing_host_key_policy(IgnorePolicy())
+            password_client.connect(self.vm.ip, username='root', password=HOST_DEFAULT_PASSWORD)
+            stdin, stdout, stderr = password_client.exec_command(
+                f'mkdir /root/.ssh && echo "{TEST_SSH_PUBKEY}" > /root/.ssh/authorized_keys'
+            )
+            exit_status = stdout.channel.recv_exit_status()
+            assert exit_status == 0
+
+        # Connect with pubkey authentication
+        self.ssh_client = paramiko.SSHClient()
+        self.ssh_client .set_missing_host_key_policy(IgnorePolicy())
+        self.ssh_client .connect(self.vm.ip, username='root')
+
+    def refresh_screen(self):
+        while self.console_channel.recv_ready():
+            self.console_stream.feed(self.console_channel.recv(BUFFER_READ_SIZE))
+
+    def has_content_on_screen(self, pattern: str) -> bool:
+        return any(pattern in line for line in self.console_screen.display)
+
+    def wait_for_screen_content(self, pattern: str) -> None:
+        while not self.has_content_on_screen(pattern):
+            self.console_stream.feed(self.console_channel.recv(BUFFER_READ_SIZE))
+
+    def wait_for_screen_to_settle(self) -> None:
+        time.sleep(self.stabilize_time)
+        self.refresh_screen()
+
+    def wait_for_screen_to_stabilize(self) -> None:
+        time.sleep(self.stabilize_time)
+        while self.console_channel.recv_ready():
+            self.refresh_screen()
+            time.sleep(self.stabilize_time)
+
+    def send_to_console(self, data: str) -> None:
+        self.console_channel.send(data.encode())
+
+    def screen_error(self, message: str) -> ScreenError:
+        return ScreenError(f"{message}:\n{self.show_screen()}")
+
+    def debug_screen(self, title: str) -> None:
+        logging.debug(f"{title}:\n{self.show_screen()}")
+
+    def show_screen(self) -> str:
+        ANSI_RESET = "\033[0m"
+        ANSI_BOLD = "\033[1m"
+        ANSI_REVERSE = "\033[7m"
+
+        columns = self.console_screen.columns
+
+        # 1. Draw the top border
+        result = ["┌" + "─" * columns + "┐"]
+
+        # 2. Draw each row with left and right borders
+        for row_idx in range(self.console_screen.lines):
+            row = self.console_screen.buffer[row_idx]
+
+            # Start with the left border wall
+            row_str = "│"
+
+            for col_idx in range(columns):
+                char = row[col_idx]
+
+                fmt = ""
+                if char.bold:
+                    fmt += ANSI_BOLD
+                if char.reverse:
+                    fmt += ANSI_REVERSE
+
+                if fmt:
+                    row_str += f"{fmt}{char.data}{ANSI_RESET}"
+                else:
+                    row_str += char.data
+
+            # Cap the line with the right border wall
+            row_str += "│"
+
+            result.append(row_str)
+
+        # 3. Draw the bottom border
+        result.append("└" + "─" * columns + "┘")
+        return "\n".join(result)
 
 class InstallationFailed(Exception):
     @classmethod
@@ -128,6 +274,8 @@ def poweroff(ip: str) -> None:
 
 
 def monitor_install(installer: InstallerVM) -> None:
+    assert installer.ssh_client is not None
+
     logging.info("Get the PID of the installer")
     stdin, stdout, stderr = installer.ssh_client.exec_command("pgrep -f -n 'python /opt/xensource/installer/init'")
     pid_string = stdout.read().decode().strip()
@@ -154,7 +302,7 @@ def monitor_install(installer: InstallerVM) -> None:
     logging.info(f"Start monitoring /tmp/install-log with PID {pid} on {installer.vm.ip}")
     stdin, stdout, stderr = installer.ssh_client.exec_command(
         f"tail -f /tmp/install-log --pid {pid} -c +{length+1}",
-        timeout=2 * 60,
+        timeout=30 * 60,
         bufsize=1,
     )
 
@@ -173,9 +321,6 @@ def monitor_install(installer: InstallerVM) -> None:
             break
     logging.info("RPM installation succeeded")
 
-    # Increase timeout to 8 minutes for this section
-    stdout.channel.settimeout(8 * 60)
-
     for line in stdout:
         logging.debug(f"> {line.rstrip()}")
         InstallationFailed.check(line, stdout)
@@ -192,6 +337,8 @@ def monitor_install(installer: InstallerVM) -> None:
     logging.info("The installer process has terminated")
 
 def monitor_restore(installer: InstallerVM) -> None:
+    assert installer.ssh_client is not None
+
     logging.info("Get the PID of the installer")
     stdin, stdout, stderr = installer.ssh_client.exec_command("pgrep -f -n 'python /opt/xensource/installer/init'")
     pid_string = stdout.read().decode().strip()
@@ -240,24 +387,17 @@ def monitor_restore(installer: InstallerVM) -> None:
             break
     logging.info("Data restoration succeeded")
 
-    # Plug screen (#TODO re-use older screen)
-    screen = pyte.Screen(columns=80, lines=24)
-    stream = pyte.ByteStream(screen)
-    while installer.console_channel.recv_ready():
-        stream.feed(installer.console_channel.recv(BUFFER_READ_SIZE))
-    logging.debug(f"Restore completing screen:\n{show_screen(screen)}")
+    # Refresh screen
+    installer.refresh_screen()
+    installer.debug_screen("Restore completing screen")
 
     # Wait for restore completed screen
     logging.info("Wait for restore completed screen")
-    while not any("┤ Restore Complete ├" in line for line in screen.display):
-        stream.feed(installer.console_channel.recv(BUFFER_READ_SIZE))
+    installer.wait_for_screen_content("┤ Restore Complete ├")
+    installer.wait_for_screen_to_stabilize()
+    installer.debug_screen("Restore completed screen:\n{show_screen(screen)}")
 
-    # Wait for screen to stabilize
-    time.sleep(1)
-    while installer.console_channel.recv_ready():
-        stream.feed(installer.console_channel.recv(BUFFER_READ_SIZE))
-    logging.debug(f"Restore completed screen:\n{show_screen(screen)}")
-    installer.console_channel.send(b"\r")
+    installer.send_to_console("\r")
 
     # Decrease back to 1 minute
     stdout.channel.settimeout(60)

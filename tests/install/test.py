@@ -5,9 +5,8 @@ from uuid import uuid4
 
 from data import ISO_IMAGES, NETWORKS
 from lib import commands, installer, pxe
-from lib.common import safe_split, wait_for
+from lib.common import wait_for
 from lib.installer import AnswerFile, InstallerVM
-from lib.pif import PIF
 from lib.pool import Pool
 from lib.vdi import VDI
 from lib.vm import VM

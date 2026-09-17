@@ -60,12 +60,14 @@ class VM(BaseVM):
         return self.power_state() == 'paused'
 
     # `on` can be an host name-label or UUID
-    def start(self, on: str | None = None) -> str:
+    def start(self, on: str | None = None, paused: bool = False) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
         args: XeParams = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
+        if paused:
+            args['paused'] = "true"
         return self.host.xe('vm-start', args)
 
     def shutdown(self, force: bool = False, verify: bool = False, force_if_fails: bool = False) -> str:
@@ -410,7 +412,7 @@ class VM(BaseVM):
         return self.is_running() and self.param_get('resident-on') == host.uuid
 
     def get_residence_host(self) -> Host:
-        assert self.is_running()
+        assert self.is_running() or self.is_paused()
         host_uuid = self.param_get('resident-on')
         return self.host.pool.get_host_by_uuid(host_uuid)
 
