@@ -23,7 +23,6 @@ from data import (
     TOOLS,
 )
 from lib import installer, pxe
-from lib.boot import customize_grub, customize_isolinux
 from lib.commands import local_cmd, scp, ssh
 from lib.common import Defer, callable_marker, url_download, wait_for
 from lib.installer import AnswerFile, InstallerVM
@@ -381,51 +380,26 @@ def vm_booted_with_installer(
     host_vm.insert_cd(maybe_remastered_iso)
     host_vm.start()
 
-    # Get the domain corresponding to the host VM
-    residence_host = host_vm.get_residence_host()
-    dom_id = residence_host.xe(
-        'vm-param-get',
-        {'uuid': host_vm.uuid, 'param-name': 'dom-id'},
-    )
-
-    # Prepare an SSH connection to the residence host
-    class IgnorePolicy(paramiko.MissingHostKeyPolicy):
-        def missing_host_key(self, client, hostname, key):
-            pass
-
-    residence_client = paramiko.SSHClient()
-    logging.info(f"Open an SSH channel to {residence_host.hostname_or_ip}")
-    residence_client.set_missing_host_key_policy(IgnorePolicy())
-    residence_client.connect(residence_host.hostname_or_ip, username='root')
-    residence_transport = residence_client.get_transport()
-    assert residence_transport is not None
-    residence_channel = residence_transport.open_session()
-
-    # Defer cleanup to allow for easier debugging with `--pdb`
     def cleanup():
-        residence_client.close()
         host_vm.eject_cd()
         if not host_vm.is_halted():
             host_vm.shutdown(force=True)
 
+    # Defer cleanup to allow for easier debugging with `--pdb`
     defer(cleanup)
+
+    # Get the domain corresponding to the host VM
+    residence_host = host_vm.get_residence_host()
+    dom_id = int(residence_host.xe(
+        'vm-param-get',
+        {'uuid': host_vm.uuid, 'param-name': 'dom-id'},
+    ))
+    installer_vm = InstallerVM.connect(host_vm, residence_host, dom_id)
+    defer(installer_vm.cleanup)
 
     # Intercept grub or isolinux to provide a custom vmlinuz configuration
     wait_for(host_vm.is_running, "Wait for host VM running")
-    if host_vm.is_uefi:
-        logging.info(f"Accessing grub using serial line in domain {dom_id} on {residence_host}")
-        customize_grub(
-            residence_channel,
-            dom_id,
-            vmlinuz_config,
-        )
-    else:
-        logging.info(f"Accessing isolinux using serial line in domain {dom_id} on {residence_host}")
-        customize_isolinux(
-            residence_channel,
-            dom_id,
-            vmlinuz_config,
-        )
+    installer_vm.customize_boot(vmlinuz_config)
 
     # Wait for IP address to appear in the PXE AEP table
     wait_for(
@@ -445,22 +419,9 @@ def vm_booted_with_installer(
         retry_delay_secs=5,
     )
 
-    # Add CI key
-    logging.info(f"Add CI keys to {host_vm.ip}")
-    with paramiko.SSHClient() as client:
-        client.set_missing_host_key_policy(IgnorePolicy())
-        client.connect(host_vm.ip, username='root', password=HOST_DEFAULT_PASSWORD)
-        stdin, stdout, stderr = client.exec_command(
-            f'mkdir /root/.ssh && echo "{TEST_SSH_PUBKEY}" > /root/.ssh/authorized_keys'
-        )
-        exit_status = stdout.channel.recv_exit_status()
-        assert exit_status == 0
-
-    # Connect with pubkey authentication
-    with paramiko.SSHClient() as client:
-        client.set_missing_host_key_policy(IgnorePolicy())
-        client.connect(host_vm.ip, username='root')
-        yield InstallerVM(host_vm, residence_channel, client)
+    # Configure the CI key and connect
+    installer_vm.ssh_connect_with_ci_key()
+    yield installer_vm
 
     logging.info("Shutting down Host VM")
     assert host_vm.ip is not None
