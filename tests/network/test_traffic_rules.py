@@ -201,6 +201,12 @@ class TestSimple:
         vm.start()
         vm.wait_for_os_booted()
 
+        # ensure XO is properly seeing the VM
+        wait_for(
+            fn=lambda: xo_object_exists(vm.uuid),
+            msg="Waiting for XO to see VM",
+        )
+
         # right after VM booted
         assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
