@@ -30,6 +30,7 @@ from lib.common import (
 )
 from lib.netutil import wrap_ip
 from lib.network import Network
+from lib.packagemanager import PackageManager
 from lib.pif import PIF
 from lib.sr import SR
 from lib.tunnel import Tunnel
@@ -962,6 +963,9 @@ class Host:
 
     def hostname(self) -> str:
         return self.ssh('hostname')
+
+    def package_manager(self) -> PackageManager:
+        return PackageManager.detect(self)
 
     def call_plugin(self, plugin_name: str, function: str,
                     args: dict[str, str] | None = None) -> str:
