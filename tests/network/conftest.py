@@ -115,6 +115,10 @@ def hosts_with_traffic_rules(hosts_with_xo: list[Host]) -> Generator[list[Host],
         pytest.fail("This test requires XO to use of-method=xapi-plugin "
                     "(see https://docs.xen-orchestra.com/xo5/configuration#sdn-controller-mode)")
 
+    # restart the sdn-controller plugin before starting
+    xo_cli('plugin.unload', {'id': 'sdn-controller'})
+    xo_cli('plugin.load', {'id': 'sdn-controller'})
+
     yield hosts
 
 
