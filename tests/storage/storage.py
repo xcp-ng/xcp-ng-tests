@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 
 from lib import config
@@ -503,3 +504,22 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
     for span in spans:
         if span.checksum is not None:
             span.validate(vm, dev)
+
+
+def vdi_on_boot_reset(vm: VM) -> None:
+    """
+    Provided test VM can be either booted or not
+    VDI param "on-boot" will be rolled back
+    """
+
+    vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
+    vdi.param_set("on-boot", "reset")
+    vm.start()
+    vm.wait_for_os_booted()
+
+    tmp_file = f"/dummy-{int(time.time())}.tmp"
+    vm.ssh_touch_file(tmp_file)
+    assert vm.file_exists(tmp_file)
+
+    vm.reboot(verify=True)
+    assert not vm.file_exists(tmp_file)
