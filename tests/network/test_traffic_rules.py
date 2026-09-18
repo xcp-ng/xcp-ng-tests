@@ -13,7 +13,7 @@ from lib.sr import SR
 from lib.tunnel import Tunnel
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli
+from lib.xo import xo_cli, xo_object_exists
 
 from typing import Callable
 
@@ -112,13 +112,25 @@ def sync_sdnController_action(
 ) -> str:
     def log_date(host: Host) -> str:
         # %y : file modification date, example: "2026-08-24 15:15:58.982053917 +0200"
-        return host.ssh("stat -c %y /var/log/sdn-controller-plugin.log")
+        return host.ssh("stat -c %y /var/log/sdn-controller-plugin.log", check=False)
 
     hosts = {}
 
     # on each host, get the number of Host.call_plugin calls
     for h in host.pool.hosts:
         hosts[h.name()] = log_date(h)
+
+    # wait for XO to sync
+    if 'vifId' in args:
+        wait_for(
+            lambda: xo_object_exists(args['vifId']),
+            "Wait for XO to sync VIF",
+        )
+    if 'networkId' in args:
+        wait_for(
+            lambda: xo_object_exists(args['networkId']),
+            "Wait for XO to sync Network",
+        )
 
     # run the sdnController action
     logging.info(f"sdnController.{action}")
