@@ -512,16 +512,8 @@ def vdi_on_boot_reset(vm: VM) -> None:
     VDI param "on-boot" will be rolled back
     """
 
-    was_running = vm.is_running()
     vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
-    original_param_value = vdi.param_get("on-boot")
-
-    if was_running:
-        vm.shutdown(verify=True)
-
-    if original_param_value == "persist":
-        vdi.param_set("on-boot", "reset")
-
+    vdi.param_set("on-boot", "reset")
     vm.start()
     vm.wait_for_os_booted()
 
@@ -531,14 +523,3 @@ def vdi_on_boot_reset(vm: VM) -> None:
 
     vm.reboot(verify=True)
     assert not vm.file_exists(tmp_file)
-
-    if original_param_value == "persist":
-        logging.debug(f"Rollback to {original_param_value}")
-        vm.shutdown(verify=True)
-        vdi.param_set("on-boot", original_param_value)
-        vm.start()
-        vm.wait_for_os_booted()
-
-    if not was_running:
-        logging.debug(f"Shutdown VM (as initially provided)")
-        vm.shutdown(verify=True)
