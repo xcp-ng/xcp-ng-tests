@@ -4,7 +4,7 @@ import logging
 import re
 import time
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import islice
 
 import paramiko
@@ -269,12 +269,67 @@ class AnswerFile:
                 AnswerFile._defn_to_xml_et(content, parent=element)
         return element
 
+
+@dataclass
+class LogLineWaitTracker:
+    max_reported_waits: int = 5
+    reported_wait_threshold: float = 10.0
+    previous_timestamp: float | None = None
+    previous_line: str | None = None
+    longest_waits: list[tuple[float, float, str, str]] = field(default_factory=list)
+
+    def track(self, lines: Iterator[str], *, ignore_previous_line_timestamp: bool = False) -> Iterator[str]:
+        if ignore_previous_line_timestamp:
+            self.previous_timestamp = None
+            self.previous_line = None
+        for line in lines:
+            self.record(line)
+            yield line
+
+    def record(self, line: str) -> None:
+        line = line.removesuffix("\n")
+        now = time.monotonic()
+        previous = self.previous_timestamp
+        previous_line = self.previous_line
+        self.previous_timestamp = now
+        self.previous_line = line
+        if previous is None:
+            return
+
+        assert previous_line is not None
+        delay = now - previous
+        if delay >= self.reported_wait_threshold:
+            logging.info(
+                f"Observed {delay:.1f}s wait between the following log lines:\n"
+                f"  > {previous_line}\n"
+                f"  > {line}"
+            )
+
+        self.longest_waits.append((delay, now, previous_line, line))
+        self.longest_waits.sort(reverse=True)
+        del self.longest_waits[self.max_reported_waits:]
+        self.longest_waits.sort(key=lambda x: x[1])
+
+    def log_longest_waits(self, *, context: str) -> None:
+        if not self.longest_waits:
+            logging.debug(f"Longest waits for {context}: no live log lines received")
+            return
+
+        waits = "\n".join(
+            f"  * {delay:.1f}s between:\n"
+            f"    > {before}\n"
+            f"    > {after}"
+            for delay, _, before, after in self.longest_waits
+        )
+        logging.debug(f"Longest waits for {context}:\n{waits}")
+
 def poweroff(ip: str) -> None:
     ssh(ip, "nohup sh -c 'sleep 2 && poweroff' >/dev/null 2>&1 &")
 
 
 def monitor_install(installer: InstallerVM) -> None:
     assert installer.ssh_client is not None
+    wait_tracker = LogLineWaitTracker()
 
     logging.info("Get the PID of the installer")
     stdin, stdout, stderr = installer.ssh_client.exec_command("pgrep -f -n 'python /opt/xensource/installer/init'")
@@ -307,21 +362,21 @@ def monitor_install(installer: InstallerVM) -> None:
     )
 
     if not package_phase_started:
-        for line in stdout:
+        for line in wait_tracker.track(stdout):
             logging.debug(f"> {line.rstrip()}")
             InstallationFailed.check(line, stdout)
             if NEW_PHASE_READING_PACKAGE_INFORMATION.search(line):
                 break
         logging.info("Install preparation succeeded")
 
-    for line in stdout:
+    for line in wait_tracker.track(stdout):
         logging.debug(f"> {line.rstrip()}")
         InstallationFailed.check(line, stdout)
         if NEW_PHASE_COMPLETING_INSTALLATION.search(line):
             break
     logging.info("RPM installation succeeded")
 
-    for line in stdout:
+    for line in wait_tracker.track(stdout):
         logging.debug(f"> {line.rstrip()}")
         InstallationFailed.check(line, stdout)
         if INSTALLATION_COMPLETED_SUCCESSFULLY.search(line):
@@ -331,13 +386,15 @@ def monitor_install(installer: InstallerVM) -> None:
     # Decrease back to 1 minute
     stdout.channel.settimeout(60)
 
-    for line in stdout:
+    for line in wait_tracker.track(stdout):
         logging.debug(f"> {line.rstrip()}")
         InstallationFailed.check(line, stdout)
     logging.info("The installer process has terminated")
+    wait_tracker.log_longest_waits(context=f"install on {installer.vm.ip}")
 
 def monitor_restore(installer: InstallerVM) -> None:
     assert installer.ssh_client is not None
+    wait_tracker = LogLineWaitTracker()
 
     logging.info("Get the PID of the installer")
     stdin, stdout, stderr = installer.ssh_client.exec_command("pgrep -f -n 'python /opt/xensource/installer/init'")
@@ -370,7 +427,7 @@ def monitor_restore(installer: InstallerVM) -> None:
     )
 
     if not restoring_backup_started:
-        for line in stdout:
+        for line in wait_tracker.track(stdout):
             logging.debug(f"> {line.rstrip()}")
             InstallationFailed.check(line, stdout)
             if RESTORING_BACKUP.search(line):
@@ -380,7 +437,7 @@ def monitor_restore(installer: InstallerVM) -> None:
     # Increase timeout to 5 minutes for this section
     stdout.channel.settimeout(5 * 60)
 
-    for line in stdout:
+    for line in wait_tracker.track(stdout):
         logging.debug(f"> {line.rstrip()}")
         InstallationFailed.check(line, stdout)
         if DATA_RESTORATION_COMPLETE.search(line):
@@ -402,7 +459,8 @@ def monitor_restore(installer: InstallerVM) -> None:
     # Decrease back to 1 minute
     stdout.channel.settimeout(60)
 
-    for line in stdout:
+    for line in wait_tracker.track(stdout, ignore_previous_line_timestamp=True):
         logging.debug(f"> {line.rstrip()}")
         InstallationFailed.check(line, stdout)
     logging.info("The installer process has terminated")
+    wait_tracker.log_longest_waits(context=f"restore on {installer.vm.ip}")
