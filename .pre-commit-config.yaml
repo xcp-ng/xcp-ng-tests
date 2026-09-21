@@ -47,3 +47,10 @@ repos:
         entry: "uv run pyright ."
         pass_filenames: false
         types: ["python"]
+      - id: "zizmor"
+        name: "zizmor"
+        language: "system"
+        require_serial: true
+        entry: "uv run zizmor ."
+        pass_filenames: false
+        types: ["yaml"]
