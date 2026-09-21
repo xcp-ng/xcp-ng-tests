@@ -56,7 +56,6 @@ def connect(vm: VM, port: int) -> socket.socket:
                 raise
             time.sleep(0.5)
 
-@pytest.mark.flaky # sometimes IRQs are not balanced and we don't know why. And sometimes a VM doesn't report an IP.
 @pytest.mark.small_vm
 class TestIrqBalance:
     """
