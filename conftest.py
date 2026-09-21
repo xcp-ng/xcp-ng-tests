@@ -863,20 +863,21 @@ def cifs_iso_sr(host: Host, cifs_iso_device_config: dict[str, Any]) -> Generator
     # teardown
     sr.forget()
 
-# TODO unsure about the fixture scope
-@pytest.fixture(scope='module')
+# NOTE unsure about the fixture scope
+@pytest.fixture(scope='function')
 def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None, None]:
     """
     Create a XAPI observer and setup the hosts to enable tracing in a pool.
     Use of this fixture will trigger two toolstack restarts of the pool hosts.
     """
+    # NOTE an observer is always created just for simplification
     observer_name = prefix_object_name("xcp-ng-tests").replace(' ', '_')
     observer_uuid = host.xe('observer-create', {'name-label': observer_name})
     hosts_setup = False
 
     endpoint = pytestconfig.getoption('--tracing-endpoint')
-    logging.info(f"Setting up tracing with endpoint {endpoint}")
     if endpoint:
+        logging.info(f"Setting up tracing with endpoint {endpoint}")
         # a http endpoint can be valid even if currently unreachable, check that it is reachable
         # this step assumes only one endpoint was provided, as mentioned in the option's help message
         if 'http' in endpoint and host.ssh_with_result(f'curl -f -I {endpoint} --connect-timeout 10').returncode != 22:
@@ -900,7 +901,6 @@ def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None,
     # teardown
     host.xe('observer-destroy', {'uuid': observer_uuid})
     if hosts_setup:
-        logging.info(f"Tearing down tracing")
         for host_uuid in host.pool.hosts_uuids():
             host_i = host.pool.get_host_by_uuid(host_uuid)
             if host_i.ssh_with_result('ls /etc/xapi.conf.d/observer.conf.bak').returncode == 0:

@@ -1,40 +1,47 @@
 from __future__ import annotations
 
 from typing import Any
-
+from random import choice
 import requests
+import string
 import time
 from urllib.parse import urlparse
 
-# for debugging
-import logging
+# NOTE for debugging
+# import logging
 
 class Tracing:
     def __init__(self, endpoint, enabled):
         self.endpoint: str | None = endpoint
         self.enabled: bool = enabled
-        # an observer uuid could be passed by the tracing fixture if needed by some tests, but not needed for now
+        # NOTE an observer uuid could be passed by the tracing fixture if needed by some tests, but not needed for now
 
-    def locate_span(self, operation, tag, value) -> Any:
-        # url = urlparse(self.endpoint)
-        # api = f"{url.scheme}://{url.netloc}/api/v2/traces"
+    def gen_traceparent(self) -> str:
+        # W3C: https://www.w3.org/TR/trace-context/#traceparent-header
+        version = "00"
+        trace_id = ''.join(choice(string.hexdigits) for _ in range(32)).lower()
+        parent_id = ''.join(choice(string.hexdigits) for _ in range(16)).lower()
+        trace_flags = "01"
+        return '-'.join([version, trace_id, parent_id, trace_flags])
+
+    def locate_span_zipkin(self, operation: str, tag: str, value: str) -> Any:
+        url = urlparse(self.endpoint)
+        api = f"{url.scheme}://{url.netloc}/api/v2/traces"
         if not self.enabled or not self.endpoint:
             return None
 
-        # `export-interval` setting in xapi.conf dictates how often tracing will export spans to endpoints
-        retries = 15
+        retries = 12
         for _ in range(retries):
-            logging.debug(f'sending HTTP request for spanName {operation}')
-            response = requests.get(self.endpoint, params={"spanName": operation})
-            # FIXME error here when calling json decoding, even with url parsing
+            # logging.debug(f'sending Zipkin HTTP request for spanName {operation}')
+            # http://10.1.38.10:9411/api/v2/traces?spanName=xe+observer-list&tagQuery=test.uuid worked for latest Zipkin docker image
+            # http://10.1.38.10:16686/search?operation=xe%20observer-list&service=xapi&tags={%22xs.observer.uuid%22%3A%22b2fc74d7-9f08-3ef8-16b5-09a0e748dd7a%22} needed for latest Jaeger docker image, response looks parsable, but using zipkin port 9411 always returns "unexpected end of JSON input"
+            response = requests.get(api, params={"spanName": operation, "tagQuery": tag})
+            # logging.debug(f'request URL: {response.url}')
             data = response.json()
-            if not data:
-                logging.debug("no data from HTTP request")
-                return None
-            logging.debug(
-                f'received span data, looking for span with name {operation} and tag {tag} with value {value}')
-            for spans in data:
-                for span in spans:
+            # logging.debug(
+            # f'received traces data, looking for span with name {operation} and tag {tag} with value {value}')
+            for trace in data:
+                for span in trace:
                     if span.get('name') == operation:
                         if span.get('tags', {}).get(tag) == value:
                             return span
