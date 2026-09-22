@@ -811,6 +811,9 @@ def _create_vm(
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
 
+        # Update the `is_uefi` attribute, as it might now be out-of-date due to the params above
+        vm.is_uefi = vm.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
+
 def _vm_from_cache(
     request: pytest.FixtureRequest, vm_def: dict[str, Any], host: Host, vms: list[VM], tests_hexsha: str
 ) -> None:
