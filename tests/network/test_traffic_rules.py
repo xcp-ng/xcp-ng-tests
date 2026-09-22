@@ -6,7 +6,7 @@ import logging
 import os
 from time import sleep
 
-from lib.common import Defer, wait_for, wait_for_not
+from lib.common import Defer, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.network import Network
 from lib.sr import SR
@@ -169,6 +169,27 @@ def xo_vm_power_state(vm: VM, power_state: str) -> Callable[[], bool]:
 
     return vm_power_state
 
+def has_running_vm_on_network(host: Host, network_uuid: str) -> bool:
+    # running VMs on the host
+    vms = safe_split(host.xe('vm-list', {
+        'params': 'uuid',
+        'power-state': 'running',
+        'resident-on': host.uuid,
+    }, minimal=True))
+
+    # check VIFs of running VMs
+    for uuid in vms:
+        vifs = safe_split(host.xe('vif-list', {
+            'params': 'uuid',
+            'vm-uuid': uuid,
+            'network-uuid': network_uuid,
+        }, minimal=True))
+
+        if len(vifs) != 0:
+            return True
+
+    return False
+
 @pytest.mark.small_vm
 class TestSimple:
     def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer):
@@ -289,8 +310,11 @@ class TestSimple:
                 })
         )
 
-        # the rule is not applied as there is no interface in the network at the time
-        assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        # the rule is not applied if there is no interface in the network at the time
+        if not has_running_vm_on_network(host, networkId):
+            assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
+        else:
+            assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
         assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
 
         # start the VM
