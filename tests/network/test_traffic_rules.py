@@ -64,6 +64,8 @@ def ofproto_trace_drop(
     Run ovs-appctl ofproto/trace program to check OpenFlow rules processing
     on all ports of a bridge.
     """
+    logging.info(f"Checking OpenFlow state on {br}: '{flow}'")
+
     def is_not_xapi_port(portname: str) -> bool:
         """
         Return False if portname has the form of "{br}_port"
