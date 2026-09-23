@@ -27,32 +27,6 @@ from tests.storage import (
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
 
-class TestLVMSRCreateDestroy:
-    """
-    Tests that do not use fixtures that setup the SR or import VMs,
-    because they precisely need to test SR creation and destruction,
-    and VM import.
-    """
-
-    def test_create_sr_with_missing_device(self, host: Host) -> None:
-        try_to_create_sr_with_missing_device('lvm', 'LVM-local-SR-test', host)
-
-    def test_create_and_destroy_sr(self, host: Host,
-                                   unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                                   image_format: ImageFormat
-                                   ) -> None:
-        sr_disk = unused_512B_disks[host][0].name
-        # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('lvm', "LVM-local-SR-test", {
-            'device': '/dev/' + sr_disk,
-            'preferred-image-formats': image_format
-        }, verify=True)
-        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
-        # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
-        vm.destroy(verify=True)
-        sr.destroy(verify=True)
-
 @pytest.mark.usefixtures("lvm_sr")
 @pytest.mark.thick_provisioned
 class TestLVMSR:
@@ -91,7 +65,7 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize_on_inflate_after_setSize(
+    def test_failing_resize_vdi_on_inflate_after_setSize(
         self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM, exit_on_fistpoint: None
     ) -> None:
         vm = vm_on_lvm_sr
@@ -119,7 +93,7 @@ class TestLVMSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize_on_inflate_after_setSizePhys(
+    def test_failing_resize_vdi_on_inflate_after_setSizePhys(
         self, host: Host, lvm_sr: SR, vm_on_lvm_sr: VM, exit_on_fistpoint: None
     ) -> None:
         vm = vm_on_lvm_sr
@@ -166,6 +140,10 @@ class TestLVMSR:
     def test_xva_export_import(self, vm_on_lvm_sr: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) \
             -> None:
         xva_export_import(vm_on_lvm_sr, compression, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    def test_xva_export_import_with_snapshot(self, vm_on_lvm_sr: VM, temp_large_dir: str, defer: Defer) -> None:
+        xva_export_import(vm_on_lvm_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, lvm_sr: SR, image_format: ImageFormat, temp_large_dir: str,

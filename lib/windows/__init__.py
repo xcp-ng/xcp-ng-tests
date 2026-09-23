@@ -128,37 +128,109 @@ def vif_get_mac_without_separator(vif: VIF) -> str:
     return mac.replace(":", "")
 
 
-def vif_has_rss(vif: VIF) -> bool:
-    # Even if the Xenvif hash setting request fails, Windows can still report the NIC as having RSS enabled as long as
-    # the relevant OIDs are supported (Get-NetAdapterRss reports Enabled as True and Profile as Default).
-    # We need to explicitly check MaxProcessors to see if the hash setting request has really succeeded.
+def vif_exists(vif: VIF) -> bool:
     mac = vif_get_mac_without_separator(vif)
     return strtobool(
         vif.vm.execute_powershell_script(
-            rf"""(Get-NetAdapter |
-Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
-Get-NetAdapterRss).MaxProcessors -gt 0"""
+            rf"""$null -ne (Get-NetAdapter |
+Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}})"""
         )
     )
 
 
-def vif_get_dns(vif: VIF) -> list[str]:
+def vif_execute_powershell_script(vif: VIF, script: str) -> str:
+    """Execute the given script with the matching adapter being stored in $adapter"""
     mac = vif_get_mac_without_separator(vif)
     return vif.vm.execute_powershell_script(
-        rf"""Import-Module DnsClient; Get-NetAdapter |
-Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
+        rf"""$adapter = Get-NetAdapter |
+Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}};
+if ($null -eq $adapter) {{ throw 'Cannot find the VIF network adapter' }};
+{script}"""
+    )
+
+
+def vif_has_rss(vif: VIF) -> bool:
+    # Even if the Xenvif hash setting request fails, Windows can still report the NIC as having RSS enabled as long as
+    # the relevant OIDs are supported (Get-NetAdapterRss reports Enabled as True and Profile as Default).
+    # We need to explicitly check MaxProcessors to see if the hash setting request has really succeeded.
+    return strtobool(vif_execute_powershell_script(vif, r"($adapter | Get-NetAdapterRss).MaxProcessors -gt 0"))
+
+
+def vif_get_dns(vif: VIF) -> list[str]:
+    return vif_execute_powershell_script(
+        vif,
+        r"""Import-Module DnsClient;
+$adapter |
 Get-DnsClientServerAddress -AddressFamily IPv4 |
-Select-Object -ExpandProperty ServerAddresses"""
+Select-Object -ExpandProperty ServerAddresses""",
     ).splitlines()
 
 
 def vif_set_dns(vif: VIF, nameservers: list[str]) -> None:
-    mac = vif_get_mac_without_separator(vif)
-    vif.vm.execute_powershell_script(
-        rf"""Import-Module DnsClient; Get-NetAdapter |
-Where-Object {{$_.PnPDeviceID -notlike 'root\kdnic\*' -and $_.PermanentAddress -eq '{mac}'}} |
+    vif_execute_powershell_script(
+        vif,
+        rf"""Import-Module DnsClient;
+$adapter |
 Get-DnsClientServerAddress -AddressFamily IPv4 |
-Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}"""
+Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}""",
+    )
+
+
+def vif_has_static_configuration(
+    vif: VIF,
+    address_family: str,
+    address: str,
+    prefix: int,
+    gateway: str,
+    *,
+    present: bool = True,
+) -> bool:
+    default_route = "0.0.0.0/0" if address_family == "IPv4" else "::/0"
+    comparison = "-gt 0" if present else "-eq 0"
+    return strtobool(
+        vif_execute_powershell_script(
+            vif,
+            rf"""$addresses = @(Get-NetIPAddress `
+-InterfaceIndex $adapter.ifIndex `
+-AddressFamily {address_family} `
+-ErrorAction SilentlyContinue |
+Where-Object {{$_.IPAddress -eq '{address}' -and $_.PrefixLength -eq {prefix} -and `
+    $_.PrefixOrigin -eq 'Manual' -and $_.SuffixOrigin -eq 'Manual'}});
+
+$gateways = @(Get-NetRoute `
+-InterfaceIndex $adapter.ifIndex `
+-AddressFamily {address_family} `
+-ErrorAction SilentlyContinue |
+Where-Object {{$_.DestinationPrefix -eq '{default_route}' -and $_.NextHop -eq '{gateway}'}});
+
+($addresses.Count {comparison}) -and ($gateways.Count {comparison})""",
+        )
+    )
+
+
+def vif_uses_dhcp(vif: VIF) -> bool:
+    return strtobool(
+        vif_execute_powershell_script(
+            vif,
+            "(Get-NetIPInterface -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4).Dhcp -eq 'Enabled'",
+        )
+    )
+
+
+def vif_add_manual_configuration(
+    vif: VIF,
+    address: str,
+    prefix: int,
+    gateway: str,
+) -> None:
+    vif_execute_powershell_script(
+        vif,
+        rf"""$null = New-NetIPAddress `
+-InterfaceIndex $adapter.ifIndex `
+-IPAddress '{address}' `
+-PrefixLength {prefix} `
+-DefaultGateway '{gateway}' `
+-ErrorAction Stop""",
     )
 
 

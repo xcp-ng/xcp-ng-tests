@@ -4,6 +4,7 @@ import pytest
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import uuid
@@ -12,7 +13,9 @@ import lib.commands as commands
 import lib.efi as efi
 from lib.basevm import BaseVM
 from lib.common import (
+    KiB,
     PackageManagerEnum,
+    XeParams,
     expand_scope_relative_nodeid,
     parse_xe_dict,
     safe_split,
@@ -27,7 +30,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, overload
+from typing import TYPE_CHECKING, Iterable, List, Literal, assert_never, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -60,7 +63,7 @@ class VM(BaseVM):
     def start(self, on: str | None = None) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
-        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid}
+        args: XeParams = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
         return self.host.xe('vm-start', args)
@@ -256,7 +259,7 @@ class VM(BaseVM):
 
     def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None, tracing_vars: dict[str, str | dict[str, str]] = {}) -> None:
         msg = "Migrate VM to host %s" % target_host
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'uuid': self.uuid,
             'host-uuid': target_host.uuid,
             'live': self.is_running()
@@ -308,7 +311,7 @@ class VM(BaseVM):
         logging.info("Snapshot VM")
 
         name_label = name or f"Snapshot of {self.uuid}"
-        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid, 'new-name-label': name_label}
+        args: XeParams = {'uuid': self.uuid, 'new-name-label': name_label}
         if ignore_vdis:
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         snap_uuid = self.host.xe('vm-snapshot', args)
@@ -412,6 +415,8 @@ class VM(BaseVM):
         return self.host.pool.get_host_by_uuid(host_uuid)
 
     def start_background_process(self, cmd: str) -> str:
+        if self.is_windows:
+            logging.warning('start_background_process is not reliable on Windows')
         script = "/tmp/bg_process.sh"
         pidfile = "/tmp/bg_process.pid"
         with tempfile.NamedTemporaryFile('w') as f:
@@ -443,8 +448,19 @@ class VM(BaseVM):
             self.ssh(f'rm -f {pidfile}')
             return str(pid)
 
-    def pid_exists(self, pid: str) -> bool:
-        return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
+    def pid_exists(self, pid: str, winpid: bool = False) -> bool:
+        if self.is_windows and winpid:
+            return strtobool(
+                self.execute_powershell_script(f"$null -ne (Get-Process -Id {pid} -ErrorAction SilentlyContinue)")
+            )
+        else:
+            return self.ssh_with_result(f'kill -s 0 {pid}').returncode == 0
+
+    def kill_pid(self, pid: str, winpid: bool = False) -> None:
+        if self.is_windows and winpid:
+            self.execute_powershell_script(f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue")
+        else:
+            self.ssh(f'kill {pid}')
 
     @overload
     def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
@@ -498,14 +514,47 @@ class VM(BaseVM):
 
     def detect_package_manager(self) -> PackageManagerEnum:
         """ Heuristic to determine the package manager on a unix distro. """
-        if self.file_exists('/usr/bin/rpm') or self.file_exists('/bin/rpm'):
-            return PackageManagerEnum.RPM
-        elif self.file_exists('/usr/bin/apt-get'):
+        if self.file_exists('/usr/bin/dnf'):
+            return PackageManagerEnum.DNF
+        if self.file_exists('/usr/bin/yum'):
+            return PackageManagerEnum.YUM
+        if self.file_exists('/usr/bin/apt-get'):
             return PackageManagerEnum.APT_GET
-        elif self.file_exists('/sbin/apk'):
+        if self.file_exists('/sbin/apk'):
             return PackageManagerEnum.APK
-        else:
-            return PackageManagerEnum.UNKNOWN
+        if self.file_exists('/usr/bin/zypper'):
+            return PackageManagerEnum.ZYPPER
+        return PackageManagerEnum.UNKNOWN
+
+    def grow_root_partition(self) -> int | None:
+        pkg_manager = self.detect_package_manager()
+        match pkg_manager:
+            case PackageManagerEnum.APK:
+                self.ssh('apk add util-linux e2fsprogs-extra')
+            case PackageManagerEnum.APT_GET:
+                self.ssh('apt-get update && apt-get install -y -qq util-linux e2fsprogs')
+            case PackageManagerEnum.DNF:
+                self.ssh('dnf install -y util-linux e2fsprogs')
+            case PackageManagerEnum.YUM:
+                self.ssh('yum install -y util-linux e2fsprogs')
+            case PackageManagerEnum.ZYPPER:
+                self.ssh('zypper --non-interactive install util-linux e2fsprogs')
+            case PackageManagerEnum.UNKNOWN:
+                return None
+            case _:
+                assert_never(pkg_manager)
+        mount_output = self.ssh('mount').strip()
+        root_match = re.search(r'/dev/(\w+?)(p?)(\d+) on / type (\w+)', mount_output)
+        assert root_match is not None
+        disk, p, partition, fs_type = root_match.groups()
+        if not fs_type.startswith('ext'):
+            logging.debug(f"Unsupported filesystem: {fs_type}")
+            return None
+        self.ssh(f'echo ", +" | sfdisk --no-reread --force -N {partition} /dev/{disk}')
+        self.ssh(f'partx -u -n {partition}:{partition} /dev/{disk}')
+        self.ssh(f'resize2fs /dev/{disk}{p}{partition}')
+        df_output = self.ssh('df /')
+        return int(df_output.splitlines()[-1].split()[3]) * KiB
 
     def insert_cd(self, vdi_name: str) -> None:
         logging.info("Insert CD %r in VM %s", vdi_name, self.uuid)
@@ -534,7 +583,7 @@ class VM(BaseVM):
             snapshot.destroy(verify=True)
 
     def get_messages(self, name: str) -> List[str]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'obj-uuid': self.uuid,
             'name': name,
             'params': 'uuid',
@@ -819,17 +868,19 @@ class VM(BaseVM):
             f"Write-Output (Start-Process -Wait -PassThru {program} -ArgumentList '{args}').ExitCode")
         return int(output)
 
-    def start_background_powershell(self, cmd: str) -> None:
+    def start_background_powershell(self, cmd: str) -> str:
         """
-        Run command under powershell in the background.
+        Run command under powershell in the background. Return the PID as string.
 
         Backslash-safe.
         """
         assert self.is_windows
         encoded_command = commands.encode_powershell_command(cmd)
-        self.ssh(
-            "powershell.exe -noprofile -noninteractive Invoke-WmiMethod -Class Win32_Process -Name Create "
+        return self.ssh(
+            "powershell.exe -noprofile -noninteractive -command \\("
+            "Invoke-WmiMethod -Class Win32_Process -Name Create "
             f"-ArgumentList \\'powershell.exe -noprofile -noninteractive -encodedcommand {encoded_command}\\'"
+            "\\).ProcessId"
         )
 
     def is_windows_pv_device_installed(self) -> bool:

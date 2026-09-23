@@ -10,14 +10,17 @@ import os
 import random
 import string
 import sys
+import tempfile
 import time
 import traceback
 from datetime import datetime
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 from uuid import UUID
 
 import requests
+from passlib.hash import sha512_crypt
 from pydantic import TypeAdapter
 
 from typing import (
@@ -75,12 +78,15 @@ T = TypeVar("T")
 HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
 Defer: TypeAlias = Callable[[Callable[[], object]], None]
+XeParams: TypeAlias = dict[str, str | bool | dict[str, str]]
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
-    RPM = 2
+    YUM = 2
     APT_GET = 3
     APK = 4
+    DNF = 5
+    ZYPPER = 6
 
 # Common VM images used in tests
 def vm_image(vm_key: str) -> str:
@@ -200,8 +206,9 @@ def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int
             return
         if time.perf_counter() - start_time >= timeout_secs:
             expected = 'True' if not invert else 'False'
+            suffix = ": " + msg if msg else ""
             raise TimeoutError(
-                "Timeout reached while waiting for fn call to yield %s (%s)." % (expected, timeout_secs)
+                "Timed out after %ss waiting for condition to be %s%s" % (timeout_secs, expected, suffix)
             )
         time.sleep(retry_delay_secs)
 
@@ -235,6 +242,12 @@ def parse_xe_dict(xe_dict: str) -> dict[str, str]:
 def safe_split(text: str, sep: str = ',') -> list[str]:
     """ A split function that returns an empty list if the input string is empty. """
     return text.split(sep) if len(text) > 0 else []
+
+def join_names(names: list[str]) -> str:
+    """Join names with commas and 'and' for display."""
+    if len(names) <= 2:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + f" and {names[-1]}"
 
 def strip_prefix(string: str, prefix: str) -> str:
     if sys.version_info >= (3, 9):
@@ -317,13 +330,30 @@ def strtobool(val: str | None) -> bool:
     raise ValueError("invalid truth value '{}'".format(val))
 
 def url_download(url: str, filename: str) -> None:
-    r = requests.get(url, stream=True)
-    r.raise_for_status()
-    tempfilename = filename + ".part"
-    with open(tempfilename, 'wb') as fd:
-        for chunk in r.iter_content(chunk_size=128):
-            fd.write(chunk)
-    os.rename(tempfilename, filename)
+    """
+    Download the content of `url` to the `filename` destination.
+
+    A randomized filename is used during download to prevent file corruption on
+    concurrent use. If the download fails then the temporary file is removed.
+    """
+    destination = Path(filename)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        temp_name: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent, prefix=f"{destination.name}.", suffix=".part", delete=False
+            ) as fd:
+                temp_name = fd.name
+                for chunk in r.iter_content(chunk_size=64 * 1024):
+                    fd.write(chunk)
+        except BaseException:
+            if temp_name is not None:
+                os.unlink(temp_name)
+            raise
+        else:
+            os.rename(temp_name, filename)
 
 def randid(length: int = 6) -> str:
     """
@@ -352,7 +382,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str 
                accept_unknown_key: bool = False) -> str | None:
     """ Common implementation for param_get. """
     import lib.commands as commands
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
     try:
@@ -367,7 +397,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str 
 def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str | bool | dict[str, str],
                key: str | None = None) -> None:
     """ Common implementation for param_set. """
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid}
+    args: XeParams = {'uuid': uuid}
 
     if key is not None:
         param_name = '{}:{}'.format(param_name, key)
@@ -379,7 +409,7 @@ def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: st
 def _param_add(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str, key: str | None = None) -> None:
     """ Common implementation for param_add. """
     param_key = f'{key}={value}' if key is not None else value
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
 
     host.xe(f'{xe_prefix}-param-add', args)
 
@@ -387,7 +417,7 @@ def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: s
                   accept_unknown_key: bool = False) -> None:
     """ Common implementation for param_remove. """
     import lib.commands as commands
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
     try:
         host.xe(f'{xe_prefix}-param-remove', args)
     except commands.SSHCommandFailed as e:
@@ -396,5 +426,10 @@ def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: s
 
 def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None:
     """ Common implementation for param_clear. """
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)
+
+def hash_password(password: str) -> str:
+    """Hash password for /etc/shadow."""
+    # XCP-ng uses sha512 with 5000 rounds by default
+    return sha512_crypt.using(rounds=5000).hash(password)

@@ -7,7 +7,7 @@ Code is sometimes too long to be written as a standalone script
 
 import logging
 
+from lib.logger import setup_colored_logging
+
 logger = logging.getLogger()
-logging.basicConfig(
-    format="%(asctime)s.%(msecs)03d %(levelname)s %(message)s", datefmt="%b %d %H:%M:%S", level=logging.INFO
-)
+setup_colored_logging()

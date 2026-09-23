@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import tempfile
+from collections import defaultdict
 
 import git
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
@@ -38,14 +39,14 @@ from lib.tracing import Tracing
 from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vm import VM, vm_cache_key_from_def
-from lib.xo import xo_cli
+from lib.xo import _allow_xo_cli, xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable
+from typing import Any, Dict, Generator, Iterable, List, Optional
 
 # Do we cache VMs?
 try:
@@ -139,6 +140,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
              " Accepts sizes like '512', '4KiB', '1MiB'. A value of 1 is equivalent to no alignment."
     )
     parser.addoption(
+        "--no-fail-if-no-tests",
+        action="store_true",
+        default=False,
+        help="Do not fail when no test is selected (exit code 0 instead of 5)"
+    )
+    parser.addoption(
+        "--linstor-hosts-without-vg",
+        action="append",
+        default=[],
+        help="List of hosts (comma-separated) that will skip VG creation during linstor tests."
+             " Those are indexes starting from 1 (pool master).",
+    )
+    parser.addoption(
         "--tracing-endpoint",
         action="store",
         default=None,
@@ -175,10 +189,33 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
             image_format = ["vhd"] # Not giving image-format will default to doing tests on vhd
         metafunc.parametrize("image_format", image_format, scope="session")
 
-def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Config) -> None:
-    # Automatically mark tests based on fixtures they require.
-    # Check pytest.ini or pytest --markers for marker descriptions.
 
+# Used to group tests together whenever possible and limit parametrized fixture
+# "context switching" (needless teardown and setup of SRs, for example)
+SCHEDULING_AXES: List[str] = [
+    "image_format",
+]
+
+def get_axis(item: pytest.Item) -> Optional[str]:
+    callspec = getattr(item, "callspec", None)
+    if callspec is None:
+        return None
+    value = None
+    # To keep the ordering simple, the current assumption is that only one axis can be defined for a given test.
+    # For reference, at the time of writing this, the only axis is image_format (qcow2 vs vhd),
+    # attributed to any test requiring the image_format parametrized fixture.
+    for axis in SCHEDULING_AXES:
+        if axis in callspec.params:
+            assert value is None, "we support at most one parametrized axis per test at the moment"
+            value = callspec.getparam(axis)
+    return value
+
+def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Config) -> None:
+    """
+    - Automatically mark tests based on fixtures they require.
+      Check pytest.ini or pytest --markers for marker descriptions.
+    - Regroup tests by axis (image_format) and by package (leaf directory)
+    """
     markable_fixtures = [
         'uefi_vm',
         'unix_vm',
@@ -187,8 +224,12 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
         'hostB1',
         'unused_512B_disks',
         'unused_4k_disks',
+        'hosts_with_xo',
     ]
 
+    # -------------
+    # Apply markers
+    # -------------
     for item in items:
         fixturenames = getattr(item, 'fixturenames', ())
         for fixturename in markable_fixtures:
@@ -201,6 +242,48 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
         if item.get_closest_marker('multi_vms'):
             # multi_vms implies small_vm
             item.add_marker('small_vm')
+
+    # -----------------------------------------------------
+    # Build execution matrix: axis -> leaf package -> items
+    # -----------------------------------------------------
+    axis_ordering: Dict[Optional[str], int] = defaultdict(int)
+    # "None" gets the same order value as the first real axis, on purpose,
+    # so that we may better retain initial test order.
+    # For example, if we start with this test order:
+    # 1. test_A: no axis
+    # 2. test_B: image_format axis, giving us both test_B[vhd] and testB[qcow2]
+    # 3. test_C: no axis
+    # 4. test_D: image_format axis, giving us both test_D[vhd] and testD[qcow2]
+    # We don't want all axis-less tests grouped at the beginning:
+    #     test_A -> test_C -> test_B[vhd ] -> test_D[vhd] -> test_B[qcow2] -> test_D[qcow2]
+    # Instead, we want to keep the intial order as much as possible:
+    #     test_A -> test_B[vhd ] -> test_C -> test_D[vhd] -> test_B[qcow2] -> test_D[qcow2]
+    # Here only the two QCOW2 tests get pushed to the back in order to limit context switching from VHD to QCOW2.
+    axis_ordering[None] = 1
+
+    for item in items:
+        axis = get_axis(item)
+        if axis not in axis_ordering:
+            axis_ordering[axis] = len(axis_ordering) # 1 (same as None's order), then 2, etc.
+
+    grouped: dict[int, dict[pytest.Package, list[pytest.Item]]] = defaultdict(lambda: defaultdict(list))
+
+    # List the items in the order that pytest initially determined, and add extra grouping criteria.
+    for item in items:
+        axis_order = axis_ordering[get_axis(item)]
+        package = item.getparent(pytest.Package)
+        assert package is not None, "all items must come from a package"
+        grouped[axis_order][package].append(item)
+
+    # Flatten back to a list of items
+    new_items: List[pytest.Item] = [
+        item
+        for axis_order in sorted(grouped) # apply axis_ordering here
+        for package in grouped[axis_order]
+        for item in grouped[axis_order][package]
+    ]
+    items[:] = new_items
+
 
 # BEGIN make test results visible from fixtures
 # from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
@@ -224,6 +307,11 @@ def pytest_runtest_makereport(
 
 # END make test results visible from fixtures
 
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED \
+            and session.config.getoption("--no-fail-if-no-tests"):
+        session.exitstatus = pytest.ExitCode.OK
+
 
 # fixtures
 
@@ -242,8 +330,7 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
             nest = Pool(nest_hostname).master
 
             protocol, rest = hostname_or_ip.split(":", 1)
-            host_vm = nest.import_vm(f"clone:{rest}", nest.main_sr_uuid(),
-                                     use_cache=True)
+            host_vm = nest.import_vm(f"clone:{rest}", nest.main_sr_uuid())
             nested_list.append(host_vm)
 
             vif = host_vm.vifs()[0]
@@ -308,12 +395,15 @@ def registered_xo_cli() -> None:
     # The fixture is not responsible for establishing the connection.
     # We just check that xo-cli is currently registered
     try:
+        old_allow_xo_cli = _allow_xo_cli(True)
         xo_cli('server.getAll')
+        _allow_xo_cli(old_allow_xo_cli)
     except Exception as e:
-        raise Exception(f"Check for registered xo_cli failed: {e}")
+        pytest.fail(f"Check for registered xo_cli failed: {e}")
 
 @pytest.fixture(scope='session')
 def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[Host], None, None]:
+    old_allow_xo_cli = _allow_xo_cli(True)
     for h in hosts:
         logging.info(">>> Connect host %s" % h)
         if not h.skip_xo_config:
@@ -327,6 +417,7 @@ def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[
         if not h.skip_xo_config:
             logging.info("<<< Disconnect host %s" % h)
             h.xo_server_remove()
+    _allow_xo_cli(old_allow_xo_cli)
 
 @pytest.fixture(scope='session')
 def hostA1(hosts: list[Host]) -> Generator[Host, None, None]:
@@ -459,11 +550,23 @@ def disks(pytestconfig: pytest.Config, pools_hosts_by_name_or_ip: dict[HostAddre
            }
     # Cross-host deduplication: a LUN in use on any host (same WWN) is unavailable on all hosts.
     # This matters for shared FC/iSCSI LUNs visible on multiple hosts simultaneously.
+    # Note that local disks on nested hosts end up with the following WWNs:
+    # - uuid.00000000-0000-0000-0000-000000000001
+    # - uuid.00000000-0000-0000-0000-000000000002
+    # - and so on
+    # Those are obviously not shared among hosts, so we need to exclude them from `used_wwns`.
+    # This is especially important for tests where one host has its system installed on disk 1,
+    # and another host has its system installed on disk 1 and 2 using RAID1 (in this case, disk 2
+    # of the first host **is** available although it shares the same WWN with disk 2 of host 2
+    # which **is not** available). We can safely assume that any disk with a WWN starting with
+    # "uuid.00000000-0000-0000-0000-" comes from a local disk on a nested host, and consequently
+    # are never shared with other hosts. As such, we can exclude them from `used_wwns` so that
+    # they are not incorrectly detected as shared.
     used_wwns = {
         disk.wwn
         for host_disks in ret.values()
         for disk in host_disks
-        if disk.wwn and not disk.available
+        if disk.wwn and not disk.available and not disk.wwn.startswith("uuid.00000000-0000-0000-0000-")
     }
     if used_wwns:
         logging.debug("cross-host used WWNs: %s", used_wwns)
@@ -723,6 +826,9 @@ def _create_vm(
         for param_def in vm_def["params"]:
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
+
+        # Update the `is_uefi` attribute, as it might now be out-of-date due to the params above
+        vm.is_uefi = vm.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
 
 def _vm_from_cache(
     request: pytest.FixtureRequest, vm_def: dict[str, Any], host: Host, vms: list[VM], tests_hexsha: str

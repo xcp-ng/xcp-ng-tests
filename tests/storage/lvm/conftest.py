@@ -10,6 +10,16 @@ from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
+# explicit import for package-scope fixtures
+from pkgfixtures import (
+    _xfs_config_on_hostA2,
+    _xfs_config_on_hostB1,
+    hostA2_with_xfsprogs,
+    hostB1_with_xfsprogs,
+    xfs_sr_on_hostA2,
+    xfs_sr_on_hostB1,
+)
+
 from typing import Generator
 
 @pytest.fixture(scope='package')

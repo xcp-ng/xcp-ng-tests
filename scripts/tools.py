@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """Just a wrapper to run cli tools package.
 """
 import sys

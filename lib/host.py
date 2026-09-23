@@ -14,6 +14,7 @@ from packaging import version
 import lib.commands as commands
 from lib.bond import Bond
 from lib.common import (
+    XeParams,
     _param_add,
     _param_clear,
     _param_get,
@@ -25,11 +26,14 @@ from lib.common import (
     strtobool,
     to_xapi_bool,
     wait_for,
+    wait_for_not,
 )
 from lib.netutil import wrap_ip
 from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
+from lib.tunnel import Tunnel
+from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
@@ -41,6 +45,7 @@ if TYPE_CHECKING:
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
+
 
 def host_data(hostname_or_ip: str) -> dict[str, str]:
     # read from data.py
@@ -81,6 +86,7 @@ class Host:
         self.saved_packages_list: list[str] | None = None
         self.saved_rollback_id: int | None = None
         self.inventory = self._get_xensource_inventory()
+        self._bios_vendor: str | None = None
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
@@ -152,24 +158,24 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = True,
+    def xe(self, action: str, args: XeParams = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
             -> str | commands.SSHResult[str]:
-        maybe_param_minimal = '--minimal' if minimal else ''
-        maybe_param_force = '--force' if force else ''
+        maybe_param_minimal = ' --minimal' if minimal else ''
+        maybe_param_force = ' --force' if force else ''
 
         def stringify(key: str, value: str | bool | dict[str, str], vars: bool) -> str:
             if isinstance(value, bool):
-                return "{}={}".format(key, to_xapi_bool(value))
+                return f"{key}={to_xapi_bool(value)}"
             if isinstance(value, dict):
                 if vars:
                     # key: 'BAGGAGE'
@@ -197,7 +203,7 @@ class Host:
                 return f'{key}={shlex.quote(value)}'
 
         command: str = ''.join(stringify(key, value, vars=True) for key, value in vars.items()) + \
-            f'xe {action} {maybe_param_minimal} {maybe_param_force} ' + \
+            f'xe {action}{maybe_param_minimal}{maybe_param_force} ' + \
             ' '.join(stringify(key, value, vars=False) for key, value in args.items())
         if simple_output:
             return self.ssh(command, check=check, simple_output=True)
@@ -297,6 +303,26 @@ class Host:
             inventory[key] = raw_value.strip('\'')
         return inventory
 
+    def _get_bios_vendor(self) -> str:
+        """Get Bios Vendor information for Host.
+
+        Performs a dmidecode command to get this bios information::
+
+            dmidecode -s bios-vendor
+
+        >>> my_host._get_bios_vendor()
+        Xen
+        """
+        return self.ssh('dmidecode -s bios-vendor')
+
+    @property
+    def is_nested(self) -> bool:
+        """The host is nested or not (physical).
+        """
+        if self._bios_vendor is None:
+            self._bios_vendor = self._get_bios_vendor()
+        return 'Xen' in self._bios_vendor
+
     def xo_get_server_id(self, store: bool = True) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
         assert isinstance(servers, list)
@@ -358,13 +384,13 @@ class Host:
 
     def xo_server_reconnect(self) -> None:
         assert self.xo_srv_id is not None
-        logging.info("Reconnect XO to host %s" % self)
+        logging.info(f"[{self}] Reconnect XO to host")
         xo_cli('server.disable', {'id': self.xo_srv_id})
         xo_cli('server.enable', {'id': self.xo_srv_id})
         wait_for(self.xo_server_connected, timeout_secs=10)
         # wait for XO to know about the host. Apparently a connected server status
         # is not enough to guarantee that the host object exists yet.
-        wait_for(lambda: xo_object_exists(self.uuid), "Wait for XO to know about HOST %s" % self.uuid)
+        wait_for(lambda: xo_object_exists(self.uuid), f"[{self}] Wait for XO to know about HOST {self.uuid}")
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
@@ -382,35 +408,35 @@ class Host:
             # Assumption: if the first disk is on the SR, the VM is.
             # If there's no VDI at all, then it is virtually on any SR.
             if not vm.vdi_uuids() or vm.get_sr().uuid == sr_uuid:
-                logging.info(f"Reusing cached VM {vm.uuid} for {uri}")
+                logging.info(f"[{self}] Reusing cached VM {vm.uuid} for {uri}")
                 return vm
-        logging.info("Could not find a VM in cache for %r", uri)
+        logging.info(f"[{self}] Could not find a VM in cache for {uri!r}")
         return None
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
         vm: VM | None = None
+
+        if uri.startswith("clone://") or uri.startswith("clone+start://"):
+            assert sr_uuid is not None
+            protocol, filename = uri.split("://", maxsplit=1)
+            base_vm = self.cached_vm(filename, sr_uuid)
+            if base_vm is None:
+                raise RuntimeError(f"VM {filename!r} not in cache (in SR {sr_uuid})")
+            vm = base_vm.clone()
+            vm.param_clear('name-description')
+            if protocol == "clone+start":
+                vm.start()
+                wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
+            return vm
+
         if use_cache:
             assert sr_uuid is not None
-            if '://' in uri and uri.startswith("clone"):
-                protocol, rest = uri.split(":", 1)
-                assert rest.startswith("//")
-                filename = rest[2:] # strip "//"
-                base_vm = self.cached_vm(filename, sr_uuid)
-                if base_vm:
-                    vm = base_vm.clone()
-                    vm.param_clear('name-description')
-                    if uri.startswith("clone+start"):
-                        vm.start()
-                        wait_for(vm.is_running, "Wait for VM running")
-            else:
-                vm = self.cached_vm(uri, sr_uuid)
+            vm = self.cached_vm(uri, sr_uuid)
             if vm:
                 return vm
-        else:
-            assert not ('://' in uri and uri.startswith("clone")), "clone URIs require cache enabled"
 
-        params: dict[str, str | bool | dict[str, str]] = {}
-        msg = "Import VM %s" % uri
+        params: XeParams = {}
+        msg = f"[{self}] Import VM {uri}"
         if '://' in uri:
             params['url'] = uri
         else:
@@ -428,7 +454,7 @@ class Host:
             vif.move(self.management_network())
         if use_cache:
             cache_key = self.vm_cache_key(uri)
-            logging.info(f"Marking VM {vm.uuid} as cached")
+            logging.info(f"[{self}] Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
         return vm
 
@@ -446,15 +472,15 @@ class Host:
 
         download_path = None
         try:
-            params: dict[str, str | bool | dict[str, str]] = {'uuid': vdi_uuid}
+            params: XeParams = {'uuid': vdi_uuid}
             if '://' in uri:
-                logging.info(f"Download ISO {uri}")
+                logging.info(f"[{self}] Download ISO {uri}")
                 download_path = f'/tmp/{vdi_uuid}'
                 self.ssh(f"curl -o '{download_path}' '{uri}'")
                 params['filename'] = download_path
             else:
                 params['filename'] = uri
-            logging.info(f"Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
+            logging.info(f"[{self}] Import ISO {uri}: name {random_name}, uuid {vdi_uuid}")
 
             self.xe('vdi-import', params)
         finally:
@@ -464,7 +490,7 @@ class Host:
         return VDI(vdi_uuid, sr=sr)
 
     def vm_from_template(self, name: str, template: str) -> VM:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             "new-name-label": prefix_object_name(name),
             "template": template,
             "sr-uuid": self.main_sr_uuid(),
@@ -479,26 +505,25 @@ class Host:
             return self.xe('vm-list', {'uuid': vm_uuid}, minimal=True) == vm_uuid
 
     def get_system_uuid(self) -> str:
-        """Return system uuid of current host.
+        """Get system uuid of current host.
 
-        Intended for driving current host from its "parent host" in a **nested context**.
+        In case host is nested, it uses `system-serial-number` instead of `system-uuid`.
 
-        .. note::
-            If the current host is nested, it means it is not a physical host. It is a VM living inside a real host.::
-
-                [PH: Physical Host] -> [VM: emulation of an XCP-ng host] -> [vm: a vm inside nested host]
-                                       |      current working host     |
-
-            So we need system-uuid of current working host (`VM`) which is
-            the uuid seen in physical host's (`PH`) scope.
+        If command result is empty or None, it raises an Error.
 
         Performs the following command::
 
-            dmidecode -s system-uuid
+            dmidecode -s [system-uuid|system-serial-number]
 
         ref: `dmidecode(8) <https://man.archlinux.org/man/dmidecode.8.en#s>__`
         """
-        return self.ssh("dmidecode -s system-uuid").lower().strip()
+        # TODO: This workaround is tracked in XCPNG-2775
+        dmi_key = "system-serial-number" if self.is_nested else "system-uuid"
+        system_uuid = self.ssh(f"dmidecode -s {dmi_key}").lower().strip()
+        if not system_uuid:
+            raise ValueError(f"The system uuid '{system_uuid}' is incorrect.")
+
+        return system_uuid
 
     def yum_clean_metadata(self) -> str:
         """Quietly removes cached metadata on target.
@@ -508,9 +533,9 @@ class Host:
             yum clean metadata -q
         """
         logging.info(f"[{self}] Removing cache metadata...")
-        return self.ssh("yum clean metadata -q")
+        return self.ssh("yum clean metadata -q --enablerepo='*'")
 
-    def yum_update(self, enablerepos: list[str] = []) -> str:
+    def yum_update(self, enablerepos: list[str] = [], disablerepos: list[str] = []) -> str:
         """Updates packages on target.
 
         Performs the following shell command::
@@ -518,43 +543,85 @@ class Host:
             yum update -y
             # with enablerepos
             yum update -y --enablerepo=extra1 --enablerepos=extra2
+            # with disablerepos
+            yum update -y --disablerepo=extra1 --disablerepos=extra2
 
-        :param enablerepos: Enable one or more repositories (default: []).
+        :param enablerepos: Enable one or more repositories (default: [])
+        :param disablerepos: Disable one or more repositories (default: [])
         """
         base_command = "yum update -y"
 
         logging.info(f"[{self}] Updating packages...")
+        if disablerepos:
+            extra = " ".join(f"--disablerepo={r}" for r in disablerepos)
+            base_command = f"{base_command} {extra}"
         if enablerepos:
             extra = " ".join(f"--enablerepo={r}" for r in enablerepos)
             base_command = f"{base_command} {extra}"
 
         return self.ssh(base_command)
 
-    def update(self, enablerepos: list[str] = [], reboot: bool = True) -> None:
+    def update(self, enablerepos: list[str] = [], disablerepos: list[str] = [], reboot: bool = True) -> None:
         """Updates current host.
 
         An helper function that wraps update tasks on current host.
 
+        When reboot is requested, the host is only rebooted if packages were
+        actually updated.
+
         :param list[str] enablerepos:
             Repositories to enable when updating.
+        :param list[str] disablerepos:
+            Repositories to disable when updating.
         :param bool reboot:
             Choose to reboot or not after update (default: True).
         """
         logging.info(f"[{self}] Updating...")
 
         self.yum_clean_metadata()
-        self.yum_update(enablerepos=enablerepos)
-        if reboot:
+        output = self.yum_update(enablerepos=enablerepos, disablerepos=disablerepos)
+        if reboot and "No packages marked for update" not in output:
             # Everything's ok, just reboot
             self.reboot(verify=True)
+        elif reboot:
+            logging.info(f"[{self}] No packages updated, skipping reboot")
 
         logging.info(f"[{self}] Updated successfully!")
 
     def restart_toolstack(self, verify: bool = False) -> None:
-        logging.info("Restart toolstack on host %s" % self)
+        logging.info(f"[{self}] Restart toolstack on host")
         self.ssh('xe-toolstack-restart')
         if verify:
-            wait_for(self.is_enabled, "Wait for host enabled", timeout_secs=30 * 60)
+            self.wait_for_xapi_enabled()
+
+    def wait_for_host_down(self, timeout_secs: int = 3 * 60) -> None:
+        wait_for_not(
+            lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
+            f"[{self}] Wait for host down",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=2,
+        )
+
+    def wait_for_host_up(self, timeout_secs: int = 10 * 60) -> None:
+        wait_for(
+            lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
+            f"[{self}] Wait for host up",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=10,
+        )
+
+    def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
+        wait_for(
+            lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
+            f"[{self}] Wait for ssh up on host",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=5
+        )
+
+    def wait_for_xapi_enabled(self, timeout_secs: int = 30 * 60) -> None:
+        logging.info(f"[{self}] Wait for XAPI to complete initialization")
+        self.ssh(f"xapi-wait-init-complete {timeout_secs}")
+        assert self.is_enabled()
 
     def is_enabled(self) -> bool:
         try:
@@ -595,7 +662,7 @@ class Host:
             # yum history list fails if the list is empty, and it's also not possible to rollback
             # to before the first transaction, so "0" would not be appropriate as last transaction.
             # To workaround this, create transactions: install and remove a small package.
-            logging.info('Install and remove a small package to workaround empty yum history.')
+            logging.info(f"[{self}] Install and remove a small package to workaround empty yum history.")
             self.yum_install(['gpm-libs'])
             self.yum_remove(['gpm-libs'])
             history_str = self.ssh('yum history list --noplugins')
@@ -616,19 +683,19 @@ class Host:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
     def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
-        logging.info('Install packages: %s on host %s' % (' '.join(packages), self))
+        logging.info(f"[{self}] Install packages: {' '.join(packages)} on host")
         cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
         if enablerepo is not None:
             cmd = f'{cmd} --enablerepo={enablerepo}'
         return self.ssh(f'{cmd} {" ".join(packages)}')
 
     def yum_remove(self, packages: list[str]) -> str:
-        logging.info('Remove packages: %s from host %s' % (' '.join(packages), self))
+        logging.info(f"[{self}] Remove packages: {' '.join(packages)} from host")
         return self.ssh(f'yum remove -y {" ".join(packages)}')
 
     def packages(self) -> list[str]:
-        """ Returns the list of installed RPMs - with version, release, arch and epoch. """
-        return sorted(self.ssh('rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}-%{EPOCH}\n"').splitlines())
+        """Returns the list of installed RPMs - with epoch, version, release, arch."""
+        return sorted(self.ssh('rpm -qa --qf "%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n"').splitlines())
 
     def check_packages_available(self, packages: list[str]) -> bool:
         """ Check if a given package list is available in the YUM repositories. """
@@ -641,14 +708,14 @@ class Host:
         return self.ssh_with_result(f'rpm -q {package}').returncode == 0
 
     def yum_save_state(self) -> None:
-        logging.info(f"Save yum state for host {self}")
+        logging.info(f"[{self}] Save yum state for host")
         # For now, that saved state feature does not support several saved states
         assert self.saved_packages_list is None, "There is already a saved package list set"
         self.saved_packages_list = self.packages()
         self.saved_rollback_id = self.get_last_yum_history_tid()
 
     def yum_restore_saved_state(self) -> None:
-        logging.info(f"Restore yum state for host {self}")
+        logging.info(f"[{self}] Restore yum state for host")
         """ Restore yum state to saved state. """
         assert self.saved_packages_list is not None, \
             "Can't restore previous state without a package list: no saved packages list"
@@ -672,18 +739,19 @@ class Host:
         self.saved_packages_list = None
         self.saved_rollback_id = None
 
+    def service_started(self, name: str) -> bool:
+        return self.ssh(f'systemctl is-active {name}', check=False) == 'active'
+
     def reboot(self, verify: bool = False) -> None:
-        logging.info("Reboot host %s" % self)
+        logging.info(f"[{self}] Reboot host")
         # Running `reboot` directly immediately disconnects the ssh session and makes the ssh client return with an
         # error code. Instead, we schedule the reboot a few seconds later to let the ssh command return properly.
         self.ssh('systemd-run --on-active=2s reboot')
         if verify:
-            wait_for(lambda: os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"), "Wait for host down")
-            wait_for(lambda: not os.system(f"ping -c1 {self.hostname_or_ip} > /dev/null 2>&1"),
-                     "Wait for host up", timeout_secs=10 * 60, retry_delay_secs=10)
-            wait_for(lambda: not os.system(f"nc -zw5 {self.hostname_or_ip} 22"),
-                     "Wait for ssh up on host", timeout_secs=10 * 60, retry_delay_secs=5)
-            wait_for(self.is_enabled, "Wait for XAPI to be ready", timeout_secs=30 * 60)
+            self.wait_for_host_down()
+            self.wait_for_host_up()
+            self.wait_for_ssh_reachable()
+            self.wait_for_xapi_enabled()
 
     def management_network(self) -> str:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
@@ -721,10 +789,33 @@ class Host:
         RAID_TYPES = {'raid0', 'raid1', 'raid4', 'raid5', 'raid6', 'raid10', 'linear'}
         USED_TYPES = RAID_TYPES | {'lvm', 'mpath', 'crypt'}
         LSBLK_FIELDS = 'NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN'
+        # The device major numbers we have on an xcp-ng host, except 254 (tapdev) and 202 (xvd)
+        # From /dev/devices:
+        #   8 sd
+        #   9 md
+        #  65 sd
+        #  66 sd
+        #  67 sd
+        #  68 sd
+        #  69 sd
+        #  70 sd
+        #  71 sd
+        # 128 sd
+        # 129 sd
+        # 130 sd
+        # 131 sd
+        # 132 sd
+        # 133 sd
+        # 134 sd
+        # 135 sd
+        # 252 mdp
+        # 253 device-mapper
+        # 259 blkext
+        LSBLK_MAJOR_NUMBERS = '8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259'
 
         devices: list[Host.BlockDeviceInfo] = []
 
-        raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS}')
+        raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS} --include {LSBLK_MAJOR_NUMBERS}')
 
         def _split_keys(line: str) -> list[tuple[str, str]]:
             return re.findall(r'(\S+)=(".*?"|\S+)', line)
@@ -809,7 +900,7 @@ class Host:
                 ))
 
         self.block_devices_info = sorted(devices, key=lambda d: d.size, reverse=True)
-        logging.debug("blockdevs found: %s", [d.name for d in self.block_devices_info])
+        logging.debug(f"[{self}] blockdevs found: {[d.name for d in self.block_devices_info]}")
 
     def disks(self) -> list[Host.BlockDeviceInfo]:
         """ List of all block devices (local disks, mdadm arrays, multipath devices). """
@@ -827,7 +918,7 @@ class Host:
 
     def sr_create(self, sr_type: str, label: str, device_config: dict[str, str], shared: bool = False,
                   verify: bool = False) -> SR:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': prefix_object_name(label),
@@ -838,12 +929,12 @@ class Host:
             params['device-config:{}'.format(key)] = value
 
         logging.info(
-            f"Create {sr_type} SR on host {self} with label '{label}' and device-config: {str(device_config)}"
+            f"[{self}] Create {sr_type} SR on host with label '{label}' and device-config: {str(device_config)}"
         )
         sr_uuid = self.xe('sr-create', params)
         sr = SR(sr_uuid, self.pool)
         if verify:
-            wait_for(sr.exists, "Wait for SR to exist")
+            wait_for(sr.exists, f"[{self}] Wait for SR {sr_uuid} to exist")
         return sr
 
     def is_master(self) -> bool:
@@ -894,7 +985,7 @@ class Host:
 
     def call_plugin(self, plugin_name: str, function: str,
                     args: dict[str, str] | None = None) -> str:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'host-uuid': self.uuid,
             'plugin': plugin_name,
             'fn': function
@@ -977,7 +1068,7 @@ class Host:
         return ret
 
     def pifs(self, device: str | None = None) -> list[PIF]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             "host-uuid": self.uuid,
         }
 
@@ -986,8 +1077,11 @@ class Host:
 
         return [PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
 
+    def tunnels(self) -> list[Tunnel]:
+        return [Tunnel(self, uuid) for uuid in safe_split(self.xe("tunnel-list", {}, minimal=True))]
+
     def create_bond(self, network: Network, pifs: list[PIF], mode: str | None = None) -> Bond:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'network-uuid': network.uuid,
             'pif-uuids': ','.join([pif.uuid for pif in pifs]),
         }
@@ -996,20 +1090,52 @@ class Host:
             args['mode'] = mode
 
         uuid = self.xe("bond-create", args, minimal=True)
-        logging.info(f"New Bond: {uuid}")
+        logging.info(f"[{self}] New Bond: {uuid}")
 
         return Bond(self, uuid)
 
     def create_network(self, label: str, description: str | None = None) -> Network:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'name-label': label,
         }
 
         if description is not None:
             args['name-description'] = description
 
-        logging.info(f"Creating network '{label}'")
+        logging.info(f"[{self}] Creating network '{label}'")
         uuid = self.xe("network-create", args, minimal=True)
-        logging.info(f"New Network: {uuid}")
+        logging.info(f"[{self}] New Network: {uuid}")
 
         return Network(self, uuid)
+
+    def create_vlan(self, network: Network, pif: PIF, vlan: int) -> VLAN:
+        args: XeParams = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'vlan': str(vlan),
+        }
+
+        untagged_pif_uuid = self.xe("vlan-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": untagged_pif_uuid,
+            "param-name": "vlan-master-of",
+        })
+        logging.info(f"New VLAN: {uuid} (untagged-pif: {untagged_pif_uuid})")
+
+        return VLAN(self, uuid)
+
+    def create_tunnel(self, network: Network, pif: PIF, protocol: str) -> Tunnel:
+        args: XeParams = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'protocol': protocol,
+        }
+
+        access_pif_uuid = self.xe("tunnel-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": access_pif_uuid,
+            "param-name": "tunnel-access-PIF-of",
+        })
+        logging.info(f"New Tunnel: {uuid} (access-pif: {access_pif_uuid})")
+
+        return Tunnel(self, uuid)

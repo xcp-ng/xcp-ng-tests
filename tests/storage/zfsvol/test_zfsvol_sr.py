@@ -29,23 +29,6 @@ from tests.storage import (
 pytestmark = pytest.mark.usefixtures("host_at_least_8_3")
 
 
-class TestZfsvolSRCreateDestroy:
-    """
-    Tests that do not use fixtures that setup the SR or import VMs,
-    because they precisely need to test SR creation and destruction,
-    and VM import.
-    """
-
-    def test_create_and_destroy_sr(self, sr_disk_wiped: str, host_with_zfsvol: Host) -> None:
-        host = host_with_zfsvol
-        # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {'device': '/dev/' + sr_disk_wiped}, verify=True)
-        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
-        # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
-        vm.destroy(verify=True)
-        sr.destroy(verify=True)
-
 @pytest.mark.usefixtures("zfsvol_sr")
 class TestZfsvolVm:
 
@@ -101,6 +84,13 @@ class TestZfsvolVm:
         if config.write_volume_cap > 20 * GiB:
             pytest.skip("Skipping large VDI test (known performance issue)")
         xva_export_import(vm_on_zfsvol_sr, compression, temp_large_dir, defer)
+
+    @pytest.mark.xfail # Failing on Exception "Only snapshots can be cloned!"
+    @pytest.mark.small_vm
+    def test_xva_export_import_with_snapshot(self, vm_on_zfsvol_sr: VM, temp_large_dir: str, defer: Defer) -> None:
+        if config.write_volume_cap > 20 * GiB:
+            pytest.skip("Skipping large VDI test (known performance issue)")
+        xva_export_import(vm_on_zfsvol_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat, temp_large_dir: str,

@@ -7,7 +7,7 @@ import traceback
 from packaging import version
 
 import lib.commands as commands
-from lib.common import HostAddress, _param_get, _param_set, safe_split, wait_for, wait_for_not
+from lib.common import HostAddress, _param_get, _param_set, safe_split, wait_for_not
 from lib.efi import EFIAuth
 from lib.host import Host
 from lib.sr import SR
@@ -30,10 +30,7 @@ class Pool:
 
         # wait for XAPI startup to be done, or we can get "Connection
         # refused (calling connect )" when calling self.hosts_uuids()
-        wait_for(lambda: commands.ssh_with_result(master_hostname_or_ip,
-                                                  'xapi-wait-init-complete 60').returncode == 0,
-                 f"Wait for XAPI init to be complete on {master_hostname_or_ip}",
-                 timeout_secs=30 * 60)
+        self.master.wait_for_xapi_enabled()
 
         logging.info("Getting Pool info for %r", master_hostname_or_ip)
         for host_uuid in self.hosts_uuids():
@@ -294,7 +291,11 @@ class Pool:
         master.xe('pool-eject', {'host-uuid': host.uuid, 'force': True})
         wait_for_not(lambda: host.uuid in self.hosts_uuids(), f"Wait for host {host} to be ejected of pool {master}.")
         self.hosts = [h for h in self.hosts if h.uuid != host.uuid]
-        wait_for(host.is_enabled, f"Wait for host {host} to restart in its own pool.", timeout_secs=10 * 60)
+        # The ejected host should reboot
+        host.wait_for_host_down()
+        host.wait_for_host_up()
+        host.wait_for_ssh_reachable()
+        host.wait_for_xapi_enabled()
 
     def network_named(self, network_name: str) -> str:
         return self.master.xe('network-list', {'name-label': network_name}, minimal=True)

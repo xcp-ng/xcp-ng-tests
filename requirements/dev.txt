@@ -13,6 +13,8 @@ types-pygments
 types-colorama
 types-pexpect
 zizmor
-prek>=0.4.1
+prek
 autopep8
+types-passlib
+icecream
 -r base.txt

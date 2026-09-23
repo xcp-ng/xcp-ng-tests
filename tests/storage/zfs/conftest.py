@@ -11,7 +11,16 @@ from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 # Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
-from pkgfixtures import host_with_saved_yum_state, sr_disk_wiped
+from pkgfixtures import (
+    _xfs_config_on_hostA2,
+    _xfs_config_on_hostB1,
+    host_with_saved_yum_state,
+    hostA2_with_xfsprogs,
+    hostB1_with_xfsprogs,
+    sr_disk_wiped,
+    xfs_sr_on_hostA2,
+    xfs_sr_on_hostB1,
+)
 
 from typing import Generator
 

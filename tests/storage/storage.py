@@ -5,8 +5,9 @@ from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import QCOW2_MAX, VHD_MAX, Defer, GiB, MiB, TiB, strtobool, wait_for
+from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
 from lib.host import Host
+from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
@@ -225,10 +226,15 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 
 XVACompression = Literal['none', 'gzip', 'zstd']
 
-def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) -> None:
+def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str,
+                      defer: Defer, *, with_snapshot=False) -> None:
     # clone the vm, so we can resize the disk without affecting the vm from the fixture
     vm: VM | None = source_vm.clone()
+    snap1: Snapshot | None = None
+    snap2: Snapshot | None = None
     defer(lambda: vm.destroy() if vm is not None else None)
+    defer(lambda: snap1.destroy() if snap1 is not None else None)
+    defer(lambda: snap2.destroy() if snap2 is not None else None)
     assert vm is not None
     host = vm.host
     sr = vm.vdis[0].sr
@@ -244,23 +250,28 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     vm.wait_for_vm_running_and_ssh_up()
     install_randstream(vm)
 
-    is_alpine = vm.ssh_with_result('apk --version').returncode == 0
-    if is_alpine:
-        # growpart is not available in alpine 3.12
-        # vm.ssh('apk add cloud-utils-growpart e2fsprogs-extra')
-        vm.ssh('apk add gawk util-linux e2fsprogs-extra')
-        vm.ssh('wget https://raw.githubusercontent.com/canonical/cloud-utils/main/bin/growpart -O /usr/bin/growpart')
-        vm.ssh('chmod +x /usr/bin/growpart')
-        # TODO: maybe use `findmnt -no SOURCE /` from util-linux to get the blockdevice mounted on /
-        growpart_returncode = vm.ssh_with_result('growpart /dev/xvda 3').returncode
-        assert growpart_returncode in [0, 1] # growpart returns 1 if the size is already the expected one
-        vm.ssh('resize2fs /dev/xvda3')
-        stream_size = min(volume_size // 2, config.write_volume_cap)
+    root_partition_size = vm.grow_root_partition()
+    if root_partition_size is not None:
+        stream_size = min(root_partition_size // 2, config.write_volume_cap)
     else:
         stream_size = 500 * MiB
 
-    checksum = randstream(vm, f'generate --size {stream_size} /root/data')
-    randstream(vm, f'validate --expected-checksum {checksum} /root/data')
+    file_size = (stream_size // 3) // 32768 * 32768
+    checksum1 = randstream(vm, f'generate --size {file_size} /root/data1')
+    randstream(vm, f'validate --expected-checksum {checksum1} /root/data1')
+
+    if with_snapshot:
+        snap1 = vm.snapshot()
+
+    checksum2 = randstream(vm, f'generate --size {file_size} /root/data2')
+    randstream(vm, f'validate --expected-checksum {checksum2} /root/data2')
+
+    if with_snapshot:
+        snap2 = vm.snapshot()
+
+    checksum3 = randstream(vm, f'generate --size {file_size} /root/data3')
+    randstream(vm, f'validate --expected-checksum {checksum3} /root/data3')
+
     vm.shutdown(verify=True)
 
     xva_path = f'{temp_large_dir}/{vm.uuid}.xva'
@@ -285,7 +296,9 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
 
     imported_vm.start()
     imported_vm.wait_for_vm_running_and_ssh_up()
-    randstream(imported_vm, f'validate --expected-checksum {checksum} /root/data')
+    randstream(imported_vm, f'validate --expected-checksum {checksum1} /root/data1')
+    randstream(imported_vm, f'validate --expected-checksum {checksum2} /root/data2')
+    randstream(imported_vm, f'validate --expected-checksum {checksum3} /root/data3')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
     vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)

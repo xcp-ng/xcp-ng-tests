@@ -7,3 +7,6 @@ tests/xen/ @xcp-ng/os-platform-release @xcp-ng/hypervisor-kernel
 
 tests/xapi/ @xcp-ng/os-platform-release @xcp-ng/xapi-network
 tests/network/ @xcp-ng/os-platform-release @xcp-ng/xapi-network
+
+tests/guest_tools/win @xcp-ng/os-platform-release @xcp-ng/windows-guest-tools
+lib/windows @xcp-ng/os-platform-release @xcp-ng/windows-guest-tools

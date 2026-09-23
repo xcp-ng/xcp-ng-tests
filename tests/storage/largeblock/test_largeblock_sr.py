@@ -17,30 +17,6 @@ if TYPE_CHECKING:
 # Requirements:
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
 
-class TestLARGEBLOCKSRCreateDestroy:
-    """
-    Tests that do not use fixtures that setup the SR or import VMs,
-    because they precisely need to test SR creation and destruction,
-    and VM import.
-    """
-
-    def test_create_sr_with_missing_device(self, host: Host) -> None:
-        try_to_create_sr_with_missing_device('largeblock', 'LARGEBLOCK-local-SR-test', host)
-
-    def test_create_and_destroy_sr(self, host: Host,
-                                   unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                                   image_format: ImageFormat) -> None:
-        # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr_disk = unused_4k_disks[host][0].name
-        sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
-                            {'device': '/dev/' + sr_disk,
-                             'preferred-image-formats': image_format}, verify=True)
-        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
-        # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
-        vm.destroy(verify=True)
-        sr.destroy(verify=True)
-
 @pytest.mark.usefixtures("largeblock_sr")
 class TestLARGEBLOCKSR:
     @pytest.mark.quicktest

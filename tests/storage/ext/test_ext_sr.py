@@ -27,31 +27,6 @@ from tests.storage import (
 # Requirements:
 # - one XCP-ng host with an additional unused disk for the SR
 
-class TestEXTSRCreateDestroy:
-    """
-    Tests that do not use fixtures that setup the SR or import VMs,
-    because they precisely need to test SR creation and destruction,
-    and VM import.
-    """
-
-    def test_create_sr_with_missing_device(self, host: Host) -> None:
-        try_to_create_sr_with_missing_device('ext', 'EXT-local-SR-test', host)
-
-    def test_create_and_destroy_sr(self, host: Host,
-                                   unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
-                                   image_format: ImageFormat
-                                   ) -> None:
-        # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr_disk = unused_512B_disks[host][0].name
-        sr = host.sr_create('ext', "EXT-local-SR-test",
-                            {'device': '/dev/' + sr_disk,
-                             'preferred-image-formats': image_format}, verify=True)
-        # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
-        # the next tests, because errors in fixtures break teardown
-        vm = host.import_vm(vm_image('mini-linux-x86_64-bios'), sr_uuid=sr.uuid)
-        vm.destroy(verify=True)
-        sr.destroy(verify=True)
-
 @pytest.mark.usefixtures("ext_sr")
 class TestEXTSR:
     @pytest.mark.quicktest
@@ -99,6 +74,10 @@ class TestEXTSR:
         xva_export_import(vm_on_ext_sr, compression, temp_large_dir, defer)
 
     @pytest.mark.small_vm
+    def test_xva_export_import_with_snapshot(self, vm_on_ext_sr: VM, temp_large_dir: str, defer: Defer) -> None:
+        xva_export_import(vm_on_ext_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
+
+    @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, ext_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
         vdi_export_import(storage_test_vm, ext_sr, image_format, temp_large_dir, defer)
@@ -127,7 +106,7 @@ class TestEXTSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_resize(self, vm_on_ext_sr: VM) -> None:
+    def test_resize_vdi(self, vm_on_ext_sr: VM) -> None:
         vm = vm_on_ext_sr
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
         old_size = vdi.get_virtual_size()
@@ -139,7 +118,7 @@ class TestEXTSR:
 
     @pytest.mark.small_vm
     @pytest.mark.big_vm
-    def test_failing_resize(self, host: Host, ext_sr: SR, vm_on_ext_sr: VM, exit_on_fistpoint: None) -> None:
+    def test_failing_resize_vdi(self, host: Host, ext_sr: SR, vm_on_ext_sr: VM, exit_on_fistpoint: None) -> None:
         vm = vm_on_ext_sr
         vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
         old_size = vdi.get_virtual_size()

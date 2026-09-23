@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 
@@ -19,6 +20,65 @@ class JobData(TypedDict):
     name_filter: NotRequired[str]
 
 JOBS: dict[str, JobData] = {
+    "postinstall": {
+        "description":
+            "Minimal set of tests to run after an installation or an upgrade.",
+        "requirements": [
+            "A pool master with a local SR. Can be a single-host pool.",
+            "A VM (small and fast-booting).",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": [
+            "tests/xapi/firstboot",
+            "tests/xo/test_xo_connection.py",
+            "tests/misc",
+            "tests/system",
+        ],
+        "markers": "not hostA2 and (small_vm or no_vm) and not reboot and not complex_prerequisites and not sr_disk",
+    },
+    "postinstall-intrapool-migrate": {
+        "description":
+            "Minimal intra-pool live-migrate tests to run after an installation or an upgrade.",
+        "requirements": [
+            "A pool with at least 2 hosts and a shared SR in addition to local SRs on hosts. The shared SR is the "
+            "default SR of the pool.",
+            "A VM (small and fast-booting).",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": [
+            "tests/misc/test_basic_without_ssh.py::TestBasicNoSSH::test_live_migrate",
+        ],
+    },
+    "postinstall-with-tls": {
+        "description":
+            "Minimal set of tests to run after an installation or an upgrade, and after enabling TLS verification in "
+            "the case of an upgrade. Includes a pool join test.",
+        "requirements": [
+            "A pool with at least 2 hosts.",
+            "(If the pool has only one host, you can add `-m 'not hostA2'` parameter but this will skip the TLS "
+            "verification test.)",
+            "A second one-host pool, without any shared storage, which will be temporarily joined to the first pool.",
+            "(If you can't provide a second pool, which is too bad because this skips pool join tests, add "
+            "`-m 'not hostB1'`, and specify the pool master of the first pool twice.)",
+            "TLS verification enabled on both pools.",
+            "A VM (small and fast-booting).",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": [
+            "tests/xapi/tls_verification",
+            # because we want to test a pool join
+            "tests/uefi_sb/test_varstored_cert_flow.py::TestPoolToDiskCertInheritanceOnPoolJoin",
+        ],
+    },
     "main": {
         "description": "a group of not-too-long tests that run either without a VM, or with a single small one",
         "requirements": [
@@ -27,6 +87,7 @@ JOBS: dict[str, JobData] = {
             "An additional free disk on the first host.",
             "Config in data.py for another NFS SR.",
             "A VM (small and fast-booting).",
+            "On XCP-ng 8.3+: TLS verification must be enabled.",
         ],
         "nb_pools": 2,
         "params": {
@@ -43,7 +104,8 @@ JOBS: dict[str, JobData] = {
             "tests/xapi_plugins",
             "tests/install/test_fixtures.py",
         ],
-        "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
+        "markers": "(small_vm or no_vm) and not flaky and not reboot "
+        "and not hosts_with_xo and not complex_prerequisites",
     },
     "main-multi-unix": {
         "description": "a group of tests that need to run on the largest variety of VMs - unix split",
@@ -78,16 +140,17 @@ JOBS: dict[str, JobData] = {
     "network-advanced": {
         "description": "a group of network tests with complex prerequisites",
         "requirements": [
-            "A pool with at least 1 host.",
+            "A pool with at least 1 host (if more, with same network configuration).",
             "At least 2 free NICs on every host.",
             "A small VM that can be imported on the SRs.",
+            "xo-cli locally installed, in $PATH, and registered to an XO instance.",
         ],
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/network"],
-        "markers": "complex_prerequisites",
+        "markers": "complex_prerequisites or hosts_with_xo",
     },
     "packages": {
         "description": "tests that packages can be installed correctly",
@@ -253,6 +316,19 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/storage"],
         "markers": "quicktest and not unused_4k_disks",
         "name_filter": "not linstor and not zfsvol",
+    },
+    "storage-benchmarks": {
+        "description": "runs disk benchmark tests",
+        "requirements": [
+            "A local SR on host A1"
+            "A small VM that can be imported on the SR",
+            "Enough storage space to store the largest test file (numjobs*memory*2)G"
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/storage/benchmarks"],
     },
     "linstor-main": {
         "description": "tests the linstor storage driver, but avoids migrations and reboots",
@@ -584,10 +660,6 @@ JOBS: dict[str, JobData] = {
 BROKEN_TESTS = [
     # not really broken but has complex prerequisites (3 NICs on 3 different networks)
     "tests/migration/test_host_evacuate.py::TestHostEvacuateWithNetwork",
-    # needs maintenance (fail on xfs)
-    "tests/storage/glusterfs",
-    # needs Fibre Channel host bus adapter (HBA)
-    "tests/storage/lvmohba",
     # running quicktest on zfsvol generates dangling TAP devices that are hard to
     # cleanup. Bug needs to be fixed before enabling quicktest on zfsvol.
     "tests/storage/zfsvol/test_zfsvol_sr.py::TestZfsvolVm::test_quicktest",
@@ -815,9 +887,15 @@ def action_run(args: argparse.Namespace) -> None:
         print(f"Error: only {nb_pools} master host(s) provided, {job_nb_pools} required.")
         sys.exit(1)
 
-    res = subprocess.run(cmd)
-    if res.returncode:
-        sys.exit(1)
+    # Use `execvp` instead of `subprocess.run` to avoid signal handling issues.
+    # With `subprocess.run`, both the Python parent and the pytest child are in
+    # the same process group and receive SIGINT. But `subprocess.run` internal
+    # logic then terminates the child with SIGKILL before pytest can finish its
+    # teardown. With `execvp`, the current process is replaced by pytest entirely
+    # so pytest handles SIGINT on its own and teardown runs normally.
+    # execvp: "v" = args as a list, "p" = resolve program via PATH.
+    os.execvp(cmd[0], cmd)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Manage test jobs")

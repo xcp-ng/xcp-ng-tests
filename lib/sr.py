@@ -6,6 +6,7 @@ import time
 import lib.commands as commands
 from lib.common import (
     GiB,
+    XeParams,
     _param_add,
     _param_clear,
     _param_get,
@@ -20,7 +21,7 @@ from lib.common import (
 )
 from lib.vdi import VDI, ImageFormat
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, Self, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -80,8 +81,15 @@ class SR:
         if verify:
             wait_for(self.all_pbds_attached, "Wait for PBDs attached")
 
+    def try_plug_pbds(self) -> bool:
+        try:
+            self.plug_pbds(verify=True)
+            return True
+        except commands.SSHCommandFailed:
+            return False
+
     def vdi_uuids(self, managed: bool = False, name_label: str | None = None) -> list[str]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'sr-uuid': self.uuid,
             'managed': managed
         }
@@ -195,6 +203,16 @@ class SR:
     def content_type(self) -> str:
         return self.param_get('content-type')
 
+    @classmethod
+    def introduce(cls, pool: Pool, type: str, shared: bool, name_label: str, sr_uuid: str) -> Self:
+        return cls(
+            pool.master.xe(
+                'sr-introduce',
+                {'uuid': sr_uuid, 'type': type, 'shared': shared, 'content-type': 'user', 'name-label': name_label},
+            ),
+            pool,
+        )
+
     def is_shared(self) -> bool:
         if self._is_shared is None:
             self._is_shared = strtobool(self.param_get('shared'))
@@ -213,7 +231,7 @@ class SR:
     ) -> VDI:
         name_label = name_label or f'test-vdi-{randid()}'
         logging.info("Create VDI %r on SR %s", name_label, self.uuid)
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'name-label': prefix_object_name(name_label),
             'virtual-size': str(virtual_size),
             'sr-uuid': self.uuid,

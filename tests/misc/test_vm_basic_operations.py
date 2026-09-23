@@ -23,13 +23,17 @@ class Test:
         vm = running_vm
         vm.test_snapshot_on_running_vm()
 
-    # When using a windows VM the background ssh process is never terminated
+    # When running the tests on Windows, the background ssh process is never terminated
     # This results in a ResourceWarning
     @pytest.mark.filterwarnings("ignore::ResourceWarning")
     def test_checkpoint(self, running_vm: VM) -> None:
         vm = running_vm
         logging.info("Start a 'sleep' process on VM through SSH")
-        pid = vm.start_background_process('sleep 10000')
+        if vm.is_windows:
+            pid = vm.start_background_powershell('Start-Sleep -Seconds 10000')
+        else:
+            pid = vm.start_background_process('sleep 10000')
+        logging.info(f"Background task PID: {pid}")
         snapshot = vm.checkpoint()
         filepath = '/tmp/%s' % snapshot.uuid
         vm.ssh_touch_file(filepath)
@@ -39,8 +43,8 @@ class Test:
         logging.info("Check file does not exist anymore")
         vm.ssh(f'test ! -f {filepath}')
         logging.info("Check 'sleep' process is still running")
-        assert vm.pid_exists(pid)
+        assert vm.pid_exists(pid, winpid=True)
         logging.info("Kill background process")
-        vm.ssh(f'kill {pid}')
-        wait_for_not(lambda: vm.pid_exists(pid), "Wait for process %s not running anymore" % pid)
+        vm.kill_pid(pid, winpid=True)
+        wait_for_not(lambda: vm.pid_exists(pid, winpid=True), "Wait for process %s not running anymore" % pid)
         snapshot.destroy(verify=True)

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, List, Literal, overload
 if TYPE_CHECKING:
     from lib.host import Host
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
 
 class BaseVM:
@@ -97,7 +97,7 @@ class BaseVM:
 
     def export(self, filepath: str, compress: str = 'none', use_cache: bool = False) -> None:
         logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'uuid': self.uuid,
             'compress': compress,
             'filename': filepath

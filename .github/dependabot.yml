@@ -4,15 +4,37 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/uv-setup"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
     cooldown:
       default-days: 7
+    commit-message:
+      prefix: "uv.lock: "
+    groups:
+      ci-deps:
+        patterns:
+          - "*"
+
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    commit-message:
+      prefix: "uv.lock: "
+    groups:
+      base-deps:
+        dependency-type: "production"
+        patterns:
+          - "*"
+      dev-deps:
+        dependency-type: "development"
+        patterns:
+          - "*"

@@ -3,12 +3,16 @@ from __future__ import annotations
 import pytest
 
 import functools
+import itertools
+import json
 import logging
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import lib.commands as commands
 from lib import config
+from lib.common import safe_split
 
 try:
     from data import LINSTOR_REDUNDANCY  # type: ignore
@@ -16,7 +20,15 @@ except ImportError:
     LINSTOR_REDUNDANCY = 2
 
 # explicit import for package-scope fixtures
-from pkgfixtures import pool_with_saved_yum_state
+from pkgfixtures import (
+    _xfs_config_on_hostA2,
+    _xfs_config_on_hostB1,
+    hostA2_with_xfsprogs,
+    hostB1_with_xfsprogs,
+    pool_with_saved_yum_state,
+    xfs_sr_on_hostA2,
+    xfs_sr_on_hostB1,
+)
 
 from typing import TYPE_CHECKING, Generator
 
@@ -41,10 +53,26 @@ def _linstor_config() -> LinstorConfig:
     return LinstorConfig()
 
 @pytest.fixture(scope='package')
-def lvm_disks(
+def linstor_host_indexes_without_vg(pytestconfig: pytest.Config) -> list[int]:
+    args = pytestconfig.getoption("--linstor-hosts-without-vg")
+    assert args is not None
+    return [
+        int(host_index) - 1 # Input indexes starts at 1
+        for host_index in itertools.chain(*[arg.split(',') for arg in args])
+    ]
+
+@pytest.fixture(scope='package')
+def linstor_hosts_with_lvm_disks(
     pool_with_unused_512B_disk: Pool,
+    linstor_host_indexes_without_vg: list[int],
+) -> list[Host]:
+    return [host for i, host in enumerate(pool_with_unused_512B_disk.hosts) if i not in linstor_host_indexes_without_vg]
+
+@pytest.fixture(scope='package')
+def lvm_disks(
     unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
     provisioning_type: str,
+    linstor_hosts_with_lvm_disks: list[Host]
 ) -> Generator[None, None, None]:
     """
     Common LVM PVs on which a LV is created on each host of the pool.
@@ -56,7 +84,8 @@ def lvm_disks(
     Return the list of device node paths for that list of devices
     used in all hosts.
     """
-    hosts = pool_with_unused_512B_disk.hosts
+    hosts = linstor_hosts_with_lvm_disks
+    assert len(hosts) >= 1
 
     @functools.cache
     def host_devices(host: Host) -> list[str]:
@@ -107,14 +136,14 @@ def pool_with_linstor(
     import concurrent.futures
     pool = pool_with_saved_yum_state
 
-    def check_linstor_installed(host: Host) -> None:
+    def ensure_linstor_not_installed(host: Host) -> None:
         if host.is_package_installed(LINSTOR_PACKAGE):
             raise Exception(
                 f'{LINSTOR_PACKAGE} is already installed on host {host}. This should not be the case.'
             )
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(check_linstor_installed, pool.hosts)
+        executor.map(ensure_linstor_not_installed, pool.hosts)
 
     def install_linstor(host: Host) -> None:
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
@@ -148,11 +177,10 @@ def pool_with_linstor(
         executor.map(remove_linstor, pool.hosts)
 
 @pytest.fixture(scope='package')
-def linstor_redundancy(pool_with_linstor: Pool) -> int:
-    return min(len(pool_with_linstor.hosts), LINSTOR_REDUNDANCY)
+def linstor_redundancy(linstor_hosts_with_lvm_disks: list[Host]) -> int:
+    return min(len(linstor_hosts_with_lvm_disks), LINSTOR_REDUNDANCY)
 
-@pytest.fixture(scope='package')
-def linstor_sr(
+def _linstor_sr(
     pool_with_linstor: Pool,
     linstor_redundancy: int,
     provisioning_type: str,
@@ -172,15 +200,34 @@ def linstor_sr(
         _linstor_config.uninstall_linstor = False
         raise pytest.fail("Could not destroy linstor SR, leaving packages in place for manual cleanup") from e
 
+linstor_sr = pytest.fixture(_linstor_sr, scope='package')
+linstor_sr_ephemeral = pytest.fixture(_linstor_sr, scope='function')
+
 @pytest.fixture(scope='module')
 def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI, None, None]:
     vdi = linstor_sr.create_vdi('LINSTOR-VDI-test', virtual_size=config.volume_size)
     yield vdi
     vdi.destroy()
 
+@contextmanager
+def _vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    """
+    Context manager to provide the fixture lifecycle on a VM on a Linstor SR
+    with different scopes without repeating the code.
+    """
+    vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
+    try:
+        yield vm
+    finally:
+        logging.info("<< Destroy VM")
+        vm.destroy(verify=True)
+
 @pytest.fixture(scope='module')
 def vm_on_linstor_sr(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
-    vm = host.import_vm(vm_ref, sr_uuid=linstor_sr.uuid)
-    yield vm
-    logging.info("<< Destroy VM")
-    vm.destroy(verify=True)
+    with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
+        yield vm
+
+@pytest.fixture(scope='function')
+def vm_on_linstor_sr_function(host: Host, linstor_sr: SR, vm_ref: str) -> Generator[VM]:
+    with _vm_on_linstor_sr(host, linstor_sr, vm_ref) as vm:
+        yield vm
