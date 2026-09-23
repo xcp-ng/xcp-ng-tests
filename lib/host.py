@@ -176,6 +176,7 @@ class Host:
                     # value: {tag: tag_value}, {'foo': 'bar', 'baz': 'foo'}
                     # return: shell escaped version of sub-string in BAGGAGE="foo=bar;baz=foo"
                     # NOTE maybe values without quotes are accepted in baggages?
+                    # => all I found are string, even for numbers
                     # NOTE not using shlex.quote, maybe not needed or is it accepted and better do it now than fix later?
                     value_str = ';'.join(f'{key2}={value2}' for key2, value2 in value.items())
                     return f'{key}="{value_str}" '
@@ -188,6 +189,7 @@ class Host:
             # value: 'foo=bar'
             # return: shell escaped version of sub-string in BAGGAGE="foo=bar"
             # NOTE maybe values without quotes are accepted in baggages?
+            # => all I found are string, even for numbers
             # NOTE not using shlex.quote, maybe not needed or is it accepted and better do it now than fix later?
             if vars:
                 return f'{key}="{value}" '

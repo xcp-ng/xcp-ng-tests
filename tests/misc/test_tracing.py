@@ -34,7 +34,7 @@ class TestTracing:
         # output tracing stats
         if tracing.enabled:
             logging.info(f'xe {operation} trace ID: {traceparent.split("-", 3)[1]}')
-            span = tracing.locate_span_zipkin(f'xe {operation}', tag1, tag1_value)
+            span = tracing.locate_span(f'xe {operation}', tag1, tag1_value)
             assert span, f"Couldn't find a span with tag {tag1}"
             span_tag1_value = span.get("tags", {}).get(tag1)
             assert span_tag1_value == tag1_value, f'Tag value expected: {tag1_value}, actual: {span_tag1_value}'
