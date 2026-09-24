@@ -150,6 +150,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="List of hosts (comma-separated) that will skip VG creation during linstor tests."
              " Those are indexes starting from 1 (pool master).",
     )
+    parser.addoption(
+        "--blktap-max-duration",
+        action="store",
+        type=int,
+        default=30,
+        help="Maximum duration, in seconds, of the long running blktap stress tests."
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -165,6 +172,7 @@ def pytest_configure(config: pytest.Config) -> None:
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
+    global_config.blktap_max_duration = config.getoption('--blktap-max-duration')
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
