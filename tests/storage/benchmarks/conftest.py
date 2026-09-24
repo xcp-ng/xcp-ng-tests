@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from lib.common import GiB, PackageManagerEnum
+from lib.common import GiB
 from lib.host import Host
 from lib.sr import SR
 from lib.vbd import VBD
@@ -18,40 +18,9 @@ from lib.vm import VM
 
 from .helpers import FioBenchmarkCSV, load_results_from_csv
 
-from typing import Generator, assert_never
+from typing import Generator
 
 MAX_LENGTH = 64 * GiB
-
-
-@pytest.fixture(scope="module")
-def running_unix_vm_with_fio(running_unix_vm: VM) -> Generator[VM, None, None]:
-    vm = running_unix_vm
-    snapshot = vm.snapshot()
-
-    package_manager = vm.detect_package_manager()
-    match package_manager:
-        case PackageManagerEnum.APT_GET:
-            vm.ssh("apt-get update && apt install -y fio")
-        case PackageManagerEnum.YUM:
-            vm.ssh("yum install -y fio")
-        case PackageManagerEnum.DNF:
-            vm.ssh("dnf install -y fio")
-        case PackageManagerEnum.ZYPPER:
-            vm.ssh("zypper install -y fio")
-        case PackageManagerEnum.APK:
-            vm.ssh("apk add fio")
-        case PackageManagerEnum.UNKNOWN:
-            raise RuntimeError("Unsupported package manager: could not install fio")
-        case _:
-            assert_never(package_manager)
-
-    yield vm
-
-    # teardown
-    try:
-        snapshot.revert()
-    finally:
-        snapshot.destroy()
 
 
 @pytest.fixture(scope="function")
