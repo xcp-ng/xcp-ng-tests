@@ -4,10 +4,11 @@ import pytest
 
 import logging
 import random
+import time
 
 from lib import config
 from lib.blktap import TapCtl, VBDConnector, XenStoreHelper
-from lib.common import MiB
+from lib.common import Defer, MiB, wait_for
 from lib.host import Host
 from lib.vm import VM
 from tests.storage import install_randstream
@@ -15,7 +16,9 @@ from tests.storage.blktap import (
     ConnectedVBD,
     assert_tapdisk_destroyed,
     assert_tapdisk_io,
+    start_fio,
     wait_for_guest_device,
+    wait_for_guest_reads,
     write_then_read,
 )
 from tests.storage.storage import StreamSpan, compute_span_layout
@@ -24,7 +27,8 @@ from tests.storage.storage import StreamSpan, compute_span_layout
 #
 # Requirements:
 # - an XCP-ng host with blktap and tapback
-# - a small unix VM with dd and blockdev in the guest, and internet access (to install randstream)
+# - a small unix VM with dd and blockdev in the guest, and internet access (to install randstream
+#   and fio)
 
 @pytest.mark.small_vm
 @pytest.mark.unix_vm
@@ -95,7 +99,7 @@ class TestTapbackIntegration:
 
 @pytest.mark.small_vm
 @pytest.mark.unix_vm
-class TestDataIntegrity:
+class TestPauseUnpause:
     @pytest.mark.parametrize("reopen", [False, True], ids=["pause", "pause-reopen"])
     def test_data_integrity_across_pause(self, host: Host, connected_vbd: ConnectedVBD, reopen: bool) -> None:
         """Random data written before a tapdisk pause/unpause must be read back unchanged."""
@@ -122,3 +126,45 @@ class TestDataIntegrity:
 
         for span in spans:
             span.validate(vm, dev)
+
+    @pytest.mark.parametrize('image_type', ['vhd', 'qcow2'])
+    def test_pause_unpause_loop_during_io(self, host: Host, running_unix_vm_with_fio: VM, image_type: str,
+                                          request: pytest.FixtureRequest, vbd_connector: VBDConnector,
+                                          defer: Defer) -> None:
+        """tapdisk survives repeated pause/unpause during guest I/O, and doesn't lose any request."""
+        vm = running_unix_vm_with_fio
+        image = f"{image_type}:{request.getfixturevalue(f'{image_type}_path')}"
+        device = "xvdc"
+        defer(lambda: vm.ssh('pkill -9 fio', check=False))
+        pid, minor = vbd_connector.connect(vm, image, device)
+        wait_for_guest_device(vm, device)
+        # fio must outlive the pause/unpause cycles
+        start_fio(vm, device, runtime=config.blktap_max_duration + 60)
+        wait_for_guest_reads(host, pid, minor)
+
+        tapctl = TapCtl(host)
+        cycles = 0
+        deadline = time.monotonic() + config.blktap_max_duration
+        while time.monotonic() < deadline:
+            cycles += 1
+            tapctl.pause(pid, minor)
+            # one cycle out of two, unpause with the image path, which makes tapdisk close and
+            # reopen it, like SM does
+            tapctl.unpause(pid, minor, image if cycles % 2 == 0 else None)
+            # tapdisk answers, and serves the guest reads again: its stats move
+            read_secs = tapctl.stats(pid, minor)['secs'][0]
+            wait_for(lambda: tapctl.stats(pid, minor)['secs'][0] > read_secs,
+                     f"Wait for guest reads after the unpause #{cycles}", timeout_secs=30)
+        logging.info(f"{cycles} pause/unpause cycles done")
+
+        # No request was lost across the pauses: the killed fio exits (a process waiting for a
+        # lost request can't), and the device has no request in flight anymore
+        vm.ssh('pkill -9 fio')
+        wait_for(lambda: vm.ssh_with_result('pgrep fio').returncode != 0,
+                 "Wait for fio to exit", timeout_secs=30)
+        inflight = vm.ssh(f'cat /sys/block/{device}/inflight').split()
+        assert inflight == ['0', '0'], \
+            f"Requests still in flight on /dev/{device}: {inflight}"
+        vbd_connector.disconnect(vm, device)
+        wait_for_guest_device(vm, device, present=False)
+        assert_tapdisk_destroyed(host, pid, minor)
