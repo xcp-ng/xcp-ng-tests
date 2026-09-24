@@ -1,6 +1,6 @@
 name: Static code checkers
 
-on: [push]
+on: [push, pull_request]
 
 permissions: {}
 
@@ -9,6 +9,7 @@ env:
 
 jobs:
   mypy:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -22,6 +23,7 @@ jobs:
       - run: prek -a mypy
 
   pyright:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -35,6 +37,7 @@ jobs:
       - run: prek -a pyright
 
   ruff:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: "1"
@@ -48,6 +51,7 @@ jobs:
       - run: prek -a ruff
 
   flake8:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -57,6 +61,7 @@ jobs:
       - run: prek -a flake8
 
   autopep8:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
