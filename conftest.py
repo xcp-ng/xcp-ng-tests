@@ -16,6 +16,7 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
+from lib.blktap_options import blktap_options_help, parse_blktap_options
 from lib.common import (
     Defer,
     DiskDevName,
@@ -150,6 +151,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="List of hosts (comma-separated) that will skip VG creation during linstor tests."
              " Those are indexes starting from 1 (pool master).",
     )
+    parser.addoption(
+        "--blktap",
+        action="append",
+        default=[],
+        metavar="KEY:VALUE",
+        help="Option of the blktap tests, as KEY:VALUE (repeated, or separated by commas); "
+             "--blktap help describes them."
+    )
+
+def pytest_cmdline_main(config: pytest.Config) -> int | None:
+    items = [item.strip() for argument in config.getoption('--blktap') or [] for item in argument.split(',')]
+    if 'help' in items:
+        print(blktap_options_help())
+        return 0
+    return None
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -165,6 +181,10 @@ def pytest_configure(config: pytest.Config) -> None:
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
+    try:
+        global_config.blktap = parse_blktap_options(config.getoption('--blktap') or [])
+    except ValueError as e:
+        raise pytest.UsageError(str(e)) from e
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
