@@ -92,6 +92,19 @@ class TapCtl:
             args += ["-t", timeout]
         self._run(*args)
 
+    def pause(self, pid: int, minor: int, timeout: int | None = None) -> None:
+        args: list[object] = ["pause", "-p", pid, "-m", minor]
+        if timeout is not None:
+            args += ["-t", timeout]
+        self._run(*args)
+
+    def unpause(self, pid: int, minor: int, path: str | None = None) -> None:
+        """Resume the I/O, optionally reopening the image or switching to a new one."""
+        args: list[object] = ["unpause", "-p", pid, "-m", minor]
+        if path:
+            args += ["-a", path]
+        self._run(*args)
+
     def list(self, pid: int | None = None, minor: int | None = None) -> list[TapdiskInfo]:
         args: list[object] = ["list"]
         if pid is not None:
