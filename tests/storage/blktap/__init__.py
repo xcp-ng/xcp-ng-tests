@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from lib.blktap import TapCtl
 from lib.common import MiB, wait_for
 
@@ -8,6 +10,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.vm import VM
+
+@dataclass
+class ConnectedVBD:
+    vm: VM
+    device: str
+    image: str  # "<format>:<path>", as given to connect()
+    pid: int
+    minor: int
 
 def wait_for_guest_device(vm: VM, device: str, present: bool = True) -> None:
     """Wait for /dev/<device> to appear in the guest (or to disappear, if present is False)."""
