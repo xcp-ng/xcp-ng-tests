@@ -46,3 +46,10 @@ def assert_tapdisk_destroyed(host: Host, pid: int, minor: int) -> None:
         result = host.ssh_with_result(f'tap-ctl list {option} {value}')
         assert result.returncode != 0 or not result.stdout.strip(), \
             f"tap-ctl list {option} {value} still lists a tapdisk:\n{result.stdout}"
+
+def wait_for_tapdisk_exit(host: Host, pid: int) -> None:
+    # The driver refuses to free a minor (EBUSY) as long as its ring is in use (ring->task
+    # in drivers/block/blktap2/ring.c), which lasts until the tapdisk exits, even after
+    # the detach: the minors can only be freed once the tapdisk exited, after its last detach.
+    wait_for(lambda: host.ssh_with_result(f'test -d /proc/{pid}').returncode != 0,
+             f"Wait for tapdisk {pid} to exit after its last detach", timeout_secs=30)
