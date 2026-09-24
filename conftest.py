@@ -20,6 +20,7 @@ from lib.common import (
     Defer,
     DiskDevName,
     HostAddress,
+    PackageManagerEnum,
     callable_marker,
     is_uuid,
     parse_size,
@@ -42,7 +43,7 @@ from lib.xo import _allow_xo_cli, xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Generator, Iterable, Sequence
+from typing import Any, Generator, Iterable, Sequence, assert_never
 
 # Do we cache VMs?
 try:
@@ -855,6 +856,36 @@ def unix_vm(imported_vm: VM) -> Generator[VM, None, None]:
 def running_unix_vm(unix_vm: VM, running_vm: VM) -> VM:
     return running_vm
     # no teardown
+
+@pytest.fixture(scope="module")
+def running_unix_vm_with_fio(running_unix_vm: VM) -> Generator[VM, None, None]:
+    vm = running_unix_vm
+    snapshot = vm.snapshot()
+
+    package_manager = vm.detect_package_manager()
+    match package_manager:
+        case PackageManagerEnum.APT_GET:
+            vm.ssh("apt-get update && apt install -y fio")
+        case PackageManagerEnum.YUM:
+            vm.ssh("yum install -y fio")
+        case PackageManagerEnum.DNF:
+            vm.ssh("dnf install -y fio")
+        case PackageManagerEnum.ZYPPER:
+            vm.ssh("zypper install -y fio")
+        case PackageManagerEnum.APK:
+            vm.ssh("apk add fio")
+        case PackageManagerEnum.UNKNOWN:
+            raise RuntimeError("Unsupported package manager: could not install fio")
+        case _:
+            assert_never(package_manager)
+
+    yield vm
+
+    # teardown
+    try:
+        snapshot.revert()
+    finally:
+        snapshot.destroy()
 
 @pytest.fixture(scope='module')
 def windows_vm(imported_vm: VM) -> Generator[VM, None, None]:
