@@ -46,11 +46,43 @@ class TapCtl:
                 raise TapCtlError(f"tap-ctl {' '.join(str(a) for a in args)} failed: {e}")
             return ""
 
+    def spawn(self) -> int:
+        """Spawn a new tapdisk daemon, return its pid."""
+        # Output format: "tapdisk spawned with pid 12345" or just "12345"
+        output = self._run("spawn").strip()
+        match = re.search(r'(\d+)', output)
+        if match:
+            return int(match.group(1))
+        raise TapCtlError(f"Could not parse spawn output: {output}")
+
+    def allocate(self) -> tuple[int, str]:
+        """Allocate a minor, return it with its device path."""
+        device = self._run("allocate").strip()
+        match = re.search(r'tapdev(\d+)', device)
+        if match:
+            return int(match.group(1)), device
+        raise TapCtlError(f"Could not parse allocate output: {device}")
+
     def free(self, minor: int) -> None:
         self._run("free", "-m", minor)
 
+    def attach(self, pid: int, minor: int) -> None:
+        self._run("attach", "-p", pid, "-m", minor)
+
     def detach(self, pid: int, minor: int) -> None:
         self._run("detach", "-p", pid, "-m", minor)
+
+    def open(self, pid: int, minor: int, path: str, readonly: bool = False, no_o_direct: bool = False,
+             timeout: int | None = None) -> None:
+        """Open an image, given as "type:/path/to/file"."""
+        args: list[object] = ["open", "-p", pid, "-m", minor, "-a", path]
+        if readonly:
+            args.append("-R")
+        if no_o_direct:
+            args.append("-D")
+        if timeout is not None:
+            args += ["-t", timeout]
+        self._run(*args)
 
     def close(self, pid: int, minor: int, force: bool = False, timeout: int | None = None) -> None:
         args: list[object] = ["close", "-p", pid, "-m", minor]
