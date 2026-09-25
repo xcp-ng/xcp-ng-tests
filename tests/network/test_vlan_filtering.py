@@ -35,6 +35,7 @@ def start_vm_on_trunk(
 
     return vm, iface
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD xapi version on v9 doesn't have VLAN filtering
 @pytest.mark.small_vm
 class TestBasic:
     def test_passing(
