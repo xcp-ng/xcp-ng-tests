@@ -2,7 +2,7 @@ import pytest
 
 import logging
 
-from lib.common import PackageManagerEnum
+from lib.packagemanager import Package
 from lib.vm import VM
 
 from typing import Generator
@@ -55,19 +55,8 @@ def started_unix_vm_with_vtpm(unix_vm_with_vtpm: VM) -> Generator[VM, None, None
 def unix_vm_with_tpm2_tools(started_unix_vm_with_vtpm: VM) -> Generator[VM, None, None]:
     vm = started_unix_vm_with_vtpm
 
-    pkg_mgr = vm.detect_package_manager()
-    if pkg_mgr == PackageManagerEnum.APT_GET:
-        # Old versions of apt-get doesn't support the --update option with the
-        # install command so we have to first update then install
-        cmd = 'apt-get update && apt-get'
-    elif pkg_mgr == PackageManagerEnum.YUM:
-        cmd = 'yum'
-    elif pkg_mgr == PackageManagerEnum.DNF:
-        cmd = 'dnf'
-    else:
-        pytest.fail("Unsupported package manager for this test. Cannot install tpm2-tools")
-
-    logging.info("Installing tpm2-tools package using '%s'" % cmd[0])
-    vm.ssh(f'{cmd} install -y tpm2-tools')
+    pkg_mgr = vm.package_manager()
+    logging.info("Installing tpm2-tools package using '%s'" % pkg_mgr.name())
+    pkg_mgr.install(Package.tpm2_tools)
 
     yield vm

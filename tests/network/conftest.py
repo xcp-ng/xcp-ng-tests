@@ -8,11 +8,11 @@ import logging
 from rpm_version import Evr  # type: ignore[import-untyped]
 
 from data import HOST_FREE_NICS
-from lib.common import PackageManagerEnum, safe_split
+from lib.common import safe_split
 from lib.host import Host
 from lib.network import Network
+from lib.packagemanager import Package
 from lib.tunnel import Tunnel
-from lib.typing import JSONType
 from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli
@@ -128,17 +128,8 @@ def vm_with_tcpdump_scope_module(imported_vm: VM):
     vm.wait_for_vm_running_and_ssh_up()
 
     # install tcpdump
-    pkg_mgr = vm.detect_package_manager()
-    if pkg_mgr == PackageManagerEnum.APK:
-        vm.ssh("apk add tcpdump")
-    elif pkg_mgr == PackageManagerEnum.APT_GET:
-        vm.ssh("apt-get install tcpdump")
-    elif pkg_mgr == PackageManagerEnum.YUM:
-        vm.ssh("yum install tcpdump")
-    elif pkg_mgr == PackageManagerEnum.DNF:
-        vm.ssh("dnf install tcpdump")
-    else:
-        pytest.fail("Package manager '%s' not supported" % pkg_mgr)
+    pkg_mgr = vm.package_manager()
+    pkg_mgr.install(Package.tcpdump)
 
     vm.shutdown(verify=True)
     yield vm

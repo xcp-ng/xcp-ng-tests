@@ -4,8 +4,9 @@ import pytest
 
 import logging
 
-from lib.common import PackageManagerEnum, wait_for
+from lib.common import wait_for
 from lib.host import Host
+from lib.packagemanager import AptGetPackageManager, DnfPackageManager
 from lib.vm import VM
 
 # Requirements:
@@ -38,34 +39,41 @@ class TestXenGuestAgent:
         if vm.ssh_with_result('which systemctl').returncode != 0:
             pytest.skip("systemd not available on this VM")
 
-        pkg_mgr = vm.detect_package_manager()
+        pkg_mgr = vm.package_manager()
+
         # RPM packages are built against Fedora 37 and won't install on
         # old RHEL-like distros (e.g., CentOS 7), so skip them.
         # The xen-guest-agent doesn't publish SUSE packages.
-        if pkg_mgr not in (PackageManagerEnum.DNF, PackageManagerEnum.APT_GET):
-            pytest.skip(f"Package manager '{pkg_mgr}' not supported in this test")
+        if not isinstance(pkg_mgr, DnfPackageManager | AptGetPackageManager):
+            pytest.skip(f"Package manager '{pkg_mgr.name()}' not supported in this test")
 
         # Remove conflicting xe-guest-utilities if present
         logging.info("Removing xe-guest-utilities if present")
-        if pkg_mgr == PackageManagerEnum.DNF:
+        if isinstance(pkg_mgr, DnfPackageManager):
             vm.ssh('rpm -qa | grep xe-guest-utilities | xargs --no-run-if-empty rpm -e')
-        elif pkg_mgr == PackageManagerEnum.APT_GET and \
-                vm.ssh_with_result('dpkg -l xe-guest-utilities').returncode == 0:
-            vm.ssh('apt-get remove -y xe-guest-utilities')
+        elif isinstance(pkg_mgr, AptGetPackageManager) and \
+                pkg_mgr.is_installed_raw('xe-guest-utilities'):
+            pkg_mgr.uninstall_raw('xe-guest-utilities')
 
-        if pkg_mgr == PackageManagerEnum.DNF:
+        if isinstance(pkg_mgr, DnfPackageManager):
             rpm_repo = xen_guest_agent_urls['rpm_repo']
-            vm.ssh(f"echo -e '[xen-guest-agent]\\nbaseurl={rpm_repo}main/\\ngpgcheck=0'"
-                   f" > /etc/yum.repos.d/xen-guest-agent.repo")
-            vm.ssh('dnf install -y xen-guest-agent')
-        elif pkg_mgr == PackageManagerEnum.APT_GET:
+            vm.create_file(
+                "/etc/yum.repos.d/xen-guest-agent.repo",
+                f"""[xen-guest-agent]
+baseurl={rpm_repo}main/
+gpgcheck=0""",
+            )
+            pkg_mgr.install_raw('xen-guest-agent')
+
+        elif isinstance(pkg_mgr, AptGetPackageManager):
             # DEB packages are published to a stable APT repo in the GitLab
             # Generic Package Registry after each push to main.
             deb_repo = xen_guest_agent_urls['deb_repo']
-            vm.ssh(f"echo 'deb [trusted=yes] {deb_repo} main/' "
-                   f"> /etc/apt/sources.list.d/xen-guest-agent.list")
-            vm.ssh('apt-get update')
-            vm.ssh('apt-get install -y xen-guest-agent')
+            vm.create_file(
+                "/etc/apt/sources.list.d/xen-guest-agent.list",
+                f"deb [trusted=yes] {deb_repo} main/",
+            )
+            pkg_mgr.install_raw('xen-guest-agent')
 
         wait_for(
             lambda: vm.ssh_with_result('systemctl is-active xen-guest-agent').returncode == 0,

@@ -14,7 +14,6 @@ import tempfile
 import time
 import traceback
 from datetime import datetime
-from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from uuid import UUID
@@ -79,14 +78,6 @@ HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
 Defer: TypeAlias = Callable[[Callable[[], object]], None]
 XeParams: TypeAlias = dict[str, str | bool | dict[str, str]]
-
-class PackageManagerEnum(Enum):
-    UNKNOWN = 1
-    YUM = 2
-    APT_GET = 3
-    APK = 4
-    DNF = 5
-    ZYPPER = 6
 
 # Common VM images used in tests
 def vm_image(vm_key: str) -> str:
