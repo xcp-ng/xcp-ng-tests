@@ -19,17 +19,15 @@ def export_test(host: Host, vm: VM, filepath: str, compress: Literal['none', 'gz
     defer(lambda: host.ssh(f'rm -f {filepath}', check=False))
     assert host.file_exists(filepath)
 
-    def check_file_type(expected: str) -> None:
-        assert host.ssh(f'file --mime-type -b {filepath}') == expected
+    def check_file_type(expected: list[str]) -> None:
+        assert host.ssh(f'file --mime-type -b {filepath}') in expected
 
-    if compress == 'none':
-        check_file_type('application/x-tar')
-    elif compress == 'gzip':
-        check_file_type('application/x-gzip')
-    elif compress == 'zstd':
-        check_file_type('application/octet-stream')
-    else:
-        assert False, 'Unsupported compress mode'
+    expected = {
+        'none': ['application/x-tar'],
+        'gzip': ['application/x-gzip', 'application/gzip'],
+        'zstd': ['application/octet-stream', 'application/zstd'],
+    }
+    check_file_type(expected[compress])
 
     vm2 = host.import_vm(filepath)
     defer(lambda: vm2.destroy())
