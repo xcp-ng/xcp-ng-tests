@@ -1,0 +1,26 @@
+import pytest
+
+from lib.host import Host
+from lib.sr import SR
+from lib.vm import VM
+from tests.storage import cold_migration_then_come_back, live_storage_migration_then_come_back
+
+# Requirements:
+# From --hosts parameter:
+# - host(A1): first XCP-ng host >= 8.3 with an additional unused native 4KiB disk for the EXT SR.
+# - hostB1: Master of a second pool. Any local SR.
+# From --vm parameter
+# - A VM to import to the EXT SR
+
+@pytest.mark.small_vm
+@pytest.mark.big_vm
+class Test:
+    def test_cold_crosspool_migration(
+        self, host: Host, hostB1: Host, vm_on_ext_sr_4k: VM, local_sr_on_hostB1: SR
+    ) -> None:
+        cold_migration_then_come_back(vm_on_ext_sr_4k, host, hostB1, local_sr_on_hostB1)
+
+    def test_live_crosspool_migration(
+        self, host: Host, hostB1: Host, vm_on_ext_sr_4k: VM, local_sr_on_hostB1: SR
+    ) -> None:
+        live_storage_migration_then_come_back(vm_on_ext_sr_4k, host, hostB1, local_sr_on_hostB1)
