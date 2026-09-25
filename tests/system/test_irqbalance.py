@@ -62,7 +62,12 @@ class TestIrqBalance:
     """
     In the past, a security fix broke IRQ balancing for VIFs.
     We want to avoid this to happen again, so this testcase runs several VMs
-    and verifies that the IRQs are balanced on more than one CPU.
+    with concurrent network traffic and verifies, from dom0's /proc/interrupts,
+    that the IRQs of their VIFs are handled by more than one dom0 vCPU.
+
+    The placement is decided by irqbalance in dom0, from the interrupt load
+    of each IRQ. The dom0 kernel applies it by rebinding the VIF event channel
+    to the chosen vCPU through a hypercall.
     """
 
     def test_start_four_vms(self, host_with_multi_vcpu_dom0: Host, four_vms: tuple[VM, VM, VM, VM]) -> None:
@@ -91,10 +96,10 @@ class TestIrqBalance:
             # consume results to re-raise exceptions
             list(executor.map(generate_stream, four_vms))
 
-        logging.info("Check that the IRQs of the VMs VIFs are not all on the same CPU on dom0")
+        logging.info("Check that the IRQs of the VMs VIFs are not all on the same dom0 vCPU")
         cpus = set()
         for vm in four_vms:
-            # List the CPU(s) that handled IRQs for the VM's vifs
+            # List the vCPU(s) that handled IRQs for the VM's vifs
             for vif in vm.vifs():
                 device_id = vif.device_id()
                 # depending on kernel patches, we're looking either for xen-dyn or xen-dyn-lateeoi
@@ -109,7 +114,7 @@ class TestIrqBalance:
                     irqs_per_cpu = fields[1:xen_dyn_index]
                     for i, val in enumerate(irqs_per_cpu):
                         if int(val) > 0:
-                            logging.info(f"VIF {device_id}: {val} IRQs for CPU {i}")
+                            logging.info(f"VIF {device_id}: {val} IRQs for vCPU {i}")
                             cpus.add(i)
 
-        assert len(cpus) > 1, "there must be more than one CPU that handles the IRQs"
+        assert len(cpus) > 1, "there must be more than one dom0 vCPU that handles the IRQs"
