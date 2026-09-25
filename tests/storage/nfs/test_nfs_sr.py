@@ -4,15 +4,13 @@ import pytest
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, GiB, vm_image, wait_for
+from lib.common import MAX_VDI_SIZE, Defer, GiB, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 from tests.storage import (
-    MAX_VDI_SIZE,
     CoalesceOperation,
-    ImageFormat,
     XVACompression,
     coalesce_integrity,
     full_vdi_write,
@@ -107,10 +105,11 @@ class TestNFSSR:
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize('vdi_op', ['snapshot', 'clone'])
-    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
-        if "NFS4" in dispatch_nfs.sr.get_name_label() and config.volume_size > 20 * GiB:
+    def test_coalesce(self, storage_test_vm: VM, dispatch_nfs: VDI, vdi_op: CoalesceOperation, defer: Defer,
+                      image_format: ImageFormat) -> None:
+        if "NFS4" in dispatch_nfs.sr.get_name_label() and config.volume_size(image_format) > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
-        coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op, defer)
+        coalesce_integrity(storage_test_vm, dispatch_nfs, vdi_op, defer, image_format)
 
     @pytest.mark.small_vm
     @pytest.mark.disk_throughput_intensive
@@ -129,24 +128,25 @@ class TestNFSSR:
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, dispatch_nfs: VM, compression: XVACompression, temp_large_dir: str,
-                               defer: Defer) -> None:
-        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.write_volume_cap > 20 * GiB:
+                               defer: Defer, image_format: ImageFormat) -> None:
+        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.write_volume_cap(image_format) > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
-        xva_export_import(dispatch_nfs, compression, temp_large_dir, defer)
+        xva_export_import(dispatch_nfs, compression, temp_large_dir, defer, image_format)
 
     @pytest.mark.small_vm
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
-    def test_xva_export_import_with_snapshot(self, dispatch_nfs: VM, temp_large_dir: str, defer: Defer) -> None:
-        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.write_volume_cap > 20 * GiB:
+    def test_xva_export_import_with_snapshot(self, dispatch_nfs: VM, temp_large_dir: str, defer: Defer,
+                                             image_format: ImageFormat) -> None:
+        if "NFS4" in dispatch_nfs.vdis[0].sr.get_name_label() and config.write_volume_cap(image_format) > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
-        xva_export_import(dispatch_nfs, 'zstd', temp_large_dir, defer, with_snapshot=True)
+        xva_export_import(dispatch_nfs, 'zstd', temp_large_dir, defer, image_format, with_snapshot=True)
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
     def test_vdi_export_import(self, storage_test_vm: VM, dispatch_nfs: SR, image_format: ImageFormat,
                                temp_large_dir: str, defer: Defer) -> None:
-        if "NFS4" in dispatch_nfs.get_name_label() and config.write_volume_cap > 20 * GiB:
+        if "NFS4" in dispatch_nfs.get_name_label() and config.write_volume_cap(image_format) > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format, temp_large_dir, defer)
 

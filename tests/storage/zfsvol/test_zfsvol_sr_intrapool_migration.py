@@ -2,6 +2,7 @@ import pytest
 
 from lib.host import Host
 from lib.sr import SR
+from lib.vdi import ImageFormat
 from lib.vm import VM
 from tests.storage import cold_migration_then_come_back, live_storage_migration_then_come_back
 
@@ -18,12 +19,10 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
 class Test:
-    def test_cold_intrapool_migration(
-        self, host: Host, hostA2: Host, vm_on_zfsvol_sr: VM, xfs_sr_on_hostA2: SR
-    ) -> None:
-        cold_migration_then_come_back(vm_on_zfsvol_sr, host, hostA2, xfs_sr_on_hostA2)
+    def test_cold_intrapool_migration(self, host: Host, hostA2: Host, vm_on_zfsvol_sr: VM, xfs_sr_on_hostA2: SR,
+                                      image_format: ImageFormat) -> None:
+        cold_migration_then_come_back(vm_on_zfsvol_sr, host, hostA2, xfs_sr_on_hostA2, image_format)
 
-    def test_live_intrapool_migration(
-        self, host: Host, hostA2: Host, vm_on_zfsvol_sr: VM, xfs_sr_on_hostA2: SR
-    ) -> None:
-        live_storage_migration_then_come_back(vm_on_zfsvol_sr, host, hostA2, xfs_sr_on_hostA2)
+    def test_live_intrapool_migration(self, host: Host, hostA2: Host, vm_on_zfsvol_sr: VM, xfs_sr_on_hostA2: SR,
+                                      image_format: ImageFormat) -> None:
+        live_storage_migration_then_come_back(vm_on_zfsvol_sr, host, hostA2, xfs_sr_on_hostA2, image_format)

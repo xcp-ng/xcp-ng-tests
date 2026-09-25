@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
+from lib.common import Defer, MiB, PackageManagerEnum, strtobool, wait_for
 from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
@@ -13,8 +13,6 @@ from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 from typing import Literal
-
-MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
 def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
     try:
@@ -27,7 +25,8 @@ def try_to_create_sr_with_missing_device(sr_type, label, host) -> None:
         return
     assert False, 'SR creation should not have succeeded!'
 
-def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
+def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR,
+                                  image_format: ImageFormat) -> None:
     """ Storage migration of a shutdown VM, then migrate it back. """
     prov_sr = vm.get_sr()
     vdi_name: str | None = None
@@ -37,14 +36,14 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
 
     if integrity_check:
         # the vdi will be destroyed with the vm
-        vdi = prov_sr.create_vdi(virtual_size=config.volume_size)
+        vdi = prov_sr.create_vdi(virtual_size=config.volume_size(image_format))
         vdi_name = vdi.name()
         vbd = vm.connect_vdi(vdi)
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
         install_randstream(vm)
         dev = f'/dev/{vbd.param_get("device")}'
-        spans = partially_populate_device(vm, dev, config.volume_size)
+        spans = partially_populate_device(vm, dev, config.volume_size(image_format), image_format)
         validate_partially_populated_device(vm, dev, spans)
         vm.shutdown(verify=True)
 
@@ -77,7 +76,8 @@ def cold_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest
     if vdi_name is not None:
         vm.destroy_vdi_by_name(vdi_name)
 
-def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR) -> None:
+def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Host, dest_sr: SR,
+                                          image_format: ImageFormat) -> None:
     prov_sr = vm.get_sr()
     vdi_name: str | None = None
     integrity_check = not vm.is_windows
@@ -86,7 +86,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
     vbd = None
 
     if integrity_check:
-        vdi = prov_sr.create_vdi(virtual_size=config.volume_size)
+        vdi = prov_sr.create_vdi(virtual_size=config.volume_size(image_format))
         vdi_name = vdi.name()
         vbd = vm.connect_vdi(vdi)
 
@@ -98,7 +98,7 @@ def live_storage_migration_then_come_back(vm: VM, prov_host: Host, dest_host: Ho
         install_randstream(vm)
         assert vbd is not None
         dev = f'/dev/{vbd.param_get("device")}'
-        spans = partially_populate_device(vm, dev, config.volume_size)
+        spans = partially_populate_device(vm, dev, config.volume_size(image_format), image_format)
         validate_partially_populated_device(vm, dev, spans)
 
     # Move the VM to another host of the pool
@@ -192,14 +192,15 @@ def randstream(vm: VM, args: str) -> str:
 
 CoalesceOperation = Literal['snapshot', 'clone']
 
-def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
+def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer,
+                       image_format: ImageFormat) -> None:
     vdi_size = vdi.get_virtual_size()
     vbd = vm.connect_vdi(vdi)
     defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
     # generate at the start, in the middle and the end of the disk
-    spans = partially_populate_device(vm, dev, vdi_size, 4, skip_spans=[1])
+    spans = partially_populate_device(vm, dev, vdi_size, image_format, 4, skip_spans=[1])
     # make sure we can read that exact data before the snapshot/clone
     validate_partially_populated_device(vm, dev, spans)
     new_vdi: VDI | None = None
@@ -227,7 +228,7 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 XVACompression = Literal['none', 'gzip', 'zstd']
 
 def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str,
-                      defer: Defer, *, with_snapshot=False) -> None:
+                      defer: Defer, image_format: ImageFormat, *, with_snapshot=False) -> None:
     # clone the vm, so we can resize the disk without affecting the vm from the fixture
     vm: VM | None = source_vm.clone()
     snap1: Snapshot | None = None
@@ -239,7 +240,7 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     host = vm.host
     sr = vm.vdis[0].sr
     # we can't shrink a volume
-    volume_size = max(vm.vdis[0].get_virtual_size(), config.volume_size)
+    volume_size = max(vm.vdis[0].get_virtual_size(), config.volume_size(image_format))
     vm.vdis[0].resize(volume_size)
     # The resulting volume size is a multiple of the block size. Store the actual VDI size, so we can make comparisons
     # later in the test
@@ -252,7 +253,7 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
 
     root_partition_size = vm.grow_root_partition()
     if root_partition_size is not None:
-        stream_size = min(root_partition_size // 2, config.write_volume_cap)
+        stream_size = min(root_partition_size // 2, config.write_volume_cap(image_format))
     else:
         stream_size = 500 * MiB
 
@@ -301,7 +302,7 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     randstream(imported_vm, f'validate --expected-checksum {checksum3} /root/data3')
 
 def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
-    vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
+    vdi_src: VDI | None = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size(image_format))
     defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
     assert vdi_src is not None
 
@@ -309,7 +310,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
     dev = f'/dev/{vbd.param_get("device")}'
 
-    spans = partially_populate_device(vm, dev, config.volume_size)
+    spans = partially_populate_device(vm, dev, config.volume_size(image_format), image_format)
     validate_partially_populated_device(vm, dev, spans)
     vm.disconnect_vdi(vdi_src)
 
@@ -324,7 +325,7 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
     total_span_size_mib = sum(span.size for span in spans) // MiB
     assert total_span_size_mib < size_mb < total_span_size_mib * 1.1, f"unexpected image size: {size_mb}"
-    vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
+    vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size(image_format))
     defer(lambda: vdi_dest.destroy())
 
     vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
@@ -443,8 +444,8 @@ def compute_span_layout(dev_size: int, total_size: int, num_spans: int, block_si
     return result
 
 
-def partially_populate_device(vm: VM, dev_path: str, dev_size: int, num_spans: int = 3, skip_spans: list[int] = []) \
-        -> list[StreamSpan]:
+def partially_populate_device(vm: VM, dev_path: str, dev_size: int, image_format: ImageFormat,
+                              num_spans: int = 3, skip_spans: list[int] = []) -> list[StreamSpan]:
     """
     Generate random data in multiple spans across a device.
 
@@ -472,6 +473,7 @@ def partially_populate_device(vm: VM, dev_path: str, dev_size: int, num_spans: i
         vm: Virtual machine to run randstream on
         dev_path: Device path (e.g., '/dev/xvdb')
         dev_size: Total device size in bytes
+        image_format: Image format the test runs on (resolves --write-volume-cap)
         num_spans: Number of spans to create (default: 3)
         skip_spans: List of span indices to skip (no data generated).
                    Skipped spans still exist in returned list with checksum=None.
@@ -482,7 +484,7 @@ def partially_populate_device(vm: VM, dev_path: str, dev_size: int, num_spans: i
         List of StreamSpan objects representing the generated spans.
     """
     logging.info(f"Generate {dev_path} content")
-    total_size = min(dev_size, config.write_volume_cap)
+    total_size = min(dev_size, config.write_volume_cap(image_format))
 
     # Validate skip_spans
     assert all(0 <= i < num_spans for i in skip_spans), \

@@ -13,8 +13,9 @@ import sys
 import tempfile
 import time
 import traceback
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import Enum, auto
 from functools import lru_cache
 from pathlib import Path
 from uuid import UUID
@@ -36,6 +37,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from lib.host import Host
+    from lib.vdi import ImageFormat
 
 
 KiB = 2**10
@@ -45,6 +47,8 @@ TiB = KiB**4
 
 VHD_MAX = 2040 * GiB
 QCOW2_MAX = 16 * TiB - 2561 * MiB
+
+MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
 _SYMBOLIC_SIZES: dict[str, int] = {
     'VHD_MAX': VHD_MAX,
@@ -72,6 +76,43 @@ def parse_size(size_str: str) -> int:
                 pass
 
     raise ValueError(f"Cannot parse size: {size_str}")
+
+class FormatMax(Enum):
+    FORMAT_MAX = auto()
+
+@dataclass(frozen=True)
+class Percent:
+    pct: float
+
+VolumeSizeSpec: TypeAlias = int | FormatMax
+WriteCapSpec: TypeAlias = int | Percent | FormatMax
+
+def parse_volume_size(size_str: str) -> VolumeSizeSpec:
+    """
+    Parse a --volume-size value like "1GiB", "VHD_MAX", or "FORMAT_MAX".
+    FORMAT_MAX resolves per image format via MAX_VDI_SIZE.
+    """
+    if size_str.strip().upper() == 'FORMAT_MAX':
+        return FormatMax.FORMAT_MAX
+    return parse_size(size_str)
+
+def parse_write_cap(cap_str: str) -> WriteCapSpec:
+    """
+    Parse a --write-volume-cap value like "2GiB", "FORMAT_MAX", or "50%".
+    A percentage resolves against the resolved --volume-size for the same image format.
+    """
+    s = cap_str.strip()
+    if s.upper() == 'FORMAT_MAX':
+        return FormatMax.FORMAT_MAX
+    if s.endswith('%'):
+        try:
+            pct = float(s[:-1].strip())
+        except ValueError:
+            raise ValueError(f"Cannot parse size: {cap_str}")
+        if pct < 0:
+            raise ValueError(f"Cannot parse size: {cap_str}")
+        return Percent(pct)
+    return parse_size(cap_str)
 
 T = TypeVar("T")
 

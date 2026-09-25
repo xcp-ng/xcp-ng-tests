@@ -1,15 +1,13 @@
 import pytest
 
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, vm_image, wait_for
+from lib.common import MAX_VDI_SIZE, Defer, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 from tests.storage import (
-    MAX_VDI_SIZE,
     CoalesceOperation,
-    ImageFormat,
     XVACompression,
     coalesce_integrity,
     full_vdi_write,
@@ -55,8 +53,8 @@ class TestLVMOISCSISR:
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
     def test_coalesce(self, storage_test_vm: 'VM', vdi_on_lvmoiscsi_sr: 'VDI', vdi_op: CoalesceOperation,
-                      defer: Defer) -> None:
-        coalesce_integrity(storage_test_vm, vdi_on_lvmoiscsi_sr, vdi_op, defer)
+                      defer: Defer, image_format: ImageFormat) -> None:
+        coalesce_integrity(storage_test_vm, vdi_on_lvmoiscsi_sr, vdi_op, defer, image_format)
 
     @pytest.mark.small_vm
     @pytest.mark.disk_throughput_intensive
@@ -72,12 +70,13 @@ class TestLVMOISCSISR:
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_lvmoiscsi_sr: VM, compression: XVACompression, temp_large_dir: str,
-                               defer: Defer) -> None:
-        xva_export_import(vm_on_lvmoiscsi_sr, compression, temp_large_dir, defer)
+                               defer: Defer, image_format: ImageFormat) -> None:
+        xva_export_import(vm_on_lvmoiscsi_sr, compression, temp_large_dir, defer, image_format)
 
     @pytest.mark.small_vm
-    def test_xva_export_import_with_snapshot(self, vm_on_lvmoiscsi_sr: VM, temp_large_dir: str, defer: Defer) -> None:
-        xva_export_import(vm_on_lvmoiscsi_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
+    def test_xva_export_import_with_snapshot(self, vm_on_lvmoiscsi_sr: VM, temp_large_dir: str, defer: Defer,
+                                             image_format: ImageFormat) -> None:
+        xva_export_import(vm_on_lvmoiscsi_sr, 'zstd', temp_large_dir, defer, image_format, with_snapshot=True)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, lvmoiscsi_sr: SR, image_format: ImageFormat,

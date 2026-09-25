@@ -29,8 +29,8 @@ def largeblock_sr(host: Host,
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_largeblock_sr(largeblock_sr) -> Generator[VDI, None, None]:
-    vdi = largeblock_sr.create_vdi('LARGEBLOCK-local-VDI-test', virtual_size=config.volume_size)
+def vdi_on_largeblock_sr(largeblock_sr, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = largeblock_sr.create_vdi('LARGEBLOCK-local-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

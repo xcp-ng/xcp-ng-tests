@@ -45,8 +45,8 @@ def nfs_sr(host: Host, image_format: ImageFormat, nfs_device_config: dict[str, s
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_nfs_sr(nfs_sr: SR) -> Generator[VDI, None, None]:
-    vdi = nfs_sr.create_vdi('NFS-VDI-test', virtual_size=config.volume_size)
+def vdi_on_nfs_sr(nfs_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = nfs_sr.create_vdi('NFS-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 
@@ -75,8 +75,8 @@ def nfs4_sr(host: Host, image_format: ImageFormat, nfs4_device_config: dict[str,
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_nfs4_sr(nfs4_sr: SR) -> Generator[VDI, None, None]:
-    vdi = nfs4_sr.create_vdi('NFS4-VDI-test', virtual_size=config.volume_size)
+def vdi_on_nfs4_sr(nfs4_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = nfs4_sr.create_vdi('NFS4-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

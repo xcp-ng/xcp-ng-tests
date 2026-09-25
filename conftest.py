@@ -23,6 +23,8 @@ from lib.common import (
     callable_marker,
     is_uuid,
     parse_size,
+    parse_volume_size,
+    parse_write_cap,
     prefix_object_name,
     setup_formatted_and_mounted_disk,
     shortened_nodeid,
@@ -122,6 +124,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default="1GiB",
         help="Default volume size for tests."
              " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
+             " 'FORMAT_MAX' resolves to the maximum for the test's image format."
     )
     parser.addoption(
         "--write-volume-cap",
@@ -129,6 +132,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default="2GiB",
         help="Maximum amount of data written to a volume."
              " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
+             " 'FORMAT_MAX' writes the full volume; a percentage like '50%' resolves"
+             " against the resolved --volume-size for the test's image format."
     )
     parser.addoption(
         "--write-volume-align",
@@ -158,10 +163,10 @@ def pytest_configure(config: pytest.Config) -> None:
     global_config.ssh_output_max_lines = int(ssh_output_max_lines)
     volume_size = config.getoption('--volume-size')
     assert volume_size is not None
-    global_config.volume_size = parse_size(volume_size)
+    global_config._volume_size = parse_volume_size(volume_size)  # noqa: SLF001
     write_volume_cap = config.getoption('--write-volume-cap')
     assert write_volume_cap is not None
-    global_config.write_volume_cap = parse_size(write_volume_cap)
+    global_config._write_volume_cap = parse_write_cap(write_volume_cap)  # noqa: SLF001
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
