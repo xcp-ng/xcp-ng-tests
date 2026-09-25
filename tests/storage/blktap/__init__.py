@@ -94,7 +94,7 @@ FIO_ACCESS_TYPES = ('read', 'rw', 'randrw')
 FIO_BLOCK_SIZES = ('4k', '64k', '1m')
 
 def fio_command(device: str, runtime: int, access_types: Sequence[str] = FIO_ACCESS_TYPES,
-                block_sizes: Sequence[str] = FIO_BLOCK_SIZES, offset: str | None = None) -> str:
+                block_sizes: Sequence[str] = FIO_BLOCK_SIZES, barriers: bool = False, offset: str | None = None) -> str:
     """
     fio I/O on the device: one job per access type and block size, all running at the same time.
 
@@ -104,14 +104,18 @@ def fio_command(device: str, runtime: int, access_types: Sequence[str] = FIO_ACC
     # exercise the multi-queue and multi-thread paths of tapdisk, which matter in these tests.
     # The options before the first --name apply to all the jobs.
     jobs = ' '.join(f'--name={rw}-{bs} --rw={rw} --bs={bs}' for rw in access_types for bs in block_sizes)
+    if barriers:
+        # synchronous writes, each one followed by a fsync, that blkfront sends as a flush (barrier):
+        # tapdisk then has barriers pending among the other requests
+        jobs += ' --name=barriers --rw=randwrite --bs=4k --ioengine=sync --fsync=1 --numjobs=4'
     offset_option = f'--offset={offset} ' if offset else ''
     return (f'fio --filename=/dev/{device} --direct=1 --ioengine=libaio --iodepth=64 {offset_option}'
             f'--runtime={runtime} --time_based {jobs}')
 
 def start_fio(vm: VM, device: str, runtime: int, access_types: Sequence[str] = FIO_ACCESS_TYPES,
-              block_sizes: Sequence[str] = FIO_BLOCK_SIZES, offset: str | None = None) -> None:
+              block_sizes: Sequence[str] = FIO_BLOCK_SIZES, barriers: bool = False, offset: str | None = None) -> None:
     """Run fio_command in the guest, in the background."""
-    command = fio_command(device, runtime, access_types, block_sizes, offset)
+    command = fio_command(device, runtime, access_types, block_sizes, barriers, offset)
     vm.ssh(f'setsid {command} > /tmp/fio.log 2>&1 < /dev/null &')
 
 def wait_for_guest_reads(host: Host, pid: int, minor: int) -> None:

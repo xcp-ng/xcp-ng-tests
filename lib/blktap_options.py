@@ -20,6 +20,8 @@ class BlktapOptions(BaseModel):
 
     max_duration: int = Field(
         default=30, description="Maximum duration, in seconds, of the long running stress tests.")
+    destroy_iterations: int = Field(
+        default=10, description="Number of tapdisks destroyed during guest I/O by the hot-unplug test.")
     bench_outdir: str | None = Field(
         default=None,
         description="Local directory for the results of the benchmarks (default: a new temporary directory).")
