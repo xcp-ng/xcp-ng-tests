@@ -404,8 +404,7 @@ class Host:
             base_vm = self.cached_vm(filename, sr_uuid)
             if base_vm is None:
                 raise RuntimeError(f"VM {filename!r} not in cache (in SR {sr_uuid})")
-            vm = base_vm.clone()
-            vm.param_clear('name-description')
+            vm = base_vm.clone_cached_vm()
             if protocol == "clone+start":
                 vm.start()
                 wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")

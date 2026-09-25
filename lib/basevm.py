@@ -57,6 +57,11 @@ class BaseVM:
         assert isinstance(n, str)
         return n
 
+    def description(self) -> str:
+        description = self.param_get('name-description')
+        assert isinstance(description, str)
+        return description
+
     # @abstractmethod
     def _disk_list(self) -> str:
         raise NotImplementedError()
