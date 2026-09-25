@@ -1,7 +1,6 @@
 import pytest
 
 import logging
-import re
 
 from lib.common import wait_for
 from lib.host import Host
@@ -9,7 +8,6 @@ from lib.host import Host
 # Requirements:
 # - an XCP-ng host (--hosts) >= 8.2
 
-pytest.fixture(scope='module')
 def test_failed_units(host: Host) -> None:
     failed_services = host.ssh('systemctl --state=failed --full --all --no-pager --no-legend')
     if failed_services:
@@ -22,7 +20,6 @@ white_list_issues = [
     "Cannot add dependency job for unit sr_health_check.timer, ignoring: Unit not found.",
 ]
 
-pytest.fixture(scope='module')
 def test_verify_default_target(host: Host) -> None:
     def analyse_default_target() -> bool:
         # systemd-analyze is sometimes reporting "Out of memory.". These two command are there
