@@ -578,7 +578,9 @@ class Host:
 
     def wait_for_host_down(self, timeout_secs: int = 3 * 60) -> None:
         wait_for_not(
-            lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
+            lambda: commands.local_cmd(
+                ["ping", "-c1", self.hostname_or_ip], check=False, simple_output=False
+            ).returncode == 0,
             f"[{self}] Wait for host down",
             timeout_secs=timeout_secs,
             retry_delay_secs=2,
@@ -586,7 +588,9 @@ class Host:
 
     def wait_for_host_up(self, timeout_secs: int = 10 * 60) -> None:
         wait_for(
-            lambda: commands.local_cmd(["ping", "-c1", self.hostname_or_ip], check=False).returncode == 0,
+            lambda: commands.local_cmd(
+                ["ping", "-c1", self.hostname_or_ip], check=False, simple_output=False
+            ).returncode == 0,
             f"[{self}] Wait for host up",
             timeout_secs=timeout_secs,
             retry_delay_secs=10,
@@ -594,7 +598,9 @@ class Host:
 
     def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
         wait_for(
-            lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
+            lambda: commands.local_cmd(
+                ["nc", "-zw5", self.hostname_or_ip, "22"], check=False, simple_output=False
+            ).returncode == 0,
             f"[{self}] Wait for ssh up on host",
             timeout_secs=timeout_secs,
             retry_delay_secs=5
