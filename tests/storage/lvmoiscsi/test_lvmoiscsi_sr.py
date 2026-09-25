@@ -8,9 +8,12 @@ from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 from tests.storage import (
     MAX_VDI_SIZE,
+    CBTTest,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
+    assert_cbt_log_does_not_exist_lvm_sr,
+    assert_cbt_log_exists_lvm_sr,
     coalesce_integrity,
     full_vdi_write,
     vdi_export_import,
@@ -99,3 +102,79 @@ class TestLVMOISCSISR:
         vm.shutdown(verify=True)
 
     # *** End of tests with reboots
+
+
+class TestLVMoISCSICBT(CBTTest):
+    """Test CBT functionality on LVMOISCSI SR"""
+
+    @staticmethod
+    def cbt_log_path(host: Host, sr: SR, vdi: VDI) -> str:
+        return f'/dev/VG_XenStorage-{sr.uuid}/{vdi.uuid}.cbtlog'
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_exists_lvm_sr(host, sr, vdi)
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_does_not_exist_lvm_sr(host, sr, vdi)
+
+    def test_enable_disable_cbt(self, host: Host, lvmoiscsi_sr: SR, vdi_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_enable_disable_cbt(host, lvmoiscsi_sr, vdi_on_lvmoiscsi_sr)
+
+    def test_cbt_log_creation(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_cbt_log_creation(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_disable_cbt_removes_log(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_disable_cbt_removes_log(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_destroy_vdi_removes_cbt_log(self, host: Host, lvmoiscsi_sr: SR,
+                                         vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_destroy_vdi_removes_cbt_log(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_cbt_disabled_after_vdi_copy(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                                         defer: Defer) -> None:
+        self._test_cbt_disabled_after_vdi_copy(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    def test_cbt_log_recreated_after_reenable(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI) -> None:
+        self._test_cbt_log_recreated_after_reenable(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
+
+    def test_snapshot_with_cbt(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                               defer: Defer) -> None:
+        self._test_snapshot_with_cbt(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    def test_cbt_on_snapshot_chain(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                                   defer: Defer) -> None:
+        self._test_cbt_on_snapshot_chain(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    def test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, lvmoiscsi_sr: SR,
+                                                         vdi_cbt_on_lvmoiscsi_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_parent_disable_does_not_affect_snapshot(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    def test_cbt_data_destroy(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                              defer: Defer) -> None:
+        self._test_cbt_data_destroy(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_changed_blocks_tracking(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                                     vm_on_lvmoiscsi_sr: VM, defer: Defer) -> None:
+        self._test_changed_blocks_tracking(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, vm_on_lvmoiscsi_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_incremental_snap_scenario(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                                       vm_on_lvmoiscsi_sr: VM, defer: Defer) -> None:
+        self._test_incremental_snap_scenario(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr,
+                                             vm_on_lvmoiscsi_sr, defer)
+
+    def test_changed_blocks_empty_after_snapshot(self, host: Host, lvmoiscsi_sr: SR,
+                                                 vdi_cbt_on_lvmoiscsi_sr: VDI, defer: Defer) -> None:
+        self._test_changed_blocks_empty_after_snapshot(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_cbt_after_coalesce(self, host: Host, lvmoiscsi_sr: SR, vdi_cbt_on_lvmoiscsi_sr: VDI,
+                                vm_on_lvmoiscsi_sr: VM) -> None:
+        self._test_cbt_after_coalesce(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr, vm_on_lvmoiscsi_sr)
+
+    def test_cbt_persist_after_pbd_replug(self, host: Host, lvmoiscsi_sr: SR,
+                                          vdi_cbt_on_lvmoiscsi_sr: VDI, ) -> None:
+        self._test_cbt_persist_after_pbd_replug(host, lvmoiscsi_sr, vdi_cbt_on_lvmoiscsi_sr)
