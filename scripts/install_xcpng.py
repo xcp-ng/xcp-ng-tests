@@ -18,7 +18,7 @@ from packaging import version
 # flake8: noqa: E402
 sys.path.append(f"{os.path.abspath(os.path.dirname(__file__))}/..")
 from lib import pxe
-from lib.commands import SSHCommandFailed, ssh
+from lib.commands import SSHCommandFailed, local_cmd, ssh
 from lib.common import is_uuid, wait_for
 from lib.host import Host, host_data
 from lib.pool import Pool
@@ -72,7 +72,7 @@ def generate_answerfile(directory: str, installer: str, hostname_or_ip: str, tar
             raise Exception(f"Unknown action: `{action}`")
 
 def is_ip_active(ip: str) -> bool:
-    return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
+    return local_cmd(["ping", "-c", "3", "-W", "10", ip], check=False).returncode == 0
 
 def is_ssh_up(ip: str) -> bool:
     try:
