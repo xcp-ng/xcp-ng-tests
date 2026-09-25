@@ -31,12 +31,20 @@ dev = [
     "libarchive-c==5.3",
     "prek",
     "pydocstyle",
+    "pyrefly",
     "pyright",
     "ruff",
     "types-passlib",
     "typing-extensions",
     "zizmor",
 ]
+
+[tool.pyrefly]
+infer-with-first-use = false
+project-excludes = ["flake8_plugins/**"]
+
+[tool.pyrefly.errors]
+implicit-any-parameter = "error"
 
 [tool.pyright]
 typeCheckingMode = "standard"
