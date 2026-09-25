@@ -16,6 +16,7 @@ def host_without_netdata(host: Host) -> Generator[Host, None, None]:
     assert not strtobool(host.call_plugin('netdata.py', 'is_netdata_installed'))
     yield host
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 class TestInstall:
     def test_is_netdata_installed(self, host: Host) -> None:
         host.call_plugin('netdata.py', 'is_netdata_installed')
@@ -31,6 +32,7 @@ class TestInstall:
 
         host.yum_restore_saved_state()
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 class TestApiKey:
     def test_get_netdata_api_key(self, host_without_netdata: Host) -> None:
         host = host_without_netdata
