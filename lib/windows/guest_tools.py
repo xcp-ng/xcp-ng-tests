@@ -45,7 +45,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
     vm.eject_cd()
 
     logging.info("Install Windows PV drivers")
-    msiexec_args = f"/i {GUEST_TOOLS_COPY_PATH} /log C:\\tools_install.log /passive /norestart"
+    msiexec_args = f"/i {GUEST_TOOLS_COPY_PATH} /l*vx C:\\tools_install.log /passive /norestart"
 
     if action == PowerAction.Nothing:
         exitcode = vm.run_powershell_command("msiexec.exe", msiexec_args)
@@ -71,7 +71,7 @@ def install_guest_tools(vm: VM, guest_tools_iso: Dict[str, Any], action: PowerAc
 
 
 def uninstall_guest_tools(vm: VM, action: PowerAction) -> None:
-    msiexec_args = f"/x {GUEST_TOOLS_COPY_PATH} /log C:\\tools_uninstall.log /passive /norestart"
+    msiexec_args = f"/x {GUEST_TOOLS_COPY_PATH} /l*vx C:\\tools_uninstall.log /passive /norestart"
     uninstall_cmd = f"Start-Process -Wait msiexec.exe -ArgumentList '{msiexec_args}';"
     if action != PowerAction.Nothing:
         uninstall_cmd += WINDOWS_SHUTDOWN_COMMAND
@@ -82,3 +82,15 @@ def uninstall_guest_tools(vm: VM, action: PowerAction) -> None:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
         wait_for_vm_xenvif_offboard(vm)
+
+
+def check_vm_driver_versions(vm: VM, guest_tools_iso: Dict[str, Any]) -> None:
+    assert vm.are_windows_tools_working()
+    expected_versions = guest_tools_iso.get("expected_versions")
+    if not expected_versions:
+        return
+
+    logging.info("Check driver versions")
+    for key, expected in expected_versions.items():
+        actual = vm.param_get("PV-drivers-version", key).strip()
+        assert expected == actual

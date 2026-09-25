@@ -11,7 +11,12 @@ from lib.windows import (
     vm_shutdown_without_tools,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
-from lib.windows.guest_tools import ERROR_INSTALL_FAILURE, install_guest_tools, uninstall_guest_tools
+from lib.windows.guest_tools import (
+    ERROR_INSTALL_FAILURE,
+    check_vm_driver_versions,
+    install_guest_tools,
+    uninstall_guest_tools,
+)
 
 from typing import Any, Tuple
 
@@ -47,7 +52,7 @@ class TestGuestToolsWindowsDestructive:
         vm, param = vm_install_other_drivers
         if param["upgradable"]:
             install_guest_tools(vm, guest_tools_iso, PowerAction.Reboot, check=False)
-            assert vm.are_windows_tools_working()
+            check_vm_driver_versions(vm, guest_tools_iso)
         else:
             exitcode = install_guest_tools(vm, guest_tools_iso, PowerAction.Nothing, check=False)
             assert exitcode == ERROR_INSTALL_FAILURE
@@ -68,3 +73,4 @@ class TestGuestToolsWindowsDestructive:
         vm.param_set("platform", "0001", "device_id")
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
+        check_vm_driver_versions(vm, guest_tools_iso)
