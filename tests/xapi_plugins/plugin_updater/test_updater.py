@@ -1,3 +1,5 @@
+import pytest
+
 import json
 
 from lib.host import Host
@@ -8,6 +10,7 @@ from lib.host import Host
 # And:
 # - access to XCP-ng RPM repository from hostA1
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 class TestUpdate:
     def test_check_update(self, host: Host) -> None:
         host.call_plugin('updater.py', 'check_update')
@@ -35,6 +38,7 @@ class TestUpdate:
         host.call_plugin('updater.py', 'update', {'packages': 'dummypkg'})
         assert host.is_package_installed(packages[1])
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 class TestProxies:
     def test_get_proxies(self, host: Host) -> None:
         proxies = json.loads(host.call_plugin('updater.py', 'get_proxies'))
