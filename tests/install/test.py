@@ -194,7 +194,6 @@ class TestNested:
             assert len(ips) == 1
             host_vm.ip = ips[0]
             ip = host_vm.ip
-            assert ip is not None
 
             wait_for(
                 lambda: commands.local_cmd(

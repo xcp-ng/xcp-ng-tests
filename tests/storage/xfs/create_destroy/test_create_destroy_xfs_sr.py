@@ -29,7 +29,7 @@ class TestXFSSRCreateDestroy:
         assert not host.file_exists('/usr/sbin/mkfs.xfs'), \
             "xfsprogs must not be installed on the host at the beginning of the tests"
         sr_disk = unused_512B_disks[host][0].name
-        sr: SR | None = None
+        sr = None
         try:
             sr = host.sr_create('xfs', "XFS-local-SR-test", {
                 'device': '/dev/' + sr_disk,

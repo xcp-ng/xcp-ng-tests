@@ -69,5 +69,5 @@ class FistPoint:
         self.enable()
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: Any) -> None:  # noqa: ANN401
         self.disable()
