@@ -1,3 +1,5 @@
+import pytest
+
 import json
 
 from lib.host import Host
@@ -35,6 +37,7 @@ class TestUpdate:
         host.call_plugin('updater.py', 'update', {'packages': 'dummypkg'})
         assert host.is_package_installed(packages[1])
 
+@pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible")
 class TestProxies:
     def test_get_proxies(self, host: Host) -> None:
         proxies = json.loads(host.call_plugin('updater.py', 'get_proxies'))

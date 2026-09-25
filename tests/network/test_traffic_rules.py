@@ -16,6 +16,8 @@ from lib.xo import xo_cli, xo_object_exists
 
 from typing import Callable
 
+pytestmark = pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible with XCP-ng 9.0")
+
 # Requirements:
 # xo-cli (on the host running the test) is expected to be usable
 # From --hosts parameter:

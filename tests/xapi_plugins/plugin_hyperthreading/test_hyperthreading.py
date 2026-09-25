@@ -1,3 +1,5 @@
+import pytest
+
 from lib.host import Host
 
 # Requirements:

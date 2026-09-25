@@ -31,6 +31,7 @@ class TestInstall:
 
         host.yum_restore_saved_state()
 
+@pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible")
 class TestApiKey:
     def test_get_netdata_api_key(self, host_without_netdata: Host) -> None:
         host = host_without_netdata
