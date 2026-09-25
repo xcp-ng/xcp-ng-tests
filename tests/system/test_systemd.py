@@ -10,6 +10,7 @@ from lib.host import Host
 # - an XCP-ng host (--hosts) >= 8.2
 
 pytest.fixture(scope='module')
+@pytest.mark.usefixtures("fail_with_v9") # TBD several units are failed
 def test_failed_units(host: Host) -> None:
     failed_services = host.ssh('systemctl --state=failed --full --all --no-pager --no-legend')
     if failed_services:
@@ -23,6 +24,7 @@ white_list_issues = [
 ]
 
 pytest.fixture(scope='module')
+@pytest.mark.usefixtures("fail_with_v9") # TBD Standard output type syslog is obsolete
 def test_verify_default_target(host: Host) -> None:
     def analyse_default_target() -> bool:
         # systemd-analyze is sometimes reporting "Out of memory.". These two command are there

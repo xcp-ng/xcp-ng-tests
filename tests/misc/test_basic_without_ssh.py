@@ -53,6 +53,7 @@ class TestBasicNoSSH:
         vm.unpause()
         vm.wait_for_os_booted()
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD xe vm-resume doesn't return
     def test_suspend(self, imported_vm: VM) -> None:
         vm = imported_vm
         vm.suspend(verify=True)
@@ -67,6 +68,7 @@ class TestBasicNoSSH:
         vm.start()
         vm.wait_for_os_booted()
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD xe vm-checkpoint doesn't return
     def test_checkpoint(self, imported_vm: VM, defer: Defer) -> None:
         vm = imported_vm
         snapshot = vm.checkpoint()
@@ -78,6 +80,7 @@ class TestBasicNoSSH:
     # Live migration tests
     # We want to test storage migration (memory+disks) and live migration without storage migration (memory only).
     # The order will depend on the initial location of the VM: a local SR or a shared SR.
+    @pytest.mark.usefixtures("fail_with_v9") # TBD xe vm-migrate doesn't return
     @pytest.mark.usefixtures("hostA2")
     def test_live_migrate(self, imported_vm: VM, existing_shared_sr: SR) -> None:
         def live_migrate(vm: VM, dest_host: Host, dest_sr: SR, check_vdis: bool = False) -> None:

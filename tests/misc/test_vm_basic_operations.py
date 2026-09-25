@@ -13,6 +13,7 @@ class Test:
         vm.unpause()
         vm.wait_for_vm_running_and_ssh_up()
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD xe vm-resume doesn't return
     def test_suspend(self, running_vm: VM) -> None:
         vm = running_vm
         vm.suspend(verify=True)
@@ -26,6 +27,7 @@ class Test:
     # When running the tests on Windows, the background ssh process is never terminated
     # This results in a ResourceWarning
     @pytest.mark.filterwarnings("ignore::ResourceWarning")
+    @pytest.mark.usefixtures("fail_with_v9") # TBD xe vm-checkpoint doesn't return
     def test_checkpoint(self, running_vm: VM) -> None:
         vm = running_vm
         logging.info("Start a 'sleep' process on VM through SSH")

@@ -12,7 +12,6 @@ from lib.common import PackageManagerEnum, safe_split
 from lib.host import Host
 from lib.network import Network
 from lib.tunnel import Tunnel
-from lib.typing import JSONType
 from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli
@@ -51,7 +50,8 @@ def host_no_sdn_controller(host: Host) -> Generator[Host, None, None]:
         host.xe('sdn-controller-introduce', cfg)
 
 @pytest.fixture(scope='package')
-def hosts_with_traffic_rules(hosts_with_xo: list[Host]) -> Generator[list[Host], None, None]:
+# TBD xcp-ng-xapi-plugins needs python2.7 and XCP-ng v9 is using python3
+def hosts_with_traffic_rules(hosts_with_xo: list[Host], fail_with_v9: None) -> Generator[list[Host], None, None]:
     """A list of XCP-ng hosts with proper traffic rules configuration."""
     hosts = hosts_with_xo
 

@@ -6,6 +6,7 @@ from lib.common import Defer, wait_for, wait_for_not
 from lib.host import Host
 from lib.vm import VM
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xe vm-migrate doesn't return
 @pytest.mark.multi_vms # run on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
 def test_cross_pool_migration(hostB1: Host, imported_vm: VM, defer: Defer) -> None:
