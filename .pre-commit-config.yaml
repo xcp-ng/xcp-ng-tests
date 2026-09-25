@@ -1,4 +1,14 @@
 repos:
+  - repo: builtin
+    hooks:
+      # Trim trailing whitespace
+      - id: trailing-whitespace
+      # Ensure newline at EOF
+      - id: end-of-file-fixer
+      # Ensures that (non-binary) files with a shebang are executable
+      - id: check-shebang-scripts-are-executable
+      # Ensures that (non-binary) executables have a shebang
+      - id: check-executables-have-shebangs
   - repo: local
     hooks:
       - id: "ruff"
