@@ -2,7 +2,7 @@ import pytest
 
 import json
 
-from data import TOOLS
+from lib import config
 from lib.commands import local_cmd
 from lib.typing import JSONType
 
@@ -33,7 +33,7 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
     if not __allow_xo_cli:
         pytest.fail("xo_cli function requires hosts_with_xo fixture usage.")
 
-    cmd = [TOOLS.get('xo-cli', 'xo-cli'), action]
+    cmd = [config.xo.cli, action]
     if action != 'list-objects' and use_json:
         cmd += ['--json']
     cmd += ["%s=%s" % (key, value) for key, value in args.items()]

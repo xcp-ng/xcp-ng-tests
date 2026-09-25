@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import tomllib
-from pathlib import Path
-
 from lib.common import HostAddress
+from lib.config_loader import Config
 
 from typing import TypeAlias, TypedDict
 
@@ -20,25 +18,18 @@ HostConfigs: TypeAlias = dict[HostAddress, HostConfig]
 class Inventory(TypedDict):
     hosts: HostConfigs
 
-def load_inventory(inventory_path: Path) -> Inventory:
-    """Create an inventory object from loaded inventory file."""
-    with open(inventory_path, "rb") as f:
-        data = tomllib.load(f)
-
-    default = data.get("default", {})
-    hosts = data.get("hosts", [])
-
+def inventory_from_config(config: Config) -> Inventory:
+    """Create an inventory object from the config's ``[tools.update]`` and ``[hosts]`` tables."""
+    default = config.tools.update
     inventory_hosts: HostConfigs = {}
-    for h, config in hosts.items():
-        repos = config.get("repositories", [])
-        disabled_repositories = config.get("disabled_repositories", [])
-        hosting_pool = config.get("hosting_pool", None)
-        if hosting_pool is None:
-            hosting_pool = default.get("hosting_pool", None)
+    for h, config_host in config.hosts.items():
         host: HostConfig = {
-            "repositories": repos or default.get("repositories", []),
-            "disabled_repositories": disabled_repositories or default.get("disabled_repositories", []),
-            "hosting_pool": hosting_pool,
+            "repositories": config_host.repositories if config_host.repositories is not None else default.repositories,
+            "disabled_repositories": (
+                config_host.disabled_repositories if config_host.disabled_repositories is not None
+                else default.disabled_repositories
+            ),
+            "hosting_pool": config_host.hosting_pool if config_host.hosting_pool is not None else default.hosting_pool,
         }
         inventory_hosts[h] = host
 
@@ -51,7 +42,7 @@ def into_inventory(
     hosts: list[HostAddress],
     repositories: list[str],
     hosting_pool: HostAddress | None,
-    disabled_repositories: list[str] = [],
+    disabled_repositories: list[str] | None = None,
 ) -> Inventory:
     """Create an inventory object from arguments.
 
