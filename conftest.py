@@ -157,6 +157,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=30,
         help="Maximum duration, in seconds, of the long running blktap stress tests."
     )
+    parser.addoption(
+        "--blktap-destroy-iterations",
+        action="store",
+        type=int,
+        default=10,
+        help="Number of tapdisks destroyed during guest I/O by the blktap hot-unplug test."
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -173,6 +180,7 @@ def pytest_configure(config: pytest.Config) -> None:
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
     global_config.blktap_max_duration = config.getoption('--blktap-max-duration')
+    global_config.blktap_destroy_iterations = config.getoption('--blktap-destroy-iterations')
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
