@@ -270,6 +270,9 @@ class SR:
             {'uuid': self.pbd_uuids()[0], 'param-name': 'device-config', 'param-key': 'server'},
         )
 
+    def get_allowed_operations(self) -> set[str]:
+        return {op.strip() for op in self.param_get('allowed-operations').split(';')}
+
     def create_vdi(
         self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
