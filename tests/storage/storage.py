@@ -512,6 +512,9 @@ def check_vdi_revert(defer: Defer, vm: VM) -> None:
     Performs successives reverts to ensure that we can revert
     and that the snapshot tree stays consistent across reverts
 
+    This test ensures that the vdi_revert feature is available and
+    enabled on this backend.
+
     We create the following snapshot tree:
     snap 1 -> snap 2
       |-----> snap 3
@@ -524,6 +527,9 @@ def check_vdi_revert(defer: Defer, vm: VM) -> None:
     """
     vm = vm.clone()
     snapshots: list[Snapshot] = []
+    sr = vm.get_sr()
+
+    assert 'VDI.revert' in sr.get_allowed_operations()
 
     def cleanup(vm: VM, snapshots: list[Snapshot]):
         for snap in snapshots:
@@ -586,6 +592,9 @@ def check_vdi_revert_cbt(defer: Defer, vm: VM):
     Perform successives revert from snapshots with/without CBT
     and ensure that it stays enabled in a consistent manner
 
+    This test ensures that the vdi_revert feature is available and
+    enabled on this backend.
+
     CBT    -> CBT    : Keep CBT
     CBT    -> no CBT : Disable CBT
     no CBT -> CBT    : Enable CBT
@@ -597,6 +606,8 @@ def check_vdi_revert_cbt(defer: Defer, vm: VM):
     snapshots: list[Snapshot] = []
     vm = vm.clone()
     sr = vm.get_sr()
+
+    assert 'VDI.revert' in sr.get_allowed_operations()
 
     def cleanup(vm: VM, snapshots: list[Snapshot]):
         for snap in snapshots:
@@ -662,6 +673,9 @@ def check_vdi_revert_journal_cbt(defer: Defer, vm: VM, fistpoint: str, host: Hos
     and ensure that it stays enabled in a consistent manner and that
     rollback journal runs successfully.
 
+    This test ensures that the vdi_revert feature is available and
+    enabled on this backend.
+
     CBT    -> CBT    : Keep CBT
     CBT    -> no CBT : Keep CBT
     no CBT -> CBT    : No CBT
@@ -682,6 +696,8 @@ def check_vdi_revert_journal_cbt(defer: Defer, vm: VM, fistpoint: str, host: Hos
     sr = vm.get_sr()
 
     snapshots: list[Snapshot] = []
+
+    assert 'VDI.revert' in sr.get_allowed_operations()
 
     def cleanup(vm: VM, snapshots: list[Snapshot]):
         for snap in snapshots:
@@ -750,6 +766,9 @@ def check_vdi_revert_journal(defer: Defer, vm: VM, fistpoint: str, host: Host | 
     Perform successives failed revert from snapshots
     and ensure that the rollback journal is able to run.
 
+    This test ensures that the vdi_revert feature is available and
+    enabled on this backend.
+
     Warning:
         Provided fistpoints should raise an error during the revert execution!
         If your backend doesn't raise an error, please use the `exit_on_fistpoint` fixture.
@@ -763,6 +782,9 @@ def check_vdi_revert_journal(defer: Defer, vm: VM, fistpoint: str, host: Host | 
     vm = vm.clone()
     snap = vm.snapshot()
     host_uuid = host.uuid if host else None
+    sr = vm.get_sr()
+
+    assert 'VDI.revert' in sr.get_allowed_operations()
 
     def cleanup(vm: VM, snap: Snapshot):
         snap.destroy(verify=True)
@@ -793,6 +815,9 @@ def check_critical_journal_revert(defer: Defer, vm: VM, host: Host, fistpoint: s
     Ensure that when a critical journal generated during a failed revert exists,
     no SR operation is executed outside of the master node.
 
+    This test ensures that the vdi_revert feature is available and
+    enabled on this backend.
+
     Warning:
         Provided fistpoints should raise an error during the revert execution!
         If your backend doesn't raise an error, please use the `exit_on_fistpoint` fixture.
@@ -806,6 +831,9 @@ def check_critical_journal_revert(defer: Defer, vm: VM, host: Host, fistpoint: s
     vm = vm.clone()
     sr = vm.get_sr()
     snap = vm.snapshot()
+
+    assert 'VDI.revert' in sr.get_allowed_operations()
+
     sr.param_set("other-config", "false", "auto-scan") # Avoid journals being run during tests unexpectedly
 
     def cleanup(sr: SR, vm: VM, snap: Snapshot):

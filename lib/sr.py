@@ -226,6 +226,9 @@ class SR:
     def get_name_label(self) -> str:
         return self.param_get('name-label')
 
+    def get_allowed_operations(self) -> set[str]:
+        return {op.strip() for op in self.param_get('allowed-operations').split(';')}
+
     def create_vdi(
         self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
