@@ -1,7 +1,7 @@
+import argparse
 import http.client
 import socket
 import xmlrpc.client
-import argparse
 
 SOCKET_PATH = "/var/xapi/xmlrpcsocket.xsconsole"
 
@@ -26,7 +26,7 @@ class _UnixTransport(xmlrpc.client.Transport):
     def make_connection(self, host):
         return _UnixConnection(self._path, self._timeout)
 
-try:
+def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('reset', type=int, help="Reset the NICs")
@@ -66,6 +66,6 @@ try:
     # Apply Changes and Reboot
     c.keypress("KEY_ENTER")
 
-except Exception as e:
-    print(e)
 
+if __name__ == "__main__":
+    main()
