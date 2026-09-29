@@ -8,7 +8,6 @@ import subprocess
 import tempfile
 
 import lib.config as config
-from lib.netutil import wrap_ip
 
 from typing import TYPE_CHECKING, Generic, List, Literal, TypeVar, overload
 
@@ -36,10 +35,10 @@ class SSHCommandFailed(BaseCommandFailed):
         self.ssherr = ssherr
 
 class LocalCommandFailed(BaseCommandFailed):
-    def __init__(self, returncode: int, stdout: str, cmd: str | list[str]):
-        msg_end = f": {stdout}" if stdout else "."
+    def __init__(self, returncode: int, stderr: str, cmd: str | list[str]):
+        msg_end = f": {stderr}" if stderr else "."
         super(LocalCommandFailed, self).__init__(
-            returncode, stdout, cmd,
+            returncode, stderr, cmd,
             f'Local command ({cmd}) failed with return code {returncode}{msg_end}'
         )
 
@@ -60,8 +59,11 @@ class SSHResult(BaseCmdResult[ResultOutputT]):
         self.ssherr: str = ssherr
 
 class LocalCommandResult(BaseCmdResult[ResultOutputT]):
-    def __init__(self, returncode: int, stdout: ResultOutputT):
+    __slots__ = ('stderr',)
+
+    def __init__(self, returncode: int, stdout: ResultOutputT, stderr: str):
         super(LocalCommandResult, self).__init__(returncode, stdout)
+        self.stderr = stderr
 
 def _ellide_log_lines(log: str) -> str:
     if log == '':
@@ -260,6 +262,9 @@ def ssh_with_result(hostname_or_ip: HostAddress, cmd: str, *, suppress_fingerpri
 
 def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         suppress_fingerprint_warnings: bool = True, local_dest: bool = False) -> subprocess.CompletedProcess[bytes]:
+    # local import to avoid cyclic import; lib.netutils also import lib.commands
+    from lib.netutil import wrap_ip
+
     opts = ['-o', 'BatchMode=yes']
     if suppress_fingerprint_warnings:
         # Suppress warnings and questions related to host key fingerprints
@@ -317,46 +322,73 @@ def sftp(
 
 @overload
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: Literal[True] = True,
+    cmd: List[str], *, check: bool = True, simple_output: Literal[True] = True, decode: Literal[True] = True,
+    cwd: str | os.PathLike[str] | None = None,
+) -> str:
+    ...
+
+@overload
+def local_cmd(
+    cmd: List[str], *, check: bool = True, simple_output: Literal[True] = True, decode: Literal[False],
+    cwd: str | os.PathLike[str] | None = None,
+) -> bytes:
+    ...
+
+@overload
+def local_cmd(
+    cmd: List[str], *, check: bool = True, simple_output: Literal[False], decode: Literal[True] = True,
     cwd: str | os.PathLike[str] | None = None,
 ) -> LocalCommandResult[str]:
     ...
 
 @overload
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: Literal[False],
+    cmd: List[str], *, check: bool = True, simple_output: Literal[False], decode: Literal[False],
     cwd: str | os.PathLike[str] | None = None,
 ) -> LocalCommandResult[bytes]:
     ...
 
+@overload
 def local_cmd(
-    cmd: List[str], *, check: bool = True, decode: bool = True,
+    cmd: List[str], *, check: bool = True, simple_output: bool = True, decode: bool = True,
     cwd: str | os.PathLike[str] | None = None,
-) -> LocalCommandResult[str] | LocalCommandResult[bytes]:
+) -> str | bytes | LocalCommandResult[str] | LocalCommandResult[bytes]:
+    ...
+
+def local_cmd(
+    cmd: List[str], *, check: bool = True, simple_output: bool = True, decode: bool = True,
+    cwd: str | os.PathLike[str] | None = None,
+) -> str | bytes | LocalCommandResult[str] | LocalCommandResult[bytes]:
     """ Run a command locally on tester end. """
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,
         check=False,
         cwd=cwd,
     )
 
     # get a decoded version of the output in any case, replacing potential errors
-    output_for_logs = res.stdout.decode(errors='replace').strip()
+    stdout_for_logs = res.stdout.decode(errors='replace').strip()
+    stderr_for_logs = res.stderr.decode(errors='replace').strip()
 
     errorcode_msg = "" if res.returncode == 0 else " - Got error code: %s" % res.returncode
     command = " ".join(cmd)
-    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(output_for_logs)}")
+    logging.debug(f"[local] {command}{errorcode_msg}{_ellide_log_lines(stdout_for_logs)}")
 
     if res.returncode and check:
-        raise LocalCommandFailed(res.returncode, output_for_logs, command)
+        logging.warning(f"[local] stderr:{_ellide_log_lines(stderr_for_logs)}")
+        raise LocalCommandFailed(res.returncode, stderr_for_logs, command)
 
+    if simple_output:
+        return res.stdout.decode().strip() if decode else res.stdout.strip()
+
+    stderr = res.stderr.decode()
     if decode:
-        return LocalCommandResult[str](res.returncode, res.stdout.decode())
+        return LocalCommandResult[str](res.returncode, res.stdout.decode(), stderr)
     else:
-        return LocalCommandResult[bytes](res.returncode, res.stdout)
+        return LocalCommandResult[bytes](res.returncode, res.stdout, stderr)
 
 def encode_powershell_command(cmd: str) -> str:
     return base64.b64encode(cmd.encode("utf-16-le")).decode("ascii")

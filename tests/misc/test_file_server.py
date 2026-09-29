@@ -19,8 +19,8 @@ def _header_equal(header: str, name: str, value: str) -> bool:
 def test_fileserver_redirect_https(host: Host) -> None:
     path = "/path/to/dir/file.txt"
     ip = wrap_ip(host.hostname_or_ip)
-    res = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
-    lines = res.stdout.splitlines()
+    output = commands.local_cmd(["curl", "-s", "-i", "http://" + ip + path])
+    lines = output.splitlines()
     assert lines[0].strip() == "HTTP/1.1 301 Moved Permanently"
     assert _header_equal(lines[2], "location", "https://" + ip + path)
 
@@ -31,10 +31,10 @@ class TestHSTS:
 
     @staticmethod
     def __get_header(host: Host) -> list[str]:
-        res = commands.local_cmd(
+        output = commands.local_cmd(
             ["curl", "-s", "-XGET", "-k", "-I", "https://" + wrap_ip(host.hostname_or_ip)]
         )
-        return res.stdout.splitlines()
+        return output.splitlines()
 
     def test_fileserver_hsts_default(self, host: Host) -> None:
         # By default HSTS header should not be set
