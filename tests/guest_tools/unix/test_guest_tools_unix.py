@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 import logging
-import time
 
 from lib.common import PackageManagerEnum, wait_for
 from lib.host import Host

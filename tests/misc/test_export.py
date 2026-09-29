@@ -2,6 +2,8 @@ import pytest
 
 import logging
 
+from packaging import version
+
 from lib.common import Defer
 from lib.host import Host
 from lib.vm import VM
@@ -25,9 +27,15 @@ def export_test(host: Host, vm: VM, filepath: str, compress: Literal['none', 'gz
     if compress == 'none':
         check_file_type('application/x-tar')
     elif compress == 'gzip':
-        check_file_type('application/x-gzip')
+        if host.xcp_version > version.parse("8.3"):
+            check_file_type('application/gzip')
+        else:
+            check_file_type('application/x-gzip')
     elif compress == 'zstd':
-        check_file_type('application/octet-stream')
+        if host.xcp_version > version.parse("8.3"):
+            check_file_type('application/zstd')
+        else:
+            check_file_type('application/octet-stream')
     else:
         assert False, 'Unsupported compress mode'
 
