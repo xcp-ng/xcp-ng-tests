@@ -1,7 +1,7 @@
 """Cleanup tasks.
 
-This module is intended for removing all VMs and all VDIs on local storage
-from existing remote targets.
+This module is intended for removing all VMs and all VDIs on local and shared
+storage from existing remote targets.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from lib.vm import VM
 from .. import logger
 
 def clean_pools(inventory: Inventory, dry_run: bool = False) -> int:
-    """Remove all VMs and all orphan VDIs on local storage from pool(s).
+    """Remove all VMs and all orphan VDIs on local and shared storage from pool(s).
 
     .. note::
 
@@ -25,7 +25,7 @@ def clean_pools(inventory: Inventory, dry_run: bool = False) -> int:
 
     *For each pool's master host declared in inventory, destroy all its VMs
     (with all their VDIs, regardless of their location), then destroy all the
-    orphan VDIs left on the local (non-shared) SRs.*
+    orphan VDIs left on the user SRs, both local and shared.*
 
     :param Inventory inventory:
         Each host (key) holds its own config data (values, eg: `enablerepos`).
@@ -55,7 +55,7 @@ def clean_pools(inventory: Inventory, dry_run: bool = False) -> int:
     return failures
 
 def clean_pool(pool: Pool, dry_run: bool) -> int:
-    """Remove all VMs and all orphan VDIs on local SRs from a single pool.
+    """Remove all VMs and all orphan VDIs on local and shared SRs from a single pool.
 
     :return:
         The number of VMs plus number VDIs that failed to be removed from pool
@@ -83,11 +83,14 @@ def clean_pool(pool: Pool, dry_run: bool) -> int:
                 logger.error(f"[{master}] Failed to remove VM {vm.uuid} ({vm.name()}): {exc}")
                 failures += 1
 
-    sr_uuids = local_sr_uuids(pool)
+    # List all SRs that contain user images
+    sr_uuids = safe_split(pool.master.xe('sr-list', {'content-type': 'user'}, minimal=True))
+
     for sr_uuid in sr_uuids:
-        for vdi_uuid in SR(sr_uuid, pool).vdi_uuids(managed=True):
-            vdi = VDI(vdi_uuid, sr=SR(sr_uuid, pool))
-            logger.info(f"[{master}] {log_prefix} orphan VDI {vdi.uuid} from local SR {sr_uuid}")
+        sr = SR(sr_uuid, pool)
+        for vdi_uuid in sr.vdi_uuids(managed=True):
+            vdi = VDI(vdi_uuid, sr=sr)
+            logger.info(f"[{master}] {log_prefix} orphan VDI {vdi.uuid} from SR {sr_uuid}")
             if not dry_run:
                 try:
                     vdi.destroy()
@@ -99,11 +102,6 @@ def clean_pool(pool: Pool, dry_run: bool) -> int:
         for sr_uuid in sr_uuids:
             wait_for_not(
                 lambda: len(SR(sr_uuid, pool).vdi_uuids(managed=True)) > 0,
-                f"Wait for local SR {sr_uuid} to be empty",
+                f"Wait for SR {sr_uuid} to be empty",
             )
     return failures
-
-def local_sr_uuids(pool: Pool) -> list[str]:
-    """Return the UUIDs of the pool's local (non-shared, user) SRs."""
-    uuids = safe_split(pool.master.xe('sr-list', {'content-type': 'user'}, minimal=True))
-    return [uuid for uuid in uuids if not SR(uuid, pool).is_shared()]
