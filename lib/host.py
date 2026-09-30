@@ -46,6 +46,8 @@ if TYPE_CHECKING:
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
+CACHED_VM_UUID_KEY = "xcpng_tests.cached_vm_uuid"
+
 
 def host_data(hostname_or_ip: str) -> dict[str, str]:
     # read from data.py
@@ -389,11 +391,14 @@ class Host:
     def cached_vm(self, uri: str, sr_uuid: str) -> VM | None:
         assert sr_uuid, "A SR UUID is necessary to use import cache"
         cache_key = self.vm_cache_key(uri)
-        # Look for an existing cache VM
+        # Look for an existing cached VM
         vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
 
         for vm_uuid in vm_uuids:
             vm = VM(vm_uuid, self)
+            vm_cached_uuid = vm.param_get('other-config', key=CACHED_VM_UUID_KEY, accept_unknown_key=True)
+            if vm_uuid != vm_cached_uuid:
+                continue
             # Make sure the VM is on the wanted SR.
             # Assumption: if the first disk is on the SR, the VM is.
             # If there's no VDI at all, then it is virtually on any SR.
@@ -445,6 +450,7 @@ class Host:
             cache_key = self.vm_cache_key(uri)
             logging.info(f"[{self}] Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
+            vm.param_set('other-config', vm.uuid, key=CACHED_VM_UUID_KEY)
         return vm
 
     def import_iso(self, uri: str, sr: SR) -> VDI:
