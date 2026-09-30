@@ -1,6 +1,7 @@
 import pytest
 
 import logging
+import re
 import time
 
 import paramiko
@@ -11,10 +12,8 @@ from lib.host import Host
 
 # Test requirements:
 # - An XCP-ng host with 2 network interfaces:
-#   * eth0 for management, configured with DHCP
-#   * eth1 to test the renaming, no configuration needed
-# - Note that test relies on the DHCP providing the same IP address
-#   after an emergency network reset
+#   * eth0 for management
+#   * eth1 to test the renaming
 
 
 @pytest.mark.parametrize("reset_nics", [False, True], ids=["no_reset", "reset_nics"])
@@ -134,6 +133,16 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     def send_keys(keys: str) -> None:
         channel.send(keys.encode())
 
+    def extract_value(key: str) -> str:
+        for i in range(screen.lines):
+            row = screen.buffer[i]
+            content = screen.display[i]
+            for match in re.finditer(key, content):
+                if all(row[j].bold for j in range(match.start(), match.end())):
+                    value, *_ = content[match.end():].split()
+                    return value
+        raise ValueError(f"Key {key!r} not found")
+
     def show_screen() -> str:
         ANSI_RESET = "\033[0m"
         ANSI_BOLD = "\033[1m"
@@ -177,6 +186,7 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     def debug_screen(title: str = "xsconsole screen") -> None:
         logging.debug(f"{title}:\n{show_screen()}")
 
+    # Wait for the welcome screen to appear
     wait_for_screen_content("XCP-ng")
     wait_for_screen_to_stabilize()
     debug_screen("Welcome screen")
@@ -188,6 +198,13 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     wait_for_screen_to_stabilize()
     debug_screen("Network menu item highlighted")
     assert get_highlighted() == ["Network and Management Interface"]
+
+    # Extract network configuration
+    dhcp = extract_value("DHCP/Static IP")
+    ip_address = extract_value("IP address")
+    netmask = extract_value("Netmask")
+    gateway = extract_value("Gateway")
+    assert dhcp in ("Static", "DHCP")
 
     # Press Enter to select the Network and Management Interface menu
     send_keys(ENTER)
@@ -251,10 +268,37 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     _, highlighted = get_highlighted()
     assert highlighted == "DHCP"
 
+    # Press "s" to select "Static"
+    if dhcp == "Static":
+        send_keys("s")
+        wait_for_screen_to_stabilize()
+        debug_screen("Select Static mode")
+        assert has_content_on_screen("─ Emergency Network Reset ─")
+        _, highlighted = get_highlighted()
+        assert highlighted == "Static"
+
+    # Validate either "DHCP" or "Static"
     send_keys(ENTER)
     wait_for_screen_to_stabilize()
-    debug_screen("Confirmation screen")
-    assert has_content_on_screen("─ Emergency Network Reset ─")
+
+    # Configure a static IP
+    if dhcp == "Static":
+        debug_screen("Static IP configuration dialog")
+        assert has_content_on_screen("─ Emergency Network Reset ─")
+        send_keys(ip_address)
+        send_keys(ENTER)
+        send_keys(netmask)
+        send_keys(ENTER)
+        send_keys(gateway)
+        send_keys(ENTER)
+        send_keys(gateway)  # Use gateway as DNS
+        wait_for_screen_to_stabilize()
+        debug_screen("Static IP configured")
+        send_keys(ENTER)
+        wait_for_screen_to_stabilize()
+
+    # Confirmation dialog
+    debug_screen("Confirmation dialog")
     assert has_content_on_screen("Press <Enter> to reset the network configuration.")
 
     send_keys(ENTER)
