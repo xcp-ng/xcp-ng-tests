@@ -28,7 +28,8 @@ def _command_clean(args: argparse.Namespace) -> int:
     if args.inventory:
         inventory = load_inventory(args.inventory)
     else:
-        inventory = into_inventory(args.hosts, [], args.hosting_pool)
+        # Hosting pool information is not used by the clean task
+        inventory = into_inventory(args.hosts, [], hosting_pool=None)
 
     return clean_pools(inventory, dry_run=args.dry_run)
 
