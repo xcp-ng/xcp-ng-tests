@@ -651,6 +651,15 @@ JOBS: dict[str, JobData] = {
             "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
+    },
+    "xsconsole": {  # TODO: is this what we want? discuss with the team
+        "description": "XSConsole testing",
+        "requirements": [
+            "1 XCP-ng host >= 8.3 with a second network interface",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/xsconsole"],
     }
 }
 
