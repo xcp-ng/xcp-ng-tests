@@ -8,6 +8,24 @@ env:
   PREK_COLOR: "always"
 
 jobs:
+  whitespace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup
+      - run: prek -a trailing-whitespace end-of-file-fixer
+
+  executables:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/uv-setup
+      - run: prek -a check-shebang-scripts-are-executable check-executables-have-shebangs
+
   mypy:
     runs-on: ubuntu-latest
     steps:
