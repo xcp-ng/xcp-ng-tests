@@ -1,17 +1,10 @@
 import sys
 
-from typing import NotRequired, TypedDict
-
-if sys.version_info >= (3, 11):
-    from typing import NotRequired
+if sys.version_info >= (3, 12):
+    from typing import TypeAliasType
 else:
-    from typing_extensions import NotRequired
+    from typing_extensions import TypeAliasType
 
-IsoImageDef = TypedDict('IsoImageDef',
-                        {'path': str,
-                         'net-url': NotRequired[str],
-                         'net-only': NotRequired[bool],
-                         'unsigned': NotRequired[bool],
-                         })
+JSONType = TypeAliasType("JSONType", None | bool | int | float | str | list["JSONType"] | dict[str, "JSONType"])
 
-JSONType = None | bool | int | float | str | list["JSONType"] | dict[str, "JSONType"]
+ConfigDict = dict[str, JSONType]

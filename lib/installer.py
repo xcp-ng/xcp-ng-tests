@@ -4,6 +4,7 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 
+from lib import config
 from lib.commands import ssh
 from lib.common import wait_for
 
@@ -14,8 +15,7 @@ class InstallationFailed(Exception):
 
 class AnswerFile:
     def __init__(self, kind: str, /):
-        from data import BASE_ANSWERFILES
-        defn = BASE_ANSWERFILES[kind]
+        defn = config.install.answerfiles[kind].model_dump()
         self.defn = self._normalize_structure(defn)  # type: ignore
 
     def write_xml(self, filename: str) -> None:

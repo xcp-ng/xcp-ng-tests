@@ -5,3 +5,5 @@ vm_data.py
 /scripts/guests/windows/id_rsa.pub
 .envrc
 *.egg-info
+# Config overrides (user environment-specific)
+config.*.toml

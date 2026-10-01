@@ -11,13 +11,10 @@ check: ruff autopep8 flake8 pyright
 # It runs on all files managed by git (untracked files are not modified)
 fix: ruff-fix autopep8-fix
 
-data.py:
-	@test -r data.py || echo "File 'data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
-
 vm_data.py:
 	@test -r vm_data.py || echo "File 'vm_data.py' does not exist. Refer to https://github.com/xcp-ng/xcp-ng-tests#configuration." && exit 1
 
-pyright ruff: data.py vm_data.py
+pyright ruff: vm_data.py
 
 ruff ruff-fix autopep8 autopep8-fix flake8 pyright:
 	uv run prek -a $@
