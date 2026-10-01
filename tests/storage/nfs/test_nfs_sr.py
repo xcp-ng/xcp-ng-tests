@@ -20,6 +20,13 @@ from tests.storage import (
     vdi_is_open,
     xva_export_import,
 )
+from tests.storage.storage import (
+    check_critical_journal_revert,
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
+)
 
 # Requirements:
 # - one XCP-ng host >= 8.0 with an additional unused disk for the SR
@@ -103,6 +110,41 @@ class TestNFSSR:
             vm.test_snapshot_on_running_vm()
         finally:
             vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_nfs_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_nfs_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_nfs_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_nfs_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_nfs_sr: VM, defer: Defer, exit_on_fistpoint: None):
+        check_vdi_revert_journal_cbt(defer, vm_on_nfs_sr, "FileSR_revert_create_src", vm_on_nfs_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_nfs_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_nfs_sr, fistpoint, vm_on_nfs_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(
+        self, vm_on_nfs_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
+    ) -> None:
+        check_critical_journal_revert(defer, vm_on_nfs_sr, hostA2, "FileSR_revert_create_src")
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize('dispatch_nfs', ['vdi_on_nfs_sr', 'vdi_on_nfs4_sr'], indirect=True)

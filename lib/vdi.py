@@ -124,3 +124,17 @@ class VDI:
         wait_for(lambda: self.get_parent() != previous_parent, msg="Waiting for coalesce", timeout_secs=10 * 60)
         logging.info("Coalesce done")
         return ret
+
+    def enable_cbt(self) -> None:
+        logging.info(f"Enabling CBT on VDI {self.uuid}")
+        self.sr.pool.master.xe('vdi-enable-cbt', {'uuid': self.uuid})
+
+    def disable_cbt(self) -> None:
+        logging.info(f"Disabling CBT on VDI {self.uuid}")
+        self.sr.pool.master.xe('vdi-disable-cbt', {'uuid': self.uuid})
+
+    def get_cbt_enabled(self) -> str:
+        return self.param_get('cbt-enabled')
+
+    def is_cbt_enabled(self) -> bool:
+        return self.get_cbt_enabled() == 'true'

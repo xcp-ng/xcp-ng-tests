@@ -17,6 +17,13 @@ from tests.storage import (
     vdi_is_open,
     xva_export_import,
 )
+from tests.storage.storage import (
+    check_critical_journal_revert,
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
+)
 
 # Requirements:
 # - one XCP-ng host >= 8.2
@@ -83,6 +90,43 @@ class TestLVMOISCSISR:
     def test_vdi_export_import(self, storage_test_vm: VM, lvmoiscsi_sr: SR, image_format: ImageFormat,
                                temp_large_dir: str, defer: Defer) -> None:
         vdi_export_import(storage_test_vm, lvmoiscsi_sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_lvmoiscsi_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_lvmoiscsi_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_lvmoiscsi_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_lvmoiscsi_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_lvmoiscsi_sr: VM, defer: Defer, exit_on_fistpoint: None):
+        check_vdi_revert_journal_cbt(
+            defer, vm_on_lvmoiscsi_sr, "LVM_revert_create_src", vm_on_lvmoiscsi_sr.host.pool.master
+        )
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "LVM_revert_create_insert",
+            "LVM_revert_create_src",
+            "LVM_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_lvmoiscsi_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str):
+        check_vdi_revert_journal(defer, vm_on_lvmoiscsi_sr, fistpoint, vm_on_lvmoiscsi_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(
+        self, vm_on_lvmoiscsi_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
+    ) -> None:
+        check_critical_journal_revert(defer, vm_on_lvmoiscsi_sr, hostA2, "LVM_revert_create_src")
 
     # *** tests with reboots (longer tests).
 
