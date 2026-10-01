@@ -26,7 +26,7 @@ def _wait_for_packet(host: Host | VM, interface: str | list[str], sfilter: str, 
 @pytest.mark.complex_prerequisites
 @pytest.mark.small_vm
 class TestBond:
-    def test_lacp(self, host: Host, vm_with_tcpdump_scope_function: VM, bond_lacp: Bond):
+    def test_lacp(self, host: Host, vm_with_tcpdump_scope_function: VM, bond_lacp: Bond) -> None:
         # expect host with eth1 and eth2 NICs free for use
         logging.info(f"Bond = {bond_lacp.uuid} mode={bond_lacp.mode()} \
             slaves={bond_lacp.slaves()}")
@@ -63,7 +63,7 @@ class TestBond:
         logging.info("Waiting for LACP packet")
         _wait_for_packet(vm, "eth1", "ether proto 0x8809")
 
-    def test_active_backup(self, host: Host, vm_with_tcpdump_scope_function: VM, bond_activebackup: Bond):
+    def test_active_backup(self, host: Host, vm_with_tcpdump_scope_function: VM, bond_activebackup: Bond) -> None:
         # expect host with eth1 and eth2 NICs free for use
         logging.info(f"Bond = {bond_activebackup.uuid} mode={bond_activebackup.mode()} \
             slaves={bond_activebackup.slaves()}")
@@ -94,7 +94,7 @@ class TestBond:
         logging.info("Waiting for some IPv6 packet")
         _wait_for_packet(host, bond_devices, "ether proto 0x86dd")
 
-    def test_balance_slb(self, host: Host, vm_with_tcpdump_scope_function: VM, bond_balanceslb: Bond):
+    def test_balance_slb(self, host: Host, vm_with_tcpdump_scope_function: VM, bond_balanceslb: Bond) -> None:
         # expect host with eth1 and eth2 NICs free for use
         logging.info(f"Bond = {bond_balanceslb.uuid} mode={bond_balanceslb.mode()} \
             slaves={bond_balanceslb.slaves()}")

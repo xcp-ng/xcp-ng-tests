@@ -8,7 +8,7 @@ from lib.vm import VM
 
 from .. import logger
 
-def create_snapshots(host: Host, vm_uuids: list[str]):
+def create_snapshots(host: Host, vm_uuids: list[str]) -> None:
     """Create a snapshot for a list of VMs in host.
 
     :param host:

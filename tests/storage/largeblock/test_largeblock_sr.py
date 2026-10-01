@@ -3,16 +3,11 @@ from __future__ import annotations
 import pytest
 
 from lib.common import vm_image, wait_for
-from lib.vdi import ImageFormat
+from lib.host import Host
+from lib.sr import SR
+from lib.vdi import VDI, ImageFormat
+from lib.vm import VM
 from tests.storage import try_to_create_sr_with_missing_device, vdi_is_open
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.sr import SR
-    from lib.vdi import VDI
-    from lib.vm import VM
 
 # Requirements:
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
