@@ -12,8 +12,8 @@ from lib.host import Host
 
 # Test requirements:
 # - An XCP-ng host with 2 network interfaces:
-#   * eth0 for management
-#   * eth1 to test the renaming
+#   * one for management
+#   * another one to test the renaming
 
 
 @pytest.mark.parametrize("reset_nics", [False, True], ids=["no_reset", "reset_nics"])
@@ -23,31 +23,47 @@ def test_retain_mgmt_iface(
     defer: Defer,
 ):
     from data import HOST_DEFAULT_PASSWORD
+    from data import HOST_FREE_NICS
 
-    # Besides the management interface (eth0), the target host needs to
-    # have another interface (eth1) that will be renamed during this test
-    eth1_mac = host.ssh("interface-rename --list | grep -i eth1 | awk '{ print $2 }'")
+    # Besides the management interface, the target host needs to have another
+    # interface that will be renamed during this test
+    if not HOST_FREE_NICS:
+        pytest.fail("There are no available free NICs for testing.")
 
-    host.ssh("ip link set eth1 down")
-    eth1_pif_uuid = host.ssh("xe pif-list device=eth1 --minimal")
-    if eth1_pif_uuid:
-        host.ssh(f"xe pif-forget uuid={eth1_pif_uuid}")
-    host.ssh("ip link set eth1 name eth999")
-    host.ssh("ip link set eth999 up")
+    target_iface = HOST_FREE_NICS[0]
+
+    iface_mac = host.ssh(f"interface-rename --list | awk '/{target_iface}/ {{ print $2 }}'")
+
+    all_ifaces = host.ssh("ip -o link show | awk -F': ' '{print $2}'").split()
+
+    # Find a non-existing interface name
+    i = 0
+    while f"eth{i}" in all_ifaces:
+        i += 1
+    new_iface_name = f"eth{i}"
+
+    host.ssh(f"ip link set {target_iface} down")
+
+    target_pif_uuid = host.ssh(f"xe pif-list device={target_iface} --minimal")
+    if target_pif_uuid:
+        host.ssh(f"xe pif-forget uuid={target_pif_uuid}")
+
+    host.ssh(f"ip link set {target_iface} name {new_iface_name}")
+    host.ssh(f"ip link set {new_iface_name} up")
 
     def cleanup():
-        if "eth999" in host.ssh("ip link show"):
-            host.ssh("ip link set eth999 down")
-            host.ssh("ip link set eth999 name eth1")
-            host.ssh("ip link set eth1 up")
-        eth999_pif_uuid = host.ssh("xe pif-list device=eth999 --minimal")
-        if eth999_pif_uuid:
-            host.ssh(f"xe pif-forget uuid={eth999_pif_uuid}")
+        if new_iface_name in host.ssh("ip link show"):
+            host.ssh(f"ip link set {new_iface_name} down")
+            host.ssh(f"ip link set {new_iface_name} name {target_iface}")
+            host.ssh(f"ip link set {target_iface} up")
+        new_pif_uuid = host.ssh("xe pif-list device={new_iface_name} --minimal")
+        if new_pif_uuid:
+            host.ssh(f"xe pif-forget uuid={new_pif_uuid}")
 
     defer(cleanup)
 
-    host.ssh(f"interface-rename --update eth999='{eth1_mac}'")
-    host.ssh("xe pif-scan host-uuid=$(xe host-list --minimal)")
+    host.ssh(f"interface-rename --update {new_iface_name}='{iface_mac}'")
+    host.ssh(f"xe pif-scan host-uuid={host.uuid}")
 
     if reset_nics:
         logging.info("Performing an emergency network reset, including interface names")
@@ -61,12 +77,12 @@ def test_retain_mgmt_iface(
     host.wait_for_ssh_reachable()
     host.wait_for_xapi_enabled()
 
-    new_iface = host.ssh(f"xe pif-list MAC={eth1_mac} params=device --minimal")
+    reboot_iface = host.ssh(f"xe pif-list MAC={iface_mac} params=device --minimal")
 
     if reset_nics:
-        assert new_iface == "eth1", "The management interface has NOT changed from eth999 to eth1"
+        assert reboot_iface != new_iface_name, "The management interface has NOT changed from {new_iface_name} to {target_iface}"
     else:
-        assert new_iface == "eth999", f"The management interface has changed from eth999 to '{new_iface}'"
+        assert reboot_iface == new_iface_name, f"The management interface has changed from {new_iface_name} to '{reboot_iface}'"
 
 
 def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
