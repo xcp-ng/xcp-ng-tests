@@ -13,9 +13,12 @@ from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import (
     MAX_VDI_SIZE,
+    CBTTest,
     CoalesceOperation,
     ImageFormat,
     XVACompression,
+    assert_cbt_log_does_not_exist_file_sr,
+    assert_cbt_log_exists_file_sr,
     coalesce_integrity,
     full_vdi_write,
     try_to_create_sr_with_missing_device,
@@ -146,3 +149,73 @@ class TestEXTSR:
         vm.shutdown(verify=True)
 
     # *** End of tests with reboots
+
+
+class TestEXTCBT(CBTTest):
+    """Test CBT functionality on EXT SR"""
+
+    @staticmethod
+    def assert_cbt_log_exists(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_exists_file_sr(host, sr, vdi)
+
+    @staticmethod
+    def assert_cbt_log_does_not_exist(host: Host, sr: SR, vdi: VDI) -> None:
+        assert_cbt_log_does_not_exist_file_sr(host, sr, vdi)
+
+    @staticmethod
+    def cbt_log_path(host: Host, sr: SR, vdi: VDI) -> str:
+        return f'/var/run/sr-mount/{sr.uuid}/{vdi.uuid}.cbtlog'
+
+    def test_enable_disable_cbt(self, host: Host, ext_sr: SR, vdi_on_ext_sr: VDI) -> None:
+        self._test_enable_disable_cbt(host, ext_sr, vdi_on_ext_sr)
+
+    def test_cbt_log_creation(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI) -> None:
+        self._test_cbt_log_creation(host, ext_sr, vdi_cbt_on_ext_sr)
+
+    def test_disable_cbt_removes_log(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI) -> None:
+        self._test_disable_cbt_removes_log(host, ext_sr, vdi_cbt_on_ext_sr)
+
+    def test_destroy_vdi_removes_cbt_log(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI) -> None:
+        self._test_destroy_vdi_removes_cbt_log(host, ext_sr, vdi_cbt_on_ext_sr)
+
+    def test_cbt_disabled_after_vdi_copy(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_disabled_after_vdi_copy(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_log_recreated_after_reenable(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI) -> None:
+        self._test_cbt_log_recreated_after_reenable(host, ext_sr, vdi_cbt_on_ext_sr)
+
+    def test_snapshot_with_cbt(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_snapshot_with_cbt(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_on_snapshot_chain(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_on_snapshot_chain(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_parent_disable_does_not_affect_snapshot(self, host: Host, ext_sr: SR,
+                                                         vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_parent_disable_does_not_affect_snapshot(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    def test_cbt_data_destroy(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_cbt_data_destroy(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_changed_blocks_tracking(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, vm_on_ext_sr: VM,
+                                     defer: Defer) -> None:
+        self._test_changed_blocks_tracking(host, ext_sr, vdi_cbt_on_ext_sr, vm_on_ext_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_incremental_snap_scenario(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI, vm_on_ext_sr: VM,
+                                       defer: Defer) -> None:
+        self._test_incremental_snap_scenario(host, ext_sr, vdi_cbt_on_ext_sr, vm_on_ext_sr, defer)
+
+    def test_changed_blocks_empty_after_snapshot(self, host: Host, ext_sr: SR,
+                                                 vdi_cbt_on_ext_sr: VDI, defer: Defer) -> None:
+        self._test_changed_blocks_empty_after_snapshot(host, ext_sr, vdi_cbt_on_ext_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_cbt_after_coalesce(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI,
+                                vm_on_ext_sr: VM) -> None:
+        self._test_cbt_after_coalesce(host, ext_sr, vdi_cbt_on_ext_sr, vm_on_ext_sr)
+
+    def test_cbt_persist_after_pbd_replug(self, host: Host, ext_sr: SR, vdi_cbt_on_ext_sr: VDI,
+                                          ) -> None:
+        self._test_cbt_persist_after_pbd_replug(host, ext_sr, vdi_cbt_on_ext_sr)
