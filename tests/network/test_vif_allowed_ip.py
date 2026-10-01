@@ -3,6 +3,7 @@ import pytest
 import ipaddress
 import os
 
+from lib.commands import local_cmd
 from lib.vm import VM
 
 # Requirements:
@@ -10,7 +11,7 @@ from lib.vm import VM
 # - a VM (--vm)
 
 def ip_responsive(ip: str) -> bool:
-    return not os.system(f"ping -c 3 -W 10 {ip} > /dev/null 2>&1")
+    return local_cmd(["ping", "-c", "3", "-W", "10", ip], check=False).returncode == 0
 
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_no_sdn_controller")

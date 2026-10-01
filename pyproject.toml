@@ -33,6 +33,7 @@ dev = [
     "pydocstyle",
     "pyright",
     "ruff",
+    "ty",
     "types-passlib",
     "typing-extensions",
     "zizmor",
