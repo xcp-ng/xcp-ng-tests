@@ -511,7 +511,7 @@ def vdi_on_boot_reset(vm: VM) -> None:
     Feature vdi-onboot not implemented on ZFS* SR
     """
 
-    vdi = VDI(vm.vdi_uuids()[0], host=vm.host)
+    vdi = vm.vdi[0]
     vdi.param_set("on-boot", "reset")
     vm.start()
     vm.wait_for_os_booted()
