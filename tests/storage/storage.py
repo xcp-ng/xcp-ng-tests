@@ -508,7 +508,8 @@ def validate_partially_populated_device(vm: VM, dev: str, spans: list[StreamSpan
 
 def vdi_on_boot_reset(vm: VM) -> None:
     """
-    Feature vdi-onboot not implemented on ZFS* SR
+    Apply the `on-boot: reset` parameter on the first VDI of the VM, and check
+    whether the VDI contents are actually reset when starting up the VM.
     """
 
     vdi = vm.vdi[0]
