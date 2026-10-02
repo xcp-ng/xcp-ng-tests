@@ -6,7 +6,7 @@ from data import TOOLS
 from lib.commands import local_cmd
 from lib.typing import JSONType
 
-from typing import Literal, overload
+from typing import Literal, TypedDict, cast, overload
 
 __allow_xo_cli = False
 def _allow_xo_cli(value: bool) -> bool:
@@ -44,6 +44,30 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
         return json.loads(res.stdout)
 
     return res.stdout
+
+
+class XoServer(TypedDict):
+    id: str
+    host: str
+    status: str
+
+def xo_servers(host: str | None = None) -> list[XoServer]:
+    """
+    Returns the registered servers in XO, possibly fitering by [host].
+    """
+    servers = cast(
+        list[XoServer],
+        xo_cli('server.getAll', use_json=True),
+    )
+
+    if host is not None:
+        servers = filter(
+            lambda s: s.get('host') == host,
+            servers,
+        )
+
+    return list(servers)
+
 
 def xo_object_exists(uuid: str) -> bool:
     """

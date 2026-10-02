@@ -35,7 +35,7 @@ from lib.sr import SR
 from lib.tunnel import Tunnel
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli
+from lib.xo import xo_cli, xo_servers
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -312,16 +312,15 @@ class Host:
         return 'Xen' in self._bios_vendor
 
     def xo_get_server_id(self) -> str | None:
-        servers = xo_cli('server.getAll', use_json=True)
-        assert isinstance(servers, list)
-        for server in servers:
-            assert isinstance(server, dict)
-            assert isinstance(server['host'], str)
-            assert isinstance(server['id'], str)
-            if server['host'] == wrap_ip(self.hostname_or_ip):
-                self.xo_srv_id = server['id']
-                return server['id']
-        return None
+        if self.xo_srv_id is None:
+            servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
+
+            if len(servers) == 0:
+                return None
+
+            self.xo_srv_id = servers[0]['id']
+
+        return self.xo_srv_id
 
     def xo_server_remove(self) -> None:
         server_id = self.xo_get_server_id()
@@ -350,15 +349,12 @@ class Host:
         self.xo_srv_id = xo_srv_id
 
     def xo_server_connected(self) -> bool:
-        servers = xo_cli('server.getAll', use_json=True)
-        assert isinstance(servers, list)
-        for server in servers:
-            assert isinstance(server, dict)
-            assert isinstance(server['host'], str)
-            assert isinstance(server['status'], str)
-            if server['host'] == wrap_ip(self.hostname_or_ip):
-                return server['status'] == "connected"
-        return False
+        servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
+
+        if len(servers) == 0:
+            return False
+
+        return servers[0]['status'] == "connected"
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
