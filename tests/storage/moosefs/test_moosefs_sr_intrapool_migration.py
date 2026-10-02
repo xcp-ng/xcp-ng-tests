@@ -2,6 +2,7 @@ import pytest
 
 from lib.host import Host
 from lib.sr import SR
+from lib.vdi import ImageFormat
 from lib.vm import VM
 from tests.storage import cold_migration_then_come_back, live_storage_migration_then_come_back
 
@@ -18,16 +19,15 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.big_vm # and ideally on a big VM to test it scales
 @pytest.mark.usefixtures("host_no_ipv6") # MooseFS doesn't support IPv6
 class Test:
-    def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM) -> None:
+    def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM,
+                                             image_format: ImageFormat) -> None:
         sr = vm_on_moosefs_sr.get_sr()
-        live_storage_migration_then_come_back(vm_on_moosefs_sr, host, hostA2, sr)
+        live_storage_migration_then_come_back(vm_on_moosefs_sr, host, hostA2, sr, image_format)
 
-    def test_cold_intrapool_migration(
-        self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM, xfs_sr_on_hostA2: SR
-    ) -> None:
-        cold_migration_then_come_back(vm_on_moosefs_sr, host, hostA2, xfs_sr_on_hostA2)
+    def test_cold_intrapool_migration(self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM, xfs_sr_on_hostA2: SR,
+                                      image_format: ImageFormat) -> None:
+        cold_migration_then_come_back(vm_on_moosefs_sr, host, hostA2, xfs_sr_on_hostA2, image_format)
 
-    def test_live_intrapool_migration(
-        self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM, xfs_sr_on_hostA2: SR
-    ) -> None:
-        live_storage_migration_then_come_back(vm_on_moosefs_sr, host, hostA2, xfs_sr_on_hostA2)
+    def test_live_intrapool_migration(self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM, xfs_sr_on_hostA2: SR,
+                                      image_format: ImageFormat) -> None:
+        live_storage_migration_then_come_back(vm_on_moosefs_sr, host, hostA2, xfs_sr_on_hostA2, image_format)

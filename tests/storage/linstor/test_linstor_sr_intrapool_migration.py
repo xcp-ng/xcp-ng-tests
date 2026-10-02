@@ -33,12 +33,15 @@ def nfs_sr(host: Host, image_format: ImageFormat) -> Generator[SR, None, None]:
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
 class Test:
-    def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, vm_on_linstor_sr: VM) -> None:
+    def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, vm_on_linstor_sr: VM,
+                                             image_format: ImageFormat) -> None:
         sr = vm_on_linstor_sr.get_sr()
-        live_storage_migration_then_come_back(vm_on_linstor_sr, host, hostA2, sr)
+        live_storage_migration_then_come_back(vm_on_linstor_sr, host, hostA2, sr, image_format)
 
-    def test_cold_intrapool_migration(self, host: Host, hostA2: Host, vm_on_linstor_sr: VM, nfs_sr: SR) -> None:
-        cold_migration_then_come_back(vm_on_linstor_sr, host, hostA2, nfs_sr)
+    def test_cold_intrapool_migration(self, host: Host, hostA2: Host, vm_on_linstor_sr: VM, nfs_sr: SR,
+                                      image_format: ImageFormat) -> None:
+        cold_migration_then_come_back(vm_on_linstor_sr, host, hostA2, nfs_sr, image_format)
 
-    def test_live_intrapool_migration(self, host: Host, hostA2: Host, vm_on_linstor_sr: VM, nfs_sr: SR) -> None:
-        live_storage_migration_then_come_back(vm_on_linstor_sr, host, hostA2, nfs_sr)
+    def test_live_intrapool_migration(self, host: Host, hostA2: Host, vm_on_linstor_sr: VM, nfs_sr: SR,
+                                      image_format: ImageFormat) -> None:
+        live_storage_migration_then_come_back(vm_on_linstor_sr, host, hostA2, nfs_sr, image_format)
