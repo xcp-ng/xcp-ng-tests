@@ -12,4 +12,5 @@ ruff
 types-passlib
 typing-extensions
 zizmor
+types-paramiko
 -r base.txt
