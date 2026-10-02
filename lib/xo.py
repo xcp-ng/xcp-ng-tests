@@ -46,6 +46,9 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
     return res.stdout
 
 def xo_object_exists(uuid: str) -> bool:
+    """
+    Returns if an object with [uuid] exists.
+    """
     lst = xo_cli('list-objects', {'uuid': uuid}, use_json=True)
     assert isinstance(lst, list)
     return len(lst) > 0
