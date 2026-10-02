@@ -22,8 +22,7 @@ def test_retain_mgmt_iface(
     reset_nics: bool,
     defer: Defer,
 ):
-    from data import HOST_DEFAULT_PASSWORD
-    from data import HOST_FREE_NICS
+    from data import HOST_DEFAULT_PASSWORD, HOST_FREE_NICS
 
     # Besides the management interface, the target host needs to have another
     # interface that will be renamed during this test
@@ -80,9 +79,13 @@ def test_retain_mgmt_iface(
     reboot_iface = host.ssh(f"xe pif-list MAC={iface_mac} params=device --minimal")
 
     if reset_nics:
-        assert reboot_iface != new_iface_name, "The management interface has NOT changed from {new_iface_name} to {target_iface}"
+        assert reboot_iface != new_iface_name, (
+            "The management interface has NOT changed from {new_iface_name} to {target_iface}"
+        )
     else:
-        assert reboot_iface == new_iface_name, f"The management interface has changed from {new_iface_name} to '{reboot_iface}'"
+        assert reboot_iface == new_iface_name, (
+            f"The management interface has changed from {new_iface_name} to '{reboot_iface}'"
+        )
 
 
 def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
