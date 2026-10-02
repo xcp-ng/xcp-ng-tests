@@ -99,6 +99,7 @@ class TestLVMOISCSISR:
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
 
+    @pytest.mark.small_vm
     def test_vdi_on_boot_reset(self, vm_on_lvmoiscsi_sr: VM) -> None:
         vdi_on_boot_reset(vm_on_lvmoiscsi_sr)
 
