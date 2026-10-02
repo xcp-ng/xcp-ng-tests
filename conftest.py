@@ -402,7 +402,7 @@ def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[
             h.xo_server_add(h.user, h.password)
         else:
             h.xo_get_server_id(store=True)
-        wait_for(h.xo_server_connected, timeout_secs=10)
+        wait_for(h.xo_server_connected)
     yield hosts
     # teardown
     for h in hosts:
