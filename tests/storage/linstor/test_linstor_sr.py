@@ -35,7 +35,7 @@ class DrbdPeerDevice(BaseModel):
 
 class DrbdConnection(BaseModel):
     name: str = ""
-    peer_devices: list[DrbdPeerDevice] = Field(default=[], alias="peer-devices")
+    peer_devices: list[DrbdPeerDevice] = Field(default=[])
 
 class DrbdResource(BaseModel):
     name: str = ""
