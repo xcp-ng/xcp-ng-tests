@@ -7,6 +7,7 @@ import time
 import paramiko
 import pyte
 
+from data import HOST_DEFAULT_PASSWORD, HOST_FREE_NICS
 from lib.common import Defer
 from lib.host import Host
 
@@ -15,14 +16,12 @@ from lib.host import Host
 #   * one for management
 #   * another one to test the renaming
 
-
 @pytest.mark.parametrize("reset_nics", [False, True], ids=["no_reset", "reset_nics"])
 def test_retain_mgmt_iface(
     host: Host,
     reset_nics: bool,
     defer: Defer,
 ):
-    from data import HOST_DEFAULT_PASSWORD, HOST_FREE_NICS
 
     # Besides the management interface, the target host needs to have another
     # interface that will be renamed during this test
@@ -43,9 +42,9 @@ def test_retain_mgmt_iface(
 
     host.ssh(f"ip link set {target_iface} down")
 
-    target_pif_uuid = host.ssh(f"xe pif-list device={target_iface} --minimal")
+    target_pif_uuid = host.xe("pif-list", {"device": target_iface, "host-uuid": host.uuid, "minimal": True})
     if target_pif_uuid:
-        host.ssh(f"xe pif-forget uuid={target_pif_uuid}")
+        host.xe("pif-forget", {"uuid": target_pif_uuid})
 
     host.ssh(f"ip link set {target_iface} name {new_iface_name}")
     host.ssh(f"ip link set {new_iface_name} up")
@@ -55,14 +54,14 @@ def test_retain_mgmt_iface(
             host.ssh(f"ip link set {new_iface_name} down")
             host.ssh(f"ip link set {new_iface_name} name {target_iface}")
             host.ssh(f"ip link set {target_iface} up")
-        new_pif_uuid = host.ssh("xe pif-list device={new_iface_name} --minimal")
+        new_pif_uuid = host.xe("pif-list", {"device": new_iface_name, "host-uuid": host.uuid, "minimal": True})
         if new_pif_uuid:
-            host.ssh(f"xe pif-forget uuid={new_pif_uuid}")
+            host.xe("pif-forget", {"uuid": new_pif_uuid})
 
     defer(cleanup)
 
     host.ssh(f"interface-rename --update {new_iface_name}='{iface_mac}'")
-    host.ssh(f"xe pif-scan host-uuid={host.uuid}")
+    host.xe("pif-scan", {"host-uuid": host.uuid})
 
     if reset_nics:
         logging.info("Performing an emergency network reset, including interface names")
@@ -76,7 +75,8 @@ def test_retain_mgmt_iface(
     host.wait_for_ssh_reachable()
     host.wait_for_xapi_enabled()
 
-    reboot_iface = host.ssh(f"xe pif-list MAC={iface_mac} params=device --minimal")
+    # reboot_iface = host.ssh(f"xe pif-list MAC={iface_mac} params=device host-uuid={host.uuid} --minimal")
+    reboot_iface = host.xe("pif-list", {"MAC": iface_mac, "params": "device", "host-uuid": host.uuid, "minimal": True})
 
     if reset_nics:
         assert reboot_iface != new_iface_name, (
@@ -89,8 +89,6 @@ def test_retain_mgmt_iface(
 
 
 def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
-    from data import HOST_DEFAULT_PASSWORD
-
     logging.getLogger("paramiko").setLevel(logging.WARNING)
 
     class IgnorePolicy(paramiko.MissingHostKeyPolicy):
