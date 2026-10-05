@@ -55,7 +55,8 @@ class TestNested:
         ("82nightly", "disk"),
         ("821.1", "disk"), ("821.1", "raid1"),
         ("81", "disk"), ("80", "disk"), ("76", "disk"), ("75", "disk"),
-        ("xs8", "disk"), ("ch821.1", "disk"),
+        ("xs8", "disk"), ("xs8", "xsraid1"),
+        ("ch821.1", "disk"),
         ("xs70", "disk"),
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -84,7 +85,7 @@ class TestNested:
                 dict(name="vm1 system disk", size="100GiB", device="xvda", userdevice="0"),
                 dict(name="vm1 extra disk", size="50GiB", device="xvdb", userdevice="1")
             ] + ([dict(name="vm1 system disk mirror", size="100GiB", device="xvdc", userdevice="2")]
-                 if system_disk_config == "raid1" else [])
+                 if system_disk_config in ("raid1", "xsraid1") else [])
             ),
             cd_vbd=dict(device="xvdd", userdevice="3"),
             vifs=[dict(index=0, network_name=NETWORKS["MGMT"])],
@@ -104,13 +105,16 @@ class TestNested:
                      {"TAG": "disk", "CONTENTS": diskname} for diskname in system_disks_names
                  ]}),
              "disk": None,
+             "xsraid1": None,
              }[system_disk_config],
 
             {"TAG": "admin-interface", "name": "eth0", "proto": "dhcp"},
             {"TAG": "primary-disk",
              "guest-storage": "no" if local_sr == "nosr" else "yes",
+             "swraid": "yes" if system_disk_config == "xsraid1" else "no",
              "CONTENTS": {"disk": system_disks_names[0],
                           "raid1": "md127",
+                          "xsraid1": ','.join(system_disks_names),
                           }[system_disk_config],
              },
         ))
@@ -135,7 +139,8 @@ class TestNested:
         "821.1-disk",
         "821.1-raid1",
         "81-disk", "80-disk", "76-disk", "75-disk",
-        "xs8-disk", "ch821.1-disk",
+        "xs8-disk", "xs8-xsraid1",
+        "ch821.1-disk",
         "xs70-disk",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -154,10 +159,11 @@ class TestNested:
         match system_disk_config:
             case "disk":
                 helper_vm.ssh("mount /dev/xvdb1 /mnt")
-            case "raid1":
+            case "raid1" | "xsraid1":
                 # FIXME helper VM has to be an Alpine, that should not be a random vm_ref
+                logging.info("Assembling RAID (%s)", system_disk_config)
                 helper_vm.ssh("apk add mdadm")
-                helper_vm.ssh("mdadm -A /dev/md/127 -N localhost:127")
+                helper_vm.ssh("mdadm -A --scan")
                 helper_vm.ssh("mount /dev/md127p1 /mnt")
             case _:
                 raise ValueError(f"unhandled system_disk_config {system_disk_config!r}")
@@ -198,7 +204,7 @@ class TestNested:
         else:
             # not a restore, looking for the last install or upgrade
             for component in reversed(split_installed_config):
-                if component in ('disk', 'raid1'):
+                if component in ('disk', 'raid1', 'xsraid1'):
                     continue
                 expected_rel_id = component
                 break
@@ -353,7 +359,8 @@ class TestNested:
         "821.1-disk",
         "821.1-raid1",
         "81-disk", "80-disk", "76-disk", "75-disk",
-        "xs8-disk", "ch821.1-disk",
+        "xs8-disk", "xs8-xsraid1",
+        "ch821.1-disk",
         "xs70-disk",
     ))
     @pytest.mark.parametrize("firmware", ("uefi", "bios"))
@@ -381,6 +388,7 @@ class TestNested:
         ("81-disk", "83nightly"),
         ("80-disk", "83nightly"),
         ("xs8-disk", "83nightly"),
+        ("xs8-xsraid1", "83nightly"),
         ("ch821.1-disk", "83nightly"),
         ("830net-disk", "830net"), # FIXME
         ("82nightly-disk", "82nightly"),
@@ -404,6 +412,7 @@ class TestNested:
             {"TAG": "existing-installation",
              "CONTENTS": {"disk": system_disks_names[0],
                           "raid1": "md127",
+                          "xsraid1": "md127",
                           }[system_disk_config]},
         ))
     def test_upgrade(self, vm_booted_with_installer: VM, system_disks_names: list[str],
@@ -426,6 +435,7 @@ class TestNested:
         ("81-disk-83nightly"),
         ("80-disk-83nightly"),
         ("xs8-disk-83nightly"),
+        ("xs8-xsraid1-83nightly"),
         ("ch821.1-disk-83nightly"),
         ("830net-disk-830net"), # FIXME
         ("82nightly-disk-82nightly"),
@@ -456,6 +466,7 @@ class TestNested:
         ("81-disk-83nightly", "83nightly"),
         ("80-disk-83nightly", "83nightly"),
         ("xs8-disk-83nightly", "83nightly"),
+        ("xs8-xsraid1-83nightly", "83nightly"),
         ("ch821.1-disk-83nightly", "83nightly"),
         ("830net-disk-830net", "830net"), # FIXME
         ("82nightly-disk-82nightly", "82nightly"),
@@ -474,6 +485,7 @@ class TestNested:
             {"TAG": "backup-disk",
              "CONTENTS": {"disk": system_disks_names[0],
                           "raid1": "md127",
+                          "xsraid1": "md127",
                           }[system_disk_config]},
         ))
     def test_restore(self, vm_booted_with_installer: VM, system_disks_names: list[str],
@@ -496,6 +508,7 @@ class TestNested:
         "81-disk-83nightly-83nightly",
         "80-disk-83nightly-83nightly",
         "xs8-disk-83nightly-83nightly",
+        "xs8-xsraid1-83nightly-83nightly",
         "ch821.1-disk-83nightly-83nightly",
         "830net-disk-830net-830net", # FIXME
         "82nightly-disk-82nightly-82nightly",

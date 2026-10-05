@@ -100,7 +100,7 @@ def installer_iso(request: pytest.FixtureRequest) -> dict[str, str | bool]:
                 unsigned=ISO_IMAGES[iso_key].get('unsigned', False),
                 )
 
-SystemDiskConfig: TypeAlias = Literal['disk'] | Literal['raid1']
+SystemDiskConfig: TypeAlias = Literal['disk'] | Literal['raid1'] | Literal['xsraid1']
 
 @pytest.fixture(scope='function')
 def system_disk_config(request: pytest.FixtureRequest) -> SystemDiskConfig:
@@ -120,7 +120,7 @@ def system_disk_config(request: pytest.FixtureRequest) -> SystemDiskConfig:
         # formal encoding of `installed_config`... or rely on tracking
         # by upcoming PaaS
         for component in reversed(installed_config.split('-')):
-            if component in ('disk', 'raid1'):
+            if component in ('disk', 'raid1', 'xsraid1'):
                 system_disk_config = component
                 break
         else:
@@ -135,6 +135,7 @@ def system_disks_names(request: pytest.FixtureRequest, system_disk_config: Syste
     main_disk = {"uefi": "nvme0n1", "bios": "sda"}[firmware]
 
     extra_disks = {"raid1": {"uefi": ("nvme0n2",), "bios": ("sdb",)}[firmware],
+                   "xsraid1": {"uefi": ("nvme0n2",), "bios": ("sdb",)}[firmware],
                    "disk": (),
                    }[system_disk_config]
 
