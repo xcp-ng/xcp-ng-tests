@@ -14,6 +14,7 @@ from packaging import version
 import lib.commands as commands
 from lib.bond import Bond
 from lib.common import (
+    XeParams,
     _param_add,
     _param_clear,
     _param_get,
@@ -31,6 +32,8 @@ from lib.netutil import wrap_ip
 from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
+from lib.tunnel import Tunnel
+from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
@@ -55,7 +58,8 @@ def host_data(hostname_or_ip: str) -> dict[str, str]:
 
 class Host:
     xe_prefix = "host"
-    pool: "Pool"
+    pool: Pool
+    package_manager: str
 
     # Data extraction is automatic, no conversion from str is done.
     @dataclass
@@ -91,6 +95,13 @@ class Host:
 
         self.rescan_block_devices_info()
 
+        if self.file_exists('/usr/bin/dnf'):
+            self.package_manager = 'dnf'
+        elif self.file_exists('/usr/bin/yum'):
+            self.package_manager = 'yum'
+        else:
+            raise Exception("No yum or dnf on the host")
+
     def __str__(self) -> str:
         return self.hostname_or_ip
 
@@ -101,39 +112,39 @@ class Host:
         return self.param_get('name-label')
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True, multiplexing: bool = True) -> str:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[True] = ..., multiplexing: bool = ...) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[False], multiplexing: bool = True) -> bytes:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[False], multiplexing: bool = ...) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True, multiplexing: bool = True) -> commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[True] = ..., multiplexing: bool = ...) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[False], multiplexing: bool = True) -> commands.SSHResult[bytes]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[False], multiplexing: bool = ...) -> commands.SSHResult[bytes]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[True],
-            decode: bool = True, multiplexing: bool = True) -> None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[True],
+            decode: bool = ..., multiplexing: bool = ...) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            suppress_fingerprint_warnings: bool = True, background: Literal[False] = False,
-            decode: Literal[True] = True, multiplexing: bool = True) -> str | commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            suppress_fingerprint_warnings: bool = ..., background: Literal[False] = ...,
+            decode: Literal[True] = ..., multiplexing: bool = ...) -> str | commands.SSHResult[str]:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
@@ -155,16 +166,16 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = ..., *, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = ..., *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
-    def xe(self, action: str, args: dict[str, str | bool | dict[str, str]] = {}, *, check: bool = True,
+    def xe(self, action: str, args: XeParams = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
             -> str | commands.SSHResult[str]:
         maybe_param_minimal = ' --minimal' if minimal else ''
@@ -242,7 +253,7 @@ class Host:
         self.ssh(f'rm -f /etc/yum.repos.d/xcp-ng-{name}.repo')
 
     @overload
-    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = True) -> str:
+    def execute_script(self, script_contents: str, *, shebang: str = ..., simple_output: Literal[True] = ...) -> str:
         ...
 
     @overload
@@ -341,8 +352,10 @@ class Host:
                 'password': password,
                 'allowUnauthorized': 'true',
                 'label': label
-            }
+            },
+            use_json=True,
         )
+        assert isinstance(xo_srv_id, str)
         self.xo_srv_id = xo_srv_id
 
     def xo_server_status(self) -> str | None:
@@ -391,7 +404,7 @@ class Host:
         return None
 
     def import_vm(self, uri: str, sr_uuid: str | None = None, use_cache: bool = False) -> VM:
-        vm: VM | None = None
+        vm = None
 
         if uri.startswith("clone://") or uri.startswith("clone+start://"):
             assert sr_uuid is not None
@@ -400,7 +413,6 @@ class Host:
             if base_vm is None:
                 raise RuntimeError(f"VM {filename!r} not in cache (in SR {sr_uuid})")
             vm = base_vm.clone()
-            vm.param_clear('name-description')
             if protocol == "clone+start":
                 vm.start()
                 wait_for(vm.is_running, f"[{self}] Wait for VM running ({vm.uuid})")
@@ -412,7 +424,7 @@ class Host:
             if vm:
                 return vm
 
-        params: dict[str, str | bool | dict[str, str]] = {}
+        params: XeParams = {}
         msg = f"[{self}] Import VM {uri}"
         if '://' in uri:
             params['url'] = uri
@@ -449,7 +461,7 @@ class Host:
 
         download_path = None
         try:
-            params: dict[str, str | bool | dict[str, str]] = {'uuid': vdi_uuid}
+            params: XeParams = {'uuid': vdi_uuid}
             if '://' in uri:
                 logging.info(f"[{self}] Download ISO {uri}")
                 download_path = f'/tmp/{vdi_uuid}'
@@ -467,7 +479,7 @@ class Host:
         return VDI(vdi_uuid, sr=sr)
 
     def vm_from_template(self, name: str, template: str) -> VM:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             "new-name-label": prefix_object_name(name),
             "template": template,
             "sr-uuid": self.main_sr_uuid(),
@@ -510,7 +522,7 @@ class Host:
             yum clean metadata -q
         """
         logging.info(f"[{self}] Removing cache metadata...")
-        return self.ssh("yum clean metadata -q --enablerepo='*'")
+        return self.ssh(f"{self.package_manager} clean metadata -q --enablerepo='*'")
 
     def yum_update(self, enablerepos: list[str] = [], disablerepos: list[str] = []) -> str:
         """Updates packages on target.
@@ -526,7 +538,7 @@ class Host:
         :param enablerepos: Enable one or more repositories (default: [])
         :param disablerepos: Disable one or more repositories (default: [])
         """
-        base_command = "yum update -y"
+        base_command = f'{self.package_manager} update -y'
 
         logging.info(f"[{self}] Updating packages...")
         if disablerepos:
@@ -610,7 +622,7 @@ class Host:
     def has_updates(self) -> bool:
         try:
             # yum check-update returns 100 if there are updates, 1 if there's an error, 0 if no updates
-            self.ssh('yum check-update')
+            self.ssh(f'{self.package_manager} check-update')
             # returned 0, else there would have been a SSHCommandFailed
             return False
         except commands.SSHCommandFailed as e:
@@ -634,41 +646,54 @@ class Host:
         [...]
         """
         try:
-            history_str = self.ssh('yum history list --noplugins')
-        except commands.SSHCommandFailed:
-            # yum history list fails if the list is empty, and it's also not possible to rollback
-            # to before the first transaction, so "0" would not be appropriate as last transaction.
-            # To workaround this, create transactions: install and remove a small package.
+            history_str = self.ssh(f'{self.package_manager} history list --noplugins')
+        except commands.SSHCommandFailed as e:
+            if 'Error: Failed history list' not in e.stdout:
+                # this is not the expected error for an empty history list, re-raise the exception
+                raise
+            # yum history list fails on xcp-ng 8 if the list is empty, but dnf history list works properly on xcp-ng 9.
+            # Just use a fake empty value to deal with both versions in the same way.
+            if self.package_manager == 'yum':
+                history_str = '''ID     | Command line             | Date and time    | Action(s)      | Altered
+-------------------------------------------------------------------------------'''
+            else:
+                raise
+
+        def split_history(history_str: str) -> list[str]:
+            history = history_str.splitlines()
+            line_index = None
+            for i in range(len(history)):
+                if history[i].startswith('--------'):
+                    line_index = i
+                    break
+            if line_index is None:
+                raise Exception('Unable to get yum transactions')
+            return history[line_index + 1:]
+
+        history = split_history(history_str)
+        if not history:
+            # we need a transaction to already exist. Install a small package with no deps, and remove it immediately.
             logging.info(f"[{self}] Install and remove a small package to workaround empty yum history.")
-            self.yum_install(['gpm-libs'])
-            self.yum_remove(['gpm-libs'])
-            history_str = self.ssh('yum history list --noplugins')
-
-        history = history_str.splitlines()
-        line_index = None
-        for i in range(len(history)):
-            if history[i].startswith('--------'):
-                line_index = i
-                break
-
-        if line_index is None:
-            raise Exception('Unable to get yum transactions')
+            self.yum_install(['dummypkg'])
+            self.yum_remove(['dummypkg'])
+            history = split_history(self.ssh(f'{self.package_manager} history list --noplugins'))
 
         try:
-            return int(history[line_index + 1].split()[0])
+            return int(history[0].split()[0])
         except ValueError:
             raise Exception('Unable to parse correctly last yum history tid. Output:\n' + history_str)
 
     def yum_install(self, packages: list[str], enablerepo: str | None = None) -> str:
         logging.info(f"[{self}] Install packages: {' '.join(packages)} on host")
-        cmd = 'yum install --setopt=skip_missing_names_on_install=False -y'
+        opts = '--setopt=skip_missing_names_on_install=False' if self.package_manager == 'yum' else ''
+        cmd = f'{self.package_manager} install {opts} -y'
         if enablerepo is not None:
             cmd = f'{cmd} --enablerepo={enablerepo}'
         return self.ssh(f'{cmd} {" ".join(packages)}')
 
     def yum_remove(self, packages: list[str]) -> str:
         logging.info(f"[{self}] Remove packages: {' '.join(packages)} from host")
-        return self.ssh(f'yum remove -y {" ".join(packages)}')
+        return self.ssh(f'{self.package_manager} remove -y {" ".join(packages)}')
 
     def packages(self) -> list[str]:
         """Returns the list of installed RPMs - with epoch, version, release, arch."""
@@ -701,9 +726,12 @@ class Host:
 
         assert isinstance(self.saved_rollback_id, int)
 
-        self.ssh(
-            f'yum history rollback --enablerepo=xcp-ng-base,xcp-ng-testing,xcp-ng-updates {self.saved_rollback_id} -y'
-        )
+        repositories = ['xcp-ng-base']
+        if self.xcp_version.major == 8:
+            # TODO: activate those repositories in xcp-ng 9. For now they are not available.
+            repositories += ['xcp-ng-testing', 'xcp-ng-updates']
+        self.ssh(f'{self.package_manager} history rollback'
+                 f' --enablerepo={",".join(repositories)} {self.saved_rollback_id} -y')
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
             missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
@@ -715,6 +743,9 @@ class Host:
         # We can resave a new state after that.
         self.saved_packages_list = None
         self.saved_rollback_id = None
+
+    def service_started(self, name: str) -> bool:
+        return self.ssh(f'systemctl is-active {name}', check=False) == 'active'
 
     def reboot(self, verify: bool = False) -> None:
         logging.info(f"[{self}] Reboot host")
@@ -892,7 +923,7 @@ class Host:
 
     def sr_create(self, sr_type: str, label: str, device_config: dict[str, str], shared: bool = False,
                   verify: bool = False) -> SR:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'host-uuid': self.uuid,
             'type': sr_type,
             'name-label': prefix_object_name(label),
@@ -959,7 +990,7 @@ class Host:
 
     def call_plugin(self, plugin_name: str, function: str,
                     args: dict[str, str] | None = None) -> str:
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'host-uuid': self.uuid,
             'plugin': plugin_name,
             'fn': function
@@ -1042,7 +1073,7 @@ class Host:
         return ret
 
     def pifs(self, device: str | None = None) -> list[PIF]:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             "host-uuid": self.uuid,
         }
 
@@ -1051,8 +1082,11 @@ class Host:
 
         return [PIF(uuid, self) for uuid in safe_split(self.xe("pif-list", args, minimal=True))]
 
+    def tunnels(self) -> list[Tunnel]:
+        return [Tunnel(self, uuid) for uuid in safe_split(self.xe("tunnel-list", {}, minimal=True))]
+
     def create_bond(self, network: Network, pifs: list[PIF], mode: str | None = None) -> Bond:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'network-uuid': network.uuid,
             'pif-uuids': ','.join([pif.uuid for pif in pifs]),
         }
@@ -1066,7 +1100,7 @@ class Host:
         return Bond(self, uuid)
 
     def create_network(self, label: str, description: str | None = None) -> Network:
-        args: dict[str, str | bool | dict[str, str]] = {
+        args: XeParams = {
             'name-label': label,
         }
 
@@ -1078,3 +1112,35 @@ class Host:
         logging.info(f"[{self}] New Network: {uuid}")
 
         return Network(self, uuid)
+
+    def create_vlan(self, network: Network, pif: PIF, vlan: int) -> VLAN:
+        args: XeParams = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'vlan': str(vlan),
+        }
+
+        untagged_pif_uuid = self.xe("vlan-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": untagged_pif_uuid,
+            "param-name": "vlan-master-of",
+        })
+        logging.info(f"New VLAN: {uuid} (untagged-pif: {untagged_pif_uuid})")
+
+        return VLAN(self, uuid)
+
+    def create_tunnel(self, network: Network, pif: PIF, protocol: str) -> Tunnel:
+        args: XeParams = {
+            'network-uuid': network.uuid,
+            'pif-uuid': pif.uuid,
+            'protocol': protocol,
+        }
+
+        access_pif_uuid = self.xe("tunnel-create", args, minimal=True)
+        uuid = self.xe("pif-param-get", {
+            "uuid": access_pif_uuid,
+            "param-name": "tunnel-access-PIF-of",
+        })
+        logging.info(f"New Tunnel: {uuid} (access-pif: {access_pif_uuid})")
+
+        return Tunnel(self, uuid)

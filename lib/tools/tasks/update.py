@@ -37,6 +37,12 @@ def _downgrade_command(host: Host, pkgs: set[str]) -> str:
     names = host.ssh(f"rpm -q --qf '%{{NAME}} ' {specs}").split()
     return "yum downgrade -y " + " ".join(names)
 
+def _source_packages(host: Host, pkgs: set[str]) -> set[str]:
+    """Return the source package NEVRAs of the given installed packages."""
+    specs = " ".join(_nevra_to_nvra(p) for p in sorted(pkgs))
+    out = host.ssh(f"rpm -q --qf '%{{SOURCERPM}}\\n' {specs}")
+    return {line for line in out.splitlines() if line != "(none)"}
+
 def _report_updated(before: dict[Host, set[str]], after: dict[Host, set[str]]) -> None:
     """Log a summary of the packages that were updated on each host."""
     updated = {
@@ -51,6 +57,13 @@ def _report_updated(before: dict[Host, set[str]], after: dict[Host, set[str]]) -
         f"Updated packages on all hosts ({len(common_updated)}):\n"
         f"{_format_packages(sorted(common_updated))}"
     )
+    sources = {h: _source_packages(h, pkgs & common_updated) for h, pkgs in updated.items()}
+    common_sources = set.intersection(*sources.values()) if sources else set()
+    if common_sources:
+        logger.info(
+            f"Corresponding source packages ({len(common_sources)}):\n"
+            f"{_format_packages(sorted(common_sources))}"
+        )
     for h, pkgs in updated.items():
         extra = sorted(pkgs - common_updated)
         if extra:

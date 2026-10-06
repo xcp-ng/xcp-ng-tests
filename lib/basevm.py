@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, List, Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
 from lib.sr import SR
 
 class BaseVM:
@@ -57,11 +57,16 @@ class BaseVM:
         assert isinstance(n, str)
         return n
 
+    def description(self) -> str:
+        description = self.param_get('name-description')
+        assert isinstance(description, str)
+        return description
+
     # @abstractmethod
     def _disk_list(self) -> str:
         raise NotImplementedError()
 
-    def vdi_uuids(self, sr_uuid: str | None = None) -> List[str]:
+    def vdi_uuids(self, sr_uuid: str | None = None) -> list[str]:
         output = self._disk_list()
         if output == '':
             return []
@@ -97,7 +102,7 @@ class BaseVM:
 
     def export(self, filepath: str, compress: str = 'none', use_cache: bool = False) -> None:
         logging.info("Export VM %s to %s with compress=%s" % (self.uuid, filepath, compress))
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'uuid': self.uuid,
             'compress': compress,
             'filename': filepath

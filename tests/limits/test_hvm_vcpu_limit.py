@@ -17,6 +17,7 @@ from lib.vm import VM
 # - a Linux or Windows VM (UEFI or BIOS) (--vm)
 
 HVM_MAX_VCPUS = 128
+WINDOWS_MAX_VCPUS = 64
 
 
 @pytest.mark.usefixtures("host_at_least_8_3")
@@ -28,7 +29,7 @@ class TestHvmVcpuLimit:
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
         try:
-            expected = HVM_MAX_VCPUS
+            expected = WINDOWS_MAX_VCPUS if vm.is_windows else HVM_MAX_VCPUS
             actual = int(vm.ssh('nproc --all'))
             assert actual == expected, f"Expected {expected} vCPUs, got {actual}"
             logging.info("VM successfully booted in HVM %s mode with XEN and all %d vCPUs are up",

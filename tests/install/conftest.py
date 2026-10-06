@@ -6,19 +6,16 @@ import pytest_dependency  # type: ignore[import-untyped]
 import logging
 import os
 import tempfile
-import xml.etree.ElementTree as ET
 
 from data import ARP_SERVER, ISO_IMAGES, ISO_IMAGES_BASE, ISO_IMAGES_CACHE, TEST_SSH_PUBKEY, TOOLS
 from lib import installer, pxe
 from lib.commands import local_cmd
 from lib.common import callable_marker, url_download, wait_for
+from lib.host import Host
 from lib.installer import AnswerFile
+from lib.vm import VM
 
-from typing import TYPE_CHECKING, Any, Generator, Sequence
-
-if TYPE_CHECKING:
-    from lib.host import Host
-    from lib.vm import VM
+from typing import Generator, Sequence
 
 # Return true if the version of the ISO doesn't support the source type.
 # Note: this is a quick-win hack, to avoid explicit enumeration of supported
@@ -140,8 +137,11 @@ def remastered_iso(installer_iso: dict[str, str | bool], answerfile: AnswerFile 
             answerfile.top_append(dict(TAG="script", stage="filesystem-populated",
                                        type="url", CONTENTS="file:///root/postinstall.sh"))
             if unsigned:
+                # *gpgcheck is 8.3+ syntax, netinstall-gpg-check is 8.2 syntax;
+                # installers ignore attributes they don't know
                 answerfile.top_setattr({'gpgcheck': "false",
                                         'repo-gpgcheck': "false",
+                                        'netinstall-gpg-check': "false",
                                         })
             answerfile.write_xml(answerfile_xml)
         else:

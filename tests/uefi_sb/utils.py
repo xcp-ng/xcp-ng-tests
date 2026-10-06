@@ -14,13 +14,13 @@ VM_SECURE_BOOT_FAILED = 'VM_SECURE_BOOT_FAILED'
 
 
 @overload
-def generate_keys(*, self_signed: bool = False, as_dict: Literal[True]) -> dict[str, EFIAuth]:
+def generate_keys(*, self_signed: bool = ..., as_dict: Literal[True]) -> dict[str, EFIAuth]:
     ...
 
 
 @overload
 def generate_keys(
-    *, self_signed: bool = False, as_dict: Literal[False] = False
+    *, self_signed: bool = ..., as_dict: Literal[False] = ...
 ) -> tuple[EFIAuth, EFIAuth, EFIAuth, EFIAuth]:
     ...
 

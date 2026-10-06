@@ -104,7 +104,8 @@ JOBS: dict[str, JobData] = {
             "tests/xapi_plugins",
             "tests/install/test_fixtures.py",
         ],
-        "markers": "(small_vm or no_vm) and not flaky and not reboot and not complex_prerequisites",
+        "markers": "(small_vm or no_vm) and not flaky and not reboot "
+        "and not hosts_with_xo and not complex_prerequisites",
     },
     "main-multi-unix": {
         "description": "a group of tests that need to run on the largest variety of VMs - unix split",
@@ -139,16 +140,17 @@ JOBS: dict[str, JobData] = {
     "network-advanced": {
         "description": "a group of network tests with complex prerequisites",
         "requirements": [
-            "A pool with at least 1 host.",
+            "A pool with at least 1 host (if more, with same network configuration).",
             "At least 2 free NICs on every host.",
             "A small VM that can be imported on the SRs.",
+            "xo-cli locally installed, in $PATH, and registered to an XO instance.",
         ],
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/network"],
-        "markers": "complex_prerequisites",
+        "markers": "complex_prerequisites or hosts_with_xo",
     },
     "packages": {
         "description": "tests that packages can be installed correctly",
@@ -664,7 +666,11 @@ BROKEN_TESTS = [
 ]
 
 VmDef = str | tuple[str, str]
-VMSDef = dict[str, dict[str, VmDef | list[VmDef]]]
+
+
+class VMSDef(TypedDict):
+    single: dict[str, VmDef]
+    multi: dict[str, list[VmDef]]
 
 # Returns the vm filename or None if a host_version is passed and matches the one specified
 # with the vm filename in vm_data.py. ex: ("centos6-32-hvm-created_8.2-zstd.xva", "8\.2\..*")
@@ -702,7 +708,7 @@ def get_vm_or_vms_refs(handle: str, host_version: str | None = None) -> str | li
 
     VMS = cast(VMSDef, VMS_untyped)
     category, key = handle.split("/")
-    if category not in VMS or key not in VMS[category]:
+    if category not in ("single", "multi") or key not in VMS[category]:
         print(f"ERROR: Could not find VMS['{category}']['{key}'] in vm_data.py, or it's empty.")
         print("You need to update your local vm_data.py.")
         print("You may also bypass this error by providing your own --vm parameter(s).")

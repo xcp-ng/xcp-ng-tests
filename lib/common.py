@@ -78,6 +78,7 @@ T = TypeVar("T")
 HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
 Defer: TypeAlias = Callable[[Callable[[], object]], None]
+XeParams: TypeAlias = dict[str, str | bool | dict[str, str]]
 
 class PackageManagerEnum(Enum):
     UNKNOWN = 1
@@ -133,7 +134,7 @@ def expand_scope_relative_nodeid(scoped_nodeid: str, scope: str, ref_nodeid: str
     return "::".join(itertools.chain(base, (scoped_nodeid,)))
 
 @lru_cache(maxsize=None)
-def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:
+def _get_type_adapter(tp: Any) -> TypeAdapter[Any]:  # noqa: ANN401
     return TypeAdapter(tp)
 
 @overload
@@ -141,7 +142,7 @@ def ensure_type(tp: type[T], v: object) -> T:
     ...
 
 @overload
-def ensure_type(tp: Any, v: object) -> Any:
+def ensure_type(tp: Any, v: object) -> Any:  # noqa: ANN401
     ...
 
 def ensure_type(tp: Any, v: object) -> Any:
@@ -192,21 +193,33 @@ def callable_marker(value: T | Callable[..., T], request: pytest.FixtureRequest)
     else:
         return value
 
-def wait_for(fn: Callable[[], object], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
-             invert: bool = False) -> None:
+def wait_for(fn: Callable[[], T], msg: str | None = None, timeout_secs: int = 2 * 60, retry_delay_secs: int = 2,
+             invert: bool = False) -> T:
+    """
+    Poll fn() every retry_delay_secs until it returns a truthy value, or until timeout_secs is reached.
+    When invert is True, wait for fn() to return a falsy value instead.
+
+    Returns the return value of fn() from the call that satisfied the condition, so the caller gets it directly
+    instead of having to call fn() again after the wait. Note that a falsy value is returned when invert=True.
+
+    Raises TimeoutError if timeout_secs is reached first.
+
+    If msg is provided, it is logged before the first call.
+    """
     if msg is not None:
         logging.info(msg)
     start_time = time.perf_counter()
     while True:
         ret = fn()
         if not invert and ret:
-            return
+            return ret
         if invert and not ret:
-            return
+            return ret
         if time.perf_counter() - start_time >= timeout_secs:
             expected = 'True' if not invert else 'False'
+            suffix = ": " + msg if msg else ""
             raise TimeoutError(
-                "Timeout reached while waiting for fn call to yield %s (%s)." % (expected, timeout_secs)
+                "Timed out after %ss waiting for condition to be %s%s" % (timeout_secs, expected, suffix)
             )
         time.sleep(retry_delay_secs)
 
@@ -380,7 +393,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str 
                accept_unknown_key: bool = False) -> str | None:
     """ Common implementation for param_get. """
     import lib.commands as commands
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name}
     if key is not None:
         args['param-key'] = key
     try:
@@ -395,7 +408,7 @@ def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str 
 def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str | bool | dict[str, str],
                key: str | None = None) -> None:
     """ Common implementation for param_set. """
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid}
+    args: XeParams = {'uuid': uuid}
 
     if key is not None:
         param_name = '{}:{}'.format(param_name, key)
@@ -407,7 +420,7 @@ def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: st
 def _param_add(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str, key: str | None = None) -> None:
     """ Common implementation for param_add. """
     param_key = f'{key}={value}' if key is not None else value
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
 
     host.xe(f'{xe_prefix}-param-add', args)
 
@@ -415,7 +428,7 @@ def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: s
                   accept_unknown_key: bool = False) -> None:
     """ Common implementation for param_remove. """
     import lib.commands as commands
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
     try:
         host.xe(f'{xe_prefix}-param-remove', args)
     except commands.SSHCommandFailed as e:
@@ -424,10 +437,10 @@ def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: s
 
 def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None:
     """ Common implementation for param_clear. """
-    args: dict[str, str | bool | dict[str, str]] = {'uuid': uuid, 'param-name': param_name}
+    args: XeParams = {'uuid': uuid, 'param-name': param_name}
     host.xe(f'{xe_prefix}-param-clear', args)
 
 def hash_password(password: str) -> str:
     """Hash password for /etc/shadow."""
     # XCP-ng uses sha512 with 5000 rounds by default
-    return sha512_crypt.using(rounds=5000).hash(password)
+    return sha512_crypt.using(rounds=5000).hash(password)  # type: ignore[no-untyped-call]

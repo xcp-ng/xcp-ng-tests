@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-import argparse
 import dataclasses
 import itertools
 import logging
 import os
 import tempfile
+from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
 
 import git
@@ -37,14 +37,14 @@ from lib.sr import SR
 from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vm import VM, vm_cache_key_from_def
-from lib.xo import xo_cli
+from lib.xo import _allow_xo_cli, xo_cli
 
 # Import package-scoped fixtures. Although we need to define them in a separate file so that we can
 # then import them in individual packages to fix the buggy package scope handling by pytest, we also
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Dict, Generator, Iterable, List, Optional
+from typing import Any, Generator, Iterable, Sequence
 
 # Do we cache VMs?
 try:
@@ -53,8 +53,9 @@ except ImportError:
     CACHE_IMPORTED_VM = False
 assert CACHE_IMPORTED_VM in [True, False]
 
-class SplitCommaAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+class SplitCommaAction(Action):
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str | Sequence[str] | None,
+                 option_string: str | None = None) -> None:
         items = getattr(namespace, self.dest, None)
         if items is None:
             items = []
@@ -143,6 +144,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Do not fail when no test is selected (exit code 0 instead of 5)"
     )
+    parser.addoption(
+        "--linstor-hosts-without-vg",
+        action="append",
+        default=[],
+        help="List of hosts (comma-separated) that will skip VG creation during linstor tests."
+             " Those are indexes starting from 1 (pool master).",
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -176,11 +184,11 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
 # Used to group tests together whenever possible and limit parametrized fixture
 # "context switching" (needless teardown and setup of SRs, for example)
-SCHEDULING_AXES: List[str] = [
+SCHEDULING_AXES: list[str] = [
     "image_format",
 ]
 
-def get_axis(item: pytest.Item) -> Optional[str]:
+def get_axis(item: pytest.Item) -> str | None:
     callspec = getattr(item, "callspec", None)
     if callspec is None:
         return None
@@ -208,6 +216,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
         'hostB1',
         'unused_512B_disks',
         'unused_4k_disks',
+        'hosts_with_xo',
     ]
 
     # -------------
@@ -229,7 +238,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
     # -----------------------------------------------------
     # Build execution matrix: axis -> leaf package -> items
     # -----------------------------------------------------
-    axis_ordering: Dict[Optional[str], int] = defaultdict(int)
+    axis_ordering: dict[str | None, int] = defaultdict(int)
     # "None" gets the same order value as the first real axis, on purpose,
     # so that we may better retain initial test order.
     # For example, if we start with this test order:
@@ -259,7 +268,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
         grouped[axis_order][package].append(item)
 
     # Flatten back to a list of items
-    new_items: List[pytest.Item] = [
+    new_items: list[pytest.Item] = [
         item
         for axis_order in sorted(grouped) # apply axis_ordering here
         for package in grouped[axis_order]
@@ -274,7 +283,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
 # FIXME we may have to move this into lib/ if fixtures in sub-packages
 # want to make use of this feature
 
-PHASE_REPORT_KEY = pytest.StashKey[Dict[str, pytest.TestReport]]()
+PHASE_REPORT_KEY = pytest.StashKey[dict[str, pytest.TestReport]]()
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[Any]
@@ -290,7 +299,7 @@ def pytest_runtest_makereport(
 
 # END make test results visible from fixtures
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitCode) -> None:
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED \
             and session.config.getoption("--no-fail-if-no-tests"):
         session.exitstatus = pytest.ExitCode.OK
@@ -378,12 +387,15 @@ def registered_xo_cli() -> None:
     # The fixture is not responsible for establishing the connection.
     # We just check that xo-cli is currently registered
     try:
+        old_allow_xo_cli = _allow_xo_cli(True)
         xo_cli('server.getAll')
+        _allow_xo_cli(old_allow_xo_cli)
     except Exception as e:
-        raise Exception(f"Check for registered xo_cli failed: {e}")
+        pytest.fail(f"Check for registered xo_cli failed: {e}")
 
 @pytest.fixture(scope='session')
 def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[Host], None, None]:
+    old_allow_xo_cli = _allow_xo_cli(True)
     for h in hosts:
         logging.info(">>> Connect host %s" % h)
         if not h.skip_xo_config:
@@ -397,6 +409,7 @@ def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[
         if not h.skip_xo_config:
             logging.info("<<< Disconnect host %s" % h)
             h.xo_server_remove()
+    _allow_xo_cli(old_allow_xo_cli)
 
 @pytest.fixture(scope='session')
 def hostA1(hosts: list[Host]) -> Generator[Host, None, None]:
@@ -437,11 +450,6 @@ def host_less_than_8_3(host: Host) -> None:
     if not host.xcp_version < version.parse(version_str):
         pytest.skip(f"This test requires an XCP-ng < {version_str} host")
 
-@pytest.fixture(scope='session')
-def host_with_hsts(host: Host) -> Generator[Host, None, None]:
-    host.enable_hsts_header()
-    yield host
-    host.disable_hsts_header()
 
 @pytest.fixture(scope='function')
 def xfail_on_xcpng_8_3(host: Host, request: pytest.FixtureRequest) -> None:
@@ -641,8 +649,6 @@ def imported_vm(host: Host, vm_ref: str) -> Generator[VM, None, None]:
         # Clone the VM before running tests, so that the original VM remains untouched
         logging.info(">> Clone cached VM before running tests")
         vm = vm_orig.clone()
-        # Remove the description, which may contain a cache identifier
-        vm.param_set('name-description', "")
     else:
         vm = vm_orig
 
@@ -806,6 +812,9 @@ def _create_vm(
             logging.info("Setting param %s", param_def)
             vm.param_set(**param_def)
 
+        # Update the `is_uefi` attribute, as it might now be out-of-date due to the params above
+        vm.is_uefi = vm.param_get('HVM-boot-params', 'firmware', accept_unknown_key=True) == 'uefi'
+
 def _vm_from_cache(
     request: pytest.FixtureRequest, vm_def: dict[str, Any], host: Host, vms: list[VM], tests_hexsha: str
 ) -> None:
@@ -817,8 +826,6 @@ def _vm_from_cache(
     # Clone the VM before running tests, so that the original VM remains untouched
     logging.info("Cloning VM from cache")
     vm = base_vm.clone(name=prefix_object_name(_vm_name(request, vm_def)))
-    # Remove the description, which may contain a cache identifier
-    vm.param_set('name-description', "")
 
     vms.append(vm)
 

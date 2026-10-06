@@ -15,6 +15,7 @@ from lib.basevm import BaseVM
 from lib.common import (
     KiB,
     PackageManagerEnum,
+    XeParams,
     expand_scope_relative_nodeid,
     parse_xe_dict,
     safe_split,
@@ -29,7 +30,7 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vif import VIF
 
-from typing import TYPE_CHECKING, Iterable, List, Literal, assert_never, overload
+from typing import TYPE_CHECKING, Iterable, Literal, assert_never, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -58,11 +59,14 @@ class VM(BaseVM):
     def is_paused(self) -> bool:
         return self.power_state() == 'paused'
 
+    def is_cached(self) -> bool:
+        return self.description().startswith("[Cache for ")
+
     # `on` can be an host name-label or UUID
     def start(self, on: str | None = None) -> str:
         msg_starts_on = f" (on host {on})" if on else ""
         logging.info("Start VM" + msg_starts_on)
-        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid}
+        args: XeParams = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
         return self.host.xe('vm-start', args)
@@ -107,33 +111,33 @@ class VM(BaseVM):
             return True
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> str:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[True] = True,
-            background: Literal[False] = False, decode: Literal[False]) -> bytes:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[True] = ...,
+            background: Literal[False] = ..., decode: Literal[False]) -> bytes:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[True] = True) -> commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> commands.SSHResult[str]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: Literal[False],
-            background: Literal[False] = False, decode: Literal[False]) -> commands.SSHResult[bytes]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: Literal[False],
+            background: Literal[False] = ..., decode: Literal[False]) -> commands.SSHResult[bytes]:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[True], decode: bool = True) -> None:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            background: Literal[True], decode: bool = ...) -> None:
         ...
 
     @overload
-    def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True,
-            background: Literal[False] = False, decode: Literal[True] = True) -> str | commands.SSHResult[str]:
+    def ssh(self, cmd: str, *, check: bool = ..., simple_output: bool = ...,
+            background: Literal[False] = ..., decode: Literal[True] = ...) -> str | commands.SSHResult[str]:
         ...
 
     def ssh(self, cmd: str, *, check: bool = True, simple_output: bool = True, background: bool = False,
@@ -258,7 +262,7 @@ class VM(BaseVM):
 
     def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None) -> None:
         msg = "Migrate VM to host %s" % target_host
-        params: dict[str, str | bool | dict[str, str]] = {
+        params: XeParams = {
             'uuid': self.uuid,
             'host-uuid': target_host.uuid,
             'live': self.is_running()
@@ -306,11 +310,11 @@ class VM(BaseVM):
         self.host = target_host
         self.create_vdis_list()
 
-    def snapshot(self, ignore_vdis: List[str] | None = None, name: str | None = None) -> Snapshot:
+    def snapshot(self, ignore_vdis: list[str] | None = None, name: str | None = None) -> Snapshot:
         logging.info("Snapshot VM")
 
         name_label = name or f"Snapshot of {self.uuid}"
-        args: dict[str, str | bool | dict[str, str]] = {'uuid': self.uuid, 'new-name-label': name_label}
+        args: XeParams = {'uuid': self.uuid, 'new-name-label': name_label}
         if ignore_vdis:
             args['ignore-vdi-uuids'] = ','.join(ignore_vdis)
         snap_uuid = self.host.xe('vm-snapshot', args)
@@ -462,7 +466,7 @@ class VM(BaseVM):
             self.ssh(f'kill {pid}')
 
     @overload
-    def execute_script(self, script_contents: str, *, simple_output: Literal[True] = True) -> str:
+    def execute_script(self, script_contents: str, *, simple_output: Literal[True] = ...) -> str:
         ...
 
     @overload
@@ -581,8 +585,8 @@ class VM(BaseVM):
         finally:
             snapshot.destroy(verify=True)
 
-    def get_messages(self, name: str) -> List[str]:
-        args: dict[str, str | bool | dict[str, str]] = {
+    def get_messages(self, name: str) -> list[str]:
+        args: XeParams = {
             'obj-uuid': self.uuid,
             'name': name,
             'params': 'uuid',
@@ -655,14 +659,14 @@ class VM(BaseVM):
         """
         self.param_remove('NVRAM', 'EFI-variables')
 
-    def get_all_efi_bins(self) -> List[str]:
+    def get_all_efi_bins(self) -> list[str]:
         magicsz = str(len(efi.EFI_HEADER_MAGIC))
         files = self.ssh(
             f'for file in $(find /boot -type f); do echo $file $(head -c {magicsz} $file); done', decode=False
         ).split(b'\n')
 
         magic = efi.EFI_HEADER_MAGIC.encode('ascii')
-        binaries: List[str] = []
+        binaries: list[str] = []
         for f in files:
             if magic in f:
                 # Avoid decoding an unsplit f, as some headers are not utf8
@@ -706,11 +710,21 @@ class VM(BaseVM):
         logging.info("New VBD %s", vbd_uuid)
         return vbd
 
-    def clone(self, *, name: str | None = None) -> "VM":
+    def clone(self, *, name: str | None = None, description: str | None = None) -> VM:
+        is_cached = self.is_cached()
         if name is None:
-            name = self.name() + '_clone_for_tests'
-        logging.info("Clone VM")
-        uuid = self.host.xe('vm-clone', {'uuid': self.uuid, 'new-name-label': name})
+            suffix = "_clone_from_cache" if is_cached else "_clone_for_tests"
+            name = self.name() + suffix
+        if description is None and is_cached:
+            # Updating the description is mandatory here, so that the cloned VM is not detected as a cached VM
+            # Note that the new description is passed directly to `xe vm-clone` to avoid race conditions.
+            cached_vm_description = self.description()
+            description = f"Clone of cached VM {self.uuid} with key {cached_vm_description}"
+        values: XeParams = {'uuid': self.uuid, 'new-name-label': name}
+        if description is not None:
+            values['new-name-description'] = description
+        logging.info("Clone cached VM" if is_cached else "Clone VM")
+        uuid = self.host.xe('vm-clone', values)
         return VM(uuid, self.host)
 
     def set_variable_from_file(
@@ -784,6 +798,9 @@ class VM(BaseVM):
         tmp_file = res_host.ssh('mktemp')
         session = f"detached-cat-{self.uuid}"
         ret = False
+        # The screen package installation is broken on el10, see https://bugzilla.redhat.com/show_bug.cgi?id=2385964
+        if res_host.xcp_version.major == 9 and not res_host.ssh('ls -ld /run/screen').startswith('drwxrwxrwx'):
+            res_host.ssh('dnf reinstall -y screen')
         try:
             res_host.ssh(f'screen -dmS {session}')
             # run `cat` on the pty in a background screen session and redirect to a tmp file.
@@ -827,8 +844,8 @@ class VM(BaseVM):
 
     @overload
     def execute_powershell_script(self, script_contents: str,
-                                  simple_output: Literal[True] = True,
-                                  prepend: str = "$ProgressPreference = 'SilentlyContinue';") -> str:
+                                  simple_output: Literal[True] = ...,
+                                  prepend: str = ...) -> str:
         ...
 
     @overload
@@ -836,7 +853,7 @@ class VM(BaseVM):
         self,
         script_contents: str,
         simple_output: Literal[False],
-        prepend: str = "$ProgressPreference = 'SilentlyContinue';",
+        prepend: str = ...,
     ) -> commands.SSHResult[str]:
         ...
 
@@ -944,7 +961,7 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
 
     @overload
-    def xenstore_read(self, path: str, accept_unknown_key: Literal[False] = False) -> str:
+    def xenstore_read(self, path: str, accept_unknown_key: Literal[False] = ...) -> str:
         ...
 
     @overload

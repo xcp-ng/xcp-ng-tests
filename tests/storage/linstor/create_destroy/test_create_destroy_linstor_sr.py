@@ -57,7 +57,7 @@ class TestLinstorSRCreateDestroy:
         vm.destroy(verify=True)
         sr.destroy(verify=True)
 
-    def test_forget_and_introduce_sr(self, linstor_sr_ephemeral: SR):
+    def test_forget_and_introduce_sr(self, linstor_sr_ephemeral: SR) -> None:
         sr = linstor_sr_ephemeral
         sr_name = sr.param_get('name-label')
         all_pbds = sr.pbd_uuids()

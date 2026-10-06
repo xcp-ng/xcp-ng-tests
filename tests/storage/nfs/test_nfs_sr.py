@@ -114,11 +114,11 @@ class TestNFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.disk_throughput_intensive
-    def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_nfs_sr: VDI, defer: Defer):
+    def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_nfs_sr: VDI, defer: Defer) -> None:
         full_vdi_write(storage_test_vm, vdi_on_nfs_sr, defer)
 
     @pytest.mark.small_vm
-    def test_invalid_vdi_size(self, nfs_sr: SR, image_format: ImageFormat):
+    def test_invalid_vdi_size(self, nfs_sr: SR, image_format: ImageFormat) -> None:
         with pytest.raises(SSHCommandFailed) as excinfo:
             nfs_sr.create_vdi(virtual_size=MAX_VDI_SIZE[image_format] + 1)
         assert 'VDI Invalid size' in excinfo.value.stdout

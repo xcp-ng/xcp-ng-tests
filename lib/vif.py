@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import time
 
-from lib.common import _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.network import Network
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -73,7 +74,7 @@ class VIF:
         address: str | None = None,
         gateway: str | None = None,
     ) -> None:
-        args: dict[str, str | bool | dict[str, str]] = {"uuid": self.uuid, "mode": mode}
+        args: XeParams = {"uuid": self.uuid, "mode": mode}
         if address is not None:
             args["address"] = address
         if gateway is not None:
@@ -88,7 +89,7 @@ class VIF:
         self,
         mode: Literal["static"],
         address: str,
-        gateway: str | None = None,
+        gateway: str | None = ...,
     ) -> None:  #
         ...
 
@@ -96,8 +97,8 @@ class VIF:
     def configure_ipv4(
         self,
         mode: Literal["dhcp"] | Literal["none"],
-        address: None = None,
-        gateway: None = None,
+        address: None = ...,
+        gateway: None = ...,
     ) -> None:  #
         ...
 
@@ -114,7 +115,7 @@ class VIF:
         self,
         mode: Literal["static"],
         address: str,
-        gateway: str | None = None,
+        gateway: str | None = ...,
     ) -> None:  #
         ...
 
@@ -122,8 +123,8 @@ class VIF:
     def configure_ipv6(
         self,
         mode: Literal["autoconf"] | Literal["none"],
-        address: None = None,
-        gateway: None = None,
+        address: None = ...,
+        gateway: None = ...,
     ) -> None:  #
         ...
 
@@ -134,3 +135,8 @@ class VIF:
         gateway: str | None = None,
     ) -> None:
         self._configure("ipv6", mode, address, gateway)
+
+    def network(self) -> Network:
+        network_uuid = self.param_get('network-uuid')
+        assert network_uuid is not None, "VIF must have a network-uuid"
+        return Network(self.vm.host, network_uuid)
