@@ -156,7 +156,7 @@ JOBS: dict[str, JobData] = {
         "description": "pool HA failover scenarios on a 2-node Moonshot pool",
         "requirements": [
             "A 2-node pool on Moonshot whose hosts can be hard power-cycled.",
-            "tests/ha/data.py with CARTRIDGES mapping host addresses to Moonshot slots.",
+            "data.py HOSTS[..].power_control with type=moonshot, chassis, slot, user, password for each host.",
             "NFS_DEVICE_CONFIG in data.py (shared NFS for VM disks + HA heartbeat).",
             "A small VM that can be imported on the NFS SR.",
         ],
