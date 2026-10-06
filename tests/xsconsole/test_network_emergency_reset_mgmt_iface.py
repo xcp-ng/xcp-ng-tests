@@ -21,7 +21,7 @@ def test_retain_mgmt_iface(
     host: Host,
     reset_nics: bool,
     defer: Defer,
-):
+) -> None:
 
     # Besides the management interface, the target host needs to have another
     # interface that will be renamed during this test
@@ -49,7 +49,7 @@ def test_retain_mgmt_iface(
     host.ssh(f"ip link set {target_iface} name {new_iface_name}")
     host.ssh(f"ip link set {new_iface_name} up")
 
-    def cleanup():
+    def cleanup() -> None:
         if new_iface_name in host.ssh("ip link show"):
             host.ssh(f"ip link set {new_iface_name} down")
             host.ssh(f"ip link set {new_iface_name} name {target_iface}")
@@ -92,7 +92,7 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     logging.getLogger("paramiko").setLevel(logging.WARNING)
 
     class IgnorePolicy(paramiko.MissingHostKeyPolicy):
-        def missing_host_key(self, client, hostname, key):
+        def missing_host_key(self, client: paramiko.SSHClient, hostname: str, key: paramiko.PKey) -> None:
             pass
 
     client = paramiko.SSHClient()
@@ -116,7 +116,7 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     BUFFER_READ_SIZE = 4096
     STABILIZE_TIME = 0.5  # seconds
 
-    def refresh_screen():
+    def refresh_screen() -> None:
         while channel.recv_ready():
             stream.feed(channel.recv(BUFFER_READ_SIZE))
 
