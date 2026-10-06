@@ -9,7 +9,7 @@ from lib.host import Host
 from lib.sr import SR
 from lib.vdi import ImageFormat
 from lib.vm import VM
-from tests.ha.ha import destroy_ha_protected_vm, destroy_nfs_sr_after_ha
+from tests.ha.ha import assert_pool_ready, destroy_ha_vdis, restore_original_master, restore_pool_after_ha
 
 from typing import Generator
 
@@ -20,25 +20,24 @@ def nfs_device_config() -> dict[str, str]:
 
 @pytest.fixture(scope='package')
 def nfs_sr(host: Host, image_format: ImageFormat, nfs_device_config: dict[str, str]) -> Generator[SR, None, None]:
+    assert_pool_ready(host.pool)
     sr = host.sr_create(
         'nfs', 'NFS-SR-test', nfs_device_config | {'preferred-image-formats': image_format}, shared=True
     )
     yield sr
-    logging.info('<< Destroy NFS SR %s after HA tests', sr.uuid)
-    try:
-        destroy_nfs_sr_after_ha(host.pool, sr)
-    except Exception:
-        logging.error('Could not destroy NFS SR %s after HA tests', sr.uuid, exc_info=True)
-        raise
+    restore_pool_after_ha(host.pool)
+    restore_original_master(host.pool)
+    # sr-destroy refuses a non-empty SR.
+    destroy_ha_vdis(host.pool, sr)
+    sr.destroy()
 
 
 @pytest.fixture(scope='module')
 def ha_protected_vm(host: Host, nfs_sr: SR, vm_ref: str) -> Generator[VM, None, None]:
     vm = host.import_vm(vm_ref, sr_uuid=nfs_sr.uuid)
     yield vm
-    logging.info('<< Destroy HA protected VM %s', vm.uuid)
-    try:
-        destroy_ha_protected_vm(host.pool, vm)
-    except Exception:
-        logging.error('Could not destroy HA protected VM %s', vm.uuid, exc_info=True)
-        raise
+    logging.info(f'<< Destroy HA protected VM {vm.uuid}')
+    # Scenarios leave the survivor as master.
+    restore_pool_after_ha(host.pool)
+    restore_original_master(host.pool)
+    vm.destroy(verify=True)

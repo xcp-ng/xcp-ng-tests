@@ -37,7 +37,7 @@ from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_cli, xo_object_exists
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
@@ -47,7 +47,7 @@ XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
 
-def host_data(hostname_or_ip: str) -> dict[str, str]:
+def host_data(hostname_or_ip: str) -> dict[str, Any]:
     # read from data.py
     from data import HOST_DEFAULT_PASSWORD, HOST_DEFAULT_USER, HOSTS
     if hostname_or_ip in HOSTS:
@@ -599,12 +599,32 @@ class Host:
             retry_delay_secs=10,
         )
 
+    # Static so that a host can be checked before its Host object exists: Host() itself
+    # connects over SSH, which hangs for minutes when the host is down.
+    @staticmethod
+    def ssh_reachable(hostname_or_ip: str) -> bool:
+        return commands.local_cmd(["nc", "-zw5", hostname_or_ip, "22"], check=False).returncode == 0
+
+    def is_ssh_reachable(self) -> bool:
+        return Host.ssh_reachable(self.hostname_or_ip)
+
     def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
         wait_for(
-            lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
+            self.is_ssh_reachable,
             f"[{self}] Wait for ssh up on host",
             timeout_secs=timeout_secs,
             retry_delay_secs=5
+        )
+
+    def xapi_pid(self) -> str:
+        return self.ssh('pidof -s xapi', check=False)
+
+    def wait_for_xapi_restart(self, old_pid: str, timeout_secs: int = 10 * 60) -> None:
+        """Until a new xapi process runs, xapi-wait-init-complete may still answer for the old one."""
+        wait_for(
+            lambda: self.xapi_pid() not in ('', old_pid),
+            f"[{self}] Wait for xapi to restart",
+            timeout_secs=timeout_secs,
         )
 
     def wait_for_xapi_enabled(self, timeout_secs: int = 30 * 60) -> None:
@@ -757,6 +777,17 @@ class Host:
             self.wait_for_host_up()
             self.wait_for_ssh_reachable()
             self.wait_for_xapi_enabled()
+
+    def hard_power_off(self, verify: bool = False) -> None:
+        logging.info(f"[{self}] Hard power-off")
+        # SysRq 'o' powers off immediately. SSH often fails once the host dies - that is expected.
+        try:
+            self.ssh('echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger')
+        except commands.SSHCommandFailed:
+            pass
+        if verify:
+            # Host should die quickly; keep a short timeout unlike reboot's 3 min default.
+            self.wait_for_host_down(timeout_secs=30)
 
     def management_network(self) -> str:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
