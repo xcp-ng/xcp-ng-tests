@@ -995,8 +995,10 @@ def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None,
                 host_i = host.pool.get_host_by_uuid(host_uuid)
                 if host_i.ssh_with_result('ls /etc/xapi.conf.d/observer.conf').returncode == 0:
                     host_i.ssh('cp /etc/xapi.conf.d/observer.conf /etc/xapi.conf.d/observer.conf.bak')
+                # NOTE smapi (experimental component) breaks tracing for migration with storage motion
                 host_i.ssh(
-                    'printf "observer-experimental-components=\"\"\nobserver-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
+                    'printf "observer-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
+                # 'printf "observer-experimental-components=\"\"\nobserver-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
                 host_i.restart_toolstack(verify=True)
             hosts_setup = True
             host.xe('observer-param-set', {'uuid': observer_uuid, 'enabled': 'true'})

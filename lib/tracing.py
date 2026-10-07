@@ -9,8 +9,7 @@ import requests
 
 from typing import Any
 
-# NOTE for debugging
-# import logging
+import logging
 
 class Tracing:
     def __init__(self, endpoint, enabled) -> None:
@@ -26,26 +25,39 @@ class Tracing:
         trace_flags = "01"
         return '-'.join([version, trace_id, parent_id, trace_flags])
 
-    def locate_span(self, name: str, tag: str, value: str) -> Any:
-        # NOTE in the future maybe parsing the endpoint URL could allow to recognize the type of endpoint to then call sub-functions
-        url = urlparse(self.endpoint)
-        api = f"{url.scheme}://{url.netloc}/api/v2/traces"
+    def span_from_traceid(self, name: str, traceid: str) -> Any:
         if not self.enabled or not self.endpoint:
             return None
-
+        # NOTE in the future maybe parsing the endpoint URL could allow to recognize the type of endpoint and use sub-functions
+        url = urlparse(self.endpoint)
+        # REPHRASE only true zipkin endpoints are supported, they are case-sensitive and transform span names in lowercase (not tags and tag values)
+        name = name.lower()
         retries = 12
         for _ in range(retries):
-            # logging.debug(f'sending Zipkin HTTP request for spanName {operation}')
-            # http://10.1.38.10:9411/api/v2/traces?spanName=xe+observer-list&tagQuery=test.uuid worked for latest Zipkin docker image
-            # http://10.1.38.10:16686/search?operation=xe%20observer-list&service=xapi&tags={%22xs.observer.uuid%22%3A%22b2fc74d7-9f08-3ef8-16b5-09a0e748dd7a%22} needed for latest Jaeger docker image, response looks parsable, but using zipkin port 9411 always returns "unexpected end of JSON input"
-            response = requests.get(api, params={"spanName": name, "tagQuery": tag})
-            # logging.debug(f'request URL: {response.url}')
-            data = response.json()
-            # logging.debug(
-            # f'received traces data, looking for span with name {operation} and tag {tag} with value {value}')
-            for trace in data:
+            response = requests.get(f"{url.scheme}://{url.netloc}/api/v2/trace/{traceid}")
+            if response.status_code == 200:
+                trace = response.json()
                 for span in trace:
-                    if span.get('name') == name and span.get('tags', {}).get(tag) == value:
+                    if span.get('name') == name:
                         return span
             time.sleep(5)
         return None
+
+    # NOTE allows to not duplicate this code in each migration test, which will be useful
+    # as we will probably need to evolve the migration spans search in the future.
+    def stats_migration(self, traceparent) -> None:
+        # NOTE some migration spans are missing the user tags (like VM_migrate_downtime_end),
+        # it likely depends on how/where the with_tracing call are done in xapi/xenopsd
+        traceid = traceparent.split("-", 3)[1]
+        logging.info(f'Migration trace ID: {traceid}')
+        logging.info("Locating VM.pool_migrate span")
+        span_pool_migrate = self.span_from_traceid("VM.pool_migrate", traceid)
+        logging.info("Locating VM_migrate_downtime_begin span")
+        span_downtime_begin = self.span_from_traceid("VM_migrate_downtime_begin", traceid)
+        logging.info("Locating VM_migrate_downtime_end span")
+        span_downtime_end = self.span_from_traceid("VM_migrate_downtime_end", traceid)
+        if span_pool_migrate:
+            logging.info(f'Migration duration: {span_pool_migrate.get("duration") / 1000000}s')
+        if span_downtime_begin and span_downtime_end:
+            logging.info(
+                f'Downtime duration: {(span_downtime_end.get("timestamp") - span_downtime_begin.get("timestamp")) / 1000000}s')

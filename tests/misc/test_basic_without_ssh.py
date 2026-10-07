@@ -83,31 +83,16 @@ class TestBasicNoSSH:
     @pytest.mark.usefixtures("hostA2")
     def test_live_migrate(self, imported_vm: VM, existing_shared_sr: SR, tracing: Tracing) -> None:
         def live_migrate(vm: VM, dest_host: Host, dest_sr: SR, tracing: Tracing, check_vdis: bool = False) -> None:
-            tag = "migration.uuid"
-            value = str(uuid.uuid4())
+            traceparent = tracing.gen_traceparent()
             if tracing.enabled:
-                # FIXME adding tracing_vars breaks migration with:
-                # TypeError: metaclass conflict: the metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all its base
-                vm.migrate(dest_host, dest_sr, tracing_vars={'BAGGAGE': {tag: value}})
+                vm.migrate(dest_host, dest_sr, tracing_vars={'TRACEPARENT': traceparent})
             else:
                 vm.migrate(dest_host, dest_sr)
             if check_vdis:
                 wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
             wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
             if tracing.enabled:
-                # TODO I expect most traces to be missing when using a traceparent, check this with downtime spans
-                span_pool_migrate = tracing.locate_span("VM.pool_migrate", tag, value)
-                if span_pool_migrate:
-                    logging.info(f'Migration duration: {span_pool_migrate.get("duration") / 1000000}s')
-                else:
-                    logging.info("No overall migration span found")
-                span_downtime_begin = tracing.locate_span("VM_migrate_downtime_begin", tag, value)
-                span_downtime_end = tracing.locate_span("VM_migrate_downtime_end", tag, value)
-                if span_downtime_begin and span_downtime_end:
-                    logging.info(
-                        f'Downtime duration: {(span_downtime_end.get("timestamp") - span_downtime_begin.get("timestamp")) / 1000000}s')
-                else:
-                    logging.info("No migration downtime spans found")
+                tracing.stats_migration(traceparent)
 
         vm = imported_vm
         initial_sr = vm.get_sr()
