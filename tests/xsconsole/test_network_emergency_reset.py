@@ -16,10 +16,10 @@ from lib.host import Host
 #   * one for management
 #   * another one to test the renaming
 
-@pytest.mark.parametrize("reset_nics", [False, True], ids=["no_reset", "reset_nics"])
-def test_retain_mgmt_iface(
+@pytest.mark.parametrize("reset_names", [False, True], ids=["no_reset", "reset_names"])
+def test_reset_interface_names(
     host: Host,
-    reset_nics: bool,
+    reset_names: bool,
     defer: Defer,
 ) -> None:
 
@@ -63,11 +63,11 @@ def test_retain_mgmt_iface(
     host.ssh(f"interface-rename --update {new_iface_name}='{iface_mac}'")
     host.xe("pif-scan", {"host-uuid": host.uuid})
 
-    if reset_nics:
+    if reset_names:
         logging.info("Performing an emergency network reset, including interface names")
     else:
         logging.info("Performing an emergency network reset without resetting interface names")
-    emergency_network_reset(host, reset_nics, defer)
+    emergency_network_reset(host, reset_names, defer)
 
     # wait for host to be powered-up again and XAPI services to start
     host.wait_for_host_down()
@@ -78,9 +78,9 @@ def test_retain_mgmt_iface(
     # reboot_iface = host.ssh(f"xe pif-list MAC={iface_mac} params=device host-uuid={host.uuid} --minimal")
     reboot_iface = host.xe("pif-list", {"MAC": iface_mac, "params": "device", "host-uuid": host.uuid, "minimal": True})
 
-    if reset_nics:
+    if reset_names:
         assert reboot_iface != new_iface_name, (
-            "The management interface has NOT changed from {new_iface_name} to {target_iface}"
+            f"The management interface has NOT changed from {new_iface_name} to {target_iface}"
         )
     else:
         assert reboot_iface == new_iface_name, (
@@ -88,7 +88,7 @@ def test_retain_mgmt_iface(
         )
 
 
-def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
+def emergency_network_reset(host: Host, reset_names: bool, defer: Defer) -> None:
     logging.getLogger("paramiko").setLevel(logging.WARNING)
 
     class IgnorePolicy(paramiko.MissingHostKeyPolicy):
@@ -269,7 +269,7 @@ def emergency_network_reset(host: Host, reset_nics: bool, defer: Defer) -> None:
     _, highlighted = get_highlighted()
     assert highlighted in ("Rename", "Yes")
 
-    if not reset_nics:
+    if not reset_names:
         send_keys(DOWN)
         wait_for_screen_to_stabilize()
         debug_screen("Do not reset the network interface names")
