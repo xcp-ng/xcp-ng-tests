@@ -83,10 +83,13 @@ def clean_pool(pool: Pool, dry_run: bool) -> int:
                 logger.error(f"[{master}] Failed to remove VM {vm.uuid} ({vm.name()}): {exc}")
                 failures += 1
 
-    sr_uuids = local_sr_uuids(pool)
+    # List all SRs that contain user images
+    sr_uuids = safe_split(pool.master.xe('sr-list', {'content-type': 'user'}, minimal=True))
+
     for sr_uuid in sr_uuids:
-        for vdi_uuid in SR(sr_uuid, pool).vdi_uuids(managed=True):
-            vdi = VDI(vdi_uuid, sr=SR(sr_uuid, pool))
+        sr = SR(sr_uuid, pool)
+        for vdi_uuid in sr.vdi_uuids(managed=True):
+            vdi = VDI(vdi_uuid, sr=sr)
             logger.info(f"[{master}] {log_prefix} orphan VDI {vdi.uuid} from local SR {sr_uuid}")
             if not dry_run:
                 try:
@@ -102,8 +105,3 @@ def clean_pool(pool: Pool, dry_run: bool) -> int:
                 f"Wait for local SR {sr_uuid} to be empty",
             )
     return failures
-
-def local_sr_uuids(pool: Pool) -> list[str]:
-    """Return the UUIDs of the pool's local (non-shared, user) SRs."""
-    uuids = safe_split(pool.master.xe('sr-list', {'content-type': 'user'}, minimal=True))
-    return [uuid for uuid in uuids if not SR(uuid, pool).is_shared()]
