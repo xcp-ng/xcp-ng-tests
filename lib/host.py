@@ -349,19 +349,16 @@ class Host:
         assert isinstance(xo_srv_id, str)
         self.xo_srv_id = xo_srv_id
 
-    def xo_server_status(self) -> str | None:
+    def xo_server_connected(self) -> bool:
         servers = xo_cli('server.getAll', use_json=True)
         assert isinstance(servers, list)
         for server in servers:
             assert isinstance(server, dict)
             assert isinstance(server['host'], str)
-            assert isinstance(server['status'], str | None)
+            assert isinstance(server['status'], str)
             if server['host'] == wrap_ip(self.hostname_or_ip):
-                return server['status']
-        return None
-
-    def xo_server_connected(self) -> bool:
-        return self.xo_server_status() == "connected"
+                return server['status'] == "connected"
+        return False
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
