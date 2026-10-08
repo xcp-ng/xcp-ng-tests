@@ -765,6 +765,49 @@ class Host:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
         return PIF(uuid, self)
 
+    def disk_by_id_symlinks(self) -> dict[str, list[str]]:
+        """
+        Extract the `/dev/disk/by-id` symlinks of every device, as a dict of
+        {device_name: [list of symlinks], ...}.
+
+        Same approach as the one used by the `lsblk.py` XAPI plugin:
+        https://github.com/xcp-ng/xcp-ng-xapi-plugins/blob/d3a89f29eefad5c714c302f24d6ced0934448e66/SOURCES/etc/xapi.d/plugins/lsblk.py
+
+        The differences are:
+        - the output of `udevadm info` is filtered on the server, to transfer only the useful
+          lines instead of the whole database, which weighs several hundreds of kilobytes
+        - devices having no `disk/by-id` symlink are not present in the dict at all, instead of
+          being mapped to an empty list
+        """
+        result: dict[str, list[str]] = {}
+        # udev exports each device as a block of `KEY: value` lines: `P:`, `N:` for the device name,
+        # then the properties (`E:`) and the symlinks (`S:`). Grep is used to reduce what is
+        # transferred over SSH, in three steps:
+        # - keep only the name lines and the `disk/by-id` symlinks, ignoring the other symlinks
+        #   (`by-label`, `by-path`, ...) and all the properties: the name of a device then sits
+        #   right before its own symlinks
+        # - keep the line preceding each symlink: only the names having at least one symlink are
+        #   kept, and this also prints the other symlinks of the same device once more
+        # - filter that output again to drop the duplicated symlinks and the `--` separators that
+        #   `grep -B1` inserts between non-contiguous blocks
+        udev_export = self.ssh(
+            "set -o pipefail; udevadm info --export-db | "
+            "grep -E '^(N: |S: disk/by-id/)' | "
+            "grep -B1 '^S: disk/by-id/' | "
+            "grep -E '^(N: |S: disk/by-id/)'"
+        )
+        for device in udev_export.split("N: "):
+            if not device:
+                continue
+            name, *symlinks = device.splitlines()
+            symlinks = sorted(
+                "/dev/" + symlink.removeprefix("S: ")
+                for symlink in symlinks
+                if symlink.startswith("S: ")
+            )
+            result[name] = symlinks
+        return result
+
     def rescan_block_devices_info(self) -> None:
         """
         Initialize information about block devices: local disks, mdadm arrays, and multipath devices.
@@ -821,6 +864,7 @@ class Host:
         devices: list[Host.BlockDeviceInfo] = []
 
         raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS} --include {LSBLK_MAJOR_NUMBERS}')
+        by_id_symlinks = self.disk_by_id_symlinks()
 
         def _split_keys(line: str) -> list[tuple[str, str]]:
             return re.findall(r'(\S+)=(".*?"|\S+)', line)
@@ -862,9 +906,12 @@ class Host:
                     if wwn in seen_wwns:
                         continue
                     seen_wwns.add(wwn)
+                symlinks = by_id_symlinks.get(r['name'], [])
+                # Fallback to `/dev/{name}` if no symlinks have been reported
+                path = symlinks[0] if symlinks else f'/dev/{r["name"]}'
                 devices.append(Host.BlockDeviceInfo(
                     name=r['name'],
-                    path=f'/dev/{r["name"]}',
+                    path=path,
                     size=int(r['size']),
                     log_sec=int(r['log-sec']),
                     type='disk',
