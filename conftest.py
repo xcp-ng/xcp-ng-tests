@@ -863,10 +863,20 @@ def vm_with_vcpu_count(request: pytest.FixtureRequest, imported_vm: VM) -> Gener
     """
     vcpu_count = getattr(request, 'param', 128)
     vm = imported_vm.clone()
-    assert vm.is_halted(), "The VM must not be running to set vCPU parameters"
-    vm.param_set('platform', 'true', key='vcpu-unrestricted')
-    vm.param_set('VCPUs-max', str(vcpu_count))
-    vm.param_set('VCPUs-at-startup', str(vcpu_count))
+    try:
+        assert vm.is_halted(), "The VM must not be running to set vCPU parameters"
+        vm.param_set('platform', 'true', key='vcpu-unrestricted')
+        # XAPI requires VCPUs-at-startup <= VCPUs-max at each step: lower VCPUs-at-startup first
+        # when reducing the count of a VM with more vCPUs
+        if vcpu_count < int(vm.param_get('VCPUs-at-startup')):
+            vm.param_set('VCPUs-at-startup', str(vcpu_count))
+            vm.param_set('VCPUs-max', str(vcpu_count))
+        else:
+            vm.param_set('VCPUs-max', str(vcpu_count))
+            vm.param_set('VCPUs-at-startup', str(vcpu_count))
+    except Exception:
+        vm.destroy()
+        raise
     yield vm
     vm.destroy()
 
