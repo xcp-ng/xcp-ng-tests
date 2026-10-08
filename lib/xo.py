@@ -6,7 +6,7 @@ from data import TOOLS
 from lib.commands import local_cmd
 from lib.typing import JSONType
 
-from typing import Literal, overload
+from typing import Literal, TypedDict, cast, overload
 
 __allow_xo_cli = False
 def _allow_xo_cli(value: bool) -> bool:
@@ -45,7 +45,73 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
 
     return res.stdout
 
+
+class XoServer(TypedDict):
+    id: str
+    host: str
+    status: str
+
+def xo_servers(host: str | None = None) -> list[XoServer]:
+    """
+    Returns the registered servers in XO, possibly fitering by [host].
+    """
+    servers = cast(
+        list[XoServer],
+        xo_cli('server.getAll', use_json=True),
+    )
+
+    if host is not None:
+        servers = filter(
+            lambda s: s.get('host') == host,
+            servers,
+        )
+
+    return list(servers)
+
+def xo_server_add(label: str, host: str, username: str, password: str, allowUnauthorized: bool) -> str:
+    uuid = xo_cli('server.add', {
+        'host': host,
+        'username': username,
+        'password': password,
+        'allowUnauthorized': 'true' if allowUnauthorized else 'false',
+        'label': label,
+    },
+        use_json=True,
+    )
+    assert isinstance(uuid, str)
+    return uuid
+
+def xo_server_remove(uuid: str) -> None:
+    xo_cli('server.remove', {'id': uuid})
+
+
+class XoPlugin(TypedDict):
+    id: str
+    loaded: bool
+    version: str
+
+def xo_plugins(id: str | None = None) -> list[XoPlugin]:
+    """
+    Returns the plugins in XO, possibly filtering by [id].
+    """
+    plugins = cast(
+        list[XoPlugin],
+        xo_cli('plugin.get', use_json=True),
+    )
+
+    if id is not None:
+        plugins = filter(
+            lambda s: s.get('id') == id,
+            plugins,
+        )
+
+    return list(plugins)
+
+
 def xo_object_exists(uuid: str) -> bool:
+    """
+    Returns if an object with [uuid] exists.
+    """
     lst = xo_cli('list-objects', {'uuid': uuid}, use_json=True)
     assert isinstance(lst, list)
     return len(lst) > 0

@@ -35,7 +35,7 @@ from lib.sr import SR
 from lib.tunnel import Tunnel
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli, xo_object_exists
+from lib.xo import xo_server_add, xo_server_remove, xo_servers
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -311,76 +311,41 @@ class Host:
             self._bios_vendor = self._get_bios_vendor()
         return 'Xen' in self._bios_vendor
 
-    def xo_get_server_id(self, store: bool = True) -> str | None:
-        servers = xo_cli('server.getAll', use_json=True)
-        assert isinstance(servers, list)
-        for server in servers:
-            assert isinstance(server, dict)
-            assert isinstance(server['host'], str)
-            assert isinstance(server['id'], str)
-            if server['host'] == wrap_ip(self.hostname_or_ip):
-                if store:
-                    self.xo_srv_id = server['id']
-                return server['id']
-        return None
+    def xo_get_server_id(self) -> str | None:
+        if self.xo_srv_id is None:
+            servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
+
+            if len(servers) == 0:
+                return None
+
+            self.xo_srv_id = servers[0]['id']
+
+        return self.xo_srv_id
 
     def xo_server_remove(self) -> None:
-        if self.xo_srv_id is not None:
-            xo_cli('server.remove', {'id': self.xo_srv_id})
-        else:
-            servers = xo_cli('server.getAll', use_json=True)
-            assert isinstance(servers, list)
-            for server in servers:
-                assert isinstance(server, dict)
-                assert isinstance(server['host'], str)
-                assert isinstance(server['id'], str)
-                if server['host'] == wrap_ip(self.hostname_or_ip):
-                    xo_cli('server.remove', {'id': server['id']})
+        server_id = self.xo_get_server_id()
+        if server_id is not None:
+            xo_server_remove(server_id)
+            self.xo_srv_id = None
 
-    def xo_server_add(self, username: str, password: str, label: str | None = None,
-                      unregister_first: bool = True) -> None:
+    def xo_server_add(self, username: str, password: str, label: str | None = None) -> None:
         """ Returns the server ID created by XO's `server.add`. """
-        if unregister_first:
-            self.xo_server_remove()
-        if label is None:
-            label = 'Auto tests %s' % self.hostname_or_ip
-        xo_srv_id = xo_cli(
-            'server.add',
-            {
-                'host': wrap_ip(self.hostname_or_ip),
-                'username': username,
-                'password': password,
-                'allowUnauthorized': 'true',
-                'label': label
-            },
-            use_json=True,
+        self.xo_server_remove()
+        self.xo_srv_id = xo_server_add(
+            label or f"Auto tests {self.hostname_or_ip}",
+            wrap_ip(self.hostname_or_ip),
+            username,
+            password,
+            allowUnauthorized=True,
         )
-        assert isinstance(xo_srv_id, str)
-        self.xo_srv_id = xo_srv_id
-
-    def xo_server_status(self) -> str | None:
-        servers = xo_cli('server.getAll', use_json=True)
-        assert isinstance(servers, list)
-        for server in servers:
-            assert isinstance(server, dict)
-            assert isinstance(server['host'], str)
-            assert isinstance(server['status'], str | None)
-            if server['host'] == wrap_ip(self.hostname_or_ip):
-                return server['status']
-        return None
 
     def xo_server_connected(self) -> bool:
-        return self.xo_server_status() == "connected"
+        servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
 
-    def xo_server_reconnect(self) -> None:
-        assert self.xo_srv_id is not None
-        logging.info(f"[{self}] Reconnect XO to host")
-        xo_cli('server.disable', {'id': self.xo_srv_id})
-        xo_cli('server.enable', {'id': self.xo_srv_id})
-        wait_for(self.xo_server_connected, timeout_secs=10)
-        # wait for XO to know about the host. Apparently a connected server status
-        # is not enough to guarantee that the host object exists yet.
-        wait_for(lambda: xo_object_exists(self.uuid), f"[{self}] Wait for XO to know about HOST {self.uuid}")
+        if len(servers) == 0:
+            return False
+
+        return servers[0]['status'] == "connected"
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
