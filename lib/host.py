@@ -862,14 +862,20 @@ class Host:
                     if wwn in seen_wwns:
                         continue
                     seen_wwns.add(wwn)
+                wwn = wwn.removeprefix('0x')
+                if wwn:
+                    path = self.ssh(f"ls /dev/disk/by-id/*{wwn}")
+                    assert path and len(path.split()) == 1
+                else:
+                    path = f'/dev/{r["name"]}'
                 devices.append(Host.BlockDeviceInfo(
                     name=r['name'],
-                    path=f'/dev/{r["name"]}',
+                    path=path,
                     size=int(r['size']),
                     log_sec=int(r['log-sec']),
                     type='disk',
                     available=_all_available(r['kname']),
-                    wwn=wwn.removeprefix('0x'),
+                    wwn=wwn,
                 ))
 
             # --- mdadm arrays (may appear once per member, deduplicate) ---
