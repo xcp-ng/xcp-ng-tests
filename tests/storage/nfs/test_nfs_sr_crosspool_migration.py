@@ -18,6 +18,7 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 # Make sure these fixtures are called before the parametrized one
 @pytest.mark.usefixtures('vm_ref')
 @pytest.mark.usefixtures('image_format')
+@pytest.mark.xfail_on_xcpng_9_0("TBD no XFS SR driver for the destination SR")
 class Test:
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_cold_crosspool_migration(self, host: Host, hostB1: Host, dispatch_nfs: VM, xfs_sr_on_hostB1: SR,
