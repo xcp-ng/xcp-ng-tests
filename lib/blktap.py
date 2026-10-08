@@ -173,6 +173,12 @@ class TapCtl:
             raise TapCtlError(f"No tapdisk found for minor {minor} after create")
         return tapdisks[0].pid, minor
 
+    def destroy(self, pid: int, minor: int, timeout: int | None = None) -> None:
+        args: list[object] = ["destroy", "-p", pid, "-m", minor]
+        if timeout is not None:
+            args += ["-t", timeout]
+        self._run(*args)
+
 class VBDConnectorError(Exception):
     pass
 
@@ -459,6 +465,31 @@ class VBDConnector:
 
         logging.info(f"Detached {device} (tapdisk still running)")
 
+    def status(self, vm: VM, device: str) -> str:
+        """Human readable state of a VBD connection."""
+        if not vm.is_running():
+            return f"VM {vm.uuid} not running"
+        devid = self.calc_devid(device)
+        backend = self.backend_path(vm, device)
+        frontend = self.frontend_path(device)
+
+        status_lines = [f"Device: {device} (devid={devid})", f"Backend: {backend}"]
+        if self.xenstore.exists(backend):
+            status_lines.append(f"  State: {self.xenstore.read(f'{backend}/state')}")
+            status_lines.append(f"  Mode: {self.xenstore.read(f'{backend}/mode')}")
+            status_lines.append(f"  Physical device: {self.xenstore.read(f'{backend}/physical-device')}")
+        else:
+            status_lines.append("  (not connected)")
+
+        status_lines.append(f"Frontend: {frontend}")
+        frontend_state = vm.xenstore_read(f"{frontend}/state", accept_unknown_key=True)
+        if frontend_state is not None:
+            status_lines.append(f"  State: {frontend_state}")
+        else:
+            status_lines.append("  (not connected)")
+
+        return "\n".join(status_lines)
+
 class XenStoreError(Exception):
     pass
 
@@ -497,3 +528,12 @@ class XenStoreHelper:
             return True
         except XenStoreError:
             return False
+
+    def ls(self, path: str) -> list[str]:
+        """Direct children of a path (empty if it doesn't exist)."""
+        # xenstore-list, not xenstore-ls which is recursive; and rely on the return
+        # code as stderr is merged in the output
+        result = self.host.ssh_with_result(shlex.join(["xenstore-list", path]))
+        if result.returncode != 0:
+            return []
+        return result.stdout.split()
