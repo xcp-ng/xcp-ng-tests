@@ -16,6 +16,7 @@ def verify_contains(host: Host, archive: str, files: list[str]) -> None:
     listing_clean = [x.split('/', maxsplit=1)[1] for x in listing.splitlines()]
     assert all(file in listing_clean for file in files)
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xen-bugtool: command not found
 class TestsBugtool:
     # Verify a minimal bugtool invocation that only queries certain capabilities
     def test_bugtool_entries(self, host: Host, defer: Defer) -> None:

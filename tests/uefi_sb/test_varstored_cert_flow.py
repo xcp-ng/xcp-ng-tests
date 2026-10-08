@@ -27,6 +27,7 @@ from typing import Generator
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
 @pytest.mark.usefixtures("host_at_least_8_3", "hostA2")
 class TestPoolToDiskCertPropagationToAllHosts:
     def test_set_pool_certificates(self, host: Host) -> None:
@@ -96,6 +97,7 @@ class TestVMCertMisc:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
 @pytest.mark.small_vm
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolToVMCertInheritance:
@@ -189,6 +191,7 @@ class TestPoolToDiskCertInheritanceOnPoolJoin:
         host.pool.eject_host(joined_host)
         host.pool.clear_custom_uefi_certs()
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
     def test_host_certificates_updated_after_join(
         self, keys_auths_for_joined_host: tuple[list[str], dict[str, EFIAuth], Host]
     ) -> None:

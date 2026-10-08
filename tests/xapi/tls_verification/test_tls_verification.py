@@ -50,6 +50,7 @@ class TestTLSVerification:
     def test_tls_verification(self, hostA1: Host) -> None:
         self._test_tls_verification(hostA1)
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD certificate tests fail to contact the other host
     def test_refresh_certificate(self, hostA1: Host) -> None:
         logging.info("Refresh the xapi:pool certificate on every pool member")
         for h in hostA1.pool.hosts:
@@ -71,6 +72,7 @@ class TestTLSVerification:
         hostA2.ssh(f'rm -r {tmp_dir}')
         hostA2.ssh('systemctl reload-or-restart stunnel@xapi')
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD certificate tests fail to contact the other host
     def test_break_cert(self, hostA1: Host, hostA2_with_saved_cert: Host) -> None:
         hostA2 = hostA2_with_saved_cert
         logging.info(f"Replace the certificate on host {hostA2}")
@@ -91,6 +93,7 @@ class TestTLSVerification:
 The server may be switched off or there may be network connectivity problems." in excinfo.value.stdout
         )
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD certificate tests fail to contact the other host
     def test_toolstack_restart(self, hostA1: Host, hostA2: Host) -> None:
         """
         Same test as the previous one, but we don't break the cert.

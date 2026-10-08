@@ -45,6 +45,7 @@ def do_execute_xst(host: Host, modname: str, defer: Defer, testname: str | None 
     host.ssh(f"grep -q 'status: pass' /sys/kernel/debug/xst/{testname}/results")
 
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD package test-ring0 is missing
 @pytest.mark.reboot  # host_with_ring0_tests
 @pytest.mark.usefixtures("host_with_ring0_tests")
 class TestRing0Tests:
