@@ -11,6 +11,7 @@ from .conftest import DIRECTORIES_PATH
 # From --hosts parameter:
 # - host: a XCP-ng host >= 8.2
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD package xcp-ng-xapi-storage is not available
 class TestFSPVDI:
     def test_create_and_destroy_VDI(self, host_with_fsp: Host, fsp_sr: SR, fsp_config: dict[str, str]) -> None:
         linkname = 'vdifor' + os.path.basename(fsp_config['shared_dir_path'])

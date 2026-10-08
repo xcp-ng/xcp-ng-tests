@@ -10,6 +10,7 @@ from tests.storage import try_to_create_sr_with_missing_device
 # Requirements:
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no LargeBlock SR driver
 class TestLARGEBLOCKSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,

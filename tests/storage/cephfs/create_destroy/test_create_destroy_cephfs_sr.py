@@ -34,6 +34,7 @@ class TestCephFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no CephFS SR driver
     def test_create_and_destroy_sr(
         self, host: Host, cephfs_device_config: dict[str, str], pool_with_ceph: Pool
     ) -> None:

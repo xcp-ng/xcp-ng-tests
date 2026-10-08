@@ -11,6 +11,11 @@ from lib.vm import VM
 
 from typing import Generator
 
+@pytest.fixture(scope='session', autouse=True)
+def skip_on_v9(host: Host) -> None:
+    if host.xcp_version >= version.parse("8.99"):
+        pytest.skip("Secure Boot is not supported yet on XCP-ng 9")
+
 @pytest.fixture(scope='module')
 def pool_without_uefi_certs(host: Host) -> Generator[Pool, None, None]:
     assert host.xcp_version < version.parse("8.3"), "fixture only relevant on XCP-ng 8.2"

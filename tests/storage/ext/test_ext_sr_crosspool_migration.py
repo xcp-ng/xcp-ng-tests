@@ -18,10 +18,12 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally with a big VM to test it scales
 class Test:
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver for the destination SR
     def test_cold_crosspool_migration(self, host: Host, hostB1: Host, vm_on_ext_sr: VM, xfs_sr_on_hostB1: SR,
                                       image_format: ImageFormat) -> None:
         cold_migration_then_come_back(vm_on_ext_sr, host, hostB1, xfs_sr_on_hostB1, image_format)
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver for the destination SR
     def test_live_crosspool_migration(self, host: Host, hostB1: Host, vm_on_ext_sr: VM, xfs_sr_on_hostB1: SR,
                                       image_format: ImageFormat) -> None:
         live_storage_migration_then_come_back(vm_on_ext_sr, host, hostB1, xfs_sr_on_hostB1, image_format)

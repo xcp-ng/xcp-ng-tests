@@ -35,6 +35,7 @@ class TestMooseFSSRCreateDestroy:
 
     # MooseFS doesn't support IPv6
     @pytest.mark.usefixtures("host_no_ipv6")
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no MooseFS SR driver
     def test_create_and_destroy_sr(
         self, moosefs_device_config: dict[str, str], pool_with_moosefs_enabled: Pool
     ) -> None:

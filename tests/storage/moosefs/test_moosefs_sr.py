@@ -19,6 +19,7 @@ from tests.storage import vdi_is_open, vdi_on_boot_reset
 
 # MooseFS doesn't support IPv6
 @pytest.mark.usefixtures("moosefs_sr", "host_no_ipv6")
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no MooseFS SR driver
 class TestMooseFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, moosefs_sr: SR) -> None:

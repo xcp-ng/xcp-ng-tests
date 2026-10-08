@@ -18,6 +18,7 @@ from tests.storage import cold_migration_then_come_back, live_storage_migration_
 @pytest.mark.small_vm # run with a small VM to test the features
 @pytest.mark.big_vm # and ideally on a big VM to test it scales
 @pytest.mark.usefixtures("host_no_ipv6") # MooseFS doesn't support IPv6
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no MooseFS SR driver
 class Test:
     def test_live_intrapool_shared_migration(self, host: Host, hostA2: Host, vm_on_moosefs_sr: VM,
                                              image_format: ImageFormat) -> None:

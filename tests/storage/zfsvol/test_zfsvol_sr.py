@@ -29,6 +29,7 @@ pytestmark = pytest.mark.usefixtures("host_at_least_8_3")
 
 
 @pytest.mark.usefixtures("zfsvol_sr")
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD package xcp-ng-xapi-storage-volume-zfsvol is not available
 class TestZfsvolVm:
 
     @pytest.mark.xfail

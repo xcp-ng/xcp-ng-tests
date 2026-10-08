@@ -1,3 +1,5 @@
+import pytest
+
 from lib import commands
 from lib.host import Host
 
@@ -13,12 +15,14 @@ def _attempt_sudo(host: Host, user: str, cmd: str) -> commands.SSHResult[str]:
     # if the rule isn't honored.
     return host.ssh_with_result(f"su - {user} -c 'sudo -n {cmd}'")
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0")  # TBD no sudo on XCP-ng 9 yet
 def test_sudo_allowed_cmd(host: Host, whoami_sudoer: str) -> None:
     result = _attempt_sudo(host, whoami_sudoer, "/usr/bin/whoami")
     assert result.returncode == 0 and result.stdout.strip() == "root", (
         f"expected the granted command to run as root, got {result}"
     )
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0")  # TBD no sudo on XCP-ng 9 yet
 def test_sudo_denied_cmd(host: Host, whoami_sudoer: str) -> None:
     result = _attempt_sudo(host, whoami_sudoer, "/usr/bin/id")
     assert result.returncode != 0, "user was able to run a command not granted by the drop-in"

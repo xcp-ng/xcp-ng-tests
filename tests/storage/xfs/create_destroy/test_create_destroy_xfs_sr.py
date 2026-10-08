@@ -13,6 +13,7 @@ from lib.vdi import ImageFormat
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
 # - access to XCP-ng RPM repository from the host
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver
 class TestXFSSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,

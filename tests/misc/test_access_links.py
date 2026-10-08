@@ -67,6 +67,7 @@ TEST_URLS: dict[str, dict[str, int]] = {
     "url,expected_returncode",
     [(url, codes["curl"]) for url, codes in TEST_URLS.items() if "curl" in codes],
 )
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0")  # TBD: fix emudhra cert
 def test_curl_url(host: Host, url: str, expected_returncode: int) -> None:
     """ Functional tests for curl package using sample URLs also try negative checks"""
     result = host.ssh_with_result(
@@ -82,6 +83,7 @@ def test_curl_url(host: Host, url: str, expected_returncode: int) -> None:
     "url,expected_returncode",
     [(url, codes["wget"]) for url, codes in TEST_URLS.items() if "wget" in codes],
 )
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0")  # TBD: fix emudhra cert
 def test_wget_url(host: Host, url: str, expected_returncode: int) -> None:
     """ Functional tests for wget package using sample URLs also try negative checks"""
     result = host.ssh_with_result(f"wget --quiet --output-document=/dev/null {url}")

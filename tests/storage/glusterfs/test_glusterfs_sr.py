@@ -15,6 +15,7 @@ from tests.storage import vdi_is_open, vdi_on_boot_reset
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
 # - access to XCP-ng RPM repository from the host
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD package glusterfs-server is not available
 class TestGlusterFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, glusterfs_sr: SR) -> None:
