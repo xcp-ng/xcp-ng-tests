@@ -87,6 +87,35 @@ def xo_servers(host: str | None = None) -> list[XoServer]:
     return list(servers)
 
 
+class XoPlugin:
+    id: str
+    loaded: bool
+    version: str
+
+    def __init__(self, json: JSONType) -> None:
+        assert isinstance(json, dict)
+        self.id = json_check_get_str(json, 'id')
+        self.loaded = json_check_get_bool(json, 'loaded', False)
+        self.version = json_check_get_str(json, 'version')
+
+def xo_plugins(id: str | None = None) -> list[XoPlugin]:
+    """
+    Returns the plugins in XO, possibly filtering by [id].
+    """
+    plugins_json = xo_cli('plugin.get', use_json=True)
+    assert isinstance(plugins_json, list)
+
+    plugins = map(XoPlugin, plugins_json)
+
+    if id is not None:
+        plugins = filter(
+            lambda s: s.id == id,
+            plugins,
+        )
+
+    return list(plugins)
+
+
 def xo_object_exists(uuid: str) -> bool:
     """
     Returns if an object with [uuid] exists.
