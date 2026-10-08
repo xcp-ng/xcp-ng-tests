@@ -4,7 +4,7 @@ import pytest
 
 from lib.blktap import VBDConnector, XenStoreHelper
 from lib.vm import VM
-from tests.storage.blktap import wait_for_guest_device, write_then_read
+from tests.storage.blktap import guest_queue_count, wait_for_guest_device, write_then_read
 
 # Multi-queue VBDs: tapback advertises multi-queue-max-queues when the tapdisk driver
 # supports it, then blkfront chooses multi-queue-num-queues (at most one queue per vCPU)
@@ -19,10 +19,6 @@ def start(vm: VM) -> VM:
     vm.start()
     vm.wait_for_vm_running_and_ssh_up()
     return vm
-
-def guest_queue_count(vm: VM, device: str) -> int:
-    """Number of hardware queues of the device, as seen by the guest block layer."""
-    return len(vm.ssh(f'ls /sys/block/{device}/mq').split())
 
 @pytest.mark.small_vm
 @pytest.mark.unix_vm
