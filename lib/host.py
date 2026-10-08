@@ -35,7 +35,7 @@ from lib.sr import SR
 from lib.tunnel import Tunnel
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli, xo_object_exists
+from lib.xo import xo_cli
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -369,16 +369,6 @@ class Host:
 
     def xo_server_connected(self) -> bool:
         return self.xo_server_status() == "connected"
-
-    def xo_server_reconnect(self) -> None:
-        assert self.xo_srv_id is not None
-        logging.info(f"[{self}] Reconnect XO to host")
-        xo_cli('server.disable', {'id': self.xo_srv_id})
-        xo_cli('server.enable', {'id': self.xo_srv_id})
-        wait_for(self.xo_server_connected, timeout_secs=10)
-        # wait for XO to know about the host. Apparently a connected server status
-        # is not enough to guarantee that the host object exists yet.
-        wait_for(lambda: xo_object_exists(self.uuid), f"[{self}] Wait for XO to know about HOST {self.uuid}")
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
