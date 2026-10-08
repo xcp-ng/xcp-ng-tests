@@ -27,7 +27,7 @@ from lib.common import (
 from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vbd import VBD
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vif import VIF
 
 from typing import TYPE_CHECKING, Iterable, Literal, assert_never, overload
@@ -260,7 +260,8 @@ class VM(BaseVM):
         assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None) -> None:
+    def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None,
+                image_format: ImageFormat | None = None) -> None:
         msg = "Migrate VM to host %s" % target_host
         params: XeParams = {
             'uuid': self.uuid,
@@ -293,6 +294,9 @@ class VM(BaseVM):
             for vdi_uuid in self.vdi_uuids():
                 vdi_map[vdi_uuid] = sr_uuid
             params['vdi'] = vdi_map
+            if image_format is not None:
+                # otherwise the destination SR chooses the image format of the migrated VDIs
+                params['image-format'] = {vdi_uuid: image_format for vdi_uuid in vdi_map}
 
             if cross_pool:
                 # VIF mapping is only required for cross pool migration
