@@ -69,6 +69,29 @@ def xo_servers(host: str | None = None) -> list[XoServer]:
     return list(servers)
 
 
+class XoPlugin(TypedDict):
+    id: str
+    loaded: bool
+    version: str
+
+def xo_plugins(id: str | None = None) -> list[XoPlugin]:
+    """
+    Returns the plugins in XO, possibly filtering by [id].
+    """
+    plugins = cast(
+        list[XoPlugin],
+        xo_cli('plugin.get', use_json=True),
+    )
+
+    if id is not None:
+        plugins = filter(
+            lambda s: s.get('id') == id,
+            plugins,
+        )
+
+    return list(plugins)
+
+
 def xo_object_exists(uuid: str) -> bool:
     """
     Returns if an object with [uuid] exists.
