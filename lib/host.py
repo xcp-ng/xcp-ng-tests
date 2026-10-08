@@ -336,11 +336,10 @@ class Host:
                 if server['host'] == wrap_ip(self.hostname_or_ip):
                     xo_cli('server.remove', {'id': server['id']})
 
-    def xo_server_add(self, username: str, password: str, label: str | None = None,
-                      unregister_first: bool = True) -> None:
+    def xo_server_add(self, username: str, password: str, label: str | None = None) -> None:
         """ Returns the server ID created by XO's `server.add`. """
-        if unregister_first:
-            self.xo_server_remove()
+        self.xo_server_remove()
+
         if label is None:
             label = 'Auto tests %s' % self.hostname_or_ip
         xo_srv_id = xo_cli(
