@@ -7,7 +7,7 @@ import traceback
 from packaging import version
 
 import lib.commands as commands
-from lib.common import HostAddress, _param_get, _param_set, safe_split, wait_for_not
+from lib.common import HostAddress, _param_get, _param_set, safe_split, strtobool, wait_for, wait_for_not
 from lib.efi import EFIAuth
 from lib.host import Host
 from lib.sr import SR
@@ -35,8 +35,11 @@ class Pool:
         logging.info("Getting Pool info for %r", master_hostname_or_ip)
         for host_uuid in self.hosts_uuids():
             if host_uuid != self.hosts[0].uuid:
-                host = Host(self, self.host_ip(host_uuid))
-                self.hosts.append(host)
+                address = self.host_ip(host_uuid)
+                # SSH to a host that is down hangs for minutes instead of failing.
+                if not Host.ssh_reachable(address):
+                    raise Exception(f"Pool member {address} is unreachable: is it powered on?")
+                self.hosts.append(Host(self, address))
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs: dict[str, str] | None = None
         self.pre_existing_sr_uuids = safe_split(self.master.xe('sr-list', {'minimal': 'true'}), ',')
@@ -46,6 +49,46 @@ class Pool:
 
     def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
         _param_set(self.master, Pool.xe_prefix, self.uuid, param_name, value, key)
+
+    def is_ha_enabled(self) -> bool:
+        return strtobool(self.param_get('ha-enabled'))
+
+    def enable_ha(self, heartbeat_sr: SR, failures_to_tolerate: str | int) -> None:
+        logging.info(f'Enable HA on pool {self.uuid} (heartbeat SR {heartbeat_sr.uuid})')
+        self.param_set('ha-host-failures-to-tolerate', str(failures_to_tolerate))
+        self.master.xe('pool-ha-enable', {'heartbeat-sr-uuids': heartbeat_sr.uuid})
+
+    def disable_ha(self) -> None:
+        logging.info(f'Disable HA on pool {self.uuid}')
+        self.master.xe('pool-ha-disable')
+
+    def is_live_master(self, host: Host) -> bool:
+        """True when host is enabled pool master and answers xe (pool.conf alone is not enough)."""
+        return (
+            host.is_ssh_reachable()
+            and host.is_master()
+            and host.is_enabled()
+            and host.xe('pool-list', minimal=True) == self.uuid
+        )
+
+    def designate_new_master(self, host: Host) -> None:
+        logging.info(f'Designate {host} as pool master (was {self.master})')
+        old_pids = {h.uuid: h.xapi_pid() for h in self.hosts}
+        self.master.xe('pool-designate-new-master', {'host-uuid': host.uuid})
+        # Every host restarts xapi some 30s after the call returns. Wait for the new processes,
+        # or the checks below would still talk to the old ones.
+        for h in self.hosts:
+            h.wait_for_xapi_restart(old_pids[h.uuid])
+            h.wait_for_xapi_enabled()
+
+        def new_master_ready() -> bool:
+            try:
+                return self.is_live_master(host)
+            except commands.SSHCommandFailed:
+                return False
+
+        wait_for(new_master_ready, f'Wait for {host} to become pool master', timeout_secs=10 * 60)
+        self.master = host
 
     def exec_on_hosts_on_error_rollback(self, func: Callable[[Host], Any],
                                         rollback_func: Callable[[Host], Any] | None,

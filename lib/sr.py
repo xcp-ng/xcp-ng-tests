@@ -262,6 +262,12 @@ class SR:
     def get_name_label(self) -> str:
         return self.param_get('name-label')
 
+    def nfs_server(self) -> str:
+        return self.pool.master.xe(
+            'pbd-param-get',
+            {'uuid': self.pbd_uuids()[0], 'param-name': 'device-config', 'param-key': 'server'},
+        )
+
     def create_vdi(
         self, name_label: str | None = None, virtual_size: int = 1 * GiB, image_format: ImageFormat | None = None
     ) -> VDI:
