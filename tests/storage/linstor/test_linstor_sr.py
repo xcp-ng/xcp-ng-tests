@@ -106,6 +106,16 @@ class TestLinstorSR:
             if provisioning_type == "thick":
                 pytest.fail("Expected failure for thick provisioning did not occur (XPASS)")
 
+    def test_health_check(self, linstor_sr: SR, storage_pool_name: str) -> None:
+        master = linstor_sr.pool.master
+        result = json.loads(master.call_plugin('linstor-manager', 'healthCheck', {
+            'groupName': storage_pool_name
+        }))
+        logging.debug("healthCheck result: %s", result)
+        assert result['controller-uri'], "No controller URI returned"
+        assert len(result['nodes']) == len(linstor_sr.pool.hosts)
+        assert not result['errors'], f"healthCheck reported errors: {result['errors']}"
+
     def test_vdi_is_not_open(self, vdi_on_linstor_sr: VDI) -> None:
         assert not vdi_is_open(vdi_on_linstor_sr)
 
