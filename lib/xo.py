@@ -68,6 +68,22 @@ def xo_servers(host: str | None = None) -> list[XoServer]:
 
     return list(servers)
 
+def xo_server_add(label: str, host: str, username: str, password: str, allowUnauthorized: bool) -> str:
+    uuid = xo_cli('server.add', {
+        'host': host,
+        'username': username,
+        'password': password,
+        'allowUnauthorized': 'true' if allowUnauthorized else 'false',
+        'label': label,
+    },
+        use_json=True,
+    )
+    assert isinstance(uuid, str)
+    return uuid
+
+def xo_server_remove(uuid: str) -> None:
+    xo_cli('server.remove', {'id': uuid})
+
 
 class XoPlugin(TypedDict):
     id: str

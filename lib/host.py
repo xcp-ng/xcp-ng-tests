@@ -35,7 +35,7 @@ from lib.sr import SR
 from lib.tunnel import Tunnel
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli, xo_servers
+from lib.xo import xo_server_add, xo_server_remove, xo_servers
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -325,28 +325,19 @@ class Host:
     def xo_server_remove(self) -> None:
         server_id = self.xo_get_server_id()
         if server_id is not None:
-            xo_cli('server.remove', {'id': server_id})
+            xo_server_remove(server_id)
             self.xo_srv_id = None
 
     def xo_server_add(self, username: str, password: str, label: str | None = None) -> None:
         """ Returns the server ID created by XO's `server.add`. """
         self.xo_server_remove()
-
-        if label is None:
-            label = 'Auto tests %s' % self.hostname_or_ip
-        xo_srv_id = xo_cli(
-            'server.add',
-            {
-                'host': wrap_ip(self.hostname_or_ip),
-                'username': username,
-                'password': password,
-                'allowUnauthorized': 'true',
-                'label': label
-            },
-            use_json=True,
+        self.xo_srv_id = xo_server_add(
+            label or f"Auto tests {self.hostname_or_ip}",
+            wrap_ip(self.hostname_or_ip),
+            username,
+            password,
+            allowUnauthorized=True,
         )
-        assert isinstance(xo_srv_id, str)
-        self.xo_srv_id = xo_srv_id
 
     def xo_server_connected(self) -> bool:
         servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
