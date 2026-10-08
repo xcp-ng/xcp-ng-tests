@@ -14,6 +14,7 @@ class TestUpdate:
     def test_check_update(self, host: Host) -> None:
         host.call_plugin('updater.py', 'check_update')
 
+    @pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible")
     def test_update(self, host: Host) -> None:
         host.yum_save_state()
         host.call_plugin('updater.py', 'update')
@@ -23,6 +24,7 @@ class TestUpdate:
 
         host.yum_restore_saved_state()
 
+    @pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible")
     def test_package_update(self, host_with_saved_yum_state: Host) -> None:
         host = host_with_saved_yum_state
         packages = host.get_available_package_versions('dummypkg')
