@@ -324,17 +324,10 @@ class Host:
         return None
 
     def xo_server_remove(self) -> None:
-        if self.xo_srv_id is not None:
-            xo_cli('server.remove', {'id': self.xo_srv_id})
-        else:
-            servers = xo_cli('server.getAll', use_json=True)
-            assert isinstance(servers, list)
-            for server in servers:
-                assert isinstance(server, dict)
-                assert isinstance(server['host'], str)
-                assert isinstance(server['id'], str)
-                if server['host'] == wrap_ip(self.hostname_or_ip):
-                    xo_cli('server.remove', {'id': server['id']})
+        server_id = self.xo_get_server_id()
+        if server_id is not None:
+            xo_cli('server.remove', {'id': server_id})
+            self.xo_srv_id = None
 
     def xo_server_add(self, username: str, password: str, label: str | None = None) -> None:
         """ Returns the server ID created by XO's `server.add`. """
