@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from lib.blktap import TapCtl
 from lib.common import MiB, wait_for
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from lib.host import Host
     from lib.vm import VM
+
+@dataclass
+class ConnectedVBD:
+    vm: VM
+    device: str
+    image: str  # "<format>:<path>", as given to connect()
+    pid: int
+    minor: int
 
 def wait_for_guest_device(vm: VM, device: str, present: bool = True) -> None:
     """Wait for /dev/<device> to appear in the guest (or to disappear, if present is False)."""
@@ -53,3 +63,25 @@ def wait_for_tapdisk_exit(host: Host, pid: int) -> None:
     # the detach: the minors can only be freed once the tapdisk exited, after its last detach.
     wait_for(lambda: host.ssh_with_result(f'test -d /proc/{pid}').returncode != 0,
              f"Wait for tapdisk {pid} to exit after its last detach", timeout_secs=30)
+
+FIO_ACCESS_TYPES = ('read', 'rw', 'randrw')
+FIO_BLOCK_SIZES = ('4k', '64k', '1m')
+
+def fio_command(device: str, runtime: int, access_types: Sequence[str] = FIO_ACCESS_TYPES,
+                block_sizes: Sequence[str] = FIO_BLOCK_SIZES) -> str:
+    """fio I/O on the device: one job per access type and block size, all running at the same time."""
+    # fio rather than dd: several jobs (processes) and many requests in flight (libaio, iodepth)
+    # exercise the multi-queue and multi-thread paths of tapdisk, which matter in these tests.
+    # The options before the first --name apply to all the jobs.
+    jobs = ' '.join(f'--name={rw}-{bs} --rw={rw} --bs={bs}' for rw in access_types for bs in block_sizes)
+    return (f'fio --filename=/dev/{device} --direct=1 --ioengine=libaio --iodepth=64 '
+            f'--runtime={runtime} --time_based {jobs}')
+
+def start_fio(vm: VM, device: str, runtime: int, access_types: Sequence[str] = FIO_ACCESS_TYPES,
+              block_sizes: Sequence[str] = FIO_BLOCK_SIZES) -> None:
+    """Run fio_command in the guest, in the background."""
+    vm.ssh(f'setsid {fio_command(device, runtime, access_types, block_sizes)} > /tmp/fio.log 2>&1 < /dev/null &')
+
+def wait_for_guest_reads(host: Host, pid: int, minor: int) -> None:
+    wait_for(lambda: TapCtl(host).stats(pid, minor)['secs'][0] >= 10 * MiB // 512,
+             "Wait for the guest reads to reach tapdisk", timeout_secs=30)
