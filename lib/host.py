@@ -311,7 +311,7 @@ class Host:
             self._bios_vendor = self._get_bios_vendor()
         return 'Xen' in self._bios_vendor
 
-    def xo_get_server_id(self, store: bool = True) -> str | None:
+    def xo_get_server_id(self) -> str | None:
         servers = xo_cli('server.getAll', use_json=True)
         assert isinstance(servers, list)
         for server in servers:
@@ -319,8 +319,7 @@ class Host:
             assert isinstance(server['host'], str)
             assert isinstance(server['id'], str)
             if server['host'] == wrap_ip(self.hostname_or_ip):
-                if store:
-                    self.xo_srv_id = server['id']
+                self.xo_srv_id = server['id']
                 return server['id']
         return None
 
