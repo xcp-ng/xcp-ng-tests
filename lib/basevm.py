@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import logging
 
+from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.sr import SR
+
 from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.host import Host
-
-from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
-from lib.sr import SR
 
 class BaseVM:
     """ Base class for VM and Snapshot. """
