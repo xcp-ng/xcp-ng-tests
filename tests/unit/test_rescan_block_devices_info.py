@@ -171,7 +171,14 @@ NAME="md0" KNAME="md0" PKNAME="nvme1n1" SIZE="30721630535680" LOG-SEC="512" TYPE
 
 def _rescan(lsblk_output: str) -> list[Host.BlockDeviceInfo]:
     host = MagicMock(spec=Host)
-    host.ssh.return_value = lsblk_output
+
+    def ssh_mock(command: str) -> str:
+        name, arg = command.split(maxsplit=1)
+        if name == "lsblk":
+            return lsblk_output
+        return arg.replace("*", "nvme-")
+
+    host.ssh.side_effect = ssh_mock
     Host.rescan_block_devices_info(host)
     return host.block_devices_info
 
@@ -450,7 +457,7 @@ NAME="nvme1n1p6" KNAME="nvme1n1p6" PKNAME="nvme1n1" SIZE="1073741824" LOG-SEC="5
 def test_4k_block_device_detected() -> None:
     devices = _rescan(LSBLK_4K_BLOCK_DEVICE)
     d = _by_name(devices, 'nvme0n1')
-    assert d.path == '/dev/nvme0n1'
+    assert d.path == '/dev/disk/by-id/nvme-eui.e8238fa6bf530001001b444a41dd2519'
     assert d.type == 'disk'
     assert d.size == 1000204886016
     assert d.log_sec == 4 * KiB
