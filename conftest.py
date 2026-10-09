@@ -6,6 +6,7 @@ import dataclasses
 import itertools
 import logging
 import os
+import signal
 import tempfile
 from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
@@ -153,6 +154,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 def pytest_configure(config: pytest.Config) -> None:
+    # Treat SIGTERM the same as SIGINT
+    sigint_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGTERM, sigint_handler)
+
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
     assert ssh_output_max_lines is not None
