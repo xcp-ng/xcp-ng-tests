@@ -13,10 +13,9 @@ from lib.common import PackageManagerEnum, safe_split
 from lib.host import Host
 from lib.network import Network
 from lib.tunnel import Tunnel
-from lib.typing import JSONType
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli
+from lib.xo import xo_cli, xo_plugins
 
 from typing import Generator, Literal
 
@@ -52,34 +51,21 @@ def host_no_sdn_controller(host: Host) -> Generator[Host, None, None]:
         host.xe('sdn-controller-introduce', cfg)
 
 @pytest.fixture(scope='package')
-def hosts_with_traffic_rules(hosts_with_xo: list[Host]) -> Generator[list[Host], None, None]:
+# TBD xcp-ng-xapi-plugins is not compatible
+def hosts_with_traffic_rules(hosts_with_xo: list[Host], fail_with_v9: None) -> Generator[list[Host], None, None]:
     """A list of XCP-ng hosts with proper traffic rules configuration."""
     hosts = hosts_with_xo
 
     # check XO: check sdn-controller plugin (loaded + minimal version)
     minimal = Evr.parse("1.3.0")
 
-    plugin_found = False
-    plugins = xo_cli('plugin.get', use_json=True)
-    assert isinstance(plugins, list)
-    for plugin in plugins:
-        assert isinstance(plugin, dict)
-        if plugin.get('id') != 'sdn-controller':
-            continue
-
-        plugin_found = True
-        loaded = plugin.get('loaded', False)
-        assert isinstance(loaded, bool)
-        if loaded:
-            version = plugin.get('version', '')
-            assert isinstance(version, str)
-            if minimal > Evr.parse(version):
-                pytest.fail(f"This test requires XO with at least sdn-controller version {minimal}")
-        else:
-            pytest.fail("This test requires XO with sdn-controller plugin loaded")
-
-    if not plugin_found:
+    plugins = xo_plugins(id='sdn-controller')
+    if len(plugins) == 0:
         pytest.fail("This test requires XO with sdn-controller plugin")
+    if not plugins[0].get('loaded'):
+        pytest.fail("This test requires XO with sdn-controller plugin loaded")
+    if minimal > Evr.parse(plugins[0].get('version')):
+        pytest.fail(f"This test requires XO with at least sdn-controller version {minimal}")
 
     # check host: xcp-ng-xapi-plugins minimal version
     minimal = Evr.parse("xcp-ng-xapi-plugins-1.17.0")

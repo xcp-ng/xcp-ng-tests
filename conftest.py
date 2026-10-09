@@ -401,8 +401,8 @@ def hosts_with_xo(hosts: list[Host], registered_xo_cli: None) -> Generator[list[
         if not h.skip_xo_config:
             h.xo_server_add(h.user, h.password)
         else:
-            h.xo_get_server_id(store=True)
-        wait_for(h.xo_server_connected, timeout_secs=10)
+            h.xo_get_server_id()
+        wait_for(h.xo_server_connected)
     yield hosts
     # teardown
     for h in hosts:
@@ -437,6 +437,12 @@ def hostB1(hosts: list[Host]) -> Generator[Host, None, None]:
     _hostB1 = hosts[1]
     logging.info(">>> hostB1 present: %s" % _hostB1)
     yield _hostB1
+
+@pytest.fixture(scope='session')
+def fail_with_v9(host: Host) -> None:
+    version_str = "8.99"
+    if not host.xcp_version < version.parse(version_str):
+        pytest.xfail("This test is failing with XCP-ng v9 host")
 
 @pytest.fixture(scope='session')
 def host_at_least_8_3(host: Host) -> None:
