@@ -34,12 +34,29 @@ def guest_queue_count(vm: VM, device: str) -> int:
     """Number of hardware queues of the device, as seen by the guest block layer."""
     return len(vm.ssh(f'ls /sys/block/{device}/mq').split())
 
+def set_guest_scheduler(vm: VM, device: str, scheduler: str | None) -> None:
+    """Select the I/O scheduler of the device in the guest, if one is given."""
+    if not scheduler:
+        return
+    # the guest kernel chooses mq-deadline with a single queue, none with several: the request merges
+    # differ, so does the size of the requests tapdisk gets
+    scheduler_file = f'/sys/block/{device}/queue/scheduler'
+    vm.ssh(f'echo {scheduler} > {scheduler_file}')
+    current = vm.ssh(f'cat {scheduler_file}')
+    assert f'[{scheduler}]' in current, \
+        f"I/O scheduler {scheduler} not selected for {device}: {current}"
+
 def write_then_read(vm: VM, device: str, size_mib: int) -> None:
     """Write random data to the device, then read it back through tapdisk."""
     vm.ssh(f'dd if=/dev/urandom of=/dev/{device} bs=1M count={size_mib} conv=fsync status=none')
     # drop the guest page cache, so that the read goes through tapdisk
     vm.ssh(f'blockdev --flushbufs /dev/{device}')
     vm.ssh(f'dd if=/dev/{device} of=/dev/null bs=1M count={size_mib} status=none')
+
+def prefill(vm: VM, device: str) -> None:
+    """Write the whole device once with fio: the benchmarks must not read unallocated blocks nor allocate them."""
+    vm.ssh(shlex.join(['fio', '--name=prefill', '--rw=write', '--bs=1M', '--iodepth=32', '--direct=1',
+                       '--ioengine=libaio', f'--filename=/dev/{device}', '--size=100%']))
 
 def assert_tapdisk_io(host: Host, pid: int, minor: int, size_mib: int) -> None:
     """Check that tapdisk served at least size_mib MiB of reads and of writes."""
