@@ -185,9 +185,12 @@ class VBDConnector:
     Must stay equivalent to connect-vbd.sh from blktap-tools, except where noted.
     """
 
-    def __init__(self, host: Host) -> None:
+    def __init__(self, host: Host, polling_duration_usecs: int = 8000, polling_idle_threshold: int = 50) -> None:
         self.host = host
         self.tapctl = TapCtl(host)
+        # default XCP-ng polling values (same as connect-vbd.sh): 8 ms, while dom0 is at least 50% idle
+        self.polling_duration_usecs = polling_duration_usecs
+        self.polling_idle_threshold = polling_idle_threshold
         # the backend side, in the XenStore tree of dom0: the frontend side goes through the VM helpers
         self.xenstore = XenStoreHelper(host)
         # (VM uuid, device) -> (pid, minor) of the tapdisks created by connect(), so that
@@ -284,9 +287,8 @@ class VBDConnector:
         self.xenstore.write(f"{backend}/dev", device)
         self.xenstore.write(f"{backend}/mode", mode)
         self.xenstore.write(f"{backend}/device-type", "disk")
-        # default XCP-ng polling values (same as connect-vbd.sh)
-        self.xenstore.write(f"{backend}/polling-duration", "8000")  # 8 ms
-        self.xenstore.write(f"{backend}/polling-idle-threshold", "50")  # 50%
+        self.xenstore.write(f"{backend}/polling-duration", str(self.polling_duration_usecs))
+        self.xenstore.write(f"{backend}/polling-idle-threshold", str(self.polling_idle_threshold))
         self.xenstore.write(f"{backend}/max-ring-page-order", "3")
         # multi-queue-max-queues is not written here: tapback advertises it when the
         # tapdisk driver supports multi-queue (commented out in connect-vbd.sh too)
