@@ -8,7 +8,7 @@ import time
 
 from lib import config
 from lib.blktap import TapCtl, VBDConnector
-from lib.common import PackageManagerEnum, wait_for
+from lib.common import wait_for
 from lib.host import Host
 from lib.vm import VM
 from tests.storage.blktap import (
@@ -18,8 +18,6 @@ from tests.storage.blktap import (
     wait_for_guest_reads,
     wait_for_tapdisk_exit,
 )
-
-from typing import assert_never
 
 # Destroy tapdisks while the guest does I/O on their VBD (equivalent to test-hotunplug.sh from
 # blktap-tools).
@@ -32,31 +30,6 @@ from typing import assert_never
 # Requirements:
 # - an XCP-ng host with blktap and tapback
 # - a small unix VM, with internet access to install fio
-
-@pytest.fixture
-def vm_with_fio(vm_with_vcpu_count: VM) -> VM:
-    """The (halted) VM of vm_with_vcpu_count, started, with fio."""
-    vm = vm_with_vcpu_count
-    vm.start()
-    vm.wait_for_vm_running_and_ssh_up()
-    package_manager = vm.detect_package_manager()
-    match package_manager:
-        case PackageManagerEnum.APK:
-            vm.ssh('apk add fio')
-        case PackageManagerEnum.APT_GET:
-            vm.ssh('apt-get update && apt-get install -y fio')
-        case PackageManagerEnum.DNF:
-            vm.ssh('dnf install -y fio')
-        case PackageManagerEnum.YUM:
-            vm.ssh('yum install -y fio')
-        case PackageManagerEnum.ZYPPER:
-            vm.ssh('zypper --non-interactive install fio')
-        case PackageManagerEnum.UNKNOWN:
-            raise RuntimeError("Unsupported package manager: could not install fio")
-        case _:
-            assert_never(package_manager)
-    return vm
-    # no teardown: vm_with_vcpu_count destroys the VM
 
 @pytest.mark.small_vm
 @pytest.mark.unix_vm
