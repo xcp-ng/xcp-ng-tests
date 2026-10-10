@@ -164,6 +164,57 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=10,
         help="Number of tapdisks destroyed during guest I/O by the blktap hot-unplug test."
     )
+    parser.addoption(
+        "--blktap-bench-outdir",
+        action="store",
+        default=None,
+        help="Local directory for the results of the blktap fio benchmark (default: a new temporary directory)."
+    )
+    parser.addoption(
+        "--blktap-bench-runtime",
+        action="store",
+        type=int,
+        default=30,
+        help="Duration, in seconds, of each fio run of the blktap fio benchmark."
+    )
+    parser.addoption(
+        "--blktap-bench-matrix",
+        action="store",
+        choices=["short", "full", "tuning", "tuning-qd64", "tuning-1M", "seq-j1", "seq-j4", "seq",
+                 "mix"],
+        default="short",
+        help="fio runs of the blktap fio benchmark: a short subset, the full matrix of blktap-bench, "
+             "or the matrices to tune tapdisk (tuning, and its QD 64 or 1M runs only) "
+             "or compare builds (seq-j1, seq-j4, or both: seq; mix: seq with 75/25 random reads/writes)."
+    )
+    parser.addoption(
+        "--blktap-bench-image-dir",
+        action="store",
+        default="/tmp",
+        help="dom0 directory of the image of the blktap fio benchmark (e.g. a filesystem on a ramdisk)."
+    )
+    parser.addoption(
+        "--blktap-bench-image-size",
+        action="store",
+        type=int,
+        default=4096,
+        help="Size, in MiB, of the image of the blktap fio benchmark."
+    )
+    parser.addoption(
+        "--blktap-polling-duration",
+        action="store",
+        type=int,
+        default=None,
+        help="polling-duration (us) of the VBDs connected by the blktap tests (default: the XCP-ng one)."
+    )
+    parser.addoption(
+        "--blktap-polling-idle-threshold",
+        action="store",
+        type=int,
+        default=None,
+        help="polling-idle-threshold (%% of dom0 idle CPU) of the VBDs connected by the blktap tests "
+             "(default: the XCP-ng one)."
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -181,6 +232,13 @@ def pytest_configure(config: pytest.Config) -> None:
     global_config.write_volume_align = parse_size(write_volume_align)
     global_config.blktap_max_duration = config.getoption('--blktap-max-duration')
     global_config.blktap_destroy_iterations = config.getoption('--blktap-destroy-iterations')
+    global_config.blktap_bench_outdir = config.getoption('--blktap-bench-outdir')
+    global_config.blktap_bench_runtime = config.getoption('--blktap-bench-runtime')
+    global_config.blktap_bench_matrix = config.getoption('--blktap-bench-matrix')
+    global_config.blktap_bench_image_dir = config.getoption('--blktap-bench-image-dir')
+    global_config.blktap_bench_image_size = config.getoption('--blktap-bench-image-size')
+    global_config.blktap_polling_duration = config.getoption('--blktap-polling-duration')
+    global_config.blktap_polling_idle_threshold = config.getoption('--blktap-polling-idle-threshold')
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:

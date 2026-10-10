@@ -41,6 +41,11 @@ def write_then_read(vm: VM, device: str, size_mib: int) -> None:
     vm.ssh(f'blockdev --flushbufs /dev/{device}')
     vm.ssh(f'dd if=/dev/{device} of=/dev/null bs=1M count={size_mib} status=none')
 
+def prefill(vm: VM, device: str) -> None:
+    """Write the whole device once with fio: the benchmarks must not read unallocated blocks nor allocate them."""
+    vm.ssh(shlex.join(['fio', '--name=prefill', '--rw=write', '--bs=1M', '--iodepth=32', '--direct=1',
+                       '--ioengine=libaio', f'--filename=/dev/{device}', '--size=100%']))
+
 def assert_tapdisk_io(host: Host, pid: int, minor: int, size_mib: int) -> None:
     """Check that tapdisk served at least size_mib MiB of reads and of writes."""
     read_secs, written_secs = TapCtl(host).stats(pid, minor)['secs']  # in 512-byte sectors

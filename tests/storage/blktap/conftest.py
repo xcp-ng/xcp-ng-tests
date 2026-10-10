@@ -3,8 +3,11 @@ from __future__ import annotations
 import pytest
 
 import logging
+import tempfile
 import uuid
+from pathlib import Path
 
+from lib import config
 from lib.blktap import TapCtl, TapCtlError, VBDConnector, XenStoreHelper
 from lib.common import PackageManagerEnum
 from tests.storage.blktap import ConnectedVBD, wait_for_guest_device, wait_for_tapdisk_exit
@@ -15,13 +18,16 @@ if TYPE_CHECKING:
     from lib.host import Host
     from lib.vm import VM
 
-def _create_image(host: Host, image_format: str) -> str:
-    """Create a 100 MiB image in dom0 /tmp, return its path."""
-    path = f"/tmp/blktap-test-{uuid.uuid4()}.{image_format}"
+def _create_image(host: Host, image_format: str, size_mib: int = 100, options: str | None = None,
+                  directory: str = '/tmp') -> str:
+    """Create an image in a dom0 directory, with qemu-img options (-o) except for VHD, return its path."""
+    path = f"{directory}/blktap-test-{uuid.uuid4()}.{image_format}"
     if image_format == 'vhd':
-        host.ssh(f'vhd-util create -n {path} -s 100')
+        assert options is None, "vhd-util takes no qemu-img options"
+        host.ssh(f'vhd-util create -n {path} -s {size_mib}')
     else:
-        host.ssh(f'qemu-img create -f {image_format} {path} 100M')
+        qemu_options = f'-o {options} ' if options else ''
+        host.ssh(f'qemu-img create -f {image_format} {qemu_options}{path} {size_mib}M')
     return path
 
 @pytest.fixture
@@ -39,6 +45,28 @@ def images(request: pytest.FixtureRequest, host: Host) -> Generator[list[str], N
     paths = [_create_image(host, image_format) for _ in range(3)]
     yield [f"{image_format}:{path}" for path in paths]
     host.ssh(f"rm -f {' '.join(paths)}")
+
+def _bench_image(host: Host, image_format: str, size_mib: int) -> Generator[str, None, None]:
+    """Image like setup-qcow2.sh or setup-vhd.sh (qcow2 metadata preallocated), in --blktap-bench-image-dir."""
+    options = 'preallocation=metadata' if image_format == 'qcow2' else None
+    path = _create_image(host, image_format, size_mib=size_mib, options=options,
+                         directory=config.blktap_bench_image_dir)
+    yield f"{image_format}:{path}"
+    host.ssh(f'rm -f {path}')
+
+@pytest.fixture
+def bench_image(request: pytest.FixtureRequest, host: Host) -> Generator[str, None, None]:
+    """Image of the fio benchmark, format by indirect param."""
+    # 4 GiB by default rather than the 10 GiB of blktap-bench: dom0 /tmp is on the small root filesystem
+    yield from _bench_image(host, request.param, config.blktap_bench_image_size)
+
+@pytest.fixture
+def bench_outdir(bench_image: str) -> Path:
+    """<--blktap-bench-outdir>/<image format>, or the same in a new temporary directory, kept after the test."""
+    base = Path(config.blktap_bench_outdir or tempfile.mkdtemp(prefix='blktap-bench-'))
+    outdir = base / bench_image.split(':')[0]
+    outdir.mkdir(parents=True, exist_ok=True)
+    return outdir
 
 class TrackingTapCtl(TapCtl):
     """TapCtl remembering what it set up, to undo at teardown what the test left behind."""
@@ -121,8 +149,8 @@ def tapctl(host: Host) -> Generator[TapCtl, None, None]:
 class TrackingVBDConnector(VBDConnector):
     """VBDConnector remembering what is still connected, to clean it up at teardown."""
 
-    def __init__(self, host: Host):
-        super().__init__(host)
+    def __init__(self, host: Host, **polling: int):
+        super().__init__(host, **polling)
         # (VM uuid, device) -> (VM, "connect" (tapdisk owned) or "attach" (tapdisk not owned))
         self.tracked: dict[tuple[str, str], tuple[VM, str]] = {}
 
@@ -159,8 +187,13 @@ class TrackingVBDConnector(VBDConnector):
 
 @pytest.fixture
 def vbd_connector(host: Host) -> Generator[VBDConnector, None, None]:
-    """VBDConnector disconnecting at teardown what the test left connected."""
-    conn = TrackingVBDConnector(host)
+    """VBDConnector disconnecting at teardown what the test left connected, with the --blktap-polling-* values."""
+    polling = {}
+    if config.blktap_polling_duration is not None:
+        polling['polling_duration_usecs'] = config.blktap_polling_duration
+    if config.blktap_polling_idle_threshold is not None:
+        polling['polling_idle_threshold'] = config.blktap_polling_idle_threshold
+    conn = TrackingVBDConnector(host, **polling)
     yield conn
     conn.cleanup()
 
