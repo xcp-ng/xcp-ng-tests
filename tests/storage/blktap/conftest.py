@@ -6,9 +6,10 @@ import logging
 import uuid
 
 from lib.blktap import TapCtl, TapCtlError, VBDConnector, XenStoreHelper
+from lib.common import PackageManagerEnum
 from tests.storage.blktap import ConnectedVBD, wait_for_guest_device, wait_for_tapdisk_exit
 
-from typing import TYPE_CHECKING, Callable, Generator
+from typing import TYPE_CHECKING, Callable, Generator, assert_never
 
 if TYPE_CHECKING:
     from lib.host import Host
@@ -166,6 +167,31 @@ def vbd_connector(host: Host) -> Generator[VBDConnector, None, None]:
 @pytest.fixture
 def xenstore(host: Host) -> XenStoreHelper:
     return XenStoreHelper(host)
+
+@pytest.fixture
+def vm_with_fio(vm_with_vcpu_count: VM) -> VM:
+    """The (halted) VM of vm_with_vcpu_count, started, with fio."""
+    vm = vm_with_vcpu_count
+    vm.start()
+    vm.wait_for_vm_running_and_ssh_up()
+    package_manager = vm.detect_package_manager()
+    match package_manager:
+        case PackageManagerEnum.APK:
+            vm.ssh('apk add fio')
+        case PackageManagerEnum.APT_GET:
+            vm.ssh('apt-get update && apt-get install -y fio')
+        case PackageManagerEnum.DNF:
+            vm.ssh('dnf install -y fio')
+        case PackageManagerEnum.YUM:
+            vm.ssh('yum install -y fio')
+        case PackageManagerEnum.ZYPPER:
+            vm.ssh('zypper --non-interactive install fio')
+        case PackageManagerEnum.UNKNOWN:
+            raise RuntimeError("Unsupported package manager: could not install fio")
+        case _:
+            assert_never(package_manager)
+    return vm
+    # no teardown: vm_with_vcpu_count destroys the VM
 
 @pytest.fixture
 def connected_vbd(image: str, vbd_connector: VBDConnector, running_vm: VM) -> ConnectedVBD:
