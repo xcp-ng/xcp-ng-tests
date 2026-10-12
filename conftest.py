@@ -33,6 +33,7 @@ from lib.common import (
     wait_for,
 )
 from lib.host import Host
+from lib.logger import ColoredFormatter
 from lib.netutil import is_ipv6
 from lib.pool import Pool
 from lib.sr import SR
@@ -154,10 +155,65 @@ def pytest_addoption(parser: pytest.Parser) -> None:
              " Those are indexes starting from 1 (pool master).",
     )
 
+def _teardown_trace_dir() -> str | None:
+    """Directory where the teardown trace is written, or None to disable it.
+
+    Jenkins deletes the stdout of an aborted durable task after 20s
+    (DurableTaskStep.Execution.stop), so a teardown that outlives the step is
+    only visible through this file. The Jenkinsfile tails it in a post {} block,
+    using teardown.pid to know when to stop and teardown.offset to know where
+    the trace starts.
+    """
+    override = os.environ.get('XCP_TEARDOWN_TRACE_DIR')
+    if override:
+        return override
+    if not (os.environ.get('JENKINS_URL') or os.environ.get('BUILD_ID')):
+        return None
+    return os.environ.get('WORKSPACE') or None
+
+_teardown_trace: dict[str, str] = {}
+
+def _setup_teardown_trace() -> None:
+    trace_dir = _teardown_trace_dir()
+    if trace_dir is None:
+        return
+    _teardown_trace['log'] = os.path.join(trace_dir, 'teardown.log')
+    _teardown_trace['offset'] = os.path.join(trace_dir, 'teardown.offset')
+    with open(os.path.join(trace_dir, 'teardown.pid'), 'w') as f:
+        f.write(f"{os.getpid()}\n")
+    handler = logging.FileHandler(_teardown_trace['log'], mode='w', encoding='utf-8')
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(ColoredFormatter(
+        fmt='%(asctime)s.%(msecs)03d %(levelname)s %(message)s', datefmt='%b %d %H:%M:%S'
+    ))
+    logging.getLogger().addHandler(handler)
+
+def _record_teardown_trace_offset() -> None:
+    """Mark where the trace starts.
+
+    Whatever was logged before that point was already printed by Jenkins before
+    it aborted, so the Jenkinsfile starts tailing from there instead of
+    repeating the whole file.
+    """
+    log_path = _teardown_trace.get('log')
+    if log_path is None:
+        return
+    try:
+        offset = os.path.getsize(log_path)
+        with open(_teardown_trace['offset'], 'w') as f:
+            f.write(f"{offset}\n")
+    except OSError:
+        pass
+
 def pytest_configure(config: pytest.Config) -> None:
     # Debug which signals the CI sends us: the first SIGINT/SIGTERM/SIGHUP is
     # forwarded to the default SIGINT handler, any subsequent one is only logged.
     sigint_handler = signal.getsignal(signal.SIGINT)
+    if not callable(sigint_handler):
+        # SIGINT was ignored (SIG_IGN is inherited when the process is started in
+        # the background by a non-interactive shell). Copying that to SIGTERM
+        # would make the CI abort a no-op, so fall back to Python's default.
+        sigint_handler = signal.default_int_handler
     state = {"handled": False}
 
     def signal_handler(signum: int, frame: FrameType | None) -> None:
@@ -166,16 +222,18 @@ def pytest_configure(config: pytest.Config) -> None:
         except ValueError:
             signame = str(signum)
         logging.getLogger().warning("received %s (pid %s)", signame, os.getpid())
+        _record_teardown_trace_offset()
         if state["handled"]:
             return
         state["handled"] = True
-        assert callable(sigint_handler)
         sigint_handler(signum, frame)
 
     for signame in ("SIGINT", "SIGTERM", "SIGHUP"):
         signum = getattr(signal, signame, None)
         if signum is not None:
             signal.signal(signum, signal_handler)
+
+    _setup_teardown_trace()
 
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
