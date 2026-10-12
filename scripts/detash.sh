@@ -81,6 +81,24 @@ list_()
 }
 
 
+on_term_()  # Forward SIGTERM to the cmdline running in the screen session
+{
+    ! $trace || set -x # Restore trace when debuging
+    local reason="${1:-TERM}"
+    local pid screen_pid=""
+    for pid in $(pgrep -f -- "-S ${DETASH_NAME}" ||:) ; do
+        [ "$$" != "$pid" ] || continue  # Never signal ourselves
+        case "$(ps -o comm= -p "$pid" ||:)" in
+            SCREEN | screen) screen_pid="$pid" ; break ;;
+        esac
+    done
+    echo "info: on_term_: reason=${reason}, screen_pid=${screen_pid:-none}"
+    [ ! -z "$screen_pid" ] || return 0  # Nothing running, run_ loop will quit
+    pkill -TERM -P "$screen_pid" ||:  # Forward TERM, screen left alive
+    return 0
+}
+
+
 on_quit_()
 {
     ! $trace || set -x # Restore trace when debuging
@@ -147,7 +165,7 @@ EOF
 
     echo -e "${purplecol}================================================================================${defcol}\n"
 
-    trap "on_quit_ TERM" TERM  # Default handler for liberating resources
+    trap on_term_ TERM  # Forward SIGTERM to cmdline, run_ loop will quit
     touch "$logfile"
 
     status=255  # Default error (when screen finish before cmdline)
