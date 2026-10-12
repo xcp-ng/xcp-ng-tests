@@ -6,6 +6,7 @@ import dataclasses
 import itertools
 import logging
 import os
+import pdb
 import signal
 import tempfile
 from argparse import Action, ArgumentParser, Namespace
@@ -205,6 +206,37 @@ def _record_teardown_trace_offset() -> None:
     except OSError:
         pass
 
+# The debugger instance currently sitting at its prompt, if any.
+_pdb_session: dict[str, pdb.Pdb] = {}
+
+def pytest_enter_pdb(config: pytest.Config, pdb: pdb.Pdb) -> None:
+    _pdb_session['pdb'] = pdb
+
+def pytest_leave_pdb(config: pytest.Config, pdb: pdb.Pdb) -> None:
+    _pdb_session.pop('pdb', None)
+
+def _quit_pdb_prompt(pdb: pdb.Pdb) -> bool:
+    """Make an open debugger prompt return, as if the user had hit Ctrl-D.
+
+    IPython's TerminalPdb (see --pdbcls in pytest.ini) runs its prompt on a
+    worker thread, so a signal delivered to the main thread would never reach
+    it. The exit has to be scheduled onto the prompt's own event loop, hence the
+    chain PromptSession -> Application and the lambda wrapper (call_soon_threadsafe
+    only forwards positional arguments).
+
+    Returns False when there is no prompt we know how to unstick.
+    """
+    app = getattr(getattr(pdb, 'pt_app', None), 'app', None)
+    loop = getattr(app, 'loop', None)
+    exit_prompt = getattr(app, 'exit', None)
+    if loop is None or exit_prompt is None:
+        return False
+    try:
+        loop.call_soon_threadsafe(lambda: exit_prompt(exception=EOFError))
+    except RuntimeError:
+        return False
+    return True
+
 def pytest_configure(config: pytest.Config) -> None:
     # Debug which signals the CI sends us: the first SIGINT/SIGTERM/SIGHUP is
     # forwarded to the default SIGINT handler, any subsequent one is only logged.
@@ -226,6 +258,20 @@ def pytest_configure(config: pytest.Config) -> None:
         if state["handled"]:
             return
         state["handled"] = True
+
+        if signum == signal.SIGTERM:
+            # A CI abort must not end up at an interactive prompt: with --pdb
+            # enabled, the KeyboardInterrupt below would open one, where nobody
+            # is there to leave it. Dropping the plugin makes that impossible.
+            if config.pluginmanager.has_plugin('pdbinvoke'):
+                config.pluginmanager.unregister(name='pdbinvoke')
+            # If a prompt is already open (a test failed and --pdb left it
+            # waiting), leave it the way Ctrl-D would: the exception below then
+            # unwinds the test and pytest still runs the fixture teardowns.
+            pdb = _pdb_session.get('pdb')
+            if pdb is not None and _quit_pdb_prompt(pdb):
+                return
+
         sigint_handler(signum, frame)
 
     for signame in ("SIGINT", "SIGTERM", "SIGHUP"):
