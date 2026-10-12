@@ -23,6 +23,22 @@ logfile="${tmpdir}/screenlog.tmp"
 
 trace=$(echo $- | grep "x" > /dev/null && echo true || echo false)
 
+# Debug trace: stderr reaches the job log directly, while screen content reaches
+# it a second time via the `tail -f` below. Keeping it on stderr means a
+# DETASHDBG line seen once came from here, seen twice came from the screen.
+# Written outside $tmpdir, which on_quit_ removes before the script exits.
+dbgfile="${TMPDIR:-/tmp}/detash-debug.$$.log"
+dbg_()
+{
+    local line
+    line="$(date +%H:%M:%S.%3N) DETASHDBG[$$] $*"
+    printf '%s\n' "${line}" >&2
+    printf '%s\n' "${line}" >> "${dbgfile}" 2>/dev/null ||:
+}
+dbg_ "start $0 args: $*"
+dbg_ "tmpdir=${tmpdir} logfile=${logfile} dbgfile=${dbgfile} DETASH_NAME=${DETASH_NAME}"
+dbg_ "ancestry: $(ps -o pid=,ppid=,comm= -p $$ --ppid $$ --forest 2>/dev/null | tr -s ' ' | tr '\n' '|')"
+
 
 usage_()
 {
@@ -86,6 +102,8 @@ on_term_()  # Forward SIGTERM to the cmdline running in the screen session
     ! $trace || set -x # Restore trace when debuging
     local reason="${1:-TERM}"
     local pid screen_pid=""
+    dbg_ "on_term_ enter reason=${reason}"
+    dbg_ "on_term_ pgrep -f -- -S '${DETASH_NAME}' => [$(pgrep -af -- "-S ${DETASH_NAME}" 2>&1 | tr '\n' '|')]"
     for pid in $(pgrep -f -- "-S ${DETASH_NAME}" ||:) ; do
         [ "$$" != "$pid" ] || continue  # Never signal ourselves
         case "$(ps -o comm= -p "$pid" ||:)" in
@@ -93,8 +111,14 @@ on_term_()  # Forward SIGTERM to the cmdline running in the screen session
         esac
     done
     echo "info: on_term_: reason=${reason}, screen_pid=${screen_pid:-none}"
-    [ ! -z "$screen_pid" ] || return 0  # Nothing running, run_ loop will quit
-    pkill -TERM -P "$screen_pid" ||:  # Forward TERM, screen left alive
+    dbg_ "on_term_ resolved screen_pid=${screen_pid:-none}"
+    if [ ! -z "$screen_pid" ]; then
+        dbg_ "on_term_ children of screen_pid: [$(pgrep -P "$screen_pid" 2>&1 | tr '\n' '|')]"
+        pkill -TERM -P "$screen_pid" ||:  # Forward TERM, screen left alive
+        dbg_ "on_term_ pkill -TERM -P ${screen_pid} done, return"
+    else
+        dbg_ "on_term_ nothing to forward to, return"
+    fi
     return 0
 }
 
@@ -107,6 +131,9 @@ on_quit_()
     local pid=$$
     local status=255
     echo "info: on_quit_: reason=$reason, pid=$$"
+    dbg_ "on_quit_ enter reason=${reason} pid=${pid} statusfile=$(cat "$statusfile" 2>/dev/null || echo unreadable)"
+    dbg_ "on_quit_ screen -ls => [$(screen -ls 2>&1 | tr '\n' '|')]"
+    dbg_ "on_quit_ DETASH_ON_QUIT=${DETASH_ON_QUIT:-<unset>}"
     screen -ls ||:
     echo "info: Type DETASH_ON_QUIT=${DETASH_ON_QUIT} if defined before quitting screen"
     if [ ! -z "${DETASH_ON_QUIT}" ] ; then
@@ -129,10 +156,12 @@ on_quit_()
     jobs=$(jobs -p ||:)  # Subshell running in background
     [ -z "$jobs" ] || jobs=$(pgrep -P "$jobs" ||:)  # Processes of subshell
     [ -z "$jobs" ] || kill "${jobs}"  # Terminate procs if any (tail)
+    dbg_ "on_quit_ killed background jobs: [${jobs:-none}]"
 
     rm -rf "${tmpdir}/"*".tmp" && rmdir "${tmpdir}"  # Comment to debug
 
     echo "info: Exiting: status=${status}, pid=$$"
+    dbg_ "on_quit_ exit 0${status} (exit code will be $((0${status})))"
     exit "0${status}"
 }
 
@@ -165,7 +194,8 @@ EOF
 
     echo -e "${purplecol}================================================================================${defcol}\n"
 
-    trap on_term_ TERM  # Forward SIGTERM to cmdline, run_ loop will quit
+    dbg_ "run_ arming trap: GOT-TERM is logged here before delegating to on_term_"
+    trap 'dbg_ "GOT-TERM (trap fired, deferring to on_term_)"; on_term_' TERM  # Forward SIGTERM to cmdline, run_ loop will quit
     touch "$logfile"
 
     status=255  # Default error (when screen finish before cmdline)
@@ -179,17 +209,37 @@ EOF
     screen -d -m \
            -S "${DETASH_NAME}" \
            -- bash -x -o pipefail -c "$cmdline"  # Run in bg, blocked by tail
+    dbg_ "run_ screen -d -m launched, name='${DETASH_NAME}'"
 
     sleep 1
     { tail -f "$logfile" || echo "info: log no more displayed [$?] $logfile" ; } &
 
     set +x  # Hide trace to prevent noise in tail
+    local prev_rc=0 iter=0 t0 t1
     while true ; do
-        sync
+        # bash only runs traps *between* commands, so a signal arriving while we
+        # sit in one of these is deferred until it returns. Time them and report
+        # anything slow, since that is where a deferred trap goes to hide.
+        t0=$(date +%s%3N); sync; t1=$(date +%s%3N)
+        [ $((t1-t0)) -lt 500 ] || dbg_ "run_ SLOW sync took $((t1-t0))ms (trap would be deferred here)"
         sleep 1 ||: # "Wait and cooperative exit" (WCE)
-        screen -ls "${DETASH_NAME}" > /dev/null 2>&1 || break;  # C-a \ shortcut
+        t0=$(date +%s%3N)
+        screen -ls "${DETASH_NAME}" > /dev/null 2>&1; rc=$?
+        t1=$(date +%s%3N)
+        [ $((t1-t0)) -lt 500 ] || dbg_ "run_ SLOW screen -ls took $((t1-t0))ms (trap would be deferred here)"
+        [ "$rc" == "$prev_rc" ] || dbg_ "run_ screen -ls rc changed ${prev_rc} -> ${rc}"
+        prev_rc=$rc
+        iter=$((iter+1))
+        [ $((iter % 30)) != 0 ] || dbg_ "run_ heartbeat iter=${iter} screen -ls rc=${rc}"
+        [ "$rc" == 0 ] && continue
+        # Session is gone: capture exactly what we can still see about who did it.
+        dbg_ "run_ session gone at iter=${iter}; screen -ls => [$(screen -ls 2>&1 | tr '\n' '|')]"
+        dbg_ "run_ pgrep -af -- -S '${DETASH_NAME}' => [$(pgrep -af -- "-S ${DETASH_NAME}" 2>&1 | tr '\n' '|')]"
+        dbg_ "run_ statusfile => [$(cat "$statusfile" 2>/dev/null || echo unreadable)]"
+        break;  # C-a \ shortcut
     done
 
+    dbg_ "run_ loop exited after ${iter} iterations"
     on_quit_ "OVER"
 }
 

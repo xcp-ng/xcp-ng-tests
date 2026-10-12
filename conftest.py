@@ -9,6 +9,7 @@ import os
 import pdb
 import signal
 import tempfile
+import time
 from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
 from types import FrameType
@@ -209,11 +210,38 @@ def _record_teardown_trace_offset() -> None:
 # The debugger instance currently sitting at its prompt, if any.
 _pdb_session: dict[str, pdb.Pdb] = {}
 
+# Where we are in the process tree, for the SIGDBG trace. Under CI this is
+# "pytest <- teetty <- screen <- systemd": screen reparents to init, so pytest is
+# NOT a descendant of the shell Jenkins launched, and Jenkins reaches it only
+# through the JENKINS_NODE_COOKIE env var scan, never through the tree walk.
+_sigdbg_started = time.monotonic()
+
+def _sigdbg(msg: str) -> None:
+    logging.getLogger().warning(f"SIGDBG t+{time.monotonic() - _sigdbg_started:7.3f}s {msg}")
+
+def _ancestry() -> str:
+    parts = []
+    pid = os.getpid()
+    for _ in range(10):
+        try:
+            with open(f"/proc/{pid}/stat") as f:
+                fields = f.read().rsplit(')', 1)[1].split()
+        except (OSError, IndexError):
+            break
+        ppid, pgrp, sid = int(fields[1]), int(fields[2]), int(fields[3])
+        parts.append(f"{pid}(pgid={pgrp},sid={sid})")
+        if ppid <= 1:
+            break
+        pid = ppid
+    return " <- ".join(parts)
+
 def pytest_enter_pdb(config: pytest.Config, pdb: pdb.Pdb) -> None:
     _pdb_session['pdb'] = pdb
+    _sigdbg(f"enter_pdb {type(pdb).__name__} has_pt_app={hasattr(pdb, 'pt_app')}")
 
 def pytest_leave_pdb(config: pytest.Config, pdb: pdb.Pdb) -> None:
     _pdb_session.pop('pdb', None)
+    _sigdbg("leave_pdb")
 
 def _quit_pdb_prompt(pdb: pdb.Pdb) -> bool:
     """Make an open debugger prompt return, as if the user had hit Ctrl-D.
@@ -254,8 +282,12 @@ def pytest_configure(config: pytest.Config) -> None:
         except ValueError:
             signame = str(signum)
         logging.getLogger().warning("received %s (pid %s)", signame, os.getpid())
+        _sigdbg(f"signal {signame}({signum}) first={not state['handled']} "
+                f"in_pdb={'pdb' in _pdb_session} "
+                f"pdbinvoke={config.pluginmanager.has_plugin('pdbinvoke')}")
         _record_teardown_trace_offset()
         if state["handled"]:
+            _sigdbg("  branch=repeat-log-only")
             return
         state["handled"] = True
 
@@ -265,19 +297,32 @@ def pytest_configure(config: pytest.Config) -> None:
             # is there to leave it. Dropping the plugin makes that impossible.
             if config.pluginmanager.has_plugin('pdbinvoke'):
                 config.pluginmanager.unregister(name='pdbinvoke')
+                _sigdbg("  branch=unregistered-pdbinvoke")
+            else:
+                _sigdbg("  pdbinvoke already absent")
             # If a prompt is already open (a test failed and --pdb left it
             # waiting), leave it the way Ctrl-D would: the exception below then
             # unwinds the test and pytest still runs the fixture teardowns.
             pdb = _pdb_session.get('pdb')
             if pdb is not None and _quit_pdb_prompt(pdb):
+                _sigdbg("  branch=quit-prompt")
                 return
+            if pdb is None:
+                _sigdbg("  no pdb prompt open")
+        else:
+            _sigdbg("  not SIGTERM, no pdb handling")
 
+        _sigdbg("  branch=delegate-to-sigint-handler")
         sigint_handler(signum, frame)
 
     for signame in ("SIGINT", "SIGTERM", "SIGHUP"):
         signum = getattr(signal, signame, None)
         if signum is not None:
             signal.signal(signum, signal_handler)
+
+    _sigdbg(f"ancestry: {_ancestry()}")
+    installed = [s for s in ('SIGINT', 'SIGTERM', 'SIGHUP') if getattr(signal, s, None) is not None]
+    _sigdbg(f"handlers installed for {installed}")
 
     _setup_teardown_trace()
 
@@ -431,6 +476,9 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int | pytest.ExitC
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED \
             and session.config.getoption("--no-fail-if-no-tests"):
         session.exitstatus = pytest.ExitCode.OK
+    _sigdbg(f"sessionfinish exitstatus={exitstatus} "
+            f"adjusted={session.exitstatus} "
+            f"elapsed={time.monotonic() - _sigdbg_started:.3f}s")
 
 
 # fixtures
