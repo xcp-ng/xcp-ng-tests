@@ -10,6 +10,7 @@ import signal
 import tempfile
 from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
+from types import FrameType
 
 import git
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
@@ -154,9 +155,27 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 def pytest_configure(config: pytest.Config) -> None:
-    # Treat SIGTERM the same as SIGINT
+    # Debug which signals the CI sends us: the first SIGINT/SIGTERM/SIGHUP is
+    # forwarded to the default SIGINT handler, any subsequent one is only logged.
     sigint_handler = signal.getsignal(signal.SIGINT)
-    signal.signal(signal.SIGTERM, sigint_handler)
+    state = {"handled": False}
+
+    def signal_handler(signum: int, frame: FrameType | None) -> None:
+        try:
+            signame = signal.Signals(signum).name
+        except ValueError:
+            signame = str(signum)
+        logging.getLogger().warning("received %s (pid %s)", signame, os.getpid())
+        if state["handled"]:
+            return
+        state["handled"] = True
+        assert callable(sigint_handler)
+        sigint_handler(signum, frame)
+
+    for signame in ("SIGINT", "SIGTERM", "SIGHUP"):
+        signum = getattr(signal, signame, None)
+        if signum is not None:
+            signal.signal(signum, signal_handler)
 
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
