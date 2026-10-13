@@ -5,6 +5,7 @@ from .storage import (
     XVACompression,
     coalesce_integrity,
     cold_migration_then_come_back,
+    copy_vdi_via_nbd,
     full_vdi_write,
     install_randstream,
     live_storage_migration_then_come_back,
