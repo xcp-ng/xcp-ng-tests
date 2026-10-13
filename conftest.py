@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
 from packaging import version
 
 import lib.config as global_config
-from lib import pxe
+from lib import jenkins, pxe
 from lib.common import (
     Defer,
     DiskDevName,
@@ -166,6 +166,9 @@ def pytest_configure(config: pytest.Config) -> None:
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
+    if jenkins.enabled():
+        # Clean abort of the job: see lib/jenkins.py
+        config.pluginmanager.register(jenkins.AbortHandler(config), "jenkins_abort")
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
