@@ -1,0 +1,93 @@
+18:23:40 t+   0.626s [61958] ======================================================================
+18:23:40 t+   0.626s [61958] probe start, cmdline=61958: /home/vates/workspace/VML tests/.venv/bin/python /home/vates/workspace/VML tests/.venv/bin/pytest tests -m flaky -k (not glusterfs) and (debug_jenkins) --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug -p jenkins_probe 
+18:23:40 t+   0.626s [61958] pid=61958 ppid=61954 pgid=5219 sid=5219
+18:23:40 t+   0.626s [61958] isatty: 0=False 1=False 2=False
+18:23:40 t+   0.626s [61958] fds: 0=/dev/null 1=/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt 2=/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt
+18:23:40 t+   0.626s [61958] env JENKINS_URL='https://jenkins2.lyon.vates.team/'
+18:23:40 t+   0.626s [61958] env BUILD_TAG='jenkins-VML tests-33'
+18:23:40 t+   0.626s [61958] env BUILD_ID='33'
+18:23:40 t+   0.626s [61958] env JENKINS_NODE_COOKIE='312c4374-150c-44a0-8ac2-f0852ab15c10'
+18:23:40 t+   0.626s [61958] env JENKINS_SERVER_COOKIE='durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6'
+18:23:40 t+   0.626s [61958] env WORKSPACE='/home/vates/workspace/VML tests'
+18:23:40 t+   0.626s [61958] env STY=None
+18:23:40 t+   0.626s [61958] env TERM=None
+18:23:40 t+   0.626s [61958] env DEBUG='false'
+18:23:40 t+   0.627s [61958] ancestors: [(61954, 'sh'), (61950, 'sh')]
+18:23:40 t+   0.649s [61958] process tree (sessions [5219]):
+    PID    PPID    PGID     SID TT       STAT CMD
+   5219    5130    5219    5219 ?        Ssl  java -jar remoting.jar -workDir /home/vates -jar-cache /home/vates/remoting/jarCache
+  61950       1    5219    5219 ?        S    sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-f54edd7a' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt' 2>&1; echo $? > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt'; wait) >&- 2>&- &
+  61953   61950    5219    5219 ?        S     \_ sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-f54edd7a' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt' 2>&1; echo $? > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt'; wait) >&- 2>&- &
+  61956   61953    5219    5219 ?        S     |   \_ sleep 3
+  61954   61950    5219    5219 ?        S     \_ sh -xe /home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy
+  61958   61954    5219    5219 ?        S         \_ /home/vates/workspace/VML tests/.venv/bin/python /home/vates/workspace/VML tests/.venv/bin/pytest tests -m flaky -k (not glusterfs) and (debug_jenkins) --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug -p jenkins_probe
+  61974   61958    5219    5219 ?        R             \_ ps --forest -o pid,ppid,pgid,sid,tty,stat,cmd -s 5219
+  61896       1    5219    5219 ?        S    sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/output.txt' 2> '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; echo $? > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt'; wait) >&- 2>&- &
+  61899   61896    5219    5219 ?        S     \_ sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/output.txt' 2> '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; echo $? > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt'; wait) >&- 2>&- &
+  61902   61899    5219    5219 ?        S         \_ sleep 3
+
+18:23:40 t+   0.662s [61958] screen -ls:
+No Sockets found in /run/screen/S-vates.
+
+
+18:23:40 t+   0.663s [61958] handlers installed; SIGPIPE disposition=1
+18:23:43 t+   2.774s [61958] phase -> setup:test_debug_jenkins
+18:23:43 t+   3.301s [61958] logging INFO: [10.1.15.29] Wait for XAPI to complete initialization
+18:23:43 t+   3.540s [61958] logging INFO: Getting Pool info for '10.1.15.29'
+18:23:45 t+   4.930s [61958] phase setup:test_debug_jenkins done
+18:23:45 t+   4.931s [61958] phase -> call:test_debug_jenkins
+18:23:45 t+   4.931s [61958] logging INFO: Sleep 1 minute
+18:23:51 t+  11.110s [61958] SIGNAL SIGTERM #1 phase=call:test_debug_jenkins in_pdb=False ancestors_alive=[61954, 61950]
+18:23:51 t+  11.111s [61958] redirected fds 0/1/2 and pytest saved fds [5, 7, 9] to pytest.log
+18:23:51 t+  11.111s [61958] abort outside teardown: KeyboardInterrupt
+18:23:51 t+  11.111s [61958] phase call:test_debug_jenkins done
+18:23:51 t+  11.719s [61958] sessionfinish exitstatus=<ExitCode.INTERRUPTED: 2>
+18:23:51 t+  11.720s [61958] logging INFO: [00/60] before cleanup
+18:23:52 t+  12.721s [61958] logging INFO: [01/60] before cleanup
+18:23:52 t+  12.726s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=2.68s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:53 t+  13.722s [61958] logging INFO: [02/60] before cleanup
+18:23:54 t+  14.722s [61958] logging INFO: [03/60] before cleanup
+18:23:54 t+  14.730s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.01s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:55 t+  15.723s [61958] logging INFO: [04/60] before cleanup
+18:23:56 t+  16.397s [61958] SIGNAL SIGTERM #2 phase=sessionfinish in_pdb=False ancestors_alive=[]
+18:23:56 t+  16.397s [61958] already aborted: ignored
+18:23:56 t+  16.532s [61958] ANCESTOR GONE pid=61954 comm=sh
+18:23:56 t+  16.724s [61958] logging INFO: [05/60] before cleanup
+18:23:56 t+  16.732s [61958] ANCESTOR GONE pid=61950 comm=sh
+18:23:56 t+  16.733s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.01s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:57 t+  17.724s [61958] logging INFO: [06/60] before cleanup
+18:23:58 t+  18.725s [61958] logging INFO: [07/60] before cleanup
+18:23:58 t+  18.735s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:59 t+  19.726s [61958] logging INFO: [08/60] before cleanup
+18:24:00 t+  20.726s [61958] logging INFO: [09/60] before cleanup
+18:24:00 t+  20.737s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:01 t+  21.727s [61958] logging INFO: [10/60] before cleanup
+18:24:02.036146810 [post 62123] post start; pytest pid=61958 alive=yes
+18:24:02 t+  22.728s [61958] logging INFO: [11/60] before cleanup
+18:24:02 t+  22.739s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:03 t+  23.729s [61958] logging INFO: [12/60] before cleanup
+18:24:04 t+  24.729s [61958] logging INFO: [13/60] before cleanup
+18:24:04 t+  24.741s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:05 t+  25.730s [61958] logging INFO: [14/60] before cleanup
+18:24:06 t+  26.731s [61958] logging INFO: [15/60] before cleanup
+18:24:06 t+  26.744s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:07 t+  27.732s [61958] logging INFO: [16/60] before cleanup
+18:24:08 t+  28.711s [61958] SIGNAL SIGTERM #3 phase=sessionfinish in_pdb=False ancestors_alive=[]
+18:24:08 t+  28.711s [61958] already aborted: ignored
+18:24:08 t+  28.732s [61958] logging INFO: [17/60] before cleanup
+18:24:08 t+  28.746s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:09 t+  29.733s [61958] logging INFO: [18/60] before cleanup
+18:24:10 t+  30.734s [61958] logging INFO: [19/60] before cleanup
+18:24:10 t+  30.748s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.01s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:11 t+  31.734s [61958] logging INFO: [20/60] before cleanup
+18:24:12 t+  32.735s [61958] logging INFO: [21/60] before cleanup
+18:24:12 t+  32.750s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:13 t+  33.736s [61958] logging INFO: [22/60] before cleanup
+18:24:14 t+  34.737s [61958] logging INFO: [23/60] before cleanup
+18:24:14 t+  34.752s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:15.113889719 [post 62123] got SIGTERM (second abort)
+18:24:15 t+  34.873s [61958] SIGNAL SIGINT #1 phase=sessionfinish in_pdb=False ancestors_alive=[]
+18:24:15 t+  34.873s [61958] SIGINT -> KeyboardInterrupt (default behavior)
+18:24:15 t+  34.874s [61958] sessionfinish done, final exitstatus=<ExitCode.INTERRUPTED: 2>
+18:24:15 t+  34.874s [61958] unconfigure; signals seen: ['SIGTERM', 'SIGTERM', 'SIGTERM', 'SIGINT']
+18:24:15 t+  35.119s [61958] atexit; signals seen: ['SIGTERM', 'SIGTERM', 'SIGTERM', 'SIGINT']

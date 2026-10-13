@@ -1,0 +1,38 @@
+pipeline {
+    agent {
+        label 'ssh-master'
+    }
+    parameters {
+        booleanParam(
+            name: 'DEBUG',
+            defaultValue: false,
+            description: "Usage: https://git.vates.tech/jenkins-ci/ci-xcp-ng#readme")
+        string(
+            name: 'CI_BRANCH',
+            defaultValue: 'master',
+            description: "The branch to use for the ci-xcp-ng repository. Point it to the branch with your modified jenkins files.")
+    }
+    stages {
+        stage('setup') {
+            steps {
+                script {
+                    def debug_env = load('debug_env.groovy')  // Add DEBUG param
+                    debug_env.setup() // Defines prefix and suffix
+                    
+                    def test_env = load('test_env.groovy')
+                    git url: 'https://github.com/xcp-ng/xcp-ng-tests', branch: "${BRANCH}"
+                    test_env.setup()
+                }
+            }
+        }
+        stage('flaky tests') {
+            steps {
+                lock(resource:null, label: params.HOST_A1) {
+                    sh """
+                    ${env.debug_prefix} ./jobs.py run flaky "${HOST_A1}" $PYTEST_PARAMS ${env.debug_suffix}
+                    """
+                }
+            }
+        }
+    }
+}

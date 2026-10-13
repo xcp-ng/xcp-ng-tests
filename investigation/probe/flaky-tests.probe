@@ -1,0 +1,53 @@
+// Probe version of the flaky-tests job (see investigation/PLAN.md, phase 1).
+// Differences from flaky-tests.orginal:
+// - lock in the stage options, so it also covers post
+// - pytest loads the jenkins_probe plugin, which records signals and process events
+// - DEBUG uses the minimal investigation/probe/screen_run.sh instead of detash.sh
+// - post/always runs investigation/probe/post_probe.sh
+pipeline {
+    agent {
+        label 'ssh-master'
+    }
+    parameters {
+        booleanParam(
+            name: 'DEBUG',
+            defaultValue: false,
+            description: "Usage: https://git.vates.tech/jenkins-ci/ci-xcp-ng#readme")
+        string(
+            name: 'CI_BRANCH',
+            defaultValue: 'master',
+            description: "The branch to use for the ci-xcp-ng repository. Point it to the branch with your modified jenkins files.")
+    }
+    stages {
+        stage('setup') {
+            steps {
+                script {
+                    def test_env = load('test_env.groovy')
+                    git url: 'https://github.com/xcp-ng/xcp-ng-tests', branch: "${BRANCH}"
+                    test_env.setup()
+                    env.debug_prefix = params.DEBUG ? "investigation/probe/screen_run.sh probe-${env.BUILD_NUMBER}" : ""
+                    env.debug_suffix = params.DEBUG ? "--pdb" : ""
+                }
+            }
+        }
+        stage('flaky tests') {
+            options {
+                lock(resource: null, label: params.HOST_A1)
+            }
+            steps {
+                sh """
+                rm -rf .jenkins-pytest
+                export PYTHONPATH=\$PWD/investigation/probe
+                ${env.debug_prefix} ./jobs.py run flaky "${HOST_A1}" $PYTEST_PARAMS -p jenkins_probe ${env.debug_suffix}
+                """
+            }
+            post {
+                always {
+                    timeout(time: 6, unit: 'MINUTES') {
+                        sh 'investigation/probe/post_probe.sh'
+                    }
+                }
+            }
+        }
+    }
+}

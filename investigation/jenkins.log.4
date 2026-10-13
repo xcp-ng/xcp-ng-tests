@@ -1,0 +1,384 @@
+Started by user Vincent Michel
+
+Checking out git https://git.vates.tech/jenkins-ci/ci-xcp-ng.git into /var/lib/jenkins/workspace/VML tests@script/69f7af84c7fecc5b9844d454f8f27b15249a633cd8bbf9b7e41ec04a602abf10 to read flaky-tests
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential gitea-vates
+ > git rev-parse --resolve-git-dir /var/lib/jenkins/workspace/VML tests@script/69f7af84c7fecc5b9844d454f8f27b15249a633cd8bbf9b7e41ec04a602abf10/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://git.vates.tech/jenkins-ci/ci-xcp-ng.git # timeout=10
+Fetching upstream changes from https://git.vates.tech/jenkins-ci/ci-xcp-ng.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+using GIT_ASKPASS to set credentials
+ > git fetch --tags --force --progress -- https://git.vates.tech/jenkins-ci/ci-xcp-ng.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/vml/jenkins-cancellation^{commit} # timeout=10
+ > git rev-parse vml/jenkins-cancellation^{commit} # timeout=10
+Checking out Revision 85e710cec4fe4789f1ada1b6d1b8ad446276c28e (refs/remotes/origin/vml/jenkins-cancellation)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 85e710cec4fe4789f1ada1b6d1b8ad446276c28e # timeout=10
+Commit message: "Use flaky-tests as a probe"
+ > git rev-list --no-walk 85e710cec4fe4789f1ada1b6d1b8ad446276c28e # timeout=10
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on ssh-master
+ in /home/vates/workspace/VML tests
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Declarative: Checkout SCM)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential gitea-vates
+Fetching changes from the remote Git repository
+Multiple candidate revisions
+Checking out Revision 85e710cec4fe4789f1ada1b6d1b8ad446276c28e (refs/remotes/origin/vml/jenkins-cancellation)
+Commit message: "Use flaky-tests as a probe"
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (setup)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] load
+[Pipeline] { (test_env.groovy)
+[Pipeline] }
+[Pipeline] // load
+[Pipeline] git
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+No credentials specified
+Fetching changes from the remote Git repository
+ > git rev-parse --resolve-git-dir /home/vates/workspace/VML tests/.git # timeout=10
+ > git config remote.origin.url https://git.vates.tech/jenkins-ci/ci-xcp-ng.git # timeout=10
+Fetching upstream changes from https://git.vates.tech/jenkins-ci/ci-xcp-ng.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+using GIT_ASKPASS to set credentials
+ > git fetch --tags --force --progress -- https://git.vates.tech/jenkins-ci/ci-xcp-ng.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/vml/jenkins-cancellation^{commit} # timeout=10
+ > git rev-parse vml/jenkins-cancellation^{commit} # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 85e710cec4fe4789f1ada1b6d1b8ad446276c28e # timeout=10
+Checking out Revision b636737e28c449c042741edbdd1b0600fb601c82 (refs/remotes/origin/vml/jenkins-cancellation)
+Commit message: "Investigation: step 3"
+ > git rev-parse --resolve-git-dir /home/vates/workspace/VML tests/.git # timeout=10
+ > git config remote.origin.url https://github.com/xcp-ng/xcp-ng-tests # timeout=10
+Fetching upstream changes from https://github.com/xcp-ng/xcp-ng-tests
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+ > git fetch --tags --force --progress -- https://github.com/xcp-ng/xcp-ng-tests +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/vml/jenkins-cancellation^{commit} # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f b636737e28c449c042741edbdd1b0600fb601c82 # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git branch -D vml/jenkins-cancellation # timeout=10
+ > git checkout -b vml/jenkins-cancellation b636737e28c449c042741edbdd1b0600fb601c82 # timeout=10
+ > git rev-list --no-walk b636737e28c449c042741edbdd1b0600fb601c82 # timeout=10
+[Pipeline] echo
+configuring vates test environment
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential gitea-vates
+DEPRECATED: Relative target directory is deprecated for Pipeline jobs. Use the 'dir' step instead.
+Fetching changes from the remote Git repository
+Checking out Revision 2ae2690d9338cc41fda378d5bea2a0144d7b2670 (origin/master)
+Commit message: "Merge pull request 'Switch to the slow nfs share for large volumes tests' (#32) from gln/slow-nfs-large-volumes-twun into master"
+ > git rev-parse --resolve-git-dir /home/vates/workspace/VML tests/ci-configuration/.git # timeout=10
+ > git config remote.origin.url https://git.vates.tech/jenkins-ci/ci-configuration.git # timeout=10
+Fetching upstream changes from https://git.vates.tech/jenkins-ci/ci-configuration.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+using GIT_ASKPASS to set credentials
+ > git fetch --tags --force --progress -- https://git.vates.tech/jenkins-ci/ci-configuration.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse origin/master^{commit} # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 2ae2690d9338cc41fda378d5bea2a0144d7b2670 # timeout=10
+ > git rev-list --no-walk 2ae2690d9338cc41fda378d5bea2a0144d7b2670 # timeout=10
+[Pipeline] sh
++ cp ci-configuration/data83-bis.py data.py
+[Pipeline] sh
++ cp ci-configuration/vm_data.py vm_data.py
+[Pipeline] sh
++ pip3 install uv==0.9.9
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: uv==0.9.9 in /home/vates/.local/lib/python3.9/site-packages (0.9.9)
+[Pipeline] sh
++ uv sync --frozen --no-dev
+Audited 43 packages in 1ms
+[Pipeline] sh
+++ uv python find
++ dirname '/home/vates/workspace/VML tests/.venv/bin/python3'
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (flaky tests)
+[Pipeline] lock
+Trying to acquire lock on [Label: 10.1.15.29]
+Lock acquired on [Label: 10.1.15.29]
+[Pipeline] {
+[Pipeline] sh
++ rm -rf .jenkins-pytest
++ export 'PYTHONPATH=/home/vates/workspace/VML tests/investigation/probe'
++ PYTHONPATH='/home/vates/workspace/VML tests/investigation/probe'
++ ./jobs.py run flaky 10.1.15.29 -k 'not glusterfs' --log-cli-level=debug -k debug_jenkins -p jenkins_probe
+pytest tests -m flaky -k "(not glusterfs) and (debug_jenkins)" --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug -p jenkins_probe
+============================= test session starts ==============================
+platform linux -- Python 3.11.11, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/vates/workspace/VML tests
+configfile: pytest.ini
+plugins: dependency-0.6.1
+collected 538 items / 537 deselected / 1 selected
+
+tests/storage/test_debug_jenkins.py::test_debug_jenkins
+-------------------------------- live log setup --------------------------------
+Oct 13 18:23:43.017 DEBUG [10.1.15.29] cat /etc/xensource-inventory
+Oct 13 18:23:43.114 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e'
+Oct 13 18:23:43.115 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 18:23:43.116 DEBUG > DOM0_VCPUS='8'
+Oct 13 18:23:43.116 DEBUG > CONTROL_DOMAIN_UUID='bf5c5d6f-e582-432e-9b0f-211f75d3c1db'
+Oct 13 18:23:43.117 DEBUG > DOM0_MEM='2656'
+Oct 13 18:23:43.117 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 18:23:43.118 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 18:23:43.118 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 18:23:43.119 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 18:23:43.119 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 18:23:43.119 DEBUG > INSTALLATION_UUID='49005a69-d0bd-489d-9dfb-70bb1807feef'
+Oct 13 18:23:43.120 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 18:23:43.120 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 18:23:43.121 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 18:23:43.121 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 18:23:43.122 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 18:23:43.122 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 18:23:43.122 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 18:23:43.123 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 18:23:43.123 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 18:23:43.124 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e-part2'
+Oct 13 18:23:43.124 DEBUG > INSTALLATION_DATE='2026-07-29 12:52:50.701085'
+Oct 13 18:23:43.125 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 18:23:43.126 DEBUG [10.1.15.29] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 18:23:43.249 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.250 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.250 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.250 DEBUG > NAME="XSLocalEXT--06f279af--7e90--eb14--3eff--6286e57a21e0-06f279af--7e90--eb14--3eff--6286e57a21e0" KNAME="dm-1" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/06f279af-7e90-eb14-3eff-6286e57a21e0" WWN=""
+Oct 13 18:23:43.251 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.251 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.251 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.251 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 18:23:43.252 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dd2519"
+Oct 13 18:23:43.253 DEBUG [10.1.15.29] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 18:23:43.254 DEBUG [10.1.15.29] test -f /usr/bin/dnf
+Oct 13 18:23:43.347 DEBUG [10.1.15.29] test -f /usr/bin/yum
+Oct 13 18:23:43.442 DEBUG [10.1.15.29] cat /etc/xensource/pool.conf
+Oct 13 18:23:43.542 DEBUG > master
+Oct 13 18:23:43.543 INFO [10.1.15.29] Wait for XAPI to complete initialization
+Oct 13 18:23:43.544 DEBUG [10.1.15.29] xapi-wait-init-complete 1800
+Oct 13 18:23:43.648 DEBUG [10.1.15.29] xe host-param-get uuid=49005a69-d0bd-489d-9dfb-70bb1807feef param-name=enabled
+Oct 13 18:23:43.778 DEBUG > true
+Oct 13 18:23:43.782 INFO Getting Pool info for '10.1.15.29'
+Oct 13 18:23:43.783 DEBUG [10.1.15.29] xe host-list --minimal
+Oct 13 18:23:43.910 DEBUG > 75d0b03f-e291-4319-a6ac-d9bad3cc722d,49005a69-d0bd-489d-9dfb-70bb1807feef
+Oct 13 18:23:43.913 DEBUG [10.1.15.29] xe host-param-get uuid=75d0b03f-e291-4319-a6ac-d9bad3cc722d param-name=address
+Oct 13 18:23:44.038 DEBUG > 10.1.15.31
+Oct 13 18:23:44.042 DEBUG [10.1.15.31] cat /etc/xensource-inventory
+Oct 13 18:23:44.495 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd'
+Oct 13 18:23:44.495 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 18:23:44.495 DEBUG > DOM0_VCPUS='8'
+Oct 13 18:23:44.496 DEBUG > CONTROL_DOMAIN_UUID='c1295715-0b6c-4201-85d8-52ad95957a3b'
+Oct 13 18:23:44.496 DEBUG > DOM0_MEM='2656'
+Oct 13 18:23:44.496 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 18:23:44.496 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 18:23:44.497 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 18:23:44.497 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 18:23:44.497 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 18:23:44.497 DEBUG > INSTALLATION_UUID='75d0b03f-e291-4319-a6ac-d9bad3cc722d'
+Oct 13 18:23:44.498 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 18:23:44.498 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 18:23:44.498 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 18:23:44.498 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 18:23:44.498 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 18:23:44.499 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 18:23:44.499 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 18:23:44.499 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 18:23:44.499 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 18:23:44.500 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd-part2'
+Oct 13 18:23:44.500 DEBUG > INSTALLATION_DATE='2026-07-29 12:48:54.932305'
+Oct 13 18:23:44.500 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 18:23:44.501 DEBUG [10.1.15.31] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 18:23:44.621 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.622 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.622 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.622 DEBUG > NAME="XSLocalEXT--e0c431d9--3124--d135--6253--f17f957595d7-e0c431d9--3124--d135--6253--f17f957595d7" KNAME="dm-0" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/e0c431d9-3124-d135-6253-f17f957595d7" WWN=""
+Oct 13 18:23:44.623 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.623 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.623 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.623 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 18:23:44.623 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dec675"
+Oct 13 18:23:44.624 DEBUG [10.1.15.31] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 18:23:44.625 DEBUG [10.1.15.31] test -f /usr/bin/dnf
+Oct 13 18:23:44.718 DEBUG [10.1.15.31] test -f /usr/bin/yum
+Oct 13 18:23:44.811 DEBUG [10.1.15.29] xe pool-list --minimal
+Oct 13 18:23:44.938 DEBUG > 8cab5c54-f03f-7576-520a-a1599f46cfcf
+Oct 13 18:23:44.941 DEBUG [10.1.15.29] xe sr-list minimal=true
+Oct 13 18:23:45.066 DEBUG > 916d4425-e738-0420-289c-efe7430a6c5d,06f279af-7e90-eb14-3eff-6286e57a21e0,c10f000b-e129-3505-fad5-3ffe6f632ad0,cc0820d5-6683-625d-fb04-a1a566e5fd50,c2ad85d6-7a47-fd9d-6e1c-3146829aa4c0,71459070-7534-f00e-7602-f3865f0a8aa0,e0c431d9-3124-d135-6253-f17f957595d7
+Oct 13 18:23:45.071 DEBUG [10.1.15.29] touch /tmp/dirty
+-------------------------------- live log call ---------------------------------
+Oct 13 18:23:45.173 INFO Sleep 1 minute
+Aborted by Vincent Michel
+
+Sending interrupt signal to process
+[probe] write test on fd 11 t+12.7s
+[probe] write test on fd 12 t+12.7s
+[probe] write test on fd 11 t+14.7s
+[probe] write test on fd 12 t+14.7s
+
+Post stage
+[Pipeline] timeout
+Timeout set to expire in 6 min 0 sec
+[Pipeline] {
+[Pipeline] sh
+
++ investigation/probe/post_probe.sh
+--- process tree at post start ---
+  61958       1    5219    5219 ?        Sl   /home/vates/workspace/VML tests/.venv/bin/python /home/vates/workspace/VML tests/.venv/bin/pytest tests -m flaky -k (not glusterfs) and (debug_jenkins) --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug -p jenkins_probe
+  61964       1   61964   61964 ?        Ss   ssh: /home/vates/.ssh/control-61958:10.1.15.29:22:root [mux]
+  62002       1   62002   62002 ?        Ss   ssh: /home/vates/.ssh/control-61958:10.1.15.31:22:root [mux]
+  62117       1    5219    5219 ?        S    sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-ae40304b/script.sh' '/home/vates/workspace/VML tests@tmp/durable-ae40304b/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-ae40304b' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-ae40304b/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-ae40304b/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-ae40304b/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-ae40304b/jenkins-log.txt' 2>&1; echo $? > '/home/vates/workspace/VML tests@tmp/durable-ae40304b/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-ae40304b/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-ae40304b/jenkins-result.txt'; wait) >&- 2>&- &
+--
+No Sockets found in /run/screen/S-vates.
+
+--- probe.log so far ---
+18:23:40 t+   0.626s [61958] ======================================================================
+18:23:40 t+   0.626s [61958] probe start, cmdline=61958: /home/vates/workspace/VML tests/.venv/bin/python /home/vates/workspace/VML tests/.venv/bin/pytest tests -m flaky -k (not glusterfs) and (debug_jenkins) --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug -p jenkins_probe
+18:23:40 t+   0.626s [61958] pid=61958 ppid=61954 pgid=5219 sid=5219
+18:23:40 t+   0.626s [61958] isatty: 0=False 1=False 2=False
+18:23:40 t+   0.626s [61958] fds: 0=/dev/null 1=/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt 2=/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt
+18:23:40 t+   0.626s [61958] env JENKINS_URL='https://jenkins2.lyon.vates.team/'
+18:23:40 t+   0.626s [61958] env BUILD_TAG='jenkins-VML tests-33'
+18:23:40 t+   0.626s [61958] env BUILD_ID='33'
+18:23:40 t+   0.626s [61958] env JENKINS_NODE_COOKIE='312c4374-150c-44a0-8ac2-f0852ab15c10'
+18:23:40 t+   0.626s [61958] env JENKINS_SERVER_COOKIE='durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6'
+18:23:40 t+   0.626s [61958] env WORKSPACE='/home/vates/workspace/VML tests'
+18:23:40 t+   0.626s [61958] env STY=None
+18:23:40 t+   0.626s [61958] env TERM=None
+18:23:40 t+   0.626s [61958] env DEBUG='false'
+18:23:40 t+   0.627s [61958] ancestors: [(61954, 'sh'), (61950, 'sh')]
+18:23:40 t+   0.649s [61958] process tree (sessions [5219]):
+    PID    PPID    PGID     SID TT       STAT CMD
+   5219    5130    5219    5219 ?        Ssl  java -jar remoting.jar -workDir /home/vates -jar-cache /home/vates/remoting/jarCache
+  61950       1    5219    5219 ?        S    sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-f54edd7a' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt' 2>&1; echo $? > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt'; wait) >&- 2>&- &
+  61953   61950    5219    5219 ?        S     \_ sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-f54edd7a' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-log.txt' 2>&1; echo $? > '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-f54edd7a/jenkins-result.txt'; wait) >&- 2>&- &
+  61956   61953    5219    5219 ?        S     |   \_ sleep 3
+  61954   61950    5219    5219 ?        S     \_ sh -xe /home/vates/workspace/VML tests@tmp/durable-f54edd7a/script.sh.copy
+  61958   61954    5219    5219 ?        S         \_ /home/vates/workspace/VML tests/.venv/bin/python /home/vates/workspace/VML tests/.venv/bin/pytest tests -m flaky -k (not glusterfs) and (debug_jenkins) --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug -p jenkins_probe
+  61974   61958    5219    5219 ?        R             \_ ps --forest -o pid,ppid,pgid,sid,tty,stat,cmd -s 5219
+  61896       1    5219    5219 ?        S    sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/output.txt' 2> '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; echo $? > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt'; wait) >&- 2>&- &
+  61899   61896    5219    5219 ?        S     \_ sh -c (cp '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy'; { while [ -d '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4' -a \! -f '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt' ]; do touch '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; sleep 3; done } & jsc=durable-d2694d046b870a2c8d280c4a0413f948c6fee8736df71bd787c5c9745b2772b6; JENKINS_SERVER_COOKIE=$jsc 'sh' -xe  '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/script.sh.copy' > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/output.txt' 2> '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-log.txt'; echo $? > '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp'; mv '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt.tmp' '/home/vates/workspace/VML tests@tmp/durable-8c6e2ee4/jenkins-result.txt'; wait) >&- 2>&- &
+  61902   61899    5219    5219 ?        S         \_ sleep 3
+
+18:23:40 t+   0.662s [61958] screen -ls:
+No Sockets found in /run/screen/S-vates.
+
+
+18:23:40 t+   0.663s [61958] handlers installed; SIGPIPE disposition=1
+18:23:43 t+   2.774s [61958] phase -> setup:test_debug_jenkins
+18:23:43 t+   3.301s [61958] logging INFO: [10.1.15.29] Wait for XAPI to complete initialization
+18:23:43 t+   3.540s [61958] logging INFO: Getting Pool info for '10.1.15.29'
+18:23:45 t+   4.930s [61958] phase setup:test_debug_jenkins done
+18:23:45 t+   4.931s [61958] phase -> call:test_debug_jenkins
+18:23:45 t+   4.931s [61958] logging INFO: Sleep 1 minute
+18:23:51 t+  11.110s [61958] SIGNAL SIGTERM #1 phase=call:test_debug_jenkins in_pdb=False ancestors_alive=[61954, 61950]
+18:23:51 t+  11.111s [61958] redirected fds 0/1/2 and pytest saved fds [5, 7, 9] to pytest.log
+18:23:51 t+  11.111s [61958] abort outside teardown: KeyboardInterrupt
+18:23:51 t+  11.111s [61958] phase call:test_debug_jenkins done
+18:23:51 t+  11.719s [61958] sessionfinish exitstatus=<ExitCode.INTERRUPTED: 2>
+18:23:51 t+  11.720s [61958] logging INFO: [00/60] before cleanup
+18:23:52 t+  12.721s [61958] logging INFO: [01/60] before cleanup
+18:23:52 t+  12.726s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=2.68s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:53 t+  13.722s [61958] logging INFO: [02/60] before cleanup
+18:23:54 t+  14.722s [61958] logging INFO: [03/60] before cleanup
+18:23:54 t+  14.730s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.01s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:55 t+  15.723s [61958] logging INFO: [04/60] before cleanup
+18:23:56 t+  16.397s [61958] SIGNAL SIGTERM #2 phase=sessionfinish in_pdb=False ancestors_alive=[]
+18:23:56 t+  16.397s [61958] already aborted: ignored
+18:23:56 t+  16.532s [61958] ANCESTOR GONE pid=61954 comm=sh
+18:23:56 t+  16.724s [61958] logging INFO: [05/60] before cleanup
+18:23:56 t+  16.732s [61958] ANCESTOR GONE pid=61950 comm=sh
+18:23:56 t+  16.733s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.01s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:57 t+  17.724s [61958] logging INFO: [06/60] before cleanup
+18:23:58 t+  18.725s [61958] logging INFO: [07/60] before cleanup
+18:23:58 t+  18.735s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:23:59 t+  19.726s [61958] logging INFO: [08/60] before cleanup
+18:24:00 t+  20.726s [61958] logging INFO: [09/60] before cleanup
+18:24:00 t+  20.737s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:01 t+  21.727s [61958] logging INFO: [10/60] before cleanup
+18:24:02.036146810 [post 62123] post start; pytest pid=61958 alive=yes
+--- following probe.log while pytest is alive (max 240s) ---
+
+18:24:02 t+  22.728s [61958] logging INFO: [11/60] before cleanup
+18:24:02 t+  22.739s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:03 t+  23.729s [61958] logging INFO: [12/60] before cleanup
+
+18:24:04 t+  24.729s [61958] logging INFO: [13/60] before cleanup
+18:24:04 t+  24.741s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+
+18:24:05 t+  25.730s [61958] logging INFO: [14/60] before cleanup
+Click here to forcibly terminate running steps
+
+18:24:06 t+  26.731s [61958] logging INFO: [15/60] before cleanup
+18:24:06 t+  26.744s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+
+18:24:07 t+  27.732s [61958] logging INFO: [16/60] before cleanup
+Aborted by Vincent Michel
+
+Sending interrupt signal to process
+
+18:24:08 t+  28.711s [61958] SIGNAL SIGTERM #3 phase=sessionfinish in_pdb=False ancestors_alive=[]
+18:24:08 t+  28.711s [61958] already aborted: ignored
+18:24:08 t+  28.732s [61958] logging INFO: [17/60] before cleanup
+18:24:08 t+  28.746s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+18:24:09 t+  29.733s [61958] logging INFO: [18/60] before cleanup
+
+18:24:10 t+  30.734s [61958] logging INFO: [19/60] before cleanup
+18:24:10 t+  30.748s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.01s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+
+18:24:11 t+  31.734s [61958] logging INFO: [20/60] before cleanup
+
+18:24:12 t+  32.735s [61958] logging INFO: [21/60] before cleanup
+18:24:12 t+  32.750s [61958] heartbeat phase=sessionfinish in_pdb=False cpu_last_2s=0.00s orig_stdout=ok orig_stderr=ok fd0=/dev/null fd1=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log fd2=/home/vates/workspace/VML tests/.jenkins-pytest/pytest.log
+
+18:24:13 t+  33.736s [61958] logging INFO: [22/60] before cleanup
+
+[Pipeline] }
+
+[Pipeline] // timeout
+Error when executing always post condition:
+Also:   org.jenkinsci.plugins.workflow.actions.ErrorAction$ErrorId: 55f36e32-475a-46fc-b0f4-85da7439e012
+org.jenkinsci.plugins.workflow.steps.FlowInterruptedException: Aborted by vincent.michel
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsFlowExecution.interrupt(CpsFlowExecution.java:1304)
+	at PluginClassLoader for workflow-job//org.jenkinsci.plugins.workflow.job.WorkflowRun$2.lambda$interrupt$0(WorkflowRun.java:433)
+	at jenkins.security.ImpersonatingScheduledExecutorService.lambda$wrap$0(ImpersonatingScheduledExecutorService.java:65)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+[Pipeline] }
+Lock released on resource [Label: 10.1.15.29]
+[Pipeline] // lock
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+org.jenkinsci.plugins.workflow.actions.ErrorAction$ErrorId: bb7054ad-7e55-4034-8726-e1b01f4f5ace
+[Gitea] do not publish assets due to build being non-Successfully
+Finished: ABORTED

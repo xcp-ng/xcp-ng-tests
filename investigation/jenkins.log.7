@@ -1,0 +1,582 @@
+Started by user Vincent Michel
+
+Checking out git https://git.vates.tech/jenkins-ci/ci-xcp-ng.git into /var/lib/jenkins/workspace/VML tests@script/69f7af84c7fecc5b9844d454f8f27b15249a633cd8bbf9b7e41ec04a602abf10 to read flaky-tests
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential gitea-vates
+ > git rev-parse --resolve-git-dir /var/lib/jenkins/workspace/VML tests@script/69f7af84c7fecc5b9844d454f8f27b15249a633cd8bbf9b7e41ec04a602abf10/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://git.vates.tech/jenkins-ci/ci-xcp-ng.git # timeout=10
+Fetching upstream changes from https://git.vates.tech/jenkins-ci/ci-xcp-ng.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+using GIT_ASKPASS to set credentials
+ > git fetch --tags --force --progress -- https://git.vates.tech/jenkins-ci/ci-xcp-ng.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/vml/jenkins-cancellation^{commit} # timeout=10
+ > git rev-parse vml/jenkins-cancellation^{commit} # timeout=10
+Checking out Revision 3a2b33b742896a5d2c408bd65cd635b95085e96f (refs/remotes/origin/vml/jenkins-cancellation)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 3a2b33b742896a5d2c408bd65cd635b95085e96f # timeout=10
+Commit message: "Use scripts/jenkins_pytest.py"
+ > git rev-list --no-walk 3a2b33b742896a5d2c408bd65cd635b95085e96f # timeout=10
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on ssh-master
+ in /home/vates/workspace/VML tests
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Declarative: Checkout SCM)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential gitea-vates
+Fetching changes from the remote Git repository
+Multiple candidate revisions
+Checking out Revision 3a2b33b742896a5d2c408bd65cd635b95085e96f (refs/remotes/origin/vml/jenkins-cancellation)
+Commit message: "Use scripts/jenkins_pytest.py"
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (setup)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] load
+[Pipeline] { (debug_env.groovy)
+[Pipeline] }
+ > git rev-parse --resolve-git-dir /home/vates/workspace/VML tests/.git # timeout=10
+ > git config remote.origin.url https://git.vates.tech/jenkins-ci/ci-xcp-ng.git # timeout=10
+Fetching upstream changes from https://git.vates.tech/jenkins-ci/ci-xcp-ng.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+using GIT_ASKPASS to set credentials
+ > git fetch --tags --force --progress -- https://git.vates.tech/jenkins-ci/ci-xcp-ng.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/vml/jenkins-cancellation^{commit} # timeout=10
+ > git rev-parse vml/jenkins-cancellation^{commit} # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 3a2b33b742896a5d2c408bd65cd635b95085e96f # timeout=10
+[Pipeline] // load
+[Pipeline] echo
+WARNING: Run in detached mode, on failure take the debugger over using:
+[Pipeline] echo
+# ssh -t ssh-master screen -r debug-39
+[Pipeline] echo
+# Then from (Pdb) shell type 'continue' to tear pytest down (aborting the job does it too)
+[Pipeline] load
+[Pipeline] { (test_env.groovy)
+[Pipeline] }
+[Pipeline] // load
+[Pipeline] git
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+No credentials specified
+Fetching changes from the remote Git repository
+ > git rev-parse --resolve-git-dir /home/vates/workspace/VML tests/.git # timeout=10
+ > git config remote.origin.url https://github.com/xcp-ng/xcp-ng-tests # timeout=10
+Fetching upstream changes from https://github.com/xcp-ng/xcp-ng-tests
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+ > git fetch --tags --force --progress -- https://github.com/xcp-ng/xcp-ng-tests +refs/heads/*:refs/remotes/origin/* # timeout=10
+Checking out Revision 27f1ec93d2f59162a1bdf5c9385a63bcb00be770 (refs/remotes/origin/vml/jenkins-cancellation)
+Commit message: "Add lib/jenkins.py and scripts/jenkins_pytest.py"
+ > git rev-parse refs/remotes/origin/vml/jenkins-cancellation^{commit} # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 27f1ec93d2f59162a1bdf5c9385a63bcb00be770 # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git branch -D vml/jenkins-cancellation # timeout=10
+ > git checkout -b vml/jenkins-cancellation 27f1ec93d2f59162a1bdf5c9385a63bcb00be770 # timeout=10
+ > git rev-list --no-walk 4601502ac7da1b89dc6416f5a95db3d136808692 # timeout=10
+[Pipeline] echo
+configuring vates test environment
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential gitea-vates
+DEPRECATED: Relative target directory is deprecated for Pipeline jobs. Use the 'dir' step instead.
+Fetching changes from the remote Git repository
+Checking out Revision 2ae2690d9338cc41fda378d5bea2a0144d7b2670 (origin/master)
+Commit message: "Merge pull request 'Switch to the slow nfs share for large volumes tests' (#32) from gln/slow-nfs-large-volumes-twun into master"
+ > git rev-parse --resolve-git-dir /home/vates/workspace/VML tests/ci-configuration/.git # timeout=10
+ > git config remote.origin.url https://git.vates.tech/jenkins-ci/ci-configuration.git # timeout=10
+Fetching upstream changes from https://git.vates.tech/jenkins-ci/ci-configuration.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.52.0'
+using GIT_ASKPASS to set credentials
+ > git fetch --tags --force --progress -- https://git.vates.tech/jenkins-ci/ci-configuration.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse origin/master^{commit} # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 2ae2690d9338cc41fda378d5bea2a0144d7b2670 # timeout=10
+ > git rev-list --no-walk 2ae2690d9338cc41fda378d5bea2a0144d7b2670 # timeout=10
+[Pipeline] sh
++ cp ci-configuration/data83-bis.py data.py
+[Pipeline] sh
++ cp ci-configuration/vm_data.py vm_data.py
+[Pipeline] sh
++ pip3 install uv==0.9.9
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: uv==0.9.9 in /home/vates/.local/lib/python3.9/site-packages (0.9.9)
+[Pipeline] sh
++ uv sync --frozen --no-dev
+Audited 43 packages in 1ms
+[Pipeline] sh
+++ uv python find
++ dirname '/home/vates/workspace/VML tests/.venv/bin/python3'
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (flaky tests)
+[Pipeline] lock
+Trying to acquire lock on [Label: 10.1.15.29]
+Lock acquired on [Label: 10.1.15.29]
+[Pipeline] {
+[Pipeline] sh
++ scripts/jenkins_pytest.py run debug-39 ./jobs.py run flaky 10.1.15.29 -k 'not glusterfs' --log-cli-level=debug -k debug_jenkins --pdb
+Attach with: ssh -t vates@jenkins.lyon.vates.team screen -r debug-39
+pytest tests -m flaky -k "(not glusterfs) and (debug_jenkins)" --hosts=10.1.15.29 --vm=http://10.1.0.6/images/alpine-minimal-3.12.0.xva --log-cli-level=debug --pdb
+============================= test session starts ==============================
+platform linux -- Python 3.11.11, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/vates/workspace/VML tests
+configfile: pytest.ini
+plugins: dependency-0.6.1
+collecting ...
+collecting 111 items
+collecting 214 items
+collecting 401 items
+collected 538 items / 537 deselected / 1 selected
+
+tests/storage/test_debug_jenkins.py::test_debug_jenkins
+-------------------------------- live log setup --------------------------------
+Oct 13 23:00:27.310 DEBUG [10.1.15.29] cat /etc/xensource-inventory
+Oct 13 23:00:27.409 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e'
+Oct 13 23:00:27.410 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 23:00:27.410 DEBUG > DOM0_VCPUS='8'
+Oct 13 23:00:27.410 DEBUG > CONTROL_DOMAIN_UUID='bf5c5d6f-e582-432e-9b0f-211f75d3c1db'
+Oct 13 23:00:27.411 DEBUG > DOM0_MEM='2656'
+Oct 13 23:00:27.411 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 23:00:27.412 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 23:00:27.412 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 23:00:27.413 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 23:00:27.413 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:27.413 DEBUG > INSTALLATION_UUID='49005a69-d0bd-489d-9dfb-70bb1807feef'
+Oct 13 23:00:27.414 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 23:00:27.414 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 23:00:27.414 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 23:00:27.415 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 23:00:27.415 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:27.416 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 23:00:27.416 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 23:00:27.416 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 23:00:27.417 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 23:00:27.417 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e-part2'
+Oct 13 23:00:27.418 DEBUG > INSTALLATION_DATE='2026-07-29 12:52:50.701085'
+Oct 13 23:00:27.418 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 23:00:27.419 DEBUG [10.1.15.29] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 23:00:27.544 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.545 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.545 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.546 DEBUG > NAME="XSLocalEXT--06f279af--7e90--eb14--3eff--6286e57a21e0-06f279af--7e90--eb14--3eff--6286e57a21e0" KNAME="dm-1" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/06f279af-7e90-eb14-3eff-6286e57a21e0" WWN=""
+Oct 13 23:00:27.546 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.547 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.547 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.548 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.548 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dd2519"
+Oct 13 23:00:27.549 DEBUG [10.1.15.29] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 23:00:27.550 DEBUG [10.1.15.29] test -f /usr/bin/dnf
+Oct 13 23:00:27.645 DEBUG [10.1.15.29] test -f /usr/bin/yum
+Oct 13 23:00:27.739 DEBUG [10.1.15.29] cat /etc/xensource/pool.conf
+Oct 13 23:00:27.838 DEBUG > master
+Oct 13 23:00:27.839 INFO [10.1.15.29] Wait for XAPI to complete initialization
+Oct 13 23:00:27.840 DEBUG [10.1.15.29] xapi-wait-init-complete 1800
+Oct 13 23:00:27.944 DEBUG [10.1.15.29] xe host-param-get uuid=49005a69-d0bd-489d-9dfb-70bb1807feef param-name=enabled
+Oct 13 23:00:28.069 DEBUG > true
+Oct 13 23:00:28.072 INFO Getting Pool info for '10.1.15.29'
+Oct 13 23:00:28.073 DEBUG [10.1.15.29] xe host-list --minimal
+Oct 13 23:00:28.197 DEBUG > 75d0b03f-e291-4319-a6ac-d9bad3cc722d,49005a69-d0bd-489d-9dfb-70bb1807feef
+Oct 13 23:00:28.201 DEBUG [10.1.15.29] xe host-param-get uuid=75d0b03f-e291-4319-a6ac-d9bad3cc722d param-name=address
+Oct 13 23:00:28.325 DEBUG > 10.1.15.31
+Oct 13 23:00:28.328 DEBUG [10.1.15.31] cat /etc/xensource-inventory
+Oct 13 23:00:28.781 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd'
+Oct 13 23:00:28.781 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 23:00:28.781 DEBUG > DOM0_VCPUS='8'
+Oct 13 23:00:28.782 DEBUG > CONTROL_DOMAIN_UUID='c1295715-0b6c-4201-85d8-52ad95957a3b'
+Oct 13 23:00:28.782 DEBUG > DOM0_MEM='2656'
+Oct 13 23:00:28.782 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 23:00:28.782 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 23:00:28.783 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 23:00:28.783 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 23:00:28.783 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:28.783 DEBUG > INSTALLATION_UUID='75d0b03f-e291-4319-a6ac-d9bad3cc722d'
+Oct 13 23:00:28.784 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 23:00:28.784 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 23:00:28.784 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 23:00:28.784 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 23:00:28.785 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:28.785 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 23:00:28.785 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 23:00:28.785 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 23:00:28.786 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 23:00:28.786 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd-part2'
+Oct 13 23:00:28.786 DEBUG > INSTALLATION_DATE='2026-07-29 12:48:54.932305'
+Oct 13 23:00:28.787 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 23:00:28.788 DEBUG [10.1.15.31] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 23:00:28.912 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.912 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="XSLocalEXT--e0c431d9--3124--d135--6253--f17f957595d7-e0c431d9--3124--d135--6253--f17f957595d7" KNAME="dm-0" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/e0c431d9-3124-d135-6253-f17f957595d7" WWN=""
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dec675"
+Oct 13 23:00:28.916 DEBUG [10.1.15.31] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 23:00:28.916 DEBUG [10.1.15.31] test -f /usr/bin/dnf
+Oct 13 23:00:29.010 DEBUG [10.1.15.31] test -f /usr/bin/yum
+Oct 13 23:00:29.103 DEBUG [10.1.15.29] xe pool-list --minimal
+Oct 13 23:00:29.229 DEBUG > 8cab5c54-f03f-7576-520a-a1599f46cfcf
+Oct 13 23:00:29.233 DEBUG [10.1.15.29] xe sr-list minimal=true
+Oct 13 23:00:29.364 DEBUG > 916d4425-e738-0420-289c-efe7430a6c5d,06f279af-7e90-eb14-3eff-6286e57a21e0,c10f000b-e129-3505-fad5-3ffe6f632ad0,cc0820d5-6683-625d-fb04-a1a566e5fd50,c2ad85d6-7a47-fd9d-6e1c-3146829aa4c0,71459070-7534-f00e-7602-f3865f0a8aa0,e0c431d9-3124-d135-6253-f17f957595d7
+Oct 13 23:00:29.368 DEBUG [10.1.15.29] touch /tmp/dirty
+-------------------------------- live log call ---------------------------------
+Oct 13 23:00:29.471 INFO Sleep 1 minute
+Oct 13 23:01:29.472 INFO Ooops
+FAILED                                                                   [100%]
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> captured log >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Oct 13 23:00:27.310 DEBUG [10.1.15.29] cat /etc/xensource-inventory
+Oct 13 23:00:27.409 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e'
+Oct 13 23:00:27.410 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 23:00:27.410 DEBUG > DOM0_VCPUS='8'
+Oct 13 23:00:27.410 DEBUG > CONTROL_DOMAIN_UUID='bf5c5d6f-e582-432e-9b0f-211f75d3c1db'
+Oct 13 23:00:27.411 DEBUG > DOM0_MEM='2656'
+Oct 13 23:00:27.411 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 23:00:27.412 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 23:00:27.412 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 23:00:27.413 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 23:00:27.413 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:27.413 DEBUG > INSTALLATION_UUID='49005a69-d0bd-489d-9dfb-70bb1807feef'
+Oct 13 23:00:27.414 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 23:00:27.414 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 23:00:27.414 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 23:00:27.415 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 23:00:27.415 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:27.416 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 23:00:27.416 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 23:00:27.416 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 23:00:27.417 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 23:00:27.417 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e-part2'
+Oct 13 23:00:27.418 DEBUG > INSTALLATION_DATE='2026-07-29 12:52:50.701085'
+Oct 13 23:00:27.418 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 23:00:27.419 DEBUG [10.1.15.29] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 23:00:27.544 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.545 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.545 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.546 DEBUG > NAME="XSLocalEXT--06f279af--7e90--eb14--3eff--6286e57a21e0-06f279af--7e90--eb14--3eff--6286e57a21e0" KNAME="dm-1" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/06f279af-7e90-eb14-3eff-6286e57a21e0" WWN=""
+Oct 13 23:00:27.546 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.547 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.547 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.548 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.548 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dd2519"
+Oct 13 23:00:27.549 DEBUG [10.1.15.29] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 23:00:27.550 DEBUG [10.1.15.29] test -f /usr/bin/dnf
+Oct 13 23:00:27.645 DEBUG [10.1.15.29] test -f /usr/bin/yum
+Oct 13 23:00:27.739 DEBUG [10.1.15.29] cat /etc/xensource/pool.conf
+Oct 13 23:00:27.838 DEBUG > master
+Oct 13 23:00:27.839 INFO [10.1.15.29] Wait for XAPI to complete initialization
+Oct 13 23:00:27.840 DEBUG [10.1.15.29] xapi-wait-init-complete 1800
+Oct 13 23:00:27.944 DEBUG [10.1.15.29] xe host-param-get uuid=49005a69-d0bd-489d-9dfb-70bb1807feef param-name=enabled
+Oct 13 23:00:28.069 DEBUG > true
+Oct 13 23:00:28.072 INFO Getting Pool info for '10.1.15.29'
+Oct 13 23:00:28.073 DEBUG [10.1.15.29] xe host-list --minimal
+Oct 13 23:00:28.197 DEBUG > 75d0b03f-e291-4319-a6ac-d9bad3cc722d,49005a69-d0bd-489d-9dfb-70bb1807feef
+Oct 13 23:00:28.201 DEBUG [10.1.15.29] xe host-param-get uuid=75d0b03f-e291-4319-a6ac-d9bad3cc722d param-name=address
+Oct 13 23:00:28.325 DEBUG > 10.1.15.31
+Oct 13 23:00:28.328 DEBUG [10.1.15.31] cat /etc/xensource-inventory
+Oct 13 23:00:28.781 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd'
+Oct 13 23:00:28.781 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 23:00:28.781 DEBUG > DOM0_VCPUS='8'
+Oct 13 23:00:28.782 DEBUG > CONTROL_DOMAIN_UUID='c1295715-0b6c-4201-85d8-52ad95957a3b'
+Oct 13 23:00:28.782 DEBUG > DOM0_MEM='2656'
+Oct 13 23:00:28.782 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 23:00:28.782 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 23:00:28.783 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 23:00:28.783 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 23:00:28.783 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:28.783 DEBUG > INSTALLATION_UUID='75d0b03f-e291-4319-a6ac-d9bad3cc722d'
+Oct 13 23:00:28.784 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 23:00:28.784 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 23:00:28.784 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 23:00:28.784 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 23:00:28.785 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:28.785 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 23:00:28.785 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 23:00:28.785 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 23:00:28.786 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 23:00:28.786 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd-part2'
+Oct 13 23:00:28.786 DEBUG > INSTALLATION_DATE='2026-07-29 12:48:54.932305'
+Oct 13 23:00:28.787 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 23:00:28.788 DEBUG [10.1.15.31] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 23:00:28.912 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.912 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="XSLocalEXT--e0c431d9--3124--d135--6253--f17f957595d7-e0c431d9--3124--d135--6253--f17f957595d7" KNAME="dm-0" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/e0c431d9-3124-d135-6253-f17f957595d7" WWN=""
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dec675"
+Oct 13 23:00:28.916 DEBUG [10.1.15.31] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 23:00:28.916 DEBUG [10.1.15.31] test -f /usr/bin/dnf
+Oct 13 23:00:29.010 DEBUG [10.1.15.31] test -f /usr/bin/yum
+Oct 13 23:00:29.103 DEBUG [10.1.15.29] xe pool-list --minimal
+Oct 13 23:00:29.229 DEBUG > 8cab5c54-f03f-7576-520a-a1599f46cfcf
+Oct 13 23:00:29.233 DEBUG [10.1.15.29] xe sr-list minimal=true
+Oct 13 23:00:29.364 DEBUG > 916d4425-e738-0420-289c-efe7430a6c5d,06f279af-7e90-eb14-3eff-6286e57a21e0,c10f000b-e129-3505-fad5-3ffe6f632ad0,cc0820d5-6683-625d-fb04-a1a566e5fd50,c2ad85d6-7a47-fd9d-6e1c-3146829aa4c0,71459070-7534-f00e-7602-f3865f0a8aa0,e0c431d9-3124-d135-6253-f17f957595d7
+Oct 13 23:00:29.368 DEBUG [10.1.15.29] touch /tmp/dirty
+Oct 13 23:00:29.471 INFO Sleep 1 minute
+Oct 13 23:01:29.472 INFO Ooops
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+my_fixture = None
+
+    @pytest.mark.flaky
+    def test_debug_jenkins(my_fixture: None) -> None:
+        logging.info("Sleep 1 minute")
+        time.sleep(60)
+        logging.info("Ooops")
+>       1 / 0
+E       ZeroDivisionError: division by zero
+
+tests/storage/test_debug_jenkins.py:25: ZeroDivisionError
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+>>>>>>>>>>>>>>>>>> PDB post_mortem (IO-capturing turned off) >>>>>>>>>>>>>>>>>>>
+------------------------------ live log logreport ------------------------------
+Oct 13 23:01:30.473 DEBUG Using selector: EpollSelector
+> /home/vates/workspace/VML tests/tests/storage/test_debug_jenkins.py(25)test_debug_jenkins()
+     21 def test_debug_jenkins(my_fixture: None) -> None:
+     22     logging.info("Sleep 1 minute")
+     23     time.sleep(60)
+     24     logging.info("Ooops")
+---> 25     1 / 0
+
+Oct 13 23:01:30.497 DEBUG Using selector: EpollSelector
+ipdb>ipdb>p1+1ipdb> p 1+1
+
+2
+Oct 13 23:02:27.421 DEBUG Using selector: EpollSelector
+ipdb>Aborted by Vincent Michel
+
+Sending interrupt signal to process
+
+===== Jenkins abort =====
+ipdb>
+
+>>>>>>>>>>>>>>>>>>>>> PDB continue (IO-capturing resumed) >>>>>>>>>>>>>>>>>>>>>>
+
+------------------------------ live log teardown -------------------------------
+Oct 13 23:02:40.870 INFO [00/60] before cleanup
+Oct 13 23:02:41.871 INFO [01/60] before cleanup
+Click here to forcibly terminate running steps
+Post stage
+[Pipeline] timeout
+Timeout set to expire in 15 min
+[Pipeline] {
+[Pipeline] sh
++ scripts/jenkins_pytest.py monitor
+Oct 13 23:02:41.871 INFO [01/60] before cleanup
+Oct 13 23:02:42.872 INFO [02/60] before cleanup
+Oct 13 23:02:43.873 INFO [03/60] before cleanup
+Oct 13 23:02:44.873 INFO [04/60] before cleanup
+Oct 13 23:02:45.874 INFO [05/60] before cleanup
+Oct 13 23:02:46.875 INFO [06/60] before cleanup
+Oct 13 23:02:47.876 INFO [07/60] before cleanup
+Oct 13 23:02:48.876 INFO [08/60] before cleanup
+Oct 13 23:02:49.877 INFO [09/60] before cleanup
+Oct 13 23:02:50.878 INFO [10/60] before cleanup
+Oct 13 23:02:51.879 INFO [11/60] before cleanup
+Oct 13 23:02:52.879 INFO [12/60] before cleanup
+Oct 13 23:02:53.880 INFO [13/60] before cleanup
+Oct 13 23:02:54.881 INFO [14/60] before cleanup
+Oct 13 23:02:55.882 INFO [15/60] before cleanup
+Oct 13 23:02:56.883 INFO [16/60] before cleanup
+Oct 13 23:02:57.884 INFO [17/60] before cleanup
+Oct 13 23:02:58.885 INFO [18/60] before cleanup
+Oct 13 23:02:59.885 INFO [19/60] before cleanup
+Oct 13 23:03:00.886 INFO [20/60] before cleanup
+Oct 13 23:03:01.887 INFO [21/60] before cleanup
+Aborted by Vincent Michel
+
+Sending interrupt signal to process
+
+===== Jenkins abort: interrupting the teardown =====
+
+tests/storage/test_debug_jenkins.py::test_debug_jenkins ERROR            [100%]
+
+==================================== ERRORS ====================================
+___________________ ERROR at teardown of test_debug_jenkins ____________________
+
+host = Host('10.1.15.29')
+
+    @pytest.fixture
+    def my_fixture(host: Host) -> Iterator[None]:
+        host.ssh("touch /tmp/dirty")
+        yield None
+        for i in range(60):
+            logging.info(f"[{i:02}/60] before cleanup")
+>           time.sleep(1)
+E           KeyboardInterrupt
+
+tests/storage/test_debug_jenkins.py:17: KeyboardInterrupt
+------------------------------ Captured log setup ------------------------------
+Oct 13 23:00:27.310 DEBUG [10.1.15.29] cat /etc/xensource-inventory
+Oct 13 23:00:27.409 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e'
+Oct 13 23:00:27.410 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 23:00:27.410 DEBUG > DOM0_VCPUS='8'
+Oct 13 23:00:27.410 DEBUG > CONTROL_DOMAIN_UUID='bf5c5d6f-e582-432e-9b0f-211f75d3c1db'
+Oct 13 23:00:27.411 DEBUG > DOM0_MEM='2656'
+Oct 13 23:00:27.411 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 23:00:27.412 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 23:00:27.412 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 23:00:27.413 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 23:00:27.413 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:27.413 DEBUG > INSTALLATION_UUID='49005a69-d0bd-489d-9dfb-70bb1807feef'
+Oct 13 23:00:27.414 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 23:00:27.414 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 23:00:27.414 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 23:00:27.415 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 23:00:27.415 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:27.416 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 23:00:27.416 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 23:00:27.416 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 23:00:27.417 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 23:00:27.417 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274f1e-part2'
+Oct 13 23:00:27.418 DEBUG > INSTALLATION_DATE='2026-07-29 12:52:50.701085'
+Oct 13 23:00:27.418 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 23:00:27.419 DEBUG [10.1.15.29] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 23:00:27.544 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.545 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.545 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.546 DEBUG > NAME="XSLocalEXT--06f279af--7e90--eb14--3eff--6286e57a21e0-06f279af--7e90--eb14--3eff--6286e57a21e0" KNAME="dm-1" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/06f279af-7e90-eb14-3eff-6286e57a21e0" WWN=""
+Oct 13 23:00:27.546 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.547 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.547 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.548 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274f1e"
+Oct 13 23:00:27.548 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dd2519"
+Oct 13 23:00:27.549 DEBUG [10.1.15.29] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 23:00:27.550 DEBUG [10.1.15.29] test -f /usr/bin/dnf
+Oct 13 23:00:27.645 DEBUG [10.1.15.29] test -f /usr/bin/yum
+Oct 13 23:00:27.739 DEBUG [10.1.15.29] cat /etc/xensource/pool.conf
+Oct 13 23:00:27.838 DEBUG > master
+Oct 13 23:00:27.839 INFO [10.1.15.29] Wait for XAPI to complete initialization
+Oct 13 23:00:27.840 DEBUG [10.1.15.29] xapi-wait-init-complete 1800
+Oct 13 23:00:27.944 DEBUG [10.1.15.29] xe host-param-get uuid=49005a69-d0bd-489d-9dfb-70bb1807feef param-name=enabled
+Oct 13 23:00:28.069 DEBUG > true
+Oct 13 23:00:28.072 INFO Getting Pool info for '10.1.15.29'
+Oct 13 23:00:28.073 DEBUG [10.1.15.29] xe host-list --minimal
+Oct 13 23:00:28.197 DEBUG > 75d0b03f-e291-4319-a6ac-d9bad3cc722d,49005a69-d0bd-489d-9dfb-70bb1807feef
+Oct 13 23:00:28.201 DEBUG [10.1.15.29] xe host-param-get uuid=75d0b03f-e291-4319-a6ac-d9bad3cc722d param-name=address
+Oct 13 23:00:28.325 DEBUG > 10.1.15.31
+Oct 13 23:00:28.328 DEBUG [10.1.15.31] cat /etc/xensource-inventory
+Oct 13 23:00:28.781 DEBUG > PRIMARY_DISK='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd'
+Oct 13 23:00:28.781 DEBUG > PRODUCT_VERSION='8.3.0'
+Oct 13 23:00:28.781 DEBUG > DOM0_VCPUS='8'
+Oct 13 23:00:28.782 DEBUG > CONTROL_DOMAIN_UUID='c1295715-0b6c-4201-85d8-52ad95957a3b'
+Oct 13 23:00:28.782 DEBUG > DOM0_MEM='2656'
+Oct 13 23:00:28.782 DEBUG > COMPANY_NAME_SHORT='Vates, XenServer, and others'
+Oct 13 23:00:28.782 DEBUG > MANAGEMENT_ADDRESS_TYPE='IPv4'
+Oct 13 23:00:28.783 DEBUG > PARTITION_LAYOUT='ROOT,BACKUP,LOG,BOOT,SWAP,SR'
+Oct 13 23:00:28.783 DEBUG > PRODUCT_VERSION_TEXT='8.3'
+Oct 13 23:00:28.783 DEBUG > PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:28.783 DEBUG > INSTALLATION_UUID='75d0b03f-e291-4319-a6ac-d9bad3cc722d'
+Oct 13 23:00:28.784 DEBUG > PRODUCT_VERSION_TEXT_SHORT='8.3'
+Oct 13 23:00:28.784 DEBUG > BRAND_CONSOLE='Xen Orchestra'
+Oct 13 23:00:28.784 DEBUG > PRODUCT_NAME='xenenterprise'
+Oct 13 23:00:28.784 DEBUG > MANAGEMENT_INTERFACE='xapi1'
+Oct 13 23:00:28.785 DEBUG > COMPANY_PRODUCT_BRAND='XCP-ng'
+Oct 13 23:00:28.785 DEBUG > PLATFORM_VERSION='3.4.0'
+Oct 13 23:00:28.785 DEBUG > BUILD_NUMBER='cloud'
+Oct 13 23:00:28.785 DEBUG > PLATFORM_NAME='XCP'
+Oct 13 23:00:28.786 DEBUG > BRAND_CONSOLE_URL='https://xcp-ng.org'
+Oct 13 23:00:28.786 DEBUG > BACKUP_PARTITION='/dev/disk/by-id/nvme-eui.000000000000001000080d0300274acd-part2'
+Oct 13 23:00:28.786 DEBUG > INSTALLATION_DATE='2026-07-29 12:48:54.932305'
+Oct 13 23:00:28.787 DEBUG > COMPANY_NAME='Vates, XenServer, and others'
+Oct 13 23:00:28.788 DEBUG [10.1.15.31] lsblk --pairs --bytes --output NAME,KNAME,PKNAME,SIZE,LOG-SEC,TYPE,MOUNTPOINT,WWN --include 8,9,65,66,67,68,69,70,71,128,129,130,131,132,133,134,135,252,253,259
+Oct 13 23:00:28.912 DEBUG > NAME="nvme0n1" KNAME="nvme0n1" PKNAME="" SIZE="512110190592" LOG-SEC="512" TYPE="disk" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.912 DEBUG > NAME="nvme0n1p5" KNAME="nvme0n1p5" PKNAME="nvme0n1" SIZE="4294967296" LOG-SEC="512" TYPE="part" MOUNTPOINT="/var/log" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p3" KNAME="nvme0n1p3" PKNAME="nvme0n1" SIZE="467548839424" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="XSLocalEXT--e0c431d9--3124--d135--6253--f17f957595d7-e0c431d9--3124--d135--6253--f17f957595d7" KNAME="dm-0" PKNAME="nvme0n1p3" SIZE="467534872576" LOG-SEC="512" TYPE="lvm" MOUNTPOINT="/run/sr-mount/e0c431d9-3124-d135-6253-f17f957595d7" WWN=""
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p1" KNAME="nvme0n1p1" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="/" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.913 DEBUG > NAME="nvme0n1p6" KNAME="nvme0n1p6" PKNAME="nvme0n1" SIZE="1073741824" LOG-SEC="512" TYPE="part" MOUNTPOINT="[SWAP]" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme0n1p4" KNAME="nvme0n1p4" PKNAME="nvme0n1" SIZE="536870912" LOG-SEC="512" TYPE="part" MOUNTPOINT="/boot/efi" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme0n1p2" KNAME="nvme0n1p2" PKNAME="nvme0n1" SIZE="19327352832" LOG-SEC="512" TYPE="part" MOUNTPOINT="" WWN="eui.000000000000001000080d0300274acd"
+Oct 13 23:00:28.914 DEBUG > NAME="nvme1n1" KNAME="nvme1n1" PKNAME="" SIZE="1000204886016" LOG-SEC="4096" TYPE="disk" MOUNTPOINT="" WWN="eui.e8238fa6bf530001001b444a41dec675"
+Oct 13 23:00:28.916 DEBUG [10.1.15.31] blockdevs found: ['nvme1n1', 'nvme0n1']
+Oct 13 23:00:28.916 DEBUG [10.1.15.31] test -f /usr/bin/dnf
+Oct 13 23:00:29.010 DEBUG [10.1.15.31] test -f /usr/bin/yum
+Oct 13 23:00:29.103 DEBUG [10.1.15.29] xe pool-list --minimal
+Oct 13 23:00:29.229 DEBUG > 8cab5c54-f03f-7576-520a-a1599f46cfcf
+Oct 13 23:00:29.233 DEBUG [10.1.15.29] xe sr-list minimal=true
+Oct 13 23:00:29.364 DEBUG > 916d4425-e738-0420-289c-efe7430a6c5d,06f279af-7e90-eb14-3eff-6286e57a21e0,c10f000b-e129-3505-fad5-3ffe6f632ad0,cc0820d5-6683-625d-fb04-a1a566e5fd50,c2ad85d6-7a47-fd9d-6e1c-3146829aa4c0,71459070-7534-f00e-7602-f3865f0a8aa0,e0c431d9-3124-d135-6253-f17f957595d7
+Oct 13 23:00:29.368 DEBUG [10.1.15.29] touch /tmp/dirty
+------------------------------ Captured log call -------------------------------
+Oct 13 23:00:29.471 INFO Sleep 1 minute
+Oct 13 23:01:29.472 INFO Ooops
+---------------------------- Captured log teardown -----------------------------
+Oct 13 23:02:40.870 INFO [00/60] before cleanup
+Oct 13 23:02:41.871 INFO [01/60] before cleanup
+Oct 13 23:02:42.872 INFO [02/60] before cleanup
+Oct 13 23:02:43.873 INFO [03/60] before cleanup
+Oct 13 23:02:44.873 INFO [04/60] before cleanup
+Oct 13 23:02:45.874 INFO [05/60] before cleanup
+Oct 13 23:02:46.875 INFO [06/60] before cleanup
+Oct 13 23:02:47.876 INFO [07/60] before cleanup
+Oct 13 23:02:48.876 INFO [08/60] before cleanup
+Oct 13 23:02:49.877 INFO [09/60] before cleanup
+Oct 13 23:02:50.878 INFO [10/60] before cleanup
+Oct 13 23:02:51.879 INFO [11/60] before cleanup
+Oct 13 23:02:52.879 INFO [12/60] before cleanup
+Oct 13 23:02:53.880 INFO [13/60] before cleanup
+Oct 13 23:02:54.881 INFO [14/60] before cleanup
+Oct 13 23:02:55.882 INFO [15/60] before cleanup
+Oct 13 23:02:56.883 INFO [16/60] before cleanup
+Oct 13 23:02:57.884 INFO [17/60] before cleanup
+Oct 13 23:02:58.885 INFO [18/60] before cleanup
+Oct 13 23:02:59.885 INFO [19/60] before cleanup
+Oct 13 23:03:00.886 INFO [20/60] before cleanup
+Oct 13 23:03:01.887 INFO [21/60] before cleanup
+=========================== short test summary info ============================
+ERROR tests/storage/test_debug_jenkins.py::test_debug_jenkins - KeyboardInterrupt
+FAILED tests/storage/test_debug_jenkins.py::test_debug_jenkins - ZeroDivisionError: division by zero
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 2 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Jenkins abort !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+============ 1 failed, 537 deselected, 1 error in 157.34s (0:02:37) ============
+Terminated
+[Pipeline] }
+[Pipeline] // timeout
+Error when executing always post condition:
+Also:   org.jenkinsci.plugins.workflow.actions.ErrorAction$ErrorId: 57cbabf9-3381-41f9-9e12-24aeaa44d762
+org.jenkinsci.plugins.workflow.steps.FlowInterruptedException: Aborted by vincent.michel
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsFlowExecution.interrupt(CpsFlowExecution.java:1304)
+	at PluginClassLoader for workflow-job//org.jenkinsci.plugins.workflow.job.WorkflowRun$2.lambda$interrupt$0(WorkflowRun.java:433)
+	at jenkins.security.ImpersonatingScheduledExecutorService.lambda$wrap$0(ImpersonatingScheduledExecutorService.java:65)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+[Pipeline] }
+Lock released on resource [Label: 10.1.15.29]
+[Pipeline] // lock
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+org.jenkinsci.plugins.workflow.actions.ErrorAction$ErrorId: d788e5f9-e950-4503-a7e3-76b4123e1bed
+[Gitea] do not publish assets due to build being non-Successfully
+Finished: ABORTED
