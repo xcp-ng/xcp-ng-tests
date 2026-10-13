@@ -5,6 +5,7 @@ import pytest
 import logging
 import re
 from enum import StrEnum
+from textwrap import dedent
 
 from lib.common import Defer, safe_split
 from lib.host import Host
@@ -181,6 +182,125 @@ class TestNtpMode:
 
         if ntpconf.servers != []:
             pytest.fail("ntp configuration has static servers configured")
+
+    @pytest.mark.reboot
+    def test_dhcp_with_reset(self, hosts: list[Host], defer: Defer) -> None:
+        """
+        Test for ntp-mode=DHCP
+        The host will be first rebooted to use DHCP (or the test will be skipped if it is already in DHCP).
+        The test is done offline and result read once the host rebooted again in its previous network configuration.
+        """
+        # use the first host alone in a pool
+        hosts.sort(key=lambda h: len(h.pool.hosts))
+        host = hosts[0]
+
+        if len(host.pool.hosts) > 1:
+            # avoid disturbing the whole pool: the IP will change
+            pytest.fail("test needs Host alone in a pool")
+
+        mgmt_pif = host.management_pif()
+
+        mode = mgmt_pif.ip_configuration_mode()
+        device = mgmt_pif.device()
+        vlan = mgmt_pif.vlan()
+
+        cmd_restore = [
+            "/opt/xensource/bin/xe-reset-networking",
+            f"--mode={mode}",
+            f"--device={device}",
+            "--novlan" if vlan is None else f"--vlan={vlan}",
+        ]
+        if mode == 'Static':
+            for name in ['IP', 'netmask', 'gateway', 'DNS']:
+                value = mgmt_pif.param_get(name)
+                if value:
+                    cmd_restore.append(f"--{name.lower()}={value}")
+
+        elif mode == 'DHCP':
+            pytest.skip("Skipping as already in mode=DHCP")
+
+        else:
+            pytest.fail(f"unsupported IP-configuration-mode: {mode}")
+
+        # set ntp-mode=DHCP now
+        previous = host_ntp_mode(host, NtpMode.DHCP)
+        defer(lambda: host_ntp_mode(host, previous))
+
+        # install a self-disabling systemd oneshot unit
+        host.create_file(
+            "/etc/systemd/system/run-once.service",
+            dedent("""
+                [Unit]
+                Description=Run a command once on next boot
+                After=xapi-init-complete.target
+                Wants=xapi-init-complete.target
+                ConditionPathExists=/root/run-once.sh
+
+                [Service]
+                Type=oneshot
+                ExecStart=/bin/bash /root/run-once.sh
+
+                [Install]
+                WantedBy=multi-user.target
+            """),
+        )
+        defer(lambda: host.ssh("rm -f /etc/systemd/system/run-once.service"))
+
+        # install script which will be run by the unit
+        host.create_file(
+            "/root/run-once.sh",
+            dedent(f"""
+                #!/bin/bash
+                PATH=/opt/xensource/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+
+                >/root/run-once.log
+
+                # check hook filemode
+                if [ -x /etc/dhcp/dhclient.d/chrony.sh ]; then
+                    echo "HOOK=yes" >>/root/run-once.log
+                else
+                    echo "HOOK=no" >>/root/run-once.log
+                fi
+
+                # reset to previous ntp-mode before rebooting
+                xe host-param-set uuid={host.uuid} ntp-mode={previous}
+
+                # restore (and reboot)
+                mv -f /root/run-once.sh /root/run-once.sh.old
+                echo yes | {' '.join(cmd_restore)}
+            """.strip()),
+        )
+        defer(lambda: host.ssh("rm -f /root/run-once.sh /root/run-once.sh.old /root/run-once.log"))
+
+        # enable the unit
+        host.ssh("systemctl daemon-reload")
+        host.ssh("systemctl enable run-once.service")
+        defer(lambda: host.ssh("systemctl disable run-once.service"))
+
+        # remove log file (to ensure that the one we will read is from this run)
+        host.ssh("rm -f /root/run-once.log")
+
+        # host will:
+        # - reboot with ntp-mode=DHCP (and alternate IP)
+        # - run `run-once.service` unit
+        # - reboot with ntp-mode={previous} and get back at the previous IP
+        cmd_reset_to_dhcp = [
+            "/opt/xensource/bin/xe-reset-networking",
+            "--mode=DHCP",
+            f"--device={device}",
+            "--novlan" if vlan is None else f"--vlan={vlan}",
+        ]
+        host.ssh(f"( sleep 1 ; echo yes | {' '.join(cmd_reset_to_dhcp)} ) &")
+
+        host.wait_for_host_down()
+        host.wait_for_host_up()
+        host.wait_for_ssh_reachable()
+        host.wait_for_xapi_enabled()
+
+        # check for results
+        output = host.ssh("cat /root/run-once.log")
+        if output != "HOOK=yes":
+            pytest.fail("ntp configuration has no DHCP enabled ntp servers")
 
     def test_custom(self, host: Host, defer: Defer) -> None:
         """
