@@ -97,7 +97,7 @@ list_()
 }
 
 
-on_term_()  # Forward SIGTERM to the cmdline running in the screen session
+on_term_()  # Report the SIGTERM; deliberately does NOT touch the session (see below)
 {
     ! $trace || set -x # Restore trace when debuging
     local reason="${1:-TERM}"
@@ -112,12 +112,16 @@ on_term_()  # Forward SIGTERM to the cmdline running in the screen session
     done
     echo "info: on_term_: reason=${reason}, screen_pid=${screen_pid:-none}"
     dbg_ "on_term_ resolved screen_pid=${screen_pid:-none}"
+    # Do NOT signal the session here. Its child is teetty, which owns the
+    # workload's pty; killing it takes pytest down with it. pytest is reached
+    # directly by the JENKINS_NODE_COOKIE scan and conftest.py handles that.
+    # Record who is alive right now, so a run that loses the cleanup says whether
+    # the workload was already gone by the time we got here.
+    dbg_ "on_term_ subtree: [$(ps -o pid=,ppid=,stat=,comm= $(pgrep -d' ' -f 'teetty|pytest|ipdb' 2>/dev/null) 2>/dev/null | tr -s ' ' | tr '\n' '|')]"
     if [ ! -z "$screen_pid" ]; then
-        dbg_ "on_term_ children of screen_pid: [$(pgrep -P "$screen_pid" 2>&1 | tr '\n' '|')]"
-        pkill -TERM -P "$screen_pid" ||:  # Forward TERM, screen left alive
-        dbg_ "on_term_ pkill -TERM -P ${screen_pid} done, return"
+        dbg_ "on_term_ leaving screen_pid=${screen_pid} alone (log only)"
     else
-        dbg_ "on_term_ nothing to forward to, return"
+        dbg_ "on_term_ no screen session, nothing to do"
     fi
     return 0
 }

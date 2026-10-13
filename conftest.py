@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import atexit
 import dataclasses
 import itertools
 import logging
@@ -183,12 +184,28 @@ def _setup_teardown_trace() -> None:
     _teardown_trace['offset'] = os.path.join(trace_dir, 'teardown.offset')
     with open(os.path.join(trace_dir, 'teardown.pid'), 'w') as f:
         f.write(f"{os.getpid()}\n")
+    # A second copy under /tmp, named per run. The $WORKSPACE copy may be wiped
+    # by Jenkins; this one survives so a post-mortem can still tell whether a
+    # signal ever reached us. Appended, never truncated, so a second pytest on
+    # the same agent cannot clobber the first one's evidence.
+    _teardown_trace['raw'] = f"/tmp/teardown.{os.getpid()}.log"
     handler = logging.FileHandler(_teardown_trace['log'], mode='w', encoding='utf-8')
     handler.setLevel(logging.INFO)
     handler.setFormatter(ColoredFormatter(
         fmt='%(asctime)s.%(msecs)03d %(levelname)s %(message)s', datefmt='%b %d %H:%M:%S'
     ))
     logging.getLogger().addHandler(handler)
+
+def _atexit_trace() -> None:
+    """Record how we are leaving, so a kill can be told from a clean exit.
+
+    A missing atexit line means the process was killed outright (SIGKILL, or
+    died with its pty). That distinction is the whole point: it is what tells us
+    whether a signal reached us and we still exited, or we simply vanished.
+    """
+    last = _teardown_trace.get('last_signal', 'none')
+    _sigdbg(f"atexit last_signal={last} "
+            f"pdb_open={'pdb' in _pdb_session}")
 
 def _record_teardown_trace_offset() -> None:
     """Mark where the trace starts.
@@ -217,7 +234,19 @@ _pdb_session: dict[str, pdb.Pdb] = {}
 _sigdbg_started = time.monotonic()
 
 def _sigdbg(msg: str) -> None:
-    logging.getLogger().warning(f"SIGDBG t+{time.monotonic() - _sigdbg_started:7.3f}s {msg}")
+    line = f"SIGDBG t+{time.monotonic() - _sigdbg_started:7.3f}s {msg}"
+    logging.getLogger().warning(line)
+    # Write straight to the file too. Going through logging alone is not enough:
+    # if the CI abort severed our stdout (the screen/tail path), those lines
+    # were produced but never surfaced, which left us unable to tell "no signal
+    # arrived" from "the signal arrived and the trace went missing".
+    raw = _teardown_trace.get('raw')
+    if raw:
+        try:
+            with open(raw, 'a', encoding='utf-8') as f:
+                f.write(f"{line}\n")
+        except OSError:
+            pass
 
 def _ancestry() -> str:
     parts = []
@@ -281,6 +310,7 @@ def pytest_configure(config: pytest.Config) -> None:
             signame = signal.Signals(signum).name
         except ValueError:
             signame = str(signum)
+        _teardown_trace['last_signal'] = signame
         logging.getLogger().warning("received %s (pid %s)", signame, os.getpid())
         _sigdbg(f"signal {signame}({signum}) first={not state['handled']} "
                 f"in_pdb={'pdb' in _pdb_session} "
@@ -325,6 +355,7 @@ def pytest_configure(config: pytest.Config) -> None:
     _sigdbg(f"handlers installed for {installed}")
 
     _setup_teardown_trace()
+    atexit.register(_atexit_trace)
 
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
     ssh_output_max_lines = config.getoption('--ssh-output-max-lines')
