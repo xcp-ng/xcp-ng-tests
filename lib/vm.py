@@ -257,7 +257,7 @@ class VM(BaseVM):
         assert self.previous_host is not None
         return self.previous_host.pool_has_vm(self.uuid)
 
-    def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None, tracing_vars: dict[str, str | dict[str, str]] = {}) -> None:
+    def migrate(self, target_host: Host, sr: SR | None = None, network: str | None = None, vars: dict[str, str | dict[str, str]] = {}) -> None:
         msg = "Migrate VM to host %s" % target_host
         params: XeParams = {
             'uuid': self.uuid,
@@ -301,7 +301,7 @@ class VM(BaseVM):
                     vif_map[vif.uuid] = network
                 params['vif'] = vif_map
 
-        self.host.xe('vm-migrate', params, vars=tracing_vars)
+        self.host.xe('vm-migrate', params, vars=vars)
 
         self.previous_host = self.host
         self.host = target_host

@@ -84,10 +84,7 @@ class TestBasicNoSSH:
     def test_live_migrate(self, imported_vm: VM, existing_shared_sr: SR, tracing: Tracing) -> None:
         def live_migrate(vm: VM, dest_host: Host, dest_sr: SR, tracing: Tracing, check_vdis: bool = False) -> None:
             traceparent = tracing.gen_traceparent()
-            if tracing.enabled:
-                vm.migrate(dest_host, dest_sr, tracing_vars={'TRACEPARENT': traceparent})
-            else:
-                vm.migrate(dest_host, dest_sr)
+            vm.migrate(dest_host, dest_sr, vars={'TRACEPARENT': traceparent})
             if check_vdis:
                 wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
             wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")

@@ -16,7 +16,6 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
-from lib.commands import SSHCommandFailed
 from lib.common import (
     Defer,
     DiskDevName,
@@ -156,8 +155,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--tracing-endpoint",
         action="store",
         default=None,
-        help="One distributed tracing observer endpoint."
-        "Example: http://<jaeger-ip>:9411/api/v2/spans"
+        help="A single distributed tracing observer endpoint."
+        "Example: http://<zipkin-vm-ip>:9411/api/v2/spans"
     )
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -969,53 +968,59 @@ def cifs_iso_sr(host: Host, cifs_iso_device_config: dict[str, Any]) -> Generator
     # teardown
     sr.forget()
 
-# NOTE unsure about the fixture scope
-@pytest.fixture(scope='function')
-def tracing(pytestconfig: pytest.Config, host: Host) -> Generator[Tracing, None, None]:
+# NOTE chose session since no need to teardown after each test (avoid toolstack restarts and lost time)
+@pytest.fixture(scope='session')
+def tracing(pytestconfig: pytest.Config, hosts: list[Host]) -> Generator[Tracing, None, None]:
     """
-    Create a XAPI observer and setup the hosts to enable tracing in a pool.
-    Use of this fixture will trigger two toolstack restarts of the pool hosts.
+    Create a XAPI observer and enable tracing in the pools.
+    Use of this fixture will trigger toolstack restarts of the hosts that
+    don't have http endpoints enabled when one is provided.
     """
-    # NOTE an observer is always created just for simplification
-    observer_name = prefix_object_name("xcp-ng-tests").replace(' ', '_')
-    observer_uuid = host.xe('observer-create', {'name-label': observer_name})
-    hosts_setup = False
+    def enable_observer(host: Host, uuid: str, endpoint: str) -> bool:
+        return host.ssh_with_result(f"xe observer-param-set uuid={uuid} endpoints={endpoint} enabled=true").returncode == 0
 
+    observer_name = prefix_object_name("xcp-ng-tests").replace(' ', '_')
+    observer_uuids = []
     endpoint = pytestconfig.getoption('--tracing-endpoint')
+    enabled = True
     if endpoint:
         logging.info(f"Setting up tracing with endpoint {endpoint}")
         # a http endpoint can be valid even if currently unreachable, check that it is reachable
-        # this step assumes only one endpoint was provided, as mentioned in the option's help message
-        if 'http' in endpoint and host.ssh_with_result(f'curl -f -I {endpoint} --connect-timeout 10').returncode != 22:
-            logging.error(f'Tracing endpoint {endpoint} unreachable')
+        if 'http' in endpoint and hosts[0].ssh_with_result(f'curl -f -I {endpoint} --connect-timeout 10').returncode != 22:
+            logging.warning(f'enabling tracing failed: endpoint {endpoint} unreachable')
+            enabled = False
         else:
-            host.xe('observer-param-set', {'uuid': observer_uuid,
-                    'endpoints': endpoint, 'components': 'xapi,xenopsd,smapi'})
-            for host_uuid in host.pool.hosts_uuids():
-                host_i = host.pool.get_host_by_uuid(host_uuid)
-                if host_i.ssh_with_result('ls /etc/xapi.conf.d/observer.conf').returncode == 0:
-                    host_i.ssh('cp /etc/xapi.conf.d/observer.conf /etc/xapi.conf.d/observer.conf.bak')
-                # NOTE smapi (experimental component) breaks tracing for migration with storage motion
-                host_i.ssh(
-                    'printf "observer-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
-                # 'printf "observer-experimental-components=\"\"\nobserver-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/observer.conf')
-                host_i.restart_toolstack(verify=True)
-            hosts_setup = True
-            host.xe('observer-param-set', {'uuid': observer_uuid, 'enabled': 'true'})
-
-    enabled = host.xe('observer-param-get', {"uuid": observer_uuid, "param-name": "enabled"}) == 'true'
+            # setup pool-wide observers with endpoint
+            for host in hosts:
+                observer_uuid = host.xe('observer-create', {'name-label': observer_name, 'components': 'xapi,xenopsd'})
+                observer_uuids.append(observer_uuid)
+                if not enable_observer(host, observer_uuid, endpoint):
+                    if 'http' in endpoint:
+                        # retry with XAPI conf modification
+                        # NOTE manual testing: only the master can enable http endpoints, naming the conf xcpngtests works
+                        # NOTE don't enable smapi (experimental component), it can break tracing since an SM Qcow2 update
+                        host.ssh(
+                            'printf "observer-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/xcp-ng-tests.conf')
+                        host.restart_toolstack(verify=True)
+                        if not enable_observer(host, observer_uuid, endpoint):
+                            logging.warning(f'enabling tracing failed: endpoint {endpoint} is invalid')
+                            enabled = False
+                            break
+                    else:
+                        logging.warning(f'enabling tracing failed: endpoint {endpoint} is invalid')
+                        enabled = False
+                        break
+    else:
+        enabled = False
     tracing = Tracing(endpoint, enabled)
     yield tracing
     # teardown
-    host.xe('observer-destroy', {'uuid': observer_uuid})
-    if hosts_setup:
-        for host_uuid in host.pool.hosts_uuids():
-            host_i = host.pool.get_host_by_uuid(host_uuid)
-            if host_i.ssh_with_result('ls /etc/xapi.conf.d/observer.conf.bak').returncode == 0:
-                host_i.ssh('mv -f /etc/xapi.conf.d/observer.conf.bak /etc/xapi.conf.d/observer.conf')
-            else:
-                host_i.ssh('rm -f /etc/xapi.conf.d/observer.conf')
-            host_i.restart_toolstack(verify=True)
+    for i in range(len(observer_uuids)):
+        # observer_uuid = host.ssh(f"xe observer-list name-label={observer_name} | head -n 1 | cut -d' ' -f 20")
+        hosts[i].xe('observer-destroy', {'uuid': observer_uuids[i]})
+        if hosts[i].ssh_with_result('ls /etc/xapi.conf.d/xcp-ng-tests.conf').returncode == 0:
+            hosts[i].ssh('rm -f /etc/xapi.conf.d/xcp-ng-tests.conf')
+            hosts[i].restart_toolstack(verify=True)
 
 @pytest.fixture()
 def defer(request: pytest.FixtureRequest) -> Defer:

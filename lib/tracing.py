@@ -25,12 +25,10 @@ class Tracing:
         trace_flags = "01"
         return '-'.join([version, trace_id, parent_id, trace_flags])
 
-    def span_from_traceid(self, name: str, traceid: str) -> Any:
-        if not self.enabled or not self.endpoint:
-            return None
-        # NOTE in the future maybe parsing the endpoint URL could allow to recognize the type of endpoint and use sub-functions
+    def get_span_zipkinv2(self, name: str, traceid: str) -> Any:
         url = urlparse(self.endpoint)
-        # REPHRASE only true zipkin endpoints are supported, they are case-sensitive and transform span names in lowercase (not tags and tag values)
+        # only true zipkin endpoints are supported (Jaeger zipkin port not supported)
+        # case-sensitive endpoint with only span names converted to lowercase
         name = name.lower()
         retries = 12
         for _ in range(retries):
@@ -43,21 +41,40 @@ class Tracing:
             time.sleep(5)
         return None
 
+    def span_from_traceid(self, name: str, traceid: str) -> Any:
+        if not self.enabled or not self.endpoint:
+            return None
+        span = None
+        if "api/v2/spans" in self.endpoint:
+            span = self.get_span_zipkinv2(name, traceid)
+        else:
+            logging.warning(f"tracing endpoint type not supported")
+
+        if span:
+            logging.debug(f"Span {name} found")
+        else:
+            logging.debug(f"Span {name} not found")
+        return span
+
     # NOTE allows to not duplicate this code in each migration test, which will be useful
     # as we will probably need to evolve the migration spans search in the future.
     def stats_migration(self, traceparent) -> None:
+        """ Storage migration stats not tested (VDI.pool_migrate). """
+        if not self.enabled or not self.endpoint:
+            return
         # NOTE some migration spans are missing the user tags (like VM_migrate_downtime_end),
         # it likely depends on how/where the with_tracing call are done in xapi/xenopsd
         traceid = traceparent.split("-", 3)[1]
         logging.info(f'Migration trace ID: {traceid}')
-        logging.info("Locating VM.pool_migrate span")
-        span_pool_migrate = self.span_from_traceid("VM.pool_migrate", traceid)
-        logging.info("Locating VM_migrate_downtime_begin span")
+        logging.info("Locating migration spans")
+        span_migration = self.span_from_traceid("VM.pool_migrate", traceid)
+        if not span_migration:
+            # retry with cross-pool migration span
+            span_migration = self.span_from_traceid("VM.migrate_send", traceid)
         span_downtime_begin = self.span_from_traceid("VM_migrate_downtime_begin", traceid)
-        logging.info("Locating VM_migrate_downtime_end span")
         span_downtime_end = self.span_from_traceid("VM_migrate_downtime_end", traceid)
-        if span_pool_migrate:
-            logging.info(f'Migration duration: {span_pool_migrate.get("duration") / 1000000}s')
+        if span_migration:
+            logging.info(f'Migration duration: {span_migration.get("duration") / 1000000}s')
         if span_downtime_begin and span_downtime_end:
             logging.info(
                 f'Downtime duration: {(span_downtime_end.get("timestamp") - span_downtime_begin.get("timestamp")) / 1000000}s')
