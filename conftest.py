@@ -201,6 +201,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Size, in MiB, of the image of the blktap fio benchmark."
     )
     parser.addoption(
+        "--blktap-app-bench-workloads",
+        action="store",
+        default="pgbench,sqlite-delete,sqlite-wal,fileserver,varmail,webserver,kernel",
+        help="Comma-separated workloads of the blktap application benchmark, among pgbench, sqlite-delete, "
+             "sqlite-wal (speedtest1 with each journal mode), fileserver, varmail, webserver (filebench "
+             "personalities) and kernel (Linux kernel build)."
+    )
+    parser.addoption(
         "--blktap-polling-duration",
         action="store",
         type=int,
@@ -237,6 +245,9 @@ def pytest_configure(config: pytest.Config) -> None:
     global_config.blktap_bench_matrix = config.getoption('--blktap-bench-matrix')
     global_config.blktap_bench_image_dir = config.getoption('--blktap-bench-image-dir')
     global_config.blktap_bench_image_size = config.getoption('--blktap-bench-image-size')
+    app_bench_workloads = config.getoption('--blktap-app-bench-workloads')
+    assert app_bench_workloads is not None
+    global_config.blktap_app_bench_workloads = app_bench_workloads.split(',')
     global_config.blktap_polling_duration = config.getoption('--blktap-polling-duration')
     global_config.blktap_polling_idle_threshold = config.getoption('--blktap-polling-idle-threshold')
 

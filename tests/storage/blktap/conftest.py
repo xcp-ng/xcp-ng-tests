@@ -61,12 +61,26 @@ def bench_image(request: pytest.FixtureRequest, host: Host) -> Generator[str, No
     yield from _bench_image(host, request.param, config.blktap_bench_image_size)
 
 @pytest.fixture
-def bench_outdir(bench_image: str) -> Path:
+def app_bench_image(request: pytest.FixtureRequest, host: Host) -> Generator[str, None, None]:
+    """Image of the application benchmark, format by indirect param: 10 GiB, for the kernel build."""
+    yield from _bench_image(host, request.param, 10240)
+
+def _bench_outdir(image: str) -> Path:
     """<--blktap-bench-outdir>/<image format>, or the same in a new temporary directory, kept after the test."""
     base = Path(config.blktap_bench_outdir or tempfile.mkdtemp(prefix='blktap-bench-'))
-    outdir = base / bench_image.split(':')[0]
+    outdir = base / image.split(':')[0]
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
+
+@pytest.fixture
+def bench_outdir(bench_image: str) -> Path:
+    """Results directory of the benchmarks of bench_image."""
+    return _bench_outdir(bench_image)
+
+@pytest.fixture
+def app_bench_outdir(app_bench_image: str) -> Path:
+    """Results directory of the benchmarks of app_bench_image."""
+    return _bench_outdir(app_bench_image)
 
 class TrackingTapCtl(TapCtl):
     """TapCtl remembering what it set up, to undo at teardown what the test left behind."""

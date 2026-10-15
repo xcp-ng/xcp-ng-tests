@@ -12,6 +12,8 @@ blktap_bench_runtime = 30
 blktap_bench_matrix = 'short'
 blktap_bench_image_dir = '/tmp'
 blktap_bench_image_size = 4096
+blktap_app_bench_workloads = ['pgbench', 'sqlite-delete', 'sqlite-wal', 'fileserver', 'varmail', 'webserver',
+                              'kernel']
 blktap_polling_duration: int | None = None
 blktap_polling_idle_threshold: int | None = None
 
