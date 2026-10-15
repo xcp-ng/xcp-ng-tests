@@ -825,10 +825,16 @@ class Host:
         def _split_keys(line: str) -> list[tuple[str, str]]:
             return re.findall(r'(\S+)=(".*?"|\S+)', line)
 
-        rows = [
-            {key.lower(): val.strip('"') for key, val in _split_keys(line)}
-            for line in raw.strip().splitlines()
-        ]
+        # stderr is merged into the output: lsblk warns about devices that vanish while it runs (e.g. a
+        # device-mapper volume being deactivated), skip those lines rather than parse them as devices
+        expected_keys = set(LSBLK_FIELDS.lower().split(','))
+        rows = []
+        for line in raw.strip().splitlines():
+            row = {key.lower(): val.strip('"') for key, val in _split_keys(line)}
+            if row.keys() != expected_keys:
+                logging.warning(f"Ignoring unexpected lsblk output line: {line!r}")
+                continue
+            rows.append(row)
 
         # build children map: kname -> list of child knames
         children: dict[str, list[str]] = {}
