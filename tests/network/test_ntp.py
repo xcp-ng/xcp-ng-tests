@@ -7,6 +7,7 @@ import re
 from enum import StrEnum
 from textwrap import dedent
 
+from lib.commands import SSHCommandFailed
 from lib.common import Defer, safe_split
 from lib.host import Host
 
@@ -290,7 +291,23 @@ class TestNtpMode:
             f"--device={device}",
             "--novlan" if vlan is None else f"--vlan={vlan}",
         ]
-        host.ssh(f"( sleep 1 ; echo yes | {' '.join(cmd_reset_to_dhcp)} ) &")
+        cmdline = " ".join(cmd_reset_to_dhcp)
+        script = rf"""\
+spawn {cmdline};\
+expect "IP configuration mode:  dhcp";\
+expect -exact {{Type '\''yes'\'' to continue.}};\
+send -- "yes";\
+send -- "\r";\
+wait ;\
+        """
+        logging.info(f"About to reboot {host} using {cmdline} confirmed")
+        try:
+            host.ssh(f"expect -c '{script}'")  # ssh will be cut by reboot
+        except SSHCommandFailed as e:
+            if e.returncode == 255:
+                logging.debug("expected ssh error caused by reboot: %s", e)
+            else:
+                raise e
 
         host.wait_for_host_down()
         host.wait_for_host_up()
