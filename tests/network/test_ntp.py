@@ -18,6 +18,8 @@ TEST_NTP_SERVERS = ['127.0.0.1', '127.0.0.2']
 
 RE_CHRONY_SERVERS = re.compile(r"server ([^ ]+)( iburst)?")
 RE_XENSOURCE = re.compile(r".* factory-ntp-servers = \[ (.*) \] .*")
+XCPNG_NTP_CONF_FILE = '/etc/xapi.conf.d/xcpng-ntp.conf'
+RE_XCPNG_NTP_CONF = re.compile(r"^\s*factory-ntp-servers\s*=\s*(.+)\s*$")
 
 class NtpMode(StrEnum):
     DHCP = 'DHCP'
@@ -97,14 +99,13 @@ def host_xapi_factory_ntp_servers(host: Host) -> list[str]:
             servers.update(m.group(1).split("; "))
 
     if len(servers) == 0:
-        # no factory default found in logs, use hardcoded list
-        return [
-            "0.centos.pool.ntp.org",
-            "1.centos.pool.ntp.org",
-            "2.centos.pool.ntp.org",
-            "3.centos.pool.ntp.org",
-        ]
-
+        logging.info(f"No factory default found in logs, Look up for factory-ntp-servers in {XCPNG_NTP_CONF_FILE}")
+        line = host.ssh(f"grep -m 1 '^[[:space:]]*factory-ntp-servers[[:space:]]*=' {XCPNG_NTP_CONF_FILE}", check=False)
+        m = RE_XCPNG_NTP_CONF.match(line)
+        if m is not None:
+            servers = set(m.group(1).split())
+    assert servers, f"factory-ntp-servers not found in logs nor in {XCPNG_NTP_CONF_FILE}"
+    logging.info(f"Using servers {servers}")
     return list(servers)
 
 def host_ntpconf(host: Host) -> NtpService:
