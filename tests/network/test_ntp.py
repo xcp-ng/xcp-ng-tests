@@ -101,10 +101,10 @@ def host_xapi_factory_ntp_servers(host: Host) -> list[str]:
     if len(servers) == 0:
         # no factory default found in logs, use hardcoded list
         return [
-            "0.centos.pool.ntp.org",
-            "1.centos.pool.ntp.org",
-            "2.centos.pool.ntp.org",
-            "3.centos.pool.ntp.org",
+            "0.ntp.xcpng.org",
+            "1.ntp.xcpng.org",
+            "2.ntp.xcpng.org",
+            "3.ntp.xcpng.org",
         ]
 
     return list(servers)
