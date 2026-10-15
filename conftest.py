@@ -157,7 +157,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=[],
         metavar="KEY:VALUE",
         help="Option of the blktap tests, as KEY:VALUE (repeated, or separated by commas); "
-             "--blktap help describes them."
+             "the key of a list option is repeated. --blktap help describes them."
     )
 
 def pytest_cmdline_main(config: pytest.Config) -> int | None:
