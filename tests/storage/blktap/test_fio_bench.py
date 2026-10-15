@@ -60,6 +60,23 @@ MATRICES: dict[str, tuple[tuple[str, ...], tuple[int, ...], tuple[str, ...], tup
     'mix': (('read', 'write', 'randrw75'), (1, 64), ('4k', '1M'), (1, 4)),
 }
 
+# runs given one by one: (rw, iodepth, bs, numjobs)
+RUN_LISTS: dict[str, list[tuple[str, int, str, int]]] = {
+    # the DiskSpd runs of test_win_bench (CrystalDiskMark profiles), to compare Linux and Windows guests:
+    # DiskSpd threads and requests in flight per thread are fio jobs and iodepth
+    'crystal': [
+        ('read', 8, '1M', 1),  # seq1m-q8t1-read
+        ('write', 8, '1M', 1),  # seq1m-q8t1-write
+        ('read', 32, '128k', 1),  # seq128k-q32t1-read
+        ('write', 32, '128k', 1),  # seq128k-q32t1-write
+        ('randread', 32, '4k', 4),  # rnd4k-q32t4-read
+        ('randwrite', 32, '4k', 4),  # rnd4k-q32t4-write
+        ('randread', 1, '4k', 1),  # rnd4k-q1t1-read
+        ('randwrite', 1, '4k', 1),  # rnd4k-q1t1-write
+        ('randrw70', 16, '8k', 4),  # rnd8k-q16t4-mix70
+    ],
+}
+
 # context information saved with each run, as fio-bench-timeseries.sh does
 CONTEXT_COMMANDS = {
     'info-cmdline.txt': 'cat /proc/cmdline',
@@ -89,7 +106,9 @@ class FioRun:
         return int(self.rw[len(self.fio_rw):] or RWMIXREAD)
 
 def fio_runs(matrix: str) -> list[FioRun]:
-    """The runs of a matrix, in the order of fio-bench-timeseries-all.sh."""
+    """The runs of a matrix, in the order of fio-bench-timeseries-all.sh, or of a list of runs."""
+    if matrix in RUN_LISTS:
+        return [FioRun(*run) for run in RUN_LISTS[matrix]]
     return [FioRun(*run) for run in itertools.product(*MATRICES[matrix])]
 
 def bench_fio_command(run: FioRun, runtime: int, workdir: str) -> str:

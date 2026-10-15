@@ -181,11 +181,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--blktap-bench-matrix",
         action="store",
         choices=["short", "full", "tuning", "tuning-qd64", "tuning-1M", "seq-j1", "seq-j4", "seq",
-                 "mix"],
+                 "mix", "crystal"],
         default="short",
         help="fio runs of the blktap fio benchmark: a short subset, the full matrix of blktap-bench, "
              "or the matrices to tune tapdisk (tuning, and its QD 64 or 1M runs only) "
-             "or compare builds (seq-j1, seq-j4, or both: seq; mix: seq with 75/25 random reads/writes)."
+             "or compare builds (seq-j1, seq-j4, or both: seq; mix: seq with 75/25 random reads/writes), "
+             "or the DiskSpd runs of the Windows benchmark (crystal)."
     )
     parser.addoption(
         "--blktap-bench-image-dir",
