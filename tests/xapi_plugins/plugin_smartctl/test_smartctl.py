@@ -15,10 +15,12 @@ def _call_plugin(host: Host, fn: str) -> None:
     except ValueError:
         pytest.fail("JSON string was expected but ValueError was raised")
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 @pytest.mark.usefixtures("host_at_least_8_3")
 def test_smartctl_information(host: Host) -> None:
     _call_plugin(host, "information")
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 @pytest.mark.usefixtures("host_at_least_8_3")
 def test_smartctl_health(host: Host) -> None:
     _call_plugin(host, "health")
