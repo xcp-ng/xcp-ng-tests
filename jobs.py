@@ -137,6 +137,21 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/misc", "tests/migration"],
         "markers": "multi_vms and not flaky and not reboot",
     },
+    "main-multi-all": {
+        "description": "a group of tests that need to run on the largest variety of VMs - both unix and windows",
+        "requirements": [
+            "A pool with at least 2 hosts, each with a local SR and a shared SR.",
+            "An additional free disk on the first host.",
+            "A second pool with a SR to receive migrated VMs.",
+            "Windows and Unix VMs of all sorts (HVM, PV, PV-shim, BIOS, UEFI...).",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm[]": "multi/all",
+        },
+        "paths": ["tests/misc", "tests/migration"],
+        "markers": "multi_vms and not flaky and not reboot",
+    },
     "network-advanced": {
         "description": "a group of network tests with complex prerequisites",
         "requirements": [
