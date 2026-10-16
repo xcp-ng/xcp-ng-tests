@@ -19,6 +19,7 @@ from tests.storage import (
     coalesce_integrity,
     full_vdi_write,
     vdi_export_import,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -100,6 +101,10 @@ class TestZfsvolVm:
         vm = storage_test_vm
         sr = zfsvol_sr
         vdi_export_import(vm, sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_zfsvol_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_zfsvol_sr, defer)
 
     # *** tests with reboots (longer tests).
 

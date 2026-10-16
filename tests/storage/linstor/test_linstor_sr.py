@@ -10,13 +10,13 @@ import time
 from pydantic import BaseModel, Field, TypeAdapter
 
 from lib.commands import SSHCommandFailed
-from lib.common import safe_split, vm_image, wait_for
+from lib.common import Defer, safe_split, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import vdi_is_open
+from tests.storage import vdi_is_open, vdi_on_boot_reset
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
@@ -225,6 +225,10 @@ class TestLinstorSR:
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_linstor_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_linstor_sr, defer)
 
     # *** tests with reboots (longer tests).
 

@@ -21,6 +21,7 @@ from tests.storage import (
     try_to_create_sr_with_missing_device,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -149,6 +150,10 @@ class TestLVMSR:
     def test_vdi_export_import(self, storage_test_vm: VM, lvm_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
         vdi_export_import(storage_test_vm, lvm_sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_lvm_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_lvm_sr, defer)
 
     # *** tests with reboots (longer tests).
 
