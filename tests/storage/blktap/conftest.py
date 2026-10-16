@@ -5,8 +5,8 @@ import pytest
 import logging
 import uuid
 
-from lib.blktap import TapCtl, TapCtlError, VBDConnector
-from tests.storage.blktap import wait_for_tapdisk_exit
+from lib.blktap import TapCtl, TapCtlError, VBDConnector, XenStoreHelper
+from tests.storage.blktap import ConnectedVBD, wait_for_guest_device, wait_for_tapdisk_exit
 
 from typing import TYPE_CHECKING, Callable, Generator
 
@@ -162,3 +162,17 @@ def vbd_connector(host: Host) -> Generator[VBDConnector, None, None]:
     conn = TrackingVBDConnector(host)
     yield conn
     conn.cleanup()
+
+@pytest.fixture
+def xenstore(host: Host) -> XenStoreHelper:
+    return XenStoreHelper(host)
+
+@pytest.fixture
+def connected_vbd(image: str, vbd_connector: VBDConnector, running_vm: VM) -> ConnectedVBD:
+    """The image connected to the running VM as xvdb (disconnected by vbd_connector)."""
+    # image requested first: fixtures are torn down in reverse order, so the image
+    # is removed after vbd_connector disconnected it
+    device = "xvdb"
+    pid, minor = vbd_connector.connect(running_vm, image, device)
+    wait_for_guest_device(running_vm, device)
+    return ConnectedVBD(vm=running_vm, device=device, image=image, pid=pid, minor=minor)
