@@ -83,6 +83,16 @@ RUNS = [
     DiskspdRun(f'rnd8k-q16t{VCPU_COUNT}-mix70', '8K', 16, VCPU_COUNT, True, 30),
 ]
 
+def driver_verifier_settings(vm: VM) -> dict[str, Any]:
+    """The Driver Verifier settings of the guest, applied at boot: verified drivers, and StorPort miniport checks."""
+    output = vm.execute_powershell_script(
+        r"$mm = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management'; "
+        r"$storport = Get-ItemProperty -ErrorAction SilentlyContinue "
+        r"'HKLM:\SYSTEM\CurrentControlSet\Control\StorPort\Verifier'; "
+        "ConvertTo-Json -Compress @{drivers = $mm.VerifyDrivers; flags = $mm.VerifyDriverLevel; "
+        "storport = $storport.VerifyLevel}")
+    return json.loads(output)
+
 def guest_disks(vm: VM) -> list[dict[str, Any]]:
     output = vm.execute_powershell_script(
         'ConvertTo-Json -Compress @(Get-Disk | Select-Object Number, Size, PartitionStyle, IsOffline, IsReadOnly)')
@@ -156,6 +166,14 @@ def vm_with_diskspd(vm_with_vcpu_count: VM, diskspd_zip: Path) -> VM:
     vm.wait_for_vm_running_and_ssh_up()
     assert vm.are_windows_tools_working(), \
         "the Windows VM must have working PV drivers: the VBD of the test is a PV disk"
+    # some Windows test images verify the Xen PV drivers (verifier.exe /flags ... /driver xenvbd.sys ...), which
+    # divides the DiskSpd results by 3 to 5
+    verifier = driver_verifier_settings(vm)
+    assert not (verifier['drivers'] or '').strip() and not verifier['storport'], \
+        f"Driver Verifier is enabled in the Windows VM ({verifier}), the results would not be meaningful: " \
+        "disable it in the VM (as administrator: 'verifier /reset' and " \
+        r"'reg delete HKLM\SYSTEM\CurrentControlSet\Control\StorPort\Verifier /v VerifyLevel /f'), " \
+        "reboot it, or use an image without Driver Verifier"
     vm.sftp_put(str(diskspd_zip), f'{GUEST_SFTP_TEMP}/DiskSpd.zip')
     vm.execute_powershell_script(
         f"Expand-Archive -Force -Path '{GUEST_TEMP}/DiskSpd.zip' -DestinationPath '{GUEST_DIR}'")
