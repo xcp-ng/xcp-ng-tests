@@ -8,6 +8,7 @@ pluggy>=1.1.0
 pydantic
 pytest>=9.1.1
 pytest-dependency
+pytest-repeat>=0.9.4
 requests
 ipdb
 rpm-version>=0.5.1
