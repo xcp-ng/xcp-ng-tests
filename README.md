@@ -384,6 +384,10 @@ servers (LSP).
 These configurations are provided as optional suggestions for convenience and do not imply official support or a
 requirement to use specific tools.
 
+### Release process
+
+The process used to update the `stable` branch is described in [RELEASE.md](./RELEASE.md).
+
 ### Pre-commit hook
 
 #### General
