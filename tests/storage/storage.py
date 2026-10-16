@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import logging
+import ssl
+import urllib.parse
+import xmlrpc.client
 from dataclasses import dataclass
 
 from lib import config
-from lib.commands import SSHCommandFailed
+from lib.commands import SSHCommandFailed, local_cmd
 from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
 from lib.host import Host
+from lib.netutil import wrap_ip
 from lib.snapshot import Snapshot
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
-from typing import Literal
+from typing import Any, Literal
 
 MAX_VDI_SIZE: dict[ImageFormat, int] = {'qcow2': QCOW2_MAX, 'vhd': VHD_MAX}
 
@@ -148,6 +152,53 @@ print(sr_ref)
         'vdiUuid': vdi.uuid,
         'srRef': master.execute_script(get_sr_ref, shebang='python')
     }))
+
+
+class XapiSession:
+    """
+    Helper to open a xapi session and keep it live for the lifetime of the object.
+    """
+
+    def __init__(self, host: Host) -> None:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        self._server = xmlrpc.client.ServerProxy(
+            f'https://{wrap_ip(host.hostname_or_ip)}/',
+            context=context,
+            allow_none=True,
+        )
+        result: Any = self._server.session.login_with_password(host.user, host.password, '1.0', 'xcp-ng-tests')
+        assert result['Status'] == 'Success', f"Could not log in to XAPI on {host}: {result}"
+        self._session: str = result['Value']
+
+    def __enter__(self) -> XapiSession:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self._server.session.logout(self._session)
+
+    def call(self, method: str, *args: Any) -> Any: # noqa: ANN401
+        return getattr(self._server, method)(self._session, *args)
+
+
+def copy_vdi_via_nbd(vdi: VDI, dest: str) -> None:
+    """
+    Copy a VDI into the local file dest through the xapi NBD endpoint, using
+    nbdcopy
+
+    The XAPI session that provided the exportname has to be kept open during
+    the copy, as xapi-nbd validates it when the NBD connection is established.
+    """
+    with XapiSession(vdi.sr.pool.master) as xapi:
+        vdi_ref = xapi.call('VDI.get_by_uuid', vdi.uuid)['Value']
+        infos = xapi.call('VDI.get_nbd_info', vdi_ref)['Value']
+        assert infos, f'VDI.get_nbd_info() returned no NBD server for {vdi}'
+        info = infos[0]
+        # Percent-encode the exportname
+        exportname = urllib.parse.quote(info['exportname'], safe='/=')
+        uri = f"nbd://{wrap_ip(info['address'])}:{info['port']}/{exportname}"
+        local_cmd(['nbdcopy', uri, dest])
 
 
 def install_randstream(vm: VM) -> None:
