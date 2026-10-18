@@ -182,6 +182,12 @@ pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1 --volume-size=10GiB
 
 See also, below: "Markers and test selection" and "Running test jobs with `jobs.py`"
 
+### Interrupting tests
+
+Ctrl+C ends the session gracefully: the current test is interrupted, and the fixtures are torn down. A fixture setup in progress (e.g. a VM import) completes first, so that it's torn down too, and a teardown in progress goes on. Press Ctrl+C again not to wait for them.
+
+In a terminal, Ctrl+C also interrupts the commands run by pytest (e.g. `ssh`), which can make a fixture setup fail: `kill -INT <pytest's PID>` interrupts pytest only.
+
 ### Test log level
 
 Using `pytest` you can choose to change the log level that appears in your console with the [`--log-cli-level` option](https://docs.pytest.org/en/latest/how-to/logging.html#live-logs).

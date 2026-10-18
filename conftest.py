@@ -63,6 +63,9 @@ class SplitCommaAction(Action):
             items.extend([v.strip() for v in values.split(",") if v.strip()])
         setattr(namespace, self.dest, items)
 
+# Ctrl+C doesn't interrupt a fixture setup or teardown in progress
+pytest_plugins = ["lib.graceful_interrupt"]
+
 # pytest hooks
 
 def pytest_addoption(parser: pytest.Parser) -> None:
