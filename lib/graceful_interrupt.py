@@ -13,6 +13,8 @@ interrupted teardown is left half done. With this plugin, the first interruption
 A second interruption behaves as the interrupt would without this plugin, i.e. it sends a `KeyboardInterrupt` to
 the code that is currently running.
 
+Other sections of code can be shielded like a fixture setup: see shielded().
+
 Only pytest itself is concerned: in a terminal, Ctrl+C also interrupts the commands that pytest runs (they're in its
 process group), so a fixture setup running a command may fail anyway. A SIGINT sent to pytest only (kill -INT <pid>)
 doesn't have this problem.
@@ -27,14 +29,34 @@ import pytest
 
 import os
 import signal
+from contextlib import contextmanager
 from types import FrameType
 
-from typing import Any, Generator, NoReturn
+from typing import Any, Generator, Iterator, NoReturn
+
+# The plugin's handler, if registered
+_handler: GracefulInterrupt | None = None
 
 def pytest_configure(config: pytest.Config) -> None:
+    global _handler
     # Only if SIGINT raises KeyboardInterrupt, as by default
     if signal.getsignal(signal.SIGINT) is signal.default_int_handler:
-        config.pluginmanager.register(GracefulInterrupt(config), "graceful_interrupt_handler")
+        _handler = GracefulInterrupt(config)
+        config.pluginmanager.register(_handler, "graceful_interrupt_handler")
+
+@contextmanager
+def shielded() -> Iterator[None]:
+    """
+    Shield a section of code like a fixture setup: a first interruption doesn't interrupt it, but ends the session once
+    it's done. E.g. to create a resource and register its cleanup, which an interruption in between would skip.
+
+    In a fixture setup or teardown, it does nothing: they're already shielded.
+    """
+    if _handler is None:
+        yield
+    else:
+        with _handler.shielded():
+            yield
 
 class GracefulInterrupt:
 
@@ -42,6 +64,7 @@ class GracefulInterrupt:
         self.config = config
         self.session: pytest.Session | None = None
         self.setup_depth = 0
+        self.shielded_depth = 0
         self.in_teardown = False
         self.interrupted = False
 
@@ -64,6 +87,9 @@ class GracefulInterrupt:
         # Pytest is currently running a fixture setup
         elif self.setup_depth > 0:
             message = "ending the session once the fixture setup is done"
+        # Pytest is currently running a shielded section
+        elif self.shielded_depth > 0:
+            message = "ending the session once the shielded section is done"
         # Pytest is in a safe section, interrupt it
         else:
             raise KeyboardInterrupt
@@ -74,9 +100,30 @@ class GracefulInterrupt:
     @staticmethod
     def _exit(reason: str) -> NoReturn:
         """
-        End the session after a fixture setup, for an interruption received during it.
+        End the session after a fixture setup or a shielded section, for an interruption received during it.
         """
         pytest.exit(f"Interrupted, {reason}", returncode=pytest.ExitCode.INTERRUPTED)
+
+    @contextmanager
+    def shielded(self) -> Iterator[None]:
+        """
+        The shielded sections: see the module-level function of the same name.
+        """
+        # Nothing to shield due to:
+        # - an interruption has already been received
+        # - running in a fixture that is already protected
+        # - running in a teardown that is already protected
+        if self.interrupted or self.setup_depth > 0 or self.in_teardown:
+            yield
+            return
+        self.shielded_depth += 1
+        try:
+            yield
+        finally:
+            self.shielded_depth -= 1
+        # Interrupted during the shielded section, end the session
+        if self.interrupted and self.shielded_depth == 0:
+            self._exit("after a shielded section")
 
     def _write(self, msg: str) -> None:
         """Write to pytest's output, even during a test whose output it captures"""

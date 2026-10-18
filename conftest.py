@@ -9,6 +9,7 @@ import os
 import tempfile
 from argparse import Action, ArgumentParser, Namespace
 from collections import defaultdict
+from contextlib import contextmanager
 
 import git
 from cryptography.hazmat.primitives.serialization import SSHCertPrivateKeyTypes
@@ -20,6 +21,7 @@ from lib.common import (
     Defer,
     DiskDevName,
     HostAddress,
+    InterruptShield,
     callable_marker,
     is_uuid,
     parse_size,
@@ -987,3 +989,38 @@ def defer(request: pytest.FixtureRequest) -> Defer:
         of teardown logic.
     """
     return request.addfinalizer
+
+@pytest.fixture()
+def interrupt_shield(defer: Defer) -> InterruptShield:
+    """
+    Shield a step of a test from Ctrl+C, like a fixture setup (see lib/graceful_interrupt.py).
+
+    When a test creates a resource, or changes a setting, a Ctrl+C before its
+    cleanup is registered would leave it behind. Within the shielded step, a
+    first Ctrl+C doesn't interrupt the step: the session ends once the step is
+    done, and the cleanups registered with `defer` run as usual.
+
+    Usage:
+        def test_example(interrupt_shield):
+            with interrupt_shield() as defer:
+                resource = create_resource()
+                defer(lambda: resource.cleanup())
+
+            # Interrupted here as usual by Ctrl+C: the cleanup still runs.
+            assert resource.is_valid()
+
+    Keep the step to creating a resource (or changing a setting) and registering
+    its cleanup: only a second Ctrl+C interrupts it.
+
+    Returns:
+        A context manager shielding the step, and giving the 'defer' fixture
+        to register its cleanups.
+    """
+    # Not imported before pytest_plugins loads it
+    from lib.graceful_interrupt import shielded
+
+    @contextmanager
+    def shield() -> Generator[Defer, None, None]:
+        with shielded():
+            yield defer
+    return shield

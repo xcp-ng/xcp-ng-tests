@@ -184,7 +184,7 @@ See also, below: "Markers and test selection" and "Running test jobs with `jobs.
 
 ### Interrupting tests
 
-Ctrl+C ends the session gracefully: the current test is interrupted, and the fixtures are torn down. A fixture setup in progress (e.g. a VM import) completes first, so that it's torn down too, and a teardown in progress goes on. Press Ctrl+C again not to wait for them.
+Ctrl+C ends the session gracefully: the current test is interrupted, and the fixtures are torn down. A fixture setup in progress (e.g. a VM import) completes first, so that it's torn down too, and a teardown in progress goes on. Press Ctrl+C again not to wait for them. In a test, the `interrupt_shield` fixture gives the same protection to a step creating a resource (or changing a setting) and registering its cleanup with `defer`.
 
 In a terminal, Ctrl+C also interrupts the commands run by pytest (e.g. `ssh`), which can make a fixture setup fail: `kill -INT <pytest's PID>` interrupts pytest only.
 

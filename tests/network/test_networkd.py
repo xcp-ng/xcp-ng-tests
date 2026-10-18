@@ -5,7 +5,7 @@ import pytest
 import logging
 from datetime import datetime
 
-from lib.common import Defer, XeParams, wait_for
+from lib.common import InterruptShield, XeParams, wait_for
 from lib.host import Host
 from lib.network import Network
 from lib.pif import PIF
@@ -246,7 +246,7 @@ class Dhclient:
 @pytest.mark.no_vm
 class TestDHCPv4Lifecycle:
 
-    def test_acquire(self, defer: Defer, host: Host) -> None:
+    def test_acquire(self, interrupt_shield: InterruptShield, host: Host) -> None:
         # Acquire: set interface to DHCP
         # - dhcp client process running,
         # - lease recorded (if some DHCP server replied).
@@ -263,12 +263,13 @@ class TestDHCPv4Lifecycle:
 
             # reconfigure the PIF to DHCP
             # if it is already DHCP, it isn't a problem as we will check it is properly setted
-            previous_state = pif_ipv4_state(test_pif, {'mode': 'DHCP'})
-            defer(lambda pif=test_pif, state=previous_state: pif_ipv4_state(pif, state))  # type: ignore[misc]
+            with interrupt_shield() as defer:
+                previous_state = pif_ipv4_state(test_pif, {'mode': 'DHCP'})
+                defer(lambda pif=test_pif, state=previous_state: pif_ipv4_state(pif, state))  # type: ignore[misc]
 
             dhcp.assert_state("running")
 
-    def test_release(self, defer: Defer, host: Host) -> None:
+    def test_release(self, interrupt_shield: InterruptShield, host: Host) -> None:
         # Stop releases:
         # - switch DHCP → static/none → process gone
         # - lease released
@@ -285,8 +286,9 @@ class TestDHCPv4Lifecycle:
             dhcp = Dhclient(test_pif, "4")
 
             # get current state (and ensure we restore it at end)
-            previous_state = pif_ipv4_state(test_pif, None)
-            defer(lambda pif=test_pif, state=previous_state: pif_ipv4_state(pif, state))  # type: ignore[misc]
+            with interrupt_shield() as defer:
+                previous_state = pif_ipv4_state(test_pif, None)
+                defer(lambda pif=test_pif, state=previous_state: pif_ipv4_state(pif, state))  # type: ignore[misc]
 
             # DHCP -> None
             pif_ipv4_state(test_pif, {'mode': 'DHCP'})
