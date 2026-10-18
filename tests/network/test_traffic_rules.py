@@ -5,7 +5,7 @@ import pytest
 import logging
 import os
 
-from lib.common import Defer, safe_split, wait_for, wait_for_not
+from lib.common import InterruptShield, safe_split, wait_for, wait_for_not
 from lib.host import Host
 from lib.network import Network
 from lib.sr import SR
@@ -155,7 +155,7 @@ def ofctl_replaceflows(host: Host, br: str, flows: list[str] | None) -> list[str
 
     return oflows
 
-def set_clean_rules_state(defer: Defer, host: Host, bridge: str) -> None:
+def set_clean_rules_state(interrupt_shield: InterruptShield, host: Host, bridge: str) -> None:
     """
     Ensure we start with no rules on the bridge of the host.
     """
@@ -171,13 +171,15 @@ def set_clean_rules_state(defer: Defer, host: Host, bridge: str) -> None:
         accept_unknown_key=True,
     )
     if of_rules is not None:
-        network.param_remove('other-config', 'xo:sdn-controller:of-rules')
-        defer(lambda: network.param_set('other-config', of_rules, 'xo:sdn-controller:of-rules'))
+        with interrupt_shield() as defer:
+            network.param_remove('other-config', 'xo:sdn-controller:of-rules')
+            defer(lambda: network.param_set('other-config', of_rules, 'xo:sdn-controller:of-rules'))
         logging.warn(f"Network '{network_uuid}' has of-rules present (will be cleared for the test): {of_rules}")
 
     # low level OpenFlow rules check
-    flows = ofctl_replaceflows(host, bridge, [])
-    defer(lambda: ofctl_replaceflows(host, bridge, flows))
+    with interrupt_shield() as defer:
+        flows = ofctl_replaceflows(host, bridge, [])
+        defer(lambda: ofctl_replaceflows(host, bridge, flows))
 
     n = len(flows)
     if n != 1:
@@ -239,17 +241,19 @@ def has_running_vm_on_network(host: Host, network_uuid: str) -> bool:
 
 @pytest.mark.small_vm
 class TestSimple:
-    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer) -> None:
+    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
+                     interrupt_shield: InterruptShield) -> None:
         host = hosts_with_traffic_rules[0]
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
 
         vif = vm.vifs()[0]
         vifId = vif.uuid
         macAddress = vif.mac_address()
         hostBr = vif.network().bridge()
 
-        set_clean_rules_state(defer, host, hostBr)
+        set_clean_rules_state(interrupt_shield, host, hostBr)
 
         # add OF rule (before starting VM)
         sync_sdnController_action(host, 'addRule', {
@@ -330,32 +334,35 @@ class TestSimple:
 
         assert_clean_openflow_state(host, hostBr)
 
-    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer) -> None:
+    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
+                         interrupt_shield: InterruptShield) -> None:
         host = hosts_with_traffic_rules[0]
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
         networkId = host.management_network()
         hostBr = Network(host, networkId).bridge()
 
-        set_clean_rules_state(defer, host, hostBr)
+        set_clean_rules_state(interrupt_shield, host, hostBr)
 
         # add OF rule (before starting VM)
-        sync_sdnController_action(host, 'addNetworkRule', {
-            'networkId': networkId,
-            'ipRange': '10.0.0.1',
-            'direction': 'to',
-            'protocol': 'icmp',
-            'allow': 'false',
-        })
-        defer(
-            lambda:
-                sync_sdnController_action(host, 'deleteNetworkRule', {
-                    'networkId': networkId,
-                    'ipRange': '10.0.0.1',
-                    'direction': 'to',
-                    'protocol': 'icmp',
-                })
-        )
+        with interrupt_shield() as defer:
+            sync_sdnController_action(host, 'addNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.1',
+                'direction': 'to',
+                'protocol': 'icmp',
+                'allow': 'false',
+            })
+            defer(
+                lambda:
+                    sync_sdnController_action(host, 'deleteNetworkRule', {
+                        'networkId': networkId,
+                        'ipRange': '10.0.0.1',
+                        'direction': 'to',
+                        'protocol': 'icmp',
+                    })
+            )
 
         # the rule is not applied if there is no interface in the network at the time
         if not has_running_vm_on_network(host, networkId):
@@ -375,22 +382,23 @@ class TestSimple:
         assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
 
         # add OF rule (while running)
-        sync_sdnController_action(host, 'addNetworkRule', {
-            'networkId': networkId,
-            'ipRange': '10.0.0.2',
-            'direction': 'to',
-            'protocol': 'icmp',
-            'allow': 'false',
-        })
-        defer(
-            lambda:
-                sync_sdnController_action(host, 'deleteNetworkRule', {
-                    'networkId': networkId,
-                    'ipRange': '10.0.0.2',
-                    'direction': 'to',
-                    'protocol': 'icmp',
-                })
-        )
+        with interrupt_shield() as defer:
+            sync_sdnController_action(host, 'addNetworkRule', {
+                'networkId': networkId,
+                'ipRange': '10.0.0.2',
+                'direction': 'to',
+                'protocol': 'icmp',
+                'allow': 'false',
+            })
+            defer(
+                lambda:
+                    sync_sdnController_action(host, 'deleteNetworkRule', {
+                        'networkId': networkId,
+                        'ipRange': '10.0.0.2',
+                        'direction': 'to',
+                        'protocol': 'icmp',
+                    })
+            )
 
         # both rules are applied
         assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
@@ -442,12 +450,13 @@ class TestMigrate:
         hostA2: Host,
         local_sr_on_hostA2: SR,
         imported_vm: VM,
-        defer: Defer,
+        interrupt_shield: InterruptShield,
     ) -> None:
         hostA1 = hosts_with_traffic_rules[0]
 
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
 
@@ -456,8 +465,8 @@ class TestMigrate:
         macAddress = vif.mac_address()
         hostBr = vif.network().bridge()
 
-        set_clean_rules_state(defer, hostA1, hostBr)
-        set_clean_rules_state(defer, hostA2, hostBr)
+        set_clean_rules_state(interrupt_shield, hostA1, hostBr)
+        set_clean_rules_state(interrupt_shield, hostA2, hostBr)
 
         # no drop before adding the rule
         assert not ofproto_trace_drop(hostA1, hostBr, f"icmp,dl_src={macAddress}")
@@ -505,12 +514,13 @@ class TestMigrate:
         local_sr_on_hostA1: SR,
         local_sr_on_hostA2: SR,
         imported_vm: VM,
-        defer: Defer,
+        interrupt_shield: InterruptShield,
     ) -> None:
         hostA1 = hosts_with_traffic_rules[0]
 
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
         vm.start(on=hostA1.name()) # the test is assymetric, start with the VM on know host
         vm.wait_for_vm_running_and_ssh_up()
 
@@ -518,8 +528,8 @@ class TestMigrate:
         hostA1Br = Network(hostA1, networkId).bridge()
         hostA2Br = Network(hostA2, networkId).bridge()
 
-        set_clean_rules_state(defer, hostA1, hostA1Br)
-        set_clean_rules_state(defer, hostA2, hostA2Br)
+        set_clean_rules_state(interrupt_shield, hostA1, hostA1Br)
+        set_clean_rules_state(interrupt_shield, hostA2, hostA2Br)
 
         # no rule
         assert not ofproto_trace_drop(hostA1, hostA1Br, "icmp,nw_dst=10.0.0.1")
@@ -571,22 +581,23 @@ class TestMigrate:
 @pytest.mark.small_vm
 class TestVLAN:
     def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, empty_network: Network,
-                     vlan: VLAN, defer: Defer) -> None:
+                     vlan: VLAN, interrupt_shield: InterruptShield) -> None:
         host = hosts_with_traffic_rules[0]
         network = empty_network
 
         vlan_tag = vlan.tag()
         vlan_device = vlan.untagged_pif().device()
 
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
 
         # get bridge of the network of the tagged PIF
         hostBr = Network(host, vlan.tagged_pif().network_uuid()).bridge()
         netBr = network.bridge()
         logging.info(f"host bridge for vlan: {hostBr} / {netBr}")
 
-        set_clean_rules_state(defer, host, hostBr)
+        set_clean_rules_state(interrupt_shield, host, hostBr)
 
         vif = vm.create_vif(1, network_uuid=network.uuid)
         macAddress = vif.mac_address()
@@ -699,11 +710,12 @@ class TestVLAN:
         assert_clean_openflow_state(host, hostBr)
 
     def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
-                         empty_network: Network, vlan: VLAN, defer: Defer) -> None:
+                         empty_network: Network, vlan: VLAN, interrupt_shield: InterruptShield) -> None:
         host = hosts_with_traffic_rules[0]
         network = empty_network
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
         vlan_tag = vlan.tag()
         vlan_device = vlan.untagged_pif().device()
 
@@ -719,7 +731,7 @@ class TestVLAN:
             # put one vif in the VLAN
             vm.create_vif(1, network_uuid=networkId)
 
-            set_clean_rules_state(defer, host, hostBr)
+            set_clean_rules_state(interrupt_shield, host, hostBr)
 
             # no rules
             assert not ofproto_trace_drop(
@@ -802,15 +814,16 @@ class TestVLAN:
 @pytest.mark.small_vm
 class TestTunnel:
     def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
-                     tunnel: Tunnel, tunnel_protocol: str, defer: Defer) -> None:
+                     tunnel: Tunnel, tunnel_protocol: str, interrupt_shield: InterruptShield) -> None:
         host = hosts_with_traffic_rules[0]
         network = Network(host, tunnel.access_pif().network_uuid())
         hostBr = network.bridge()
 
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
 
-        set_clean_rules_state(defer, host, hostBr)
+        set_clean_rules_state(interrupt_shield, host, hostBr)
 
         vif = vm.create_vif(1, network_uuid=network.uuid)
         macAddress = vif.mac_address()
@@ -852,11 +865,12 @@ class TestTunnel:
         assert_clean_openflow_state(host, hostBr)
 
     def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM,
-                         tunnel: Tunnel, tunnel_protocol: str, defer: Defer) -> None:
+                         tunnel: Tunnel, tunnel_protocol: str, interrupt_shield: InterruptShield) -> None:
         host = hosts_with_traffic_rules[0]
         network = Network(host, tunnel.access_pif().network_uuid())
-        vm = imported_vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = imported_vm.clone()
+            defer(lambda: vm.destroy())
         hostBr = network.bridge()
 
         networkId = network.uuid
@@ -866,7 +880,7 @@ class TestTunnel:
             # put one vif in the Tunnel
             vm.create_vif(1, network_uuid=networkId)
 
-            set_clean_rules_state(defer, host, hostBr)
+            set_clean_rules_state(interrupt_shield, host, hostBr)
 
             # no rules
             assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")

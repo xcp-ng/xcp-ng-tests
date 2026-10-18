@@ -13,7 +13,7 @@ import logging
 import time
 from functools import partial
 
-from lib.common import Defer
+from lib.common import Defer, InterruptShield
 from lib.host import Host
 from lib.sr import SR
 from lib.vm import VM
@@ -104,7 +104,8 @@ class TestHaScenario:
         wait_for_vm_on_host(ha_protected_vm, target, f'Wait for VM to remain on {target} after xapi restart')
 
     def test_nfs_unreachable_pool(
-        self, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer,
+        interrupt_shield: InterruptShield,
     ) -> None:
         pool = host.pool
         master, slave = prepare_pool_for_ha(pool)
@@ -116,8 +117,9 @@ class TestHaScenario:
         boot_ids = {h: h.boot_id() for h in pool.hosts}
         for h in (master, slave):
             for spec in nfs_drop_specs(server):
-                insert_rule(h, spec)
-                defer(partial(delete_rule, h, spec))
+                with interrupt_shield():
+                    insert_rule(h, spec)
+                    defer(partial(delete_rule, h, spec))
 
         logging.info(f'Let HA run {HA_SETTLE_SECS}s without NFS on any host')
         time.sleep(HA_SETTLE_SECS)

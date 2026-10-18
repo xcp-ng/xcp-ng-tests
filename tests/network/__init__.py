@@ -5,14 +5,14 @@ import pytest
 import logging
 from contextlib import contextmanager
 
-from lib.common import Defer, wait_for
+from lib.common import InterruptShield, wait_for
 from lib.vm import VM
 
 from typing import Generator
 
 @contextmanager
 def tcpdump(
-    defer: Defer,
+    interrupt_shield: InterruptShield,
     pcapfile: str,
     vm: VM,
     interface: str,
@@ -42,12 +42,13 @@ def tcpdump(
 
     # run tcpdump in background
     logging.info(f"Running tcpdump on '{vm.name()}'")
-    vm.ssh(
-        f"tcpdump --immediate-mode {args} & "
-        f"echo $! > {pcapfile}.pid; ",
-        background=True,
-    )
-    defer(cleanup)
+    with interrupt_shield() as defer:
+        vm.ssh(
+            f"tcpdump --immediate-mode {args} & "
+            f"echo $! > {pcapfile}.pid; ",
+            background=True,
+        )
+        defer(cleanup)
 
     # check tcpdump has properly started
     wait_for(lambda: vm.file_exists(pcapfile), timeout_secs=2, retry_delay_secs=1)

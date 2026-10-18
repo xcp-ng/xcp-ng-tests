@@ -10,7 +10,7 @@ import time
 from pydantic import BaseModel, Field, TypeAdapter
 
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, safe_split, vm_image, wait_for
+from lib.common import InterruptShield, safe_split, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
@@ -228,8 +228,8 @@ class TestLinstorSR:
 
     @pytest.mark.small_vm
     @pytest.mark.skip(reason="not supported")
-    def test_vdi_on_boot_reset(self, vm_on_linstor_sr: VM, defer: Defer) -> None:
-        vdi_on_boot_reset(vm_on_linstor_sr, defer)
+    def test_vdi_on_boot_reset(self, vm_on_linstor_sr: VM, interrupt_shield: InterruptShield) -> None:
+        vdi_on_boot_reset(vm_on_linstor_sr, interrupt_shield)
 
     # *** tests with reboots (longer tests).
 
