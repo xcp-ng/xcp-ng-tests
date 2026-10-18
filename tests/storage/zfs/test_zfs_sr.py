@@ -6,7 +6,7 @@ import logging
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, vm_image, wait_for
+from lib.common import InterruptShield, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI
@@ -66,13 +66,14 @@ class TestZFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot", "clone"])
-    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
-        coalesce_integrity(storage_test_vm, vdi_on_zfs_sr, vdi_op, defer)
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, vdi_op: CoalesceOperation,
+                      interrupt_shield: InterruptShield) -> None:
+        coalesce_integrity(storage_test_vm, vdi_on_zfs_sr, vdi_op, interrupt_shield)
 
     @pytest.mark.small_vm
     @pytest.mark.disk_throughput_intensive
-    def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, defer: Defer) -> None:
-        full_vdi_write(storage_test_vm, vdi_on_zfs_sr, defer)
+    def test_full_vdi_write(self, storage_test_vm: VM, vdi_on_zfs_sr: VDI, interrupt_shield: InterruptShield) -> None:
+        full_vdi_write(storage_test_vm, vdi_on_zfs_sr, interrupt_shield)
 
     @pytest.mark.small_vm
     def test_invalid_vdi_size(self, zfs_sr: SR, image_format: ImageFormat) -> None:
@@ -82,18 +83,19 @@ class TestZFSSR:
 
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
-    def test_xva_export_import(self, vm_on_zfs_sr: VM, compression: XVACompression, temp_large_dir: str, defer: Defer) \
-            -> None:
-        xva_export_import(vm_on_zfs_sr, compression, temp_large_dir, defer)
+    def test_xva_export_import(self, vm_on_zfs_sr: VM, compression: XVACompression, temp_large_dir: str,
+                               interrupt_shield: InterruptShield) -> None:
+        xva_export_import(vm_on_zfs_sr, compression, temp_large_dir, interrupt_shield)
 
     @pytest.mark.small_vm
-    def test_xva_export_import_with_snapshot(self, vm_on_zfs_sr: VM, temp_large_dir: str, defer: Defer) -> None:
-        xva_export_import(vm_on_zfs_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
+    def test_xva_export_import_with_snapshot(self, vm_on_zfs_sr: VM, temp_large_dir: str,
+                                             interrupt_shield: InterruptShield) -> None:
+        xva_export_import(vm_on_zfs_sr, 'zstd', temp_large_dir, interrupt_shield, with_snapshot=True)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, zfs_sr: SR, image_format: ImageFormat, temp_large_dir: str,
-                               defer: Defer) -> None:
-        vdi_export_import(storage_test_vm, zfs_sr, image_format, temp_large_dir, defer)
+                               interrupt_shield: InterruptShield) -> None:
+        vdi_export_import(storage_test_vm, zfs_sr, image_format, temp_large_dir, interrupt_shield)
 
     # *** tests with reboots (longer tests).
 
