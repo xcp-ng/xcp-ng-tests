@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import lib.commands as commands
-from lib.common import strtobool, wait_for
+from lib.common import InterruptShield, strtobool, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
@@ -259,10 +259,14 @@ def start_ha_vm(vm: VM, on_host: Host) -> None:
     vm.wait_for_os_booted()
 
 
-def enable_pool_ha(pool: Pool, nfs_sr: SR) -> None:
+def enable_pool_ha(pool: Pool, nfs_sr: SR, interrupt_shield: InterruptShield) -> None:
+    """Enable HA, and defer cleanup_ha_scenario(), which brings the pool back after the scenario."""
     max_fail = pool.master.xe('pool-ha-compute-max-host-failures-to-tolerate')
     assert max_fail != '0', 'Pool cannot tolerate any host failure with current capacity'
-    pool.enable_ha(nfs_sr, max_fail)
+    with interrupt_shield() as defer:
+        # Registered first: pool-ha-enable may fail after a partial enable
+        defer(lambda: cleanup_ha_scenario(pool))
+        pool.enable_ha(nfs_sr, max_fail)
     wait_for(
         pool.is_ha_enabled,
         f'Wait for HA enabled on pool {pool.uuid}',
