@@ -9,9 +9,9 @@ from lib.common import wait_for
 from lib.vm import VM
 from lib.windows import (
     WINDOWS_SHUTDOWN_COMMAND,
-    check_vm_dns,
     insert_cd_safe,
-    set_vm_dns,
+    vm_check_test_dnsv4,
+    vm_set_test_dnsv4,
     wait_for_vm_running_and_ssh_up_without_tools,
     wait_for_vm_xenvif_offboard,
 )
@@ -96,16 +96,15 @@ def onboarding_guest_tools_iso(guest_tools_iso: dict[str, Any]) -> dict[str, Any
 @pytest.mark.multi_vms
 @pytest.mark.usefixtures("windows_vm")
 class TestXenClean:
-    def test_xenclean_without_tools(
-        self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]
-    ) -> None:
+    def test_xenclean_without_tools(self, running_unsealed_windows_vm: VM, guest_tools_iso: dict[str, Any]) -> None:
         vm = running_unsealed_windows_vm
         logging.info("XenClean with empty VM")
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_onboard_without_tools(self, running_unsealed_windows_vm: VM,
-                                            onboarding_guest_tools_iso: dict[str, Any]) -> None:
+    def test_xenclean_onboard_without_tools(
+        self, running_unsealed_windows_vm: VM, onboarding_guest_tools_iso: dict[str, Any]
+    ) -> None:
         vm = running_unsealed_windows_vm
         logging.info("XenClean onboard with empty VM")
         assert run_xenclean(vm, onboarding_guest_tools_iso, onboard=True) == "ReadyForOnboard"
@@ -118,23 +117,25 @@ class TestXenClean:
         run_xenclean(vm, guest_tools_iso)
         assert vm.are_windows_tools_uninstalled()
 
-    def test_xenclean_with_test_tools(self, vm_install_test_tools_no_reboot: VM,
-                                      guest_tools_iso: dict[str, Any]) -> None:
+    def test_xenclean_with_test_tools(
+        self, vm_install_test_tools_no_reboot: VM, guest_tools_iso: dict[str, Any]
+    ) -> None:
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         # HACK: In some cases, vm.reboot(verify=False) followed by vm.insert_cd() (as called by run_xenclean)
         # may cause the VM to hang at the BIOS screen; wait for VM start to avoid this issue.
         wait_for_vm_running_and_ssh_up_without_tools(vm)
 
-        set_vm_dns(vm)
+        vm_set_test_dnsv4(vm)
         logging.info("XenClean with test tools")
         run_xenclean(vm, guest_tools_iso)
         logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
-        check_vm_dns(vm)
+        vm_check_test_dnsv4(vm)
 
-    def test_xenclean_onboard_with_test_tools(self, vm_install_test_tools_no_reboot: VM,
-                                              onboarding_guest_tools_iso: dict[str, Any]) -> None:
+    def test_xenclean_onboard_with_test_tools(
+        self, vm_install_test_tools_no_reboot: VM, onboarding_guest_tools_iso: dict[str, Any]
+    ) -> None:
         vm = vm_install_test_tools_no_reboot
         vm.reboot()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
@@ -151,12 +152,12 @@ class TestXenClean:
         if param.get("vendor_device"):
             pytest.skip("Skipping XenClean with vendor device present")
 
-        set_vm_dns(vm)
+        vm_set_test_dnsv4(vm)
         logging.info("XenClean with other tools")
         run_xenclean(vm, guest_tools_iso)
         logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
-        check_vm_dns(vm)
+        vm_check_test_dnsv4(vm)
 
     def test_xenclean_onboard_with_other_tools(
         self, vm_install_other_drivers: tuple[VM, dict[str, Any]], onboarding_guest_tools_iso: dict[str, Any]
