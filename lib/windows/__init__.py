@@ -181,16 +181,18 @@ Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}""",
 
 def vif_has_static_configuration(
     vif: VIF,
-    address_family: str,
+    address_family: AddressFamily,
     address: str,
     prefix: int,
     gateway: str,
+    dns: list[str] | None = None,
     *,
     present: bool = True,
 ) -> bool:
     default_route = "0.0.0.0/0" if address_family == "IPv4" else "::/0"
     comparison = "-gt 0" if present else "-eq 0"
-    return strtobool(
+
+    has_ip = strtobool(
         vif_execute_powershell_script(
             vif,
             rf"""$addresses = @(Get-NetIPAddress `
@@ -209,6 +211,13 @@ Where-Object {{$_.DestinationPrefix -eq '{default_route}' -and $_.NextHop -eq '{
 ($addresses.Count {comparison}) -and ($gateways.Count {comparison})""",
         )
     )
+    if not has_ip:
+        return False
+
+    if dns is None:
+        return True
+
+    return set(vif_get_dns(vif, address_family=address_family)) == set(dns)
 
 
 def vif_uses_dhcp(vif: VIF) -> bool:
