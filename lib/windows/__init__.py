@@ -12,7 +12,7 @@ from lib.sr import SR
 from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Generator
+from typing import Any, Generator, Literal, TypeAlias
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -156,22 +156,25 @@ def vif_has_rss(vif: VIF) -> bool:
     return strtobool(vif_execute_powershell_script(vif, r"($adapter | Get-NetAdapterRss).MaxProcessors -gt 0"))
 
 
-def vif_get_dns(vif: VIF) -> list[str]:
+AddressFamily: TypeAlias = Literal["IPv4"] | Literal["IPv6"]
+
+
+def vif_get_dns(vif: VIF, address_family: AddressFamily) -> list[str]:
     return vif_execute_powershell_script(
         vif,
-        r"""Import-Module DnsClient;
+        rf"""Import-Module DnsClient;
 $adapter |
-Get-DnsClientServerAddress -AddressFamily IPv4 |
+Get-DnsClientServerAddress -AddressFamily {address_family} |
 Select-Object -ExpandProperty ServerAddresses""",
     ).splitlines()
 
 
-def vif_set_dns(vif: VIF, nameservers: list[str]) -> None:
+def vif_set_dns(vif: VIF, address_family: AddressFamily, nameservers: list[str]) -> None:
     vif_execute_powershell_script(
         vif,
         rf"""Import-Module DnsClient;
 $adapter |
-Get-DnsClientServerAddress -AddressFamily IPv4 |
+Get-DnsClientServerAddress -AddressFamily {address_family} |
 Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}""",
     )
 
@@ -257,15 +260,15 @@ def wait_for_vm_xenvif_offboard(vm: VM) -> None:
 def set_vm_dns(vm: VM) -> None:
     logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
     vif = vm.vifs()[0]
-    assert TEST_DNS_SERVER not in vif_get_dns(vif)
-    vif_set_dns(vif, [TEST_DNS_SERVER])
+    assert TEST_DNS_SERVER not in vif_get_dns(vif, "IPv4")
+    vif_set_dns(vif, "IPv4", [TEST_DNS_SERVER])
 
 
 def check_vm_dns(vm: VM) -> None:
     # The restore task takes time to fire so wait for it
     vif = vm.vifs()[0]
     wait_for(
-        lambda: TEST_DNS_SERVER in vif_get_dns(vif),
+        lambda: TEST_DNS_SERVER in vif_get_dns(vif, "IPv4"),
         f"Check VM DNS contains {TEST_DNS_SERVER}",
         timeout_secs=300,
         retry_delay_secs=30,
