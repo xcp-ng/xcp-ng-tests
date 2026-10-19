@@ -257,14 +257,14 @@ def wait_for_vm_xenvif_offboard(vm: VM) -> None:
     wait_for(lambda: is_vm_offboarded_xenvif(vm), timeout_secs=180, retry_delay_secs=15)
 
 
-def set_vm_dns(vm: VM) -> None:
+def vm_set_test_dnsv4(vm: VM) -> None:
     logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
     vif = vm.vifs()[0]
     assert TEST_DNS_SERVER not in vif_get_dns(vif, "IPv4")
     vif_set_dns(vif, "IPv4", [TEST_DNS_SERVER])
 
 
-def check_vm_dns(vm: VM) -> None:
+def vm_check_test_dnsv4(vm: VM) -> None:
     # The restore task takes time to fire so wait for it
     vif = vm.vifs()[0]
     wait_for(
