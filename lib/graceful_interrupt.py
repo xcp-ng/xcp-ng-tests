@@ -15,9 +15,9 @@ the code that is currently running.
 
 Other sections of code can be shielded like a fixture setup: see shielded().
 
-Only pytest itself is concerned: in a terminal, Ctrl+C also interrupts the commands that pytest runs (they're in its
-process group), so a fixture setup running a command may fail anyway. A SIGINT sent to pytest only (kill -INT <pid>)
-doesn't have this problem.
+Only pytest receives the interruption: the commands run by lib/commands.py are in their own process group, so a Ctrl+C
+in a terminal doesn't reach them, as when pytest alone is sent SIGINT (kill -INT <pid>). A fixture setup, or a shielded
+section, running a command isn't cut short by the command dying.
 
 The plugin leaves alone a SIGINT that pytest ignores (e.g. started in the background of a script, with `&`), or that
 something else handles.
