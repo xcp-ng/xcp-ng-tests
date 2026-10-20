@@ -59,7 +59,6 @@ class Tracing:
     # NOTE allows to not duplicate this code in each migration test, which will be useful
     # as we will probably need to evolve the migration spans search in the future.
     def stats_migration(self, traceparent) -> None:
-        """ Storage migration stats not tested (VDI.pool_migrate). """
         if not self.enabled or not self.endpoint:
             return
         # NOTE some migration spans are missing the user tags (like VM_migrate_downtime_end),
