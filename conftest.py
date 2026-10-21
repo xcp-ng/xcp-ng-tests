@@ -439,6 +439,12 @@ def hostB1(hosts: list[Host]) -> Generator[Host, None, None]:
     yield _hostB1
 
 @pytest.fixture(scope='session')
+def fail_with_v9(host: Host) -> None:
+    version_str = "8.99"
+    if not host.xcp_version < version.parse(version_str):
+        pytest.xfail("This test is failing with XCP-ng v9 host")
+
+@pytest.fixture(scope='session')
 def host_at_least_8_3(host: Host) -> None:
     version_str = "8.3"
     if not host.xcp_version >= version.parse(version_str):
