@@ -18,6 +18,7 @@ from tests.storage import (
     full_vdi_write,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -149,6 +150,13 @@ class TestNFSSR:
         if "NFS4" in dispatch_nfs.get_name_label() and config.write_volume_cap > 20 * GiB:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_vdi_on_boot_reset(self, dispatch_nfs: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(dispatch_nfs, defer)
 
     # *** tests with reboots (longer tests).
 
