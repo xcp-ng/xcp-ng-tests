@@ -41,6 +41,11 @@ def write_then_read(vm: VM, device: str, size_mib: int) -> None:
     vm.ssh(f'blockdev --flushbufs /dev/{device}')
     vm.ssh(f'dd if=/dev/{device} of=/dev/null bs=1M count={size_mib} status=none')
 
+def prefill(vm: VM, device: str) -> None:
+    """Write the whole device once with fio: the benchmarks must not read unallocated blocks nor allocate them."""
+    vm.ssh(shlex.join(['fio', '--name=prefill', '--rw=write', '--bs=1M', '--iodepth=32', '--direct=1',
+                       '--ioengine=libaio', f'--filename=/dev/{device}', '--size=100%']))
+
 def assert_tapdisk_io(host: Host, pid: int, minor: int, size_mib: int) -> None:
     """Check that tapdisk served at least size_mib MiB of reads and of writes."""
     read_secs, written_secs = TapCtl(host).stats(pid, minor)['secs']  # in 512-byte sectors
@@ -77,19 +82,24 @@ FIO_ACCESS_TYPES = ('read', 'rw', 'randrw')
 FIO_BLOCK_SIZES = ('4k', '64k', '1m')
 
 def fio_command(device: str, runtime: int, access_types: Sequence[str] = FIO_ACCESS_TYPES,
-                block_sizes: Sequence[str] = FIO_BLOCK_SIZES) -> str:
+                block_sizes: Sequence[str] = FIO_BLOCK_SIZES, barriers: bool = False) -> str:
     """fio I/O on the device: one job per access type and block size, all running at the same time."""
     # fio rather than dd: several jobs (processes) and many requests in flight (libaio, iodepth)
     # exercise the multi-queue and multi-thread paths of tapdisk, which matter in these tests.
     # The options before the first --name apply to all the jobs.
     jobs = ' '.join(f'--name={rw}-{bs} --rw={rw} --bs={bs}' for rw in access_types for bs in block_sizes)
+    if barriers:
+        # synchronous writes, each one followed by a fsync, that blkfront sends as a flush (barrier):
+        # tapdisk then has barriers pending among the other requests
+        jobs += ' --name=barriers --rw=randwrite --bs=4k --ioengine=sync --fsync=1 --numjobs=4'
     return (f'fio --filename=/dev/{device} --direct=1 --ioengine=libaio --iodepth=64 '
             f'--runtime={runtime} --time_based {jobs}')
 
 def start_fio(vm: VM, device: str, runtime: int, access_types: Sequence[str] = FIO_ACCESS_TYPES,
-              block_sizes: Sequence[str] = FIO_BLOCK_SIZES) -> None:
+              block_sizes: Sequence[str] = FIO_BLOCK_SIZES, barriers: bool = False) -> None:
     """Run fio_command in the guest, in the background."""
-    vm.ssh(f'setsid {fio_command(device, runtime, access_types, block_sizes)} > /tmp/fio.log 2>&1 < /dev/null &')
+    command = fio_command(device, runtime, access_types, block_sizes, barriers)
+    vm.ssh(f'setsid {command} > /tmp/fio.log 2>&1 < /dev/null &')
 
 def wait_for_guest_reads(host: Host, pid: int, minor: int) -> None:
     wait_for(lambda: TapCtl(host).stats(pid, minor)['secs'][0] >= 10 * MiB // 512,
