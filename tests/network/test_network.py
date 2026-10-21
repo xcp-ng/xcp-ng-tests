@@ -4,7 +4,7 @@ import pytest
 
 import logging
 
-from lib.common import Defer
+from lib.common import InterruptShield
 from lib.host import Host
 from lib.network import Network
 from lib.vm import VM
@@ -18,13 +18,15 @@ class TestNetwork:
         assert empty_network.MTU() == 1500, "expected MTU is 1500"
 
     @pytest.mark.small_vm
-    def test_private_network(self, host: Host, empty_network: Network, imported_vm: VM, defer: Defer) -> None:
+    def test_private_network(self, host: Host, empty_network: Network, imported_vm: VM,
+                             interrupt_shield: InterruptShield) -> None:
         network = empty_network
 
-        vm1 = imported_vm.clone()
-        defer(lambda: vm1.destroy())
-        vm2 = imported_vm.clone()
-        defer(lambda: vm2.destroy())
+        with interrupt_shield() as defer:
+            vm1 = imported_vm.clone()
+            defer(lambda: vm1.destroy())
+            vm2 = imported_vm.clone()
+            defer(lambda: vm2.destroy())
 
         n1 = len(vm1.vifs())
         n2 = len(vm2.vifs())
