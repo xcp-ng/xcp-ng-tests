@@ -666,7 +666,19 @@ JOBS: dict[str, JobData] = {
             "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
-    }
+    },
+    "uefi-vars-migrate": {
+        "description": "checks that UEFI variables are kept when a VM changes host (cold start and live migration)",
+        "requirements": [
+            "A pool >= 8.3 with at least 2 hosts and a shared SR.",
+            "A fast-booting unix UEFI VM.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm_efitools",
+        },
+        "paths": ["tests/uefi_sb/test_uefi_var_migrate.py"],
+    },
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
