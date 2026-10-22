@@ -168,33 +168,40 @@ class Host:
         )
 
     @overload
-    def xe(self, action: str, args: XeParams = ..., *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = ..., *, vars: dict[str, str | dict[str, str]] = {}, check: bool = ...,
            simple_output: Literal[True] = ..., minimal: bool = ..., force: bool = ...) -> str:
         ...
 
     @overload
-    def xe(self, action: str, args: XeParams = ..., *, check: bool = ...,
+    def xe(self, action: str, args: XeParams = ..., vars: dict[str, str | dict[str, str]] = {}, *, check: bool = ...,
            simple_output: Literal[False], minimal: bool = ..., force: bool = ...) -> commands.SSHResult[str]:
         ...
 
-    def xe(self, action: str, args: XeParams = {}, *, check: bool = True,
+    def xe(self, action: str, args: XeParams = {}, vars: dict[str, str | dict[str, str]] = {}, *, check: bool = True,
            simple_output: bool = True, minimal: bool = False, force: bool = False) \
             -> str | commands.SSHResult[str]:
         maybe_param_minimal = ' --minimal' if minimal else ''
         maybe_param_force = ' --force' if force else ''
 
-        def stringify(key: str, value: str | bool | dict[str, str]) -> str:
+        def stringify(key: str, value: str | bool | dict[str, str], as_vars: bool) -> str:
             if isinstance(value, bool):
                 return f"{key}={to_xapi_bool(value)}"
             if isinstance(value, dict):
-                ret = ""
-                for key2, value2 in value.items():
-                    ret += f'{key}:{key2}={shlex.quote(value2)} '
-                return ret.rstrip()
+                if as_vars:
+                    value_str = ';'.join(f'{key2}={shlex.quote(value2)}' for key2, value2 in value.items())
+                    return f'{key}="{value_str}"'
+                else:
+                    ret = ""
+                    for key2, value2 in value.items():
+                        ret += f'{key}:{key2}={shlex.quote(value2)} '
+                    return ret.rstrip()
             return f'{key}={shlex.quote(value)}'
 
-        command: str = f'xe {action}{maybe_param_minimal}{maybe_param_force} ' + \
-            ' '.join(stringify(key, value) for key, value in args.items())
+        command: str = (
+            ' '.join(stringify(key, value, as_vars=True) for key, value in vars.items())
+            + f' xe {action}{maybe_param_minimal}{maybe_param_force} '
+            + ' '.join(stringify(key, value, as_vars=False) for key, value in args.items())
+        ).lstrip()
         if simple_output:
             return self.ssh(command, check=check, simple_output=True)
         else:
