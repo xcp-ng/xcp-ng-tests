@@ -959,6 +959,8 @@ Select-String "AddService=(xenbus|xencons|xendisk|xenfilt|xenhid|xeniface|xennet
         clone = self.clone(name=f"{self.name()} cache")
         logging.info(f"Marking VM {clone.uuid} as cached")
         clone.param_set('name-description', self.host.vm_cache_key(cache_id))
+        from lib.host import CACHED_VM_UUID_KEY
+        clone.param_set('other-config', clone.uuid, key=CACHED_VM_UUID_KEY)
 
     @overload
     def xenstore_read(self, path: str, accept_unknown_key: Literal[False] = ...) -> str:
