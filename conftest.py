@@ -968,13 +968,12 @@ def cifs_iso_sr(host: Host, cifs_iso_device_config: dict[str, Any]) -> Generator
     # teardown
     sr.forget()
 
-# NOTE chose session since no need to teardown after each test (avoid toolstack restarts and lost time)
 @pytest.fixture(scope='session')
 def tracing(pytestconfig: pytest.Config, hosts: list[Host]) -> Generator[Tracing, None, None]:
     """
-    Create a XAPI observer and enable tracing in the pools.
+    Create a XAPI observer and enable tracing in each pool.
     Use of this fixture will trigger toolstack restarts of the hosts that
-    don't have http endpoints enabled when one is provided.
+    don't have http/s endpoints enabled when one is provided.
     """
     def enable_observer(host: Host, uuid: str, endpoint: str) -> bool:
         return host.ssh_with_result(f"xe observer-param-set uuid={uuid} endpoints={endpoint} enabled=true").returncode == 0
@@ -983,7 +982,9 @@ def tracing(pytestconfig: pytest.Config, hosts: list[Host]) -> Generator[Tracing
     observer_uuids = []
     endpoint = pytestconfig.getoption('--tracing-endpoint')
     enabled = True
-    if endpoint:
+    if not endpoint:
+        enabled = False
+    else:
         logging.info(f"Setting up tracing with endpoint {endpoint}")
         # a http endpoint can be valid even if currently unreachable, check that it is reachable
         if 'http' in endpoint and hosts[0].ssh_with_result(f'curl -f -I {endpoint} --connect-timeout 10').returncode != 22:
@@ -994,29 +995,20 @@ def tracing(pytestconfig: pytest.Config, hosts: list[Host]) -> Generator[Tracing
             for host in hosts:
                 observer_uuid = host.xe('observer-create', {'name-label': observer_name, 'components': 'xapi,xenopsd'})
                 observer_uuids.append(observer_uuid)
-                if not enable_observer(host, observer_uuid, endpoint):
-                    if 'http' in endpoint:
-                        # retry with XAPI conf modification
-                        # NOTE manual testing: only the master can enable http endpoints, naming the conf xcpngtests works
-                        # NOTE don't enable smapi (experimental component), it can break tracing since an SM Qcow2 update
-                        host.ssh(
-                            'printf "observer-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/xcp-ng-tests.conf')
-                        host.restart_toolstack(verify=True)
-                        if not enable_observer(host, observer_uuid, endpoint):
-                            logging.warning(f'enabling tracing failed: endpoint {endpoint} is invalid')
-                            enabled = False
-                            break
-                    else:
-                        logging.warning(f'enabling tracing failed: endpoint {endpoint} is invalid')
-                        enabled = False
-                        break
-    else:
-        enabled = False
+                enabled = enable_observer(host, observer_uuid, endpoint)
+                if not enabled and 'http' in endpoint:
+                    # retry with XAPI conf modification
+                    host.ssh(
+                        'printf "observer-endpoint-http-enabled=true\nobserver-endpoint-https-enabled=true\n" > /etc/xapi.conf.d/xcp-ng-tests.conf')
+                    host.restart_toolstack(verify=True)
+                    enabled = enable_observer(host, observer_uuid, endpoint)
+                if not enabled:
+                    logging.warning(f'enabling tracing failed: endpoint {endpoint} is invalid')
+                    break
     tracing = Tracing(endpoint, enabled)
     yield tracing
     # teardown
     for i in range(len(observer_uuids)):
-        # observer_uuid = host.ssh(f"xe observer-list name-label={observer_name} | head -n 1 | cut -d' ' -f 20")
         hosts[i].xe('observer-destroy', {'uuid': observer_uuids[i]})
         if hosts[i].ssh_with_result('ls /etc/xapi.conf.d/xcp-ng-tests.conf').returncode == 0:
             hosts[i].ssh('rm -f /etc/xapi.conf.d/xcp-ng-tests.conf')
