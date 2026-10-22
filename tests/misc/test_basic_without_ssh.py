@@ -88,8 +88,7 @@ class TestBasicNoSSH:
             if check_vdis:
                 wait_for(lambda: vm.all_vdis_on_sr(dest_sr), "Wait for all VDIs on destination SR")
             wait_for(lambda: vm.is_running_on_host(dest_host), "Wait for VM to be running on destination host")
-            if tracing.enabled:
-                tracing.stats_migration(traceparent)
+            tracing.stats_migration(traceparent)
 
         vm = imported_vm
         initial_sr = vm.get_sr()

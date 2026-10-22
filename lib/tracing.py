@@ -13,9 +13,8 @@ import logging
 
 class Tracing:
     def __init__(self, endpoint, enabled) -> None:
-        self.endpoint: str | None = endpoint
         self.enabled: bool = enabled
-        # NOTE an observer uuid could be passed by the tracing fixture if needed by some tests, but not needed for now
+        self.endpoint: str | None = endpoint
 
     def gen_traceparent(self) -> str:
         # W3C: https://www.w3.org/TR/trace-context/#traceparent-header
@@ -25,44 +24,42 @@ class Tracing:
         trace_flags = "01"
         return '-'.join([version, trace_id, parent_id, trace_flags])
 
-    def get_span_zipkinv2(self, name: str, traceid: str) -> Any:
-        url = urlparse(self.endpoint)
-        # only true zipkin endpoints are supported (Jaeger zipkin port not supported)
-        # case-sensitive endpoint with only span names converted to lowercase
-        name = name.lower()
-        retries = 12
-        for _ in range(retries):
-            response = requests.get(f"{url.scheme}://{url.netloc}/api/v2/trace/{traceid}")
+    def span_from_traceid(self, name: str, traceid: str) -> Any:
+        def get_span_zipkinv2(url: Any, name: str) -> Any:
+            # case-sensitive endpoint with only span names converted to lowercase
+            name = name.lower()
+            response = requests.get(url)
             if response.status_code == 200:
                 trace = response.json()
                 for span in trace:
                     if span.get('name') == name:
                         return span
-            time.sleep(5)
-        return None
+            return None
 
-    def span_from_traceid(self, name: str, traceid: str) -> Any:
-        if not self.enabled or not self.endpoint:
+        if not self.enabled:
             return None
         span = None
-        if "api/v2/spans" in self.endpoint:
-            span = self.get_span_zipkinv2(name, traceid)
-        else:
-            logging.warning(f"tracing endpoint type not supported")
-
-        if span:
-            logging.debug(f"Span {name} found")
-        else:
+        retries = 12
+        for _ in range(retries):
+            # only true zipkin v2 endpoints are supported (Jaeger's zipkin v2 port is not supported)
+            if self.endpoint and "api/v2/spans" in self.endpoint:
+                url = urlparse(self.endpoint)
+                span = get_span_zipkinv2(f"{url.scheme}://{url.netloc}/api/v2/trace/{traceid}", name)
+            else:
+                logging.warning(f"tracing endpoint type not supported")
+                break
+            if not span:
+                time.sleep(5)
+            else:
+                break
+        if not span:
             logging.debug(f"Span {name} not found")
         return span
 
-    # NOTE allows to not duplicate this code in each migration test, which will be useful
-    # as we will probably need to evolve the migration spans search in the future.
     def stats_migration(self, traceparent) -> None:
-        if not self.enabled or not self.endpoint:
+        """ Common method to summarize the migration durations identified by the traceparent. """
+        if not self.enabled:
             return
-        # NOTE some migration spans are missing the user tags (like VM_migrate_downtime_end),
-        # it likely depends on how/where the with_tracing call are done in xapi/xenopsd
         traceid = traceparent.split("-", 3)[1]
         logging.info(f'Migration trace ID: {traceid}')
         logging.info("Locating migration spans")

@@ -173,38 +173,23 @@ class Host:
         maybe_param_minimal = ' --minimal' if minimal else ''
         maybe_param_force = ' --force' if force else ''
 
-        def stringify(key: str, value: str | bool | dict[str, str], vars: bool) -> str:
+        def stringify(key: str, value: str | bool | dict[str, str], as_vars: bool) -> str:
             if isinstance(value, bool):
                 return f"{key}={to_xapi_bool(value)}"
             if isinstance(value, dict):
-                if vars:
-                    # key: 'BAGGAGE'
-                    # value: {tag: tag_value}, {'foo': 'bar', 'baz': 'foo'}
-                    # return: shell escaped version of sub-string in BAGGAGE="foo=bar;baz=foo"
-                    # NOTE maybe values without quotes are accepted in baggages?
-                    # => all I found are string, even for numbers
-                    # NOTE not using shlex.quote, maybe not needed or is it accepted and better do it now than fix later?
-                    value_str = ';'.join(f'{key2}={value2}' for key2, value2 in value.items())
-                    return f'{key}="{value_str}" '
+                if as_vars:
+                    value_str = ';'.join(f'{key2}={shlex.quote(value2)}' for key2, value2 in value.items())
+                    return f'{key}="{value_str}"'
                 else:
                     ret = ""
                     for key2, value2 in value.items():
                         ret += f'{key}:{key2}={shlex.quote(value2)} '
                     return ret.rstrip()
-            # key: 'BAGGAGE'
-            # value: 'foo=bar'
-            # return: shell escaped version of sub-string in BAGGAGE="foo=bar"
-            # NOTE maybe values without quotes are accepted in baggages?
-            # => all I found are string, even for numbers
-            # NOTE not using shlex.quote, maybe not needed or is it accepted and better do it now than fix later?
-            if vars:
-                return f'{key}="{value}" '
-            else:
-                return f'{key}={shlex.quote(value)}'
+            return f'{key}={shlex.quote(value)}'
 
-        command: str = ''.join(stringify(key, value, vars=True) for key, value in vars.items()) + \
-            f'xe {action}{maybe_param_minimal}{maybe_param_force} ' + \
-            ' '.join(stringify(key, value, vars=False) for key, value in args.items())
+        command: str = ' '.join(stringify(key, value, as_vars=True) for key, value in vars.items()) + \
+            f' xe {action}{maybe_param_minimal}{maybe_param_force} ' + \
+            ' '.join(stringify(key, value, as_vars=False) for key, value in args.items())
         if simple_output:
             return self.ssh(command, check=check, simple_output=True)
         else:
