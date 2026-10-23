@@ -558,7 +558,25 @@ JOBS: dict[str, JobData] = {
             "--vm[]": "multi/tools_windows",
         },
         "paths": ["tests/guest_tools/win"],
-        "markers": "multi_vms",
+        # complex_prerequisites excludes the xenvbd repro package, which has its own job
+        "markers": "multi_vms and not complex_prerequisites",
+    },
+    "windows-xenvbd-repro": {
+        "description": "reproduce the xenvbd/tapdisk shutdown-ordering hazards on one test VDI (manual runs)",
+        "requirements": [
+            "A host running the designated Windows test VM (--vm=<uuid>, prerequisites of "
+            "tests/guest_tools/win/test_nondestructive.py, no PV tools). The host may be shared: only the test "
+            "VDI's tapdisk is configured or signalled.",
+            "An SR attached to that host for the test VDIs (--repro-sr).",
+            "A staged repro driver zip (--repro-drivers), the tdtest tapdisk and tdtest-ctl "
+            "(--repro-tapdisk, --repro-tdtest-ctl). See tests/guest_tools/win/xenvbd_repro/README.md.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm[]": "multi/tools_windows",
+        },
+        "paths": ["tests/guest_tools/win/xenvbd_repro"],
+        "markers": "multi_vms and complex_prerequisites",
     },
     "xen": {
         "description": "Testing of the Xen hypervisor itself",
