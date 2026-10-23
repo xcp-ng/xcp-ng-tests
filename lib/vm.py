@@ -171,6 +171,13 @@ class VM(BaseVM):
         assert self.ip is not None
         return commands.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
 
+    def sftp_get(self, src: str, dest: str, check: bool = True,
+                 suppress_fingerprint_warnings: bool = True) -> subprocess.CompletedProcess[bytes]:
+        """Download src from the VM to the local path dest. Both paths are quoted; avoid '"' in them."""
+        cmd = f'get "{src}" "{dest}"'
+        assert self.ip is not None
+        return commands.sftp(self.ip, [cmd], check, suppress_fingerprint_warnings)
+
     def is_ssh_up(self) -> bool:
         try:
             return self.ssh_with_result('true').returncode == 0
