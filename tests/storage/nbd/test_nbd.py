@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import contextlib
 import itertools
 import logging
 import re
@@ -20,11 +21,16 @@ from lib.vdi import VDI
 #   only accepts the connections arriving on a network with the nbd purpose, which the
 #   management network gets for the duration of the tests
 #
-# Both tests reproduce a deadlock between tapdisk and xapi-nbd, seen with XO backups
+# These tests reproduce a deadlock between tapdisk and xapi-nbd, seen with XO backups
 # overlapping on a host. tapdisk sent each NBD reply with a blocking send() from its event
 # loop, so a peer not reading its replies froze the whole tapdisk, `tap-ctl list` included.
 # xapi-nbd runs `tap-ctl list` synchronously when a client connects, and doesn't read its
 # other connections meanwhile: the tapdisk sending them a reply never answers.
+#
+# Through xapi-nbd, the deadlock is a race: tapdisk must be in the middle of a reply when
+# xapi-nbd stops reading it, which only happens for a few percent of the new connections.
+# xapi-nbd reads a whole reply from tapdisk before writing it to its client, so a client
+# not reading its replies doesn't block tapdisk: it only blocks xapi-nbd.
 
 # What XO reads per request, much larger than a socket buffer
 BLOCK_SIZE = 2 * MiB
@@ -64,48 +70,114 @@ class NbdStreamer(threading.Thread):
 def tap_ctl_list_answers(host: Host) -> bool:
     return host.ssh_with_result('timeout 10 tap-ctl list').returncode == 0
 
-def first_nbd_info(session: XapiNbdSession, vdi: VDI) -> NbdInfo:
+def management_nbd_info(host: Host, session: XapiNbdSession, vdi: VDI) -> NbdInfo:
+    """ The VDI.get_nbd_info entry on the management network: the one the test runner can reach. """
+    address = host.management_pif().param_get('IP')
     infos = session.nbd_info(vdi)
-    assert infos, f"VDI.get_nbd_info returned nothing for {vdi}"
-    return infos[0]
+    for info in infos:
+        if info.address == address:
+            return info
+    raise AssertionError(f"no VDI.get_nbd_info entry on {address} for {vdi}: {infos}")
+
+# Connections reading the same VDI at once, like the parallel NBD connections of an XO backup:
+# the more of them, the more often tapdisk is in the middle of a reply when xapi-nbd stops
+# reading it to serve a new connection
+READING_CONNECTIONS = 4
+# How long new connections are attempted while the others are reading, in seconds: each one
+# only deadlocks if tapdisk is in the middle of a reply at that moment
+CONNECTION_DURATION = 5 * 60
 
 @pytest.mark.usefixtures("nbd_network", "tapdisk_control_check")
 def test_xapi_nbd_connection_while_reading(host: Host, nbd_session: XapiNbdSession, nbd_vdis: list[VDI]) -> None:
-    """ A connection to xapi-nbd must succeed while another connection is reading. """
+    """ A connection to xapi-nbd must succeed while other connections are reading. """
     reading_vdi, other_vdi = nbd_vdis
 
-    with NbdClient.from_nbd_info(first_nbd_info(nbd_session, reading_vdi)) as reading_client:
-        streamer = NbdStreamer(reading_client)
-        streamer.start()
+    with contextlib.ExitStack() as stack:
+        streamers = []
+        for _ in range(READING_CONNECTIONS):
+            client = stack.enter_context(
+                NbdClient.from_nbd_info(management_nbd_info(host, nbd_session, reading_vdi))
+            )
+            streamer = NbdStreamer(client)
+            streamer.start()
+            # Registered after the client: stopped before the client is closed
+            stack.callback(streamer.stop)
+            streamers.append(streamer)
+
+        def errors() -> list[BaseException]:
+            return [s.error for s in streamers if s.error is not None]
+
+        wait_for(lambda: all(s.bytes_read >= 64 * MiB for s in streamers) or errors(),
+                 "Wait for the NBD connections to be reading", timeout_secs=60, retry_delay_secs=1)
+        assert not errors(), f"reading NBD connections failed: {errors()!r}"
+
+        deadline = time.monotonic() + CONNECTION_DURATION
+        i = 0
+        while time.monotonic() < deadline:
+            info = management_nbd_info(host, nbd_session, other_vdi)
+            start = time.monotonic()
+            timed_out = False
+            try:
+                with NbdClient.from_nbd_info(info, timeout=30) as client:
+                    client.read(0, BLOCK_SIZE)
+            except TimeoutError:
+                timed_out = True
+            if timed_out:
+                pytest.fail(
+                    f"NBD connection {i} got no answer from xapi-nbd in 30 s while other connections were"
+                    f" reading, after {i} successful connections"
+                    f" (tap-ctl list answers: {tap_ctl_list_answers(host)})"
+                )
+            logging.info("NBD connection %d: connected and read %d bytes in %.2f s",
+                         i, BLOCK_SIZE, time.monotonic() - start)
+            i += 1
+        logging.info("%d NBD connections succeeded in %d s while other connections were reading",
+                     i, CONNECTION_DURATION)
+
+        read_before = [s.bytes_read for s in streamers]
+        time.sleep(2)
+        assert not errors(), f"reading NBD connections failed: {errors()!r}"
+        assert all(s.bytes_read > before for s, before in zip(streamers, read_before)), \
+            "a reading NBD connection stopped reading"
+        assert tap_ctl_list_answers(host), "tap-ctl list hangs"
+
+# Reads sent and never read by the stalled connection: far more than the socket buffers
+# between tapdisk and the test runner
+STALLED_READS = 32
+
+@pytest.mark.usefixtures("nbd_network", "tapdisk_control_check")
+def test_xapi_nbd_connection_while_stalled(host: Host, nbd_session: XapiNbdSession, nbd_vdis: list[VDI]) -> None:
+    """
+    A connection to xapi-nbd must succeed while another connection doesn't read its replies,
+    like a backup writing to a slow remote.
+    """
+    stalled_vdi, other_vdi = nbd_vdis
+
+    with NbdClient.from_nbd_info(management_nbd_info(host, nbd_session, stalled_vdi)) as stalled_client:
+        for i in range(STALLED_READS):
+            stalled_client.send_read(i * BLOCK_SIZE, BLOCK_SIZE)
+        # Let the replies fill the buffers up to tapdisk
+        time.sleep(5)
+        logging.info("tap-ctl list answers with a stalled NBD connection: %s", tap_ctl_list_answers(host))
+        # Where the unread replies are: tapdisk -> xapi-nbd unix sockets, xapi-nbd -> runner TCP
+        # sockets, and xapi-nbd memory
+        logging.info("Sockets with a stalled NBD connection:\n%s", host.ssh(
+            'ss -xp | grep -E "xapi-nbd|tapdisk"; ss -tnp "sport = :10809";'
+            ' grep VmRSS /proc/$(pidof xapi-nbd)/status', check=False))
+
+        info = management_nbd_info(host, nbd_session, other_vdi)
+        timed_out = False
         try:
-            wait_for(lambda: streamer.bytes_read >= 64 * MiB or streamer.error is not None,
-                     "Wait for the first NBD connection to be reading", timeout_secs=60, retry_delay_secs=1)
-            assert streamer.error is None, f"the first NBD connection failed: {streamer.error!r}"
-
-            for i in range(5):
-                info = first_nbd_info(nbd_session, other_vdi)
-                start = time.monotonic()
-                timed_out = False
-                try:
-                    with NbdClient.from_nbd_info(info, timeout=30) as client:
-                        client.read(0, BLOCK_SIZE)
-                except TimeoutError:
-                    timed_out = True
-                if timed_out:
-                    pytest.fail(
-                        f"NBD connection {i} got no answer from xapi-nbd in 30 s while another connection was"
-                        f" reading (tap-ctl list answers: {tap_ctl_list_answers(host)})"
-                    )
-                logging.info("NBD connection %d: connected and read %d bytes in %.2f s",
-                             i, BLOCK_SIZE, time.monotonic() - start)
-
-            read_before = streamer.bytes_read
-            time.sleep(2)
-            assert streamer.error is None, f"the first NBD connection failed: {streamer.error!r}"
-            assert streamer.bytes_read > read_before, "the first NBD connection stopped reading"
-            assert tap_ctl_list_answers(host), "tap-ctl list hangs"
-        finally:
-            streamer.stop()
+            with NbdClient.from_nbd_info(info, timeout=30) as client:
+                client.read(0, BLOCK_SIZE)
+        except TimeoutError:
+            timed_out = True
+        if timed_out:
+            pytest.fail(
+                "NBD connection got no answer from xapi-nbd in 30 s while another connection was stalled"
+                f" (tap-ctl list answers: {tap_ctl_list_answers(host)})"
+            )
+        assert tap_ctl_list_answers(host), "tap-ctl list hangs"
 
 def tapdisk_nbd_socket(host: Host, vdi: VDI) -> str:
     """ The NBD server socket of the tapdisk serving vdi, which must be attached. """

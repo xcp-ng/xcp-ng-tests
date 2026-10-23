@@ -56,6 +56,9 @@ def nbd_vdis(host: Host) -> Generator[list[VDI], None, None]:
     vdis = [sr.create_vdi(f'NBD-test-VDI-{i}', virtual_size=NBD_VDI_SIZE) for i in range(2)]
     yield vdis
     for vdi in vdis:
+        # xapi-nbd unplugs and destroys its dom0 VBD a few seconds after the NBD connection closes
+        wait_for(lambda: not host.xe('vbd-list', {'vdi-uuid': vdi.uuid}, minimal=True),
+                 f"Wait for xapi-nbd to release {vdi}", timeout_secs=60, retry_delay_secs=1)
         vdi.destroy()
 
 @pytest.fixture()
