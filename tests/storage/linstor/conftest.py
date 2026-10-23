@@ -140,7 +140,7 @@ def pool_with_linstor(
             )
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(ensure_linstor_not_installed, pool.hosts)
+        list(executor.map(ensure_linstor_not_installed, pool.hosts))
 
     def install_linstor(host: Host) -> None:
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
@@ -152,7 +152,7 @@ def pool_with_linstor(
         host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(install_linstor, pool.hosts)
+        list(executor.map(install_linstor, pool.hosts))
 
     yield pool
 
@@ -171,7 +171,7 @@ def pool_with_linstor(
         host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(remove_linstor, pool.hosts)
+        list(executor.map(remove_linstor, pool.hosts))
 
 @pytest.fixture(scope='package')
 def linstor_redundancy(linstor_hosts_with_lvm_disks: list[Host]) -> int:
