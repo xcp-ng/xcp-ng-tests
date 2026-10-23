@@ -285,7 +285,7 @@ def deploy_tdtest(host: Host, tapdisk_local: Path, ctl_local: Path) -> TdtestDep
     flags = _rpm_v_flags(baseline["rpm_V_blktap"], LIVE_BIN)
     # Size, digest or mode changes mean the content or permissions differ from the RPM. An mtime-only
     # difference ("T") is tolerated because the digest still matches.
-    modified = flags is not None and any(c in flags for c in "S5M")
+    modified = flags is not None and (flags == "missing" or any(c in flags for c in "S5M"))
 
     host.ssh(f"mkdir -p {TDTEST_DIR} && chmod 700 {TDTEST_DIR}")
     has_stock = host.ssh_with_result(f"test -f {STOCK_BIN}").returncode == 0
