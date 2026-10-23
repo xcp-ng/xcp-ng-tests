@@ -27,7 +27,7 @@ from pathlib import Path
 from lib.commands import SSHCommandFailed
 from lib.host import Host
 
-from typing import Callable, Generator, Iterable
+from typing import Callable, Generator, Iterable, Mapping
 
 # --------------------------------------------------------------------------------------------------
 # Host paths
@@ -522,15 +522,17 @@ echo "$off"
     return TdtestConfigResult(accepted, info.pid, info.minor, seq, config, line)
 
 
-def tdtest_set(host: Host, vdi_uuid: str, *, replace: bool = False, timeout: float = TDTEST_ACK_TIMEOUT_S,
-               **kv: object) -> TdtestConfigResult:
+def tdtest_set(host: Host, vdi_uuid: str, settings: Mapping[str, object] | None = None, *, replace: bool = False,
+               timeout: float = TDTEST_ACK_TIMEOUT_S, **kv: object) -> TdtestConfigResult:
     """
     Address the test tapdisk with tdtest settings and wait for `tdtest: config ... seq=` (fail on rejection).
 
-    By default the new keys are merged into the previous config of this VDI, so the file always holds the
-    full desired state; one-shot keys (dead_chkrng_kick) are not carried over. replace=True starts afresh.
+    Settings come from `settings` and/or keyword arguments. By default the new keys are merged into the
+    previous config of this VDI, so the file always holds the full desired state; one-shot keys
+    (dead_chkrng_kick) are not carried over. replace=True starts afresh.
     """
     vdi_uuid = _check_uuid(vdi_uuid)
+    kv = {**(settings or {}), **kv}
     unknown = set(kv) - TDTEST_KEYS
     if unknown:
         raise ValueError(f"unknown tdtest keys: {sorted(unknown)}")
