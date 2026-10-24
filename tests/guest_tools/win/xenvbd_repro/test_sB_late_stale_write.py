@@ -38,21 +38,28 @@ class TestSBLateStaleWrite:
                      log=1, **tdtest_lba_window("log", W_SB))
         # Times out, then reset, fake, and a classpnp retry (through the new ring) or a failure.
         gen2 = bs.write_sync(2, W_SB)
-        disconnect = repro.wait_tdtest(lambda e: e.ev == "disconnect", timeout=60, what="ev=disconnect")
-        repro.wait_tdtest(lambda e: e.ev == "connect" and e.index > disconnect.index, timeout=90,
-                          what="ev=connect of the new ring")
+        # Legacy drivers (c071bbf reverted) reuse the ring after the reset: no disconnect, no new ring, and the held
+        # write is released on the live ring.
+        legacy = repro.variant.legacy
+        if not legacy:
+            disconnect = repro.wait_tdtest(lambda e: e.ev == "disconnect", timeout=60, what="ev=disconnect")
+            repro.wait_tdtest(lambda e: e.ev == "connect" and e.index > disconnect.index, timeout=90,
+                              what="ev=connect of the new ring")
         gen3 = bs.write_sync(3, W_SB)
         assert gen3.status == "OK", f"the gen 3 write was not acknowledged: {gen3.raw}"
 
-        release = repro.wait_tdtest(lambda e: e.ev == "release" and e.dead is True,
-                                    timeout=hold_ms / 1000 + 60, what="ev=release dead=1")
-        log.wait_for(TD_RE_DEAD_RING_DESTROY, timeout=60, what="destroying dead ring")
+        release = repro.wait_tdtest(lambda e: e.ev == "release" and e.dead is (not legacy),
+                                    timeout=hold_ms / 1000 + 60,
+                                    what="ev=release dead=0 (legacy)" if legacy else "ev=release dead=1")
+        if not legacy:
+            log.wait_for(TD_RE_DEAD_RING_DESTROY, timeout=60, what="destroying dead ring")
         verify = bs.verify(W_SB)
 
         events = repro.tdtest_events()
         new_ring_completes = [
             e for e in events
-            if e.ev == "complete" and e.index < release.index and e.ring != release.ring
+            if e.ev == "complete" and e.index < release.index
+            and (e.id != release.id if legacy else e.ring != release.ring)
             and e.sector is not None and W_SB.contains_sector(e.sector)
         ]
         # tdtest crc= covers a whole request payload, not the guest's 4 KiB blocks, so correlate on tapdisk's own

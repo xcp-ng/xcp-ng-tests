@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import logging
+import time
 
 from lib.tapdisk_test import TD_RE_GRANT_COPY_FAIL, TdtestEvent
 from lib.windows.test_drivers import XENVBD_RE_RESET, XENVBD_RE_UNKNOWN_ID, group_xenvbd_requests
@@ -32,16 +33,47 @@ def _read_hold_ms(repro: ReproContext) -> int:
     return 3000 if repro.options.reset == "ioctl" else DISK_TIMEOUT_VALUE_S * 1000 + 2000
 
 
+def _host_now(repro: ReproContext) -> float:
+    return float(repro.host.ssh("date +%s.%N"))
+
+
+def _legacy_pause_around_release(repro: ReproContext, hold: TdtestEvent, hold_ms: int) -> None:
+    """
+    Legacy (ring reused after the reset): make the late copy land in buffers that hold other data.
+
+    Intake is paused from shortly before the reset until just after the held read is released, so that the writes
+    submitted after the reset wait on the shared ring with their buffers granted, some of them with the faked read's
+    reissued grefs. The late copy overwrites those buffers, and tapdisk writes the result to the wrong LBAs once
+    intake resumes. In the field, the stall that causes the reset leaves requests queued the same way.
+    Timing uses the host clock of the tdtest `hold` line, not the guest log, which reaches the host late.
+    """
+    hold_t = float(hold.fields["t"])
+    release_t = hold_t + hold_ms / 1000
+    pause_at = hold_t + (DISK_TIMEOUT_VALUE_S - 1)
+    time.sleep(max(0.0, pause_at - _host_now(repro)))
+    repro.tdtest(read_hold_ms=0, intake_pause="current")
+    time.sleep(max(0.0, release_t + 1.0 - _host_now(repro)))
+    repro.wait_tdtest(lambda e: e.ev == "release", timeout=30, what="ev=release of the held read")
+    repro.tdtest(read_hold_ms=0, intake_pause=0)
+
+
 def _run_sa(repro: ReproContext, load_seconds: int) -> tuple[Evidence, list[TdtestEvent]]:
     bs, log = repro.bs, repro.log
+    legacy = repro.variant.legacy
+    hold_ms = _read_hold_ms(repro)
     bs.fill(1, W_SA)
-    repro.tdtest(read_hold_ms=_read_hold_ms(repro), read_hold_max=4, **tdtest_lba_window("read_hold", W_SA_HOLD),
-                 log=1, **tdtest_lba_window("log", W_SA_HOLD))
-    run = bs.start_load(2, W_SA, threads=2, io_size=64 * 1024, seconds=load_seconds, read_percent=70)
-    repro.wait_tdtest(lambda e: e.ev == "hold", timeout=60, what="ev=hold (a read is held)")
+    # Legacy holds only the first read: a held retry of the same read would take the reissued grefs and receive
+    # identical data, which hides the corruption.
+    repro.tdtest(read_hold_ms=hold_ms, read_hold_max=1 if legacy else 4,
+                 **tdtest_lba_window("read_hold", W_SA_HOLD), log=1, **tdtest_lba_window("log", W_SA_HOLD))
+    run = bs.start_load(2, W_SA, threads=2, io_size=64 * 1024, seconds=load_seconds,
+                        read_percent=20 if legacy else 70)
+    hold = repro.wait_tdtest(lambda e: e.ev == "hold", timeout=60, what="ev=hold (a read is held)")
     if repro.options.reset == "ioctl":
         reset = bs.reset_device()
         logging.info("IOCTL_STORAGE_RESET_DEVICE: ok=%s err=%s", reset.ok, reset.win32err)
+    if legacy and repro.options.reset != "ioctl":
+        _legacy_pause_around_release(repro, hold, hold_ms)
     log.wait_for(XENVBD_RE_RESET, timeout=90, what="xenvbd TDTEST TargetReset")
     load = bs.wait(run)
     repro.wait_tdtest(lambda e: e.ev == "release", timeout=60, what="ev=release of the held read")

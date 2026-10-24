@@ -37,6 +37,8 @@ class TestSCDeadRingIntake:
     XENVBD_KNOBS: dict[str, int] = {}
 
     def test_sC_dead_ring_intake(self, repro: ReproContext) -> None:
+        if repro.variant.legacy:
+            pytest.skip("legacy drivers reuse the ring after a reset: there is no dead ring to take requests from")
         bs, log = repro.bs, repro.log
         hold_ms = HOLD_MS_GATED if repro.variant.r3 else HOLD_MS
 
