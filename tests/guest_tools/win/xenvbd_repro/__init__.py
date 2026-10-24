@@ -1,7 +1,7 @@
 """
 Shared layout, context and evidence helpers for the xenvbd/tapdisk shutdown-ordering repro tests.
 
-Scenarios (see docs/xenvbd-shutdown-ordering.md and docs/tapdisk-dead-ring-late-writes.md in win-pvdrivers):
+Scenarios (see docs/ring-faults/ in win-pvdrivers):
 - S-A: abandoned read copied late by tapdisk after xenvbd faked its completion and revoked its grants.
 - S-B: late stale write: a write held on a dead tapdisk ring lands after newer data written on the new ring.
 - S-C: dead-ring intake: requests left unconsumed on the dead ring are taken after `Closed`.

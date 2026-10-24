@@ -1,7 +1,7 @@
 # xenvbd/tapdisk shutdown-ordering repro
 
 Reproduces, and checks remediations for, the hazards described in win-pvdrivers
-`docs/xenvbd-shutdown-ordering.md` and `docs/tapdisk-dead-ring-late-writes.md`:
+`docs/ring-faults/xenvbd-shutdown-ordering.md` and `docs/ring-faults/tapdisk-dead-ring-late-writes.md`:
 
 | Test | Hazard |
 |---|---|
