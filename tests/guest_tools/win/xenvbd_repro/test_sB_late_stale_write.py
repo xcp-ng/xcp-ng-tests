@@ -98,7 +98,8 @@ class TestSBLateStaleWrite:
             ev.notes.append(f"R3' guest stall: gen3 write took {gen3.raw.get('durationMs')} ms, "
                             f"{ev.host['resets']} reset(s)")
         if crc_match is None:
-            ev.notes.append("tdtest release line carries no crc=; CRC correlation skipped")
+            ev.notes.append("no new-ring write completed before the release (expected with R3'), or no crc=; "
+                            "CRC correlation skipped")
         ev.guest_evidence = bool(stale)
         ev.host_evidence = bool(new_ring_completes) and crc_match is not False and readback_is_release is not False
         ev.reproduced = bool(stale_gen2) and ev.host_evidence
