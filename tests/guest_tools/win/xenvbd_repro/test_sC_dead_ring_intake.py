@@ -25,7 +25,8 @@ from tests.guest_tools.win.xenvbd_repro import (
 # `Closed` (chkrng timer) and copied from grefs that were revoked or reissued.
 # Requirements: see README.md in this directory.
 
-HOLD_MS = 25000
+# Long enough that the dead ring is still alive (W1 pending) when intake is resumed and the ring kicked.
+HOLD_MS = 60000
 HOLD_MS_GATED = 15000
 
 
@@ -47,7 +48,9 @@ class TestSCDeadRingIntake:
         w1 = bs.start_write_sync(2, W_SC1)
         repro.wait_tdtest(lambda e: e.ev == "hold", timeout=60, what="ev=hold of the W1 write")
         # Stop intake on the rings live now (only the current ring); a ring connected later is unaffected.
-        repro.tdtest(intake_pause="current")
+        # write_hold_ms=0 stops new holds (the reload re-arms write_hold_max), so the guest's retry of W1 on the
+        # new ring is not held again; the W1 write already held keeps its own timer.
+        repro.tdtest(intake_pause="current", write_hold_ms=0)
         w2 = bs.start_write_sync(2, W_SC2)
         time.sleep(3)  # let xenvbd push the W2 requests onto the shared ring
 
@@ -58,7 +61,7 @@ class TestSCDeadRingIntake:
         res1 = bs.wait(w1)
         res2 = bs.wait(w2)
         # Reissue grefs through the new ring.
-        load3 = bs.load(3, W_SC3, threads=2, io_size=64 * 1024, seconds=30)
+        load3 = bs.load(3, W_SC3, threads=2, io_size=64 * 1024, seconds=10)
 
         repro.tdtest(intake_pause=0, dead_chkrng_kick=1)
         repro.wait_tdtest(lambda e: e.ev == "release", timeout=hold_ms / 1000 + 60, what="ev=release of W1")
