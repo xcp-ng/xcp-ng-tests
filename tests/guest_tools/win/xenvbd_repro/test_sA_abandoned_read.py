@@ -49,7 +49,9 @@ def _legacy_pause_around_release(repro: ReproContext, hold: TdtestEvent, hold_ms
     """
     hold_t = float(hold.fields["t"])
     release_t = hold_t + hold_ms / 1000
-    pause_at = hold_t + (DISK_TIMEOUT_VALUE_S - 1)
+    # StorPort's timer starts before tapdisk holds the completion: a reset was seen 8.2 s after the hold with a
+    # 10 s TimeOutValue. Pause well before it.
+    pause_at = hold_t + DISK_TIMEOUT_VALUE_S / 2
     time.sleep(max(0.0, pause_at - _host_now(repro)))
     repro.tdtest(read_hold_ms=0, intake_pause="current")
     time.sleep(max(0.0, release_t + 1.0 - _host_now(repro)))
