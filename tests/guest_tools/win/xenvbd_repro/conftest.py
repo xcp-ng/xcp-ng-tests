@@ -78,6 +78,12 @@ PACKAGE_DIR = Path(__file__).parent
 REQUIRED_OPTIONS = ("--repro-drivers", "--repro-sr", "--repro-tapdisk", "--repro-tdtest-ctl")
 REPRO_VDI_LABEL = "xenvbd-repro"
 
+# Same lookup as the root conftest: with caching, imported_vm clones the --vm VM and tests run on the clone.
+try:
+    from data import CACHE_IMPORTED_VM
+except ImportError:
+    CACHE_IMPORTED_VM = False
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("xenvbd-repro", "xenvbd shutdown-ordering repro (tests/guest_tools/win/xenvbd_repro)")
@@ -175,14 +181,19 @@ def test_host_guard(host: Host, pytestconfig: pytest.Config, repro_options: Repr
     if not sr.is_shared() and sr.hosts_uuids() != [host.uuid]:
         pytest.skip(f"local SR {sr.uuid} does not belong to the test host {host}")
 
+    # Some shared helpers (enable_testsign, running_windows_vm_without_tools) start the VM without on=, which is
+    # only guaranteed to stay on the test host in a single-host pool.
+    if len(host.pool.hosts) > 1:
+        pytest.skip("the xenvbd repro only runs on a single-host pool (shared helpers start VMs without on=)")
+    # Never power on the --vm VM here: with CACHE_IMPORTED_VM, tests run on a clone and the original must stay
+    # untouched. running_windows_vm_without_tools starts whichever VM the tests use.
     power = vm.power_state()
     if power == "running":
         if vm.param_get("resident-on") != host.uuid:
             pytest.skip(f"test VM {vm.uuid} runs on another host; move it to {host} by hand (never migrated here)")
-    elif power == "halted":
-        logging.info("Starting the test VM on the test host %s", host)
-        vm.start(on=host.uuid)
-    else:
+        if CACHE_IMPORTED_VM:
+            pytest.skip(f"test VM {vm.uuid} is running; halt it so that it can be cloned untouched")
+    elif power != "halted":
         pytest.skip(f"test VM {vm.uuid} is {power}")
 
     leftovers = [
@@ -192,8 +203,6 @@ def test_host_guard(host: Host, pytestconfig: pytest.Config, repro_options: Repr
     if leftovers:
         pytest.fail(f"test VM still has repro VDIs from an earlier run: {leftovers}; clean them up by hand",
                     pytrace=False)
-    if len(host.pool.hosts) > 1:
-        logging.warning("multi-host pool: the test VM is only ever started with on=%s", host.uuid)
     return ReproHost(host, vm.uuid, sr.uuid)
 
 
@@ -229,7 +238,12 @@ def vm_with_test_drivers(
     """Snapshot the VM (pre-test), install the repro drivers; revert and destroy the snapshot at teardown."""
     host = test_host_guard.host
     vm = running_windows_vm_without_tools
-    assert vm.uuid == test_host_guard.vm_uuid
+    if CACHE_IMPORTED_VM:
+        # imported_vm cloned the --vm VM; the clone is destroyed at the end of the module.
+        assert vm.uuid != test_host_guard.vm_uuid
+        logging.info("Running on %s, a clone of the test VM %s", vm.uuid, test_host_guard.vm_uuid)
+    else:
+        assert vm.uuid == test_host_guard.vm_uuid
     assert_vm_on_host(vm, host)
     vm_shutdown_without_tools(vm)
     snapshot = vm.snapshot(name="xenvbd-repro pre-test")

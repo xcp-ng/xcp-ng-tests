@@ -28,9 +28,11 @@ Reproduces, and checks remediations for, the hazards described in win-pvdrivers
   before the first run.
 - Load is bounded: at most 4 threads, 1 MiB per I/O and 300 s per run. These limits are enforced in Python and
   again in `blockstamp.ps1`.
-- The test VM is never migrated: every start uses `on=<test host>`, and its residence is checked after every
-  boot. A pre-test snapshot is taken, then reverted and destroyed at the end of each test module. The VM is left
-  halted.
+- The test VM is never migrated. The tests only run on a single-host pool, because some shared helpers start
+  VMs without `on=`; residence is checked after every boot. The `--vm` VM itself is never powered on by the
+  guard: with `CACHE_IMPORTED_VM = True` (recommended), the tests run on a clone that is destroyed at the end of
+  the module, and the original must be halted. A pre-test snapshot is also taken, then reverted and destroyed at
+  the end of each test module.
 - Test VDIs (2 GiB, label `xenvbd-repro`) are created only on `--repro-sr`.
 - `blockstamp.ps1` only writes to a disk that is RAW, has no partitions, is not the system or boot disk, does
   not hold `C:`, and is exactly 2 GiB. It never writes the first 1 MiB of the disk.
@@ -42,8 +44,8 @@ or `yum reinstall blktap` (ask first).
 
 - The Windows test VM (`--vm=<uuid>`) meets the requirements in the header of
   `tests/guest_tools/win/test_nondestructive.py`: no PV tools, it reports its IP on the serial console, OpenSSH
-  with Git Bash as `DefaultShell`, and `root` is an administrator. It resides on the `--hosts` host (or is halted;
-  in that case it is started there).
+  with Git Bash as `DefaultShell`, and `root` is an administrator. It is halted (or, without VM caching, running
+  on the `--hosts` host).
 - `--repro-drivers`: a zip of one staged build (`<drv>\x64\<drv>.{inf,sys,cat}` for xenbus, xeniface,
   xenvbd, xenvif and xennet, plus `testsign.crt`), for example `repro-out\D0-hooks.zip`. It is installed with the
   unchanged `scripts/guests/windows/install-drivers.ps1`.
