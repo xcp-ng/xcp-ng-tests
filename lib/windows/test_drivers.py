@@ -54,18 +54,18 @@ QEMU_LOG_LEVEL = ("INFO", "WARNING", "ERROR", "CRITICAL")
 XENVBD_TOKEN = "TDTEST"
 # xenbus forwards Warning() as `xenvbd|<Function>:<text>` with no space after the colon (seen on the host).
 XENVBD_RE_ANY = re.compile(r"xenvbd\|(?P<func>[^:]*):\s*TDTEST (?P<event>[\w-]+)(?: (?P<body>.*))?$")
-XENVBD_RE_BANNER = re.compile(r"TDTEST banner.*variant=(?P<variant>[\w.+-]+)")
-XENVBD_RE_RESET = re.compile(r"TDTEST TargetReset target=(?P<target>\d+) caller=(?P<caller>\S+)")
+XENVBD_RE_BANNER = re.compile(r"\bTDTEST banner\b.*\bvariant=(?P<variant>[\w.+-]+)")
+XENVBD_RE_RESET = re.compile(r"\bTDTEST TargetReset target=(?P<target>\d+) caller=(?P<caller>\S+)")
 XENVBD_RE_DISABLE = re.compile(
-    r"TDTEST BlkifRingDisable target=(?P<target>\d+) ring=(?P<ring>\d+).*?faked=(?P<faked>\d+)"
+    r"\bTDTEST BlkifRingDisable target=(?P<target>\d+) ring=(?P<ring>\d+)\b.*?\bfaked=(?P<faked>\d+)"
 )
 XENVBD_RE_FAKE = re.compile(
-    r"TDTEST fake target=(?P<target>\d+) ring=(?P<ring>\d+) id=(?P<id>[0-9a-f]+)"
+    r"\bTDTEST fake target=(?P<target>\d+) ring=(?P<ring>\d+) id=(?P<id>[0-9a-f]+)\b"
 )
 XENVBD_RE_UNKNOWN_ID = re.compile(
-    r"TDTEST unknown-id target=(?P<target>\d+) ring=(?P<ring>\d+) id=(?P<id>[0-9a-f]+)"
+    r"\bTDTEST unknown-id target=(?P<target>\d+) ring=(?P<ring>\d+) id=(?P<id>[0-9a-f]+)\b"
 )
-XENVBD_RE_RING_CONNECT = re.compile(r"TDTEST ring-connect target=(?P<target>\d+) ring=(?P<ring>\d+)")
+XENVBD_RE_RING_CONNECT = re.compile(r"\bTDTEST ring-connect target=(?P<target>\d+) ring=(?P<ring>\d+)\b")
 XENVBD_KV_RE = re.compile(r"(?P<k>[A-Za-z_][\w/-]*)=(?P<v>[^\s,][^\s]*)")
 # Number bases of xenvbd fields: ids are hex (tapdisk's are decimal: normalise to int before correlating).
 XENVBD_ID_BASE = 16
