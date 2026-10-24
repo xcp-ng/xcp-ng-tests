@@ -61,19 +61,26 @@ TAPDISK_IDENT_ERE = r"tapdisk\[({pids})\]: "
 QEMU_IDENT_ERE = r"qemu-dm-({domids})\["
 REPRO_TAG_ERE = r"xcpng-repro(\[[0-9]+\])?: "
 
-# tdtest control acknowledgements.
+# tdtest control lines (the exact formats are in blktap's TDTEST.md). The trailing space after `seq=<seq>` is
+# part of the match, so that seq=1 does not match seq=12.
 TD_RE_CONFIG_OK = re.compile(
-    r"tdtest: config minor=(?P<minor>\d+) vdi=(?P<vdi>[0-9a-fA-F-]{36}) seq=(?P<seq>\d+)"
+    r"tdtest: config minor=(?P<minor>\d+) vdi=(?P<vdi>[0-9a-fA-F-]{36}) seq=(?P<seq>\S{1,64}) "
 )
-TD_RE_CONFIG_REJECTED = re.compile(r"tdtest: config rejected(?P<reason>.*)$")
+# `config rejected minor=<m> reason=...`, `minor=none` (bad signal) or `minor=<m> reason=unknown-minor`.
+TD_RE_CONFIG_REJECTED = re.compile(r"tdtest: config rejected minor=(?P<minor>-?\d+|none)(?: reason=(?P<reason>\S+))?")
+TD_RE_OFF = re.compile(r"tdtest: off minor=(?P<minor>\d+)(?: seq=(?P<seq>\S+))? reason=(?P<reason>\S+)")
 TD_RE_BANNER = re.compile(r"tdtest: v1 variant=(?P<variant>\S+)")
-# tdtest data events: `tdtest: ... ev=<name> key=value ...`.
+# Lines that tdtest logs even for a tapdisk nobody has addressed (or that was just un-addressed).
+TD_RE_CONTROL = re.compile(r"tdtest: (?:v1 variant=|config |off )")
+# tdtest events: `tdtest: ev=<name> t=<sec>.<usec> minor=<m> [ring=...] [id=...] ...`.
 TD_RE_ANY = re.compile(r"tdtest: (?P<body>.*)$")
-TD_RE_EVENT = re.compile(r"tdtest: (?P<body>.*\bev=(?P<ev>[\w-]+).*)$")
+TD_RE_EVENT = re.compile(r"tdtest: (?P<body>ev=(?P<ev>[\w-]+)(?: .*)?)$")
 TD_KV_RE = re.compile(r"(?P<k>[A-Za-z_][\w/]*)=(?P<v>[^\s,][^\s]*)")
 TDTEST_EVENTS = frozenset({
-    "intake", "hold", "release", "copyback", "copyback-skipped-dead", "complete", "connect", "disconnect",
-    "dead-intake", "gate-open", "gate-close",
+    "intake", "dead-intake", "copyin", "copyin-failed", "copyback", "copyback-failed", "copyback-skipped-dead",
+    "complete", "hold", "release", "release-cancelled", "connect", "disconnect", "dead-destroy",
+    "dead-intake-blocked", "intake-pause", "intake-resume", "dead-kick", "r2-unregister", "gate-close",
+    "gate-open",
 })
 # Stock tapdisk lines (RING_DEBUG/RING_ERR prefix them with "<domid>/<devid>, ring=<ptr>: ").
 TD_RE_RING_PREFIX = r"(?:(?P<domid>\d+)/(?P<devid>\d+), ring=(?P<ring>[^:\s]+): )?"
@@ -81,14 +88,16 @@ TD_RE_DISCONNECT_PENDING = re.compile(
     TD_RE_RING_PREFIX + r"disconnect from ring with (?P<n>\d+) pending requests"
 )
 TD_RE_DEAD_RING_DESTROY = re.compile(TD_RE_RING_PREFIX + r"destroying dead ring")
+# The stock line only promises "failed to grant-copy"; request/segment numbers are used when present.
 TD_RE_GRANT_COPY_FAIL = re.compile(
     TD_RE_RING_PREFIX
-    + r"(?:tap-err:\S+: )?(?:req (?P<sid>\d+): )?failed to grant-copy (?:request (?P<rid>\d+)|segment (?P<seg>\d+))"
+    + r"(?:tap-err:\S+: )?(?:req (?P<sid>\d+): )?failed to grant-copy(?: request (?P<rid>\d+)| segment (?P<seg>\d+))?"
 )
-# Number bases used by tdtest fields. 0 means "decimal unless 0x-prefixed".
-TD_ID_BASE = 0
-TD_GREF_BASE = 0
-TD_SECTOR_BASE = 0
+# Number bases of tdtest fields: ids, grefs and sectors are decimal (xenvbd ids are hex: lib.windows.test_drivers),
+# crc is %08x, ring is %p (0x-prefixed, kept as a string).
+TD_ID_BASE = 10
+TD_GREF_BASE = 10
+TD_SECTOR_BASE = 10
 TD_CRC_BASE = 16
 
 # tdtest config file keys (see the Phase 2 plan). `vdi` and `seq` are always written by tdtest_set().
@@ -100,8 +109,9 @@ TDTEST_KEYS = frozenset({
 })
 # Keys that trigger a one-shot action on reload and must not be carried over to later configs.
 TDTEST_ONE_SHOT_KEYS = frozenset({"dead_chkrng_kick"})
-# LBA windows are in 512-byte sectors; the end is written as the last sector of the window.
-TDTEST_LBA_END_INCLUSIVE = True
+# tdtest LBA windows are in 512-byte sectors and half-open [start, end): the end is one past the last sector
+# (xenvbd's test-log-sector-end, in contrast, is inclusive).
+TDTEST_LBA_END_INCLUSIVE = False
 TDTEST_ACK_TIMEOUT_S = 15
 
 # Exit codes of the on-host guard.
@@ -469,6 +479,7 @@ def _log_offset(host: Host) -> int:
 
 def _wait_tdtest_ack(host: Host, pid: int, offset: int, minor: int, vdi: str, seq: int,
                      timeout: float) -> tuple[bool, str]:
+    """Wait for `config minor=<m> vdi=<vdi> seq=<seq> ` (True) or `config rejected minor=<m>|none` (False)."""
     deadline = time.monotonic() + timeout
     while True:
         out = host.ssh(
@@ -476,9 +487,10 @@ def _wait_tdtest_ack(host: Host, pid: int, offset: int, minor: int, vdi: str, se
         )
         for line in out.splitlines():
             m = TD_RE_CONFIG_OK.search(line)
-            if m and int(m["minor"]) == minor and m["vdi"].lower() == vdi and int(m["seq"]) == seq:
+            if m and int(m["minor"]) == minor and m["vdi"].lower() == vdi and m["seq"] == str(seq):
                 return True, line
-            if TD_RE_CONFIG_REJECTED.search(line):
+            r = TD_RE_CONFIG_REJECTED.search(line)
+            if r and r["minor"] in (str(minor), "none"):
                 return False, line
         if time.monotonic() > deadline:
             raise TimeoutError(f"no tdtest config acknowledgement from tapdisk {pid} for seq={seq}")
