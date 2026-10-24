@@ -55,15 +55,28 @@ class TestSBLateStaleWrite:
             if e.ev == "complete" and e.index < release.index and e.ring != release.ring
             and e.sector is not None and W_SB.contains_sector(e.sector)
         ]
-        gen2_crcs = set(gen2.block_crcs)
-        crc_match = bool(gen2_crcs & set(release.crcs)) if release.crcs else None
+        # tdtest crc= covers a whole request payload, not the guest's 4 KiB blocks, so correlate on tapdisk's own
+        # CRCs: the released (dead-ring) write carries different data from the last write the new ring completed
+        # (gen 3), and the later read-back returns the released data.
+        new_ring_writes = [e for e in new_ring_completes if e.fields.get("op") == "write"]
+        last_new_crcs = new_ring_writes[-1].crcs if new_ring_writes else []
+        crc_match: bool | None = None
+        if release.crcs and last_new_crcs:
+            crc_match = release.crcs != last_new_crcs
+        later_reads = [
+            e for e in events
+            if e.ev == "complete" and e.fields.get("op") == "read" and e.index > release.index
+            and e.sector is not None and W_SB.contains_sector(e.sector) and e.crcs
+        ]
+        readback_is_release = (later_reads[-1].crcs == release.crcs) if later_reads and release.crcs else None
         stale = verify.problems_in(W_SB, ("STALE",))
         stale_gen2 = [p for p in stale if p.hdr_gen == 2]
 
         ev = Evidence("S-B", repro.variant.label, repro.options.expect)
         ev.host = {
             "release": release.line,
-            "release_crc_matches_gen2": crc_match,
+            "release_crc_differs_from_last_new_ring_write": crc_match,
+            "readback_crc_equals_release": readback_is_release,
             "new_ring_completes_before_release": [e.line for e in new_ring_completes][:10],
             "resets": len(matching(XENVBD_RE_RESET, log.lines)),
             "dead_ring_destroyed": [m.group(0) for _, m in matching(TD_RE_DEAD_RING_DESTROY, log.lines)],
@@ -80,6 +93,6 @@ class TestSBLateStaleWrite:
         if crc_match is None:
             ev.notes.append("tdtest release line carries no crc=; CRC correlation skipped")
         ev.guest_evidence = bool(stale)
-        ev.host_evidence = bool(new_ring_completes) and crc_match is not False
+        ev.host_evidence = bool(new_ring_completes) and crc_match is not False and readback_is_release is not False
         ev.reproduced = bool(stale_gen2) and ev.host_evidence
         conclude(repro, ev)
