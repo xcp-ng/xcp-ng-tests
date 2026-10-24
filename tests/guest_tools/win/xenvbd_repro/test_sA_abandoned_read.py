@@ -55,14 +55,15 @@ def _run_sa(repro: ReproContext, load_seconds: int) -> tuple[Evidence, list[Tdte
     fakes = [r for r in group_xenvbd_requests(repro.xenvbd_events()) if r.event == "fake"]
     gcf = matching(TD_RE_GRANT_COPY_FAIL, lines)
 
+    # The guest's lines reach daemon.log through qemu a few seconds late (a fake was seen logged 3 s after the
+    # tapdisk grant-copy failure of the same request), so pair by request id regardless of log order. Gref overlap
+    # is only a fallback for requests without an id match, and then needs the release to be logged after the fake.
     correlated = []
     for f in fakes:
         fgrefs = set(f.grefs)
-        for r in releases:
-            if r.index < f.index:
-                continue
-            if not ((f.id is not None and r.id == f.id) or bool(fgrefs & set(r.grefs))):
-                continue
+        by_id = [r for r in releases if f.id is not None and r.id == f.id]
+        candidates = by_id or [r for r in releases if r.index > f.index and fgrefs & set(r.grefs)]
+        for r in candidates:
             copy_fail = [gm.group(0) for gi, gm in gcf if gi > r.index
                          and (r.id is None or int(gm["rid"] or gm["sid"] or -1) in (r.id, -1))]
             correlated.append({"fake": lines[f.index], "release": r.line, "grant_copy_failures": copy_fail})
