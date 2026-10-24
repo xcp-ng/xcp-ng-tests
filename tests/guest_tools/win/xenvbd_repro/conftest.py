@@ -45,6 +45,7 @@ from lib.vm import VM
 from lib.windows import vm_shutdown_without_tools
 from lib.windows.blockstamp import Blockstamp
 from lib.windows.test_drivers import (
+    XENVBD_RE_RING_CONNECT,
     assert_vm_on_host,
     bring_disk_online,
     configure_repro_registry,
@@ -236,8 +237,11 @@ def vm_with_test_drivers(
         start_vm_on_host(vm, host)
         install_test_drivers(vm, host, repro_options.drivers)
         userdevice = pick_free_userdevice(vm)
-        # HVM xvd device ids are (202 << 8) | (userdevice << 4) for userdevice < 16, so the target is the
-        # userdevice. repro_vdi checks this against xenstore after each plug.
+        # Target id discovery: HVM xvd device ids are (202 << 8) | (userdevice << 4) for userdevice < 16, and
+        # xenvbd's __ParseVbd() maps that to target = (devid & 0xF0) >> 4 = the userdevice. So the target is the
+        # userdevice, and `test-targets` is set to 1 << target. repro_vdi checks this twice after each plug:
+        # against the xenstore backend device id (parse_vbd_target), and against the target= of the xenvbd
+        # `TDTEST ring-connect` lines, which are only logged for targets addressed by test-targets.
         target = int(userdevice)
         yield ReproVM(vm, host, snapshot, userdevice, target)
     finally:
@@ -266,7 +270,7 @@ def repro_guest(request: pytest.FixtureRequest, vm_with_test_drivers: ReproVM,
     if rv.applied_knobs != knobs:
         with LogSlice(host, f"boot-{request.node.name}", domid_fn=lambda: vm.param_get("dom-id"),
                       out_dirs=[repro_options.artifacts]) as boot:
-            configure_repro_registry(vm, host, knobs)
+            configure_repro_registry(vm, host, knobs, target=rv.target)
         rv.applied_knobs = knobs
         rv.banner = find_banner(boot.lines) or rv.banner
         logging.info("xenvbd banner: %s", rv.banner)
@@ -286,9 +290,23 @@ def _unplug_if_attached(vbd: VBD) -> None:
         vbd.unplug()
 
 
+def _check_ring_connect_target(plug_log: LogSlice, target: int) -> None:
+    """xenvbd logs `TDTEST ring-connect target=<t>` only for targets in test-targets: expect ours, nothing else."""
+    try:
+        plug_log.wait_for(XENVBD_RE_RING_CONNECT, timeout=60, what="xenvbd TDTEST ring-connect of the test VBD")
+    except TimeoutError:
+        pytest.fail(
+            f"no xenvbd TDTEST ring-connect line for target {target} after the plug: test-targets does not "
+            "address the test disk, the driver is not a repro build, or the guest log does not reach the host",
+            pytrace=False,
+        )
+    seen = {int(m["target"]) for m in plug_log.grep(XENVBD_RE_RING_CONNECT)}
+    assert seen == {target}, f"xenvbd ring-connect lines for targets {sorted(seen)}, expected only {target}"
+
+
 @pytest.fixture
-def repro_vdi(repro_guest: ReproVM, test_host_guard: ReproHost,
-              tdtest_deployed: TdtestDeployment) -> Generator[ReproDisk, None, None]:
+def repro_vdi(repro_guest: ReproVM, test_host_guard: ReproHost, tdtest_deployed: TdtestDeployment,
+              repro_options: ReproOptions) -> Generator[ReproDisk, None, None]:
     """A 2 GiB test VDI on --repro-sr, plugged inside a swap window so that its tapdisk runs tdtest."""
     host, vm = test_host_guard.host, repro_guest.vm
     sr = SR(test_host_guard.sr_uuid, host.pool)
@@ -299,12 +317,16 @@ def repro_vdi(repro_guest: ReproVM, test_host_guard: ReproHost,
         stack.callback(vbd.destroy)
         before = list_disk_numbers(vm)
         stack.callback(_unplug_if_attached, vbd)
-        try:
-            with swap_window(host, tdtest_deployed, label=f"plug {vdi.uuid}"):
-                vbd.plug()
-        except TapdiskRestoreError as e:
-            pytest.exit(str(e), returncode=3)
-        info = find_tapdisk(host, vdi.uuid)
+        with LogSlice(host, f"plug-{vdi.uuid}", domid_fn=lambda: vm.param_get("dom-id"),
+                      out_dirs=[repro_options.artifacts]) as plug_log:
+            try:
+                with swap_window(host, tdtest_deployed, label=f"plug {vdi.uuid}"):
+                    vbd.plug()
+            except TapdiskRestoreError as e:
+                pytest.exit(str(e), returncode=3)
+            info = find_tapdisk(host, vdi.uuid)
+            plug_log.add_pid(info.pid)
+            _check_ring_connect_target(plug_log, repro_guest.target)
         stack.callback(remove_tdtest_conf, host, info.minor, vdi.uuid)
         stack.callback(tdtest_off, host, vdi.uuid)
         assert_patched(host, info.pid, tdtest_deployed)

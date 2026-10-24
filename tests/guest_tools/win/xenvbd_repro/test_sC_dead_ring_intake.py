@@ -8,11 +8,13 @@ from lib.tapdisk_test import TD_RE_DEAD_RING_DESTROY, TD_RE_GRANT_COPY_FAIL
 from lib.windows.blockstamp import Window
 from lib.windows.test_drivers import XENVBD_RE_RESET
 from tests.guest_tools.win.xenvbd_repro import (
+    CLASS_GREF_REISSUED_TO_RING,
     W_SC1,
     W_SC2,
     W_SC3,
     Evidence,
     ReproContext,
+    classify_dead_intake,
     conclude,
     matching,
     problems_summary,
@@ -71,6 +73,7 @@ class TestSCDeadRingIntake:
         dead_intake = [e for e in events if e.ev == "dead-intake" and e.index > disconnect.index]
         first_dead = min((e.index for e in dead_intake), default=len(lines))
         gcf = [m.group(0) for i, m in matching(TD_RE_GRANT_COPY_FAIL, lines) if i > first_dead]
+        reissued = classify_dead_intake(events, repro.xenvbd_events())
         w2_bad = verifies["W2"].problems_in(W_SC2, ("MISDIRECTED", "CRC"))
         w3_bad = verifies["W3"].problems_in(W_SC3, ("MISDIRECTED", "CRC")) + [
             p for p in load3.problems if W_SC3.contains_block(p.lba)
@@ -82,6 +85,8 @@ class TestSCDeadRingIntake:
             "dead_intake": [e.line for e in dead_intake][:20],
             "grant_copy_failures_after_dead_intake": gcf[:20],
             "dead_ring_destroyed": [m.group(0) for _, m in matching(TD_RE_DEAD_RING_DESTROY, lines)],
+            # Own class: the dead-ring write intake read a gref that now backs a new ring page.
+            "gref_reissued_to_ring": reissued[:20],
             "gate": [e.line for e in events if e.ev in ("gate-open", "gate-close")][:10],
             "resets": len(matching(XENVBD_RE_RESET, lines)),
         }
@@ -98,6 +103,8 @@ class TestSCDeadRingIntake:
         }
         if dead_intake:
             ev.notes.append("dead-ring intake with " + ("grant-copy failure" if gcf else "successful copy"))
+        if reissued:
+            ev.notes.append(f"{CLASS_GREF_REISSUED_TO_RING}: {len(reissued)} dead-ring intake(s)")
         ev.host_evidence = bool(dead_intake)
         ev.guest_evidence = bool(w2_bad or w3_bad)
         ev.reproduced = ev.host_evidence

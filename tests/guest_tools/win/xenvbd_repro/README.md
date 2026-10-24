@@ -110,7 +110,22 @@ Every matrix cell needs at least 3 runs.
 
 Every log pattern lives in one place:
 - tapdisk, tdtest and host markers: `lib/tapdisk_test.py` (the `TD_RE_*`, `TD_KV_RE`, `*_ERE` and `TD_*_BASE`
-  constants, `TDTEST_KEYS`, `TDTEST_LBA_END_INCLUSIVE`);
+  constants, `TDTEST_KEYS`, `TDTEST_LBA_END_INCLUSIVE`; tdtest windows are half-open, xenvbd's are inclusive);
 - xenvbd: `lib/windows/test_drivers.py` (the `XENVBD_RE_*`, `XENVBD_KV_RE` and `XENVBD_*_BASE` constants).
 
 The disk layout (4 KiB blocks; block N is sectors 8N..8N+7) is in `__init__.py` (`W_*`, `XENVBD_LOG_WINDOW`).
+
+Parsing rules that matter when the formats change:
+- tdtest ids are decimal, xenvbd ids are hex; both are converted to int before they are correlated.
+- A xenvbd request line (`fake`, `submit`, `rsp`, ...) carries no grefs. They are on following `<event>-grefs` lines
+  with the same target, ring and id; `group_xenvbd_requests()` joins them. Event tokens match exactly (`fake` is
+  not `fake-grefs` or `deferred-fake`).
+- Every tdtest reload is a full spec: `tdtest_set()` rewrites all keys with `vdi=` and a fresh `seq`, drops one-shot
+  keys (`dead_chkrng_kick`), waits for `tdtest: config minor=<m> vdi=... seq=<seq> ` and fails on
+  `config rejected`. Accepted reloads reset the `*_hold_max` counters.
+- xenvbd knobs only act on targets in `test-targets`. The target of the test disk is its userdevice (the xvd device
+  id is `(202 << 8) | (userdevice << 4)`, which xenvbd maps back with `__ParseVbd()`);
+  `configure_repro_registry(..., target=)` writes `test-targets = 1 << target`, and `repro_vdi` checks the xenstore
+  backend device id and the `target=` of the `ring-connect` lines after each plug.
+- S-C reports `gref reissued to a new ring page` as its own class (`classify_dead_intake()`): a tdtest
+  `dead-intake` whose grefs are among those of a later xenvbd `ring-connect`.

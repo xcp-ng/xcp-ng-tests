@@ -7,6 +7,7 @@ import uuid
 from dataclasses import asdict
 
 from lib.tapdisk_test import (
+    TD_RE_CONTROL,
     TD_RE_DISCONNECT_PENDING,
     parse_tdtest_events,
     tdtest_off,
@@ -41,7 +42,8 @@ class TestReproSmoke:
         bs.fill(1, W_SMOKE)
         load = bs.load(2, W_SMOKE, threads=4, io_size=256 * 1024, seconds=120)
         verify = bs.verify(W_SMOKE)
-        tdtest_lines = [line for line in log.lines if "tdtest:" in line]
+        # Taken before any teardown. The banner and `off ... reason=not-addressed` are control lines, not activity.
+        tdtest_lines = [line for line in log.lines if "tdtest:" in line and not TD_RE_CONTROL.search(line)]
         repro.save_json("inert.json", {"load": load.raw, "verify_counts": verify.counts,
                                        "tdtest_lines": tdtest_lines})
         assert load.ok, f"load reported problems: {load.raw.get('mismatches')} {load.raw.get('errorCodes')}"

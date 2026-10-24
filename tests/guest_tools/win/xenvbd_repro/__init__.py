@@ -29,7 +29,13 @@ from lib.vbd import VBD
 from lib.vdi import VDI
 from lib.vm import VM
 from lib.windows.blockstamp import Blockstamp, BlockstampResult, Window
-from lib.windows.test_drivers import XENVBD_RE_BANNER, XenvbdEvent, parse_xenvbd_events
+from lib.windows.test_drivers import (
+    XENVBD_RE_BANNER,
+    XenvbdEvent,
+    group_xenvbd_requests,
+    parse_xenvbd_events,
+    xenvbd_ring_connects,
+)
 
 from typing import Any, Callable
 
@@ -189,8 +195,8 @@ class ReproContext:
 
 
 def tdtest_lba_window(prefix: str, window: Window) -> dict[str, int]:
-    """tdtest `<prefix>_lba_start/_end` keys for a block window (sectors, inclusive end)."""
-    return {f"{prefix}_lba_start": window.sector_start, f"{prefix}_lba_end": window.sector_end}
+    """tdtest `<prefix>_lba_start/_end` keys for a block window (sectors, half-open: the end is one past the last)."""
+    return {f"{prefix}_lba_start": window.sector_start, f"{prefix}_lba_end": window.sector_end + 1}
 
 
 def find_banner(lines: list[str]) -> str | None:
@@ -209,6 +215,47 @@ def check_banner(banner: str | None, variant: Variant) -> None:
         f"xenvbd banner says variant {banner!r} but --repro-variant={variant.label!r} expects "
         f"{variant.expected_banner!r}: wrong driver zip?"
     )
+
+
+CLASS_GREF_REISSUED_TO_RING = "gref reissued to a new ring page"
+
+
+def classify_dead_intake(tdtest_events: list[TdtestEvent], xenvbd_events: list[XenvbdEvent]) -> list[dict[str, Any]]:
+    """
+    S-C: find dead-ring intakes whose grefs were reissued as a shared-ring page of a newer ring.
+
+    A faked request's gref can come back as a page of the NEW ring after reconnect (tapdisk keeps its grant
+    cache while it maps the dead ring, and the grant magazine is LIFO). A dead-ring write intake on such a gref
+    copies ring contents instead of the data, so blockstamp sees CRC/garbage. For each `dead-intake` event
+    this correlates its grefs with the grefs of every xenvbd `ring-connect` (plus `ring-connect-grefs`) line that
+    came before it, and names the xenvbd requests that used the gref earlier. Both event lists must come from
+    the same log lines (their `index` values are positions in the same slice).
+    """
+    connects = xenvbd_ring_connects(xenvbd_events)
+    requests = group_xenvbd_requests(xenvbd_events)
+    found = []
+    for e in tdtest_events:
+        if e.ev != "dead-intake":
+            continue
+        grefs = set(e.grefs)
+        for rc in connects:
+            overlap = grefs & set(rc.grefs)
+            if not overlap or rc.index > e.index:
+                continue
+            owners = [
+                {"event": r.event, "id": r.id, "ring": r.ring, "line_index": r.index}
+                for r in requests
+                if r.index < rc.index and (set(r.grefs) | set(r.igrefs)) & overlap
+            ]
+            found.append({
+                "class": CLASS_GREF_REISSUED_TO_RING,
+                "dead_intake": e.line,
+                "tdtest_id": e.id,
+                "grefs": sorted(overlap),
+                "ring_connect": rc.line,
+                "earlier_requests": owners[:10],
+            })
+    return found
 
 
 def matching(rx: re.Pattern[str], lines: list[str]) -> list[tuple[int, re.Match[str]]]:

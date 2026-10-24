@@ -4,8 +4,8 @@ import pytest
 
 import logging
 
-from lib.tapdisk_test import TD_RE_GRANT_COPY_FAIL, TdtestEvent, parse_num
-from lib.windows.test_drivers import XENVBD_ID_BASE, XENVBD_RE_FAKE, XENVBD_RE_RESET, XENVBD_RE_UNKNOWN_ID
+from lib.tapdisk_test import TD_RE_GRANT_COPY_FAIL, TdtestEvent
+from lib.windows.test_drivers import XENVBD_RE_RESET, XENVBD_RE_UNKNOWN_ID, group_xenvbd_requests
 from tests.guest_tools.win.xenvbd_repro import (
     DISK_TIMEOUT_VALUE_S,
     W_SA,
@@ -50,28 +50,28 @@ def _run_sa(repro: ReproContext, load_seconds: int) -> tuple[Evidence, list[Tdte
     lines = log.lines
     tdevents = repro.tdtest_events()
     releases = [e for e in tdevents if e.ev == "release" and e.dead is False]
-    fakes = [(i, m) for i, m in matching(XENVBD_RE_FAKE, lines)]
+    # xenvbd fakes (event token exactly `fake`) with their grefs, from the `fake-grefs` lines. Both ids are
+    # ints here: xenvbd's are hex in the log, tapdisk's decimal.
+    fakes = [r for r in group_xenvbd_requests(repro.xenvbd_events()) if r.event == "fake"]
     gcf = matching(TD_RE_GRANT_COPY_FAIL, lines)
 
     correlated = []
-    for fi, fm in fakes:
-        fid = parse_num(fm["id"], XENVBD_ID_BASE) if fm["id"] else None
-        fgrefs = {g for g in fm["grefs"].split(",") if g}
+    for f in fakes:
+        fgrefs = set(f.grefs)
         for r in releases:
-            if r.index < fi:
+            if r.index < f.index:
                 continue
-            same = (fid is not None and r.id == fid) or bool(fgrefs & {str(g) for g in r.grefs})
-            if not same:
+            if not ((f.id is not None and r.id == f.id) or bool(fgrefs & set(r.grefs))):
                 continue
             copy_fail = [gm.group(0) for gi, gm in gcf if gi > r.index
                          and (r.id is None or int(gm["rid"] or gm["sid"] or -1) in (r.id, -1))]
-            correlated.append({"fake": lines[fi], "release": r.line, "grant_copy_failures": copy_fail})
+            correlated.append({"fake": lines[f.index], "release": r.line, "grant_copy_failures": copy_fail})
 
     mismatches = [p for p in load.problems if W_SA.contains_block(p.lba)]
     verify_bad = verify.problems_in(W_SA, ("MISDIRECTED", "CRC"))
     ev = Evidence("S-A", repro.variant.label, repro.options.expect)
     ev.host = {
-        "fakes": [lines[i] for i, _ in fakes][:20],
+        "fakes": [lines[f.index] for f in fakes][:20],
         "releases_dead0": [r.line for r in releases][:20],
         "grant_copy_failures": [m.group(0) for _, m in gcf][:20],
         "correlated": correlated,
