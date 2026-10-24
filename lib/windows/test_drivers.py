@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 
 from lib import commands
@@ -37,27 +37,42 @@ XENVBD_TEST_KNOBS = frozenset({
     "test-log-sector-start", "test-log-sector-end", "test-targets",
 })
 XENVBD_CLOSE_DELAY_MAX_MS = 5000
+XENVBD_DISABLE_WAIT_MAX_MS = 5000
 DISK_TIMEOUT_VALUE_S = 10
 QEMU_LOG_LEVEL = ("INFO", "WARNING", "ERROR", "CRITICAL")
 
 # --------------------------------------------------------------------------------------------------
 # xenvbd log formats. ALL guest-driver patterns live here so they can be aligned with the real output.
-# Phase 0: guest lines reach daemon.log as
-#   qemu-dm-<domid>[<pid>]: <pid>@<epoch.us>:xen_platform_log xen platform: xenvbd|<Function>: <text>
-# and every repro hook line carries the token TDTEST plus target=, ring= and id=.
+# Guest lines reach daemon.log as
+#   qemu-dm-<domid>[<pid>]: <pid>@<epoch.us>:xen_platform_log xen platform: xenvbd|<Function>: TDTEST <event> <k=v>...
+# `id=` is lowercase hex without 0x, `t=` is guest ms, `grefs=` are comma-separated decimals, and lines are
+# truncated at 255 characters. A request line (submit, defer, rsp, harvest, fake, deferred-fake) is followed by
+# `<event>-grefs ... first=<n> grefs=...` lines (and `<event>-igrefs` for indirect pages) with the same
+# target, ring and id. The event token has to match exactly: `fake` is not `fake-grefs` or `deferred-fake`.
 # --------------------------------------------------------------------------------------------------
 
 XENVBD_TOKEN = "TDTEST"
-XENVBD_RE_ANY = re.compile(r"xenvbd\|(?P<func>[^:]*): .*?\bTDTEST\b[:\s]*(?P<body>.*)$")
-XENVBD_RE_BANNER = re.compile(r"\bTDTEST\b.*\bvariant[=:]\s*(?P<variant>[\w.+-]+)")
-XENVBD_RE_RESET = re.compile(r"\bTDTEST\b.*\bTargetReset\b(?:.*\bcaller=(?P<caller>\S+))?")
-XENVBD_RE_DISABLE = re.compile(r"\bTDTEST\b.*\bBlkifRingDisable\b.*\bfaked=(?P<faked>\d+)")
-XENVBD_RE_FAKE = re.compile(r"\bTDTEST\b.*\bfake\b.*\bid=(?P<id>\w+).*\bgrefs=(?P<grefs>[0-9a-fA-Fx,]+)")
-XENVBD_RE_UNKNOWN_ID = re.compile(r"\bTDTEST\b.*\bunknown-id\b(?:.*\bid=(?P<id>\w+))?")
+XENVBD_RE_ANY = re.compile(r"xenvbd\|(?P<func>[^:]*): TDTEST (?P<event>[\w-]+)(?: (?P<body>.*))?$")
+XENVBD_RE_BANNER = re.compile(r"TDTEST banner.*variant=(?P<variant>[\w.+-]+)")
+XENVBD_RE_RESET = re.compile(r"TDTEST TargetReset target=(?P<target>\d+) caller=(?P<caller>\S+)")
+XENVBD_RE_DISABLE = re.compile(
+    r"TDTEST BlkifRingDisable target=(?P<target>\d+) ring=(?P<ring>\d+).*?faked=(?P<faked>\d+)"
+)
+XENVBD_RE_FAKE = re.compile(
+    r"TDTEST fake target=(?P<target>\d+) ring=(?P<ring>\d+) id=(?P<id>[0-9a-f]+)"
+)
+XENVBD_RE_UNKNOWN_ID = re.compile(
+    r"TDTEST unknown-id target=(?P<target>\d+) ring=(?P<ring>\d+) id=(?P<id>[0-9a-f]+)"
+)
+XENVBD_RE_RING_CONNECT = re.compile(r"TDTEST ring-connect target=(?P<target>\d+) ring=(?P<ring>\d+)")
 XENVBD_KV_RE = re.compile(r"(?P<k>[A-Za-z_][\w/-]*)=(?P<v>[^\s,][^\s]*)")
-# Number bases of xenvbd fields. 0 means "decimal unless 0x-prefixed".
-XENVBD_ID_BASE = 0
-XENVBD_GREF_BASE = 0
+# Number bases of xenvbd fields: ids are hex (tapdisk's are decimal: normalise to int before correlating).
+XENVBD_ID_BASE = 16
+XENVBD_GREF_BASE = 10
+# Events that describe one blkif request, and the suffixes of the lines that carry its grants.
+XENVBD_REQUEST_EVENTS = frozenset({"submit", "defer", "rsp", "harvest", "fake", "deferred-fake"})
+XENVBD_GREFS_SUFFIX = "-grefs"
+XENVBD_IGREFS_SUFFIX = "-igrefs"
 
 
 @dataclass
@@ -65,6 +80,7 @@ class XenvbdEvent:
     index: int
     line: str
     func: str
+    event: str
     body: str
     fields: dict[str, str]
 
@@ -83,29 +99,112 @@ class XenvbdEvent:
 
     @property
     def target(self) -> int | None:
-        return self.get_int("target")
+        return self.get_int("target", 10)
+
+    @property
+    def ring(self) -> int | None:
+        return self.get_int("ring", 10)
 
     @property
     def grefs(self) -> list[int]:
-        out = []
-        for part in self.fields.get("grefs", "").strip(",").split(","):
-            try:
-                out.append(parse_num(part, XENVBD_GREF_BASE))
-            except ValueError:
-                pass
-        return out
+        return _gref_list(self.fields.get("grefs"))
+
+
+def _gref_list(value: str | None) -> list[int]:
+    out = []
+    for part in (value or "").strip(",").split(","):
+        try:
+            out.append(int(part, XENVBD_GREF_BASE))
+        except ValueError:
+            pass
+    return out
 
 
 def parse_xenvbd_events(lines: Iterable[str]) -> list[XenvbdEvent]:
+    """Parse every `xenvbd|<Function>: TDTEST <event> ...` line; `index` is the line's index in `lines`."""
     events = []
     for i, line in enumerate(lines):
-        if XENVBD_TOKEN not in line:
-            continue
         m = XENVBD_RE_ANY.search(line)
-        func, body = (m["func"], m["body"]) if m else ("", line.split(XENVBD_TOKEN, 1)[1])
+        if not m:
+            continue
+        body = m["body"] or ""
         fields = {kv["k"]: kv["v"] for kv in XENVBD_KV_RE.finditer(body)}
-        events.append(XenvbdEvent(i, line, func, body, fields))
+        events.append(XenvbdEvent(i, line, m["func"], m["event"], body, fields))
     return events
+
+
+@dataclass
+class XenvbdRequest:
+    """One blkif request line (`event` is exactly submit, defer, rsp, harvest, fake or deferred-fake) and its grants."""
+
+    event: str
+    target: int | None
+    ring: int | None
+    id: int | None
+    index: int
+    op: str | None
+    sector: int | None
+    nsegs: int | None
+    grefs: list[int] = field(default_factory=list)
+    igrefs: list[int] = field(default_factory=list)
+    line_indexes: list[int] = field(default_factory=list)
+
+
+def group_xenvbd_requests(events: Iterable[XenvbdEvent]) -> list[XenvbdRequest]:
+    """
+    Attach each `<event>-grefs` / `<event>-igrefs` line to the preceding request line of the same event and
+    (target, ring, id). Ids are normalised from hex to int. A grants line without a request line (the
+    request line fell outside the log slice) gets a request of its own, with op=None.
+    """
+    requests: list[XenvbdRequest] = []
+    open_requests: dict[tuple[str, int | None, int | None, int | None], XenvbdRequest] = {}
+    for e in events:
+        if e.event in XENVBD_REQUEST_EVENTS:
+            req = XenvbdRequest(e.event, e.target, e.ring, e.id, e.index, e.fields.get("op"),
+                                e.get_int("sector", 10), e.get_int("nsegs", 10), line_indexes=[e.index])
+            requests.append(req)
+            open_requests[(e.event, e.target, e.ring, e.id)] = req
+            continue
+        for suffix, attr in ((XENVBD_GREFS_SUFFIX, "grefs"), (XENVBD_IGREFS_SUFFIX, "igrefs")):
+            if not e.event.endswith(suffix):
+                continue
+            base = e.event[:-len(suffix)]
+            if base not in XENVBD_REQUEST_EVENTS:
+                break
+            key = (base, e.target, e.ring, e.id)
+            req = open_requests.get(key)
+            if req is None:
+                req = XenvbdRequest(base, e.target, e.ring, e.id, e.index, None, None, None)
+                requests.append(req)
+                open_requests[key] = req
+            getattr(req, attr).extend(e.grefs)
+            req.line_indexes.append(e.index)
+            break
+    return requests
+
+
+@dataclass
+class XenvbdRingConnect:
+    index: int
+    target: int | None
+    ring: int | None
+    order: int | None
+    grefs: list[int]
+    line: str = ""
+
+
+def xenvbd_ring_connects(events: Iterable[XenvbdEvent]) -> list[XenvbdRingConnect]:
+    """`ring-connect` lines (first 8 shared-ring page grefs) merged with their `ring-connect-grefs` continuation."""
+    out: list[XenvbdRingConnect] = []
+    for e in events:
+        if e.event == "ring-connect":
+            out.append(XenvbdRingConnect(e.index, e.target, e.ring, e.get_int("order", 10), list(e.grefs), e.line))
+        elif e.event == "ring-connect-grefs":
+            for rc in reversed(out):
+                if rc.target == e.target and rc.ring == e.ring:
+                    rc.grefs.extend(e.grefs)
+                    break
+    return out
 
 
 # --------------------------------------------------------------------------------------------------
@@ -212,14 +311,24 @@ def check_driver_verifier_off(vm: VM) -> None:
     assert not strtobool(configured), "Driver Verifier is configured on the test VM; turn it off first"
 
 
-def configure_repro_registry(vm: VM, host: Host, knobs: Mapping[str, int], *, max_queues: int = 1,
+def configure_repro_registry(vm: VM, host: Host, knobs: Mapping[str, int], *, target: int, max_queues: int = 1,
                              timeout_value: int = DISK_TIMEOUT_VALUE_S,
                              qemu_log_level: Iterable[str] = QEMU_LOG_LEVEL, reboot: bool = True) -> None:
     """
     Set the repro registry state, then reboot (the knobs are read at DriverEntry).
 
     Knobs absent from `knobs` are removed, so they fall back to their defaults.
+
+    `target` is the xenvbd target id of the test disk (see parse_vbd_target()). `test-targets` is a bitmask of
+    targets and gates every xenvbd test knob (close delay, defer-fake, disable wait, submit/rsp logging,
+    ring-connect), so it is always written as `1 << target` and `knobs` must not say otherwise.
     """
+    if not 0 <= target < 32:
+        raise ValueError(f"invalid xenvbd target id {target!r}")
+    want = 1 << target
+    if knobs.get("test-targets", want) != want:
+        raise ValueError(f"test-targets={knobs['test-targets']} does not address target {target}")
+    knobs = {**knobs, "test-targets": want}
     unknown = set(knobs) - XENVBD_TEST_KNOBS
     if unknown:
         raise ValueError(f"unknown xenvbd knobs: {sorted(unknown)}")
@@ -228,6 +337,8 @@ def configure_repro_registry(vm: VM, host: Host, knobs: Mapping[str, int], *, ma
             raise ValueError(f"invalid DWORD for {name}: {value!r}")
     if knobs.get("test-close-delay-ms", 0) > XENVBD_CLOSE_DELAY_MAX_MS:
         raise ValueError(f"test-close-delay-ms is capped at {XENVBD_CLOSE_DELAY_MAX_MS}")
+    if knobs.get("test-disable-wait-ms", 0) > XENVBD_DISABLE_WAIT_MAX_MS:
+        raise ValueError(f"test-disable-wait-ms is capped at {XENVBD_DISABLE_WAIT_MAX_MS}")
 
     check_driver_verifier_off(vm)
     lines = [
