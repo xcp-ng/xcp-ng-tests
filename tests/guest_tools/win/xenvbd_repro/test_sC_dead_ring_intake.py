@@ -114,3 +114,97 @@ class TestSCDeadRingIntake:
         ev.guest_evidence = bool(w2_bad or w3_bad)
         ev.reproduced = ev.host_evidence
         conclude(repro, ev)
+
+
+@pytest.mark.multi_vms
+@pytest.mark.complex_prerequisites
+@pytest.mark.usefixtures("windows_vm")
+class TestSCMisdirectedWrite:
+    """
+    S-C, corruption form: the dead-ring intake copies a write from grefs that now back other queued writes.
+
+    Same start as test_sC_dead_ring_intake. Then a write-only load runs on W3 through the new ring, the new ring's
+    intake is paused so the load's requests wait with their buffers granted (some with W2's reissued grefs), and
+    only then is the dead ring kicked. The abandoned W2 request is taken off the dead ring and copies W3's data,
+    which tapdisk writes to W2's LBAs: verify finds W2 blocks with W3 headers (MISDIRECTED).
+    """
+
+    XENVBD_KNOBS: dict[str, int] = {}
+
+    def test_sC_misdirected_write(self, repro: ReproContext) -> None:
+        if repro.variant.legacy:
+            pytest.skip("legacy drivers reuse the ring after a reset: there is no dead ring to take requests from")
+        bs, log = repro.bs, repro.log
+        hold_ms = HOLD_MS_GATED if repro.variant.r3 else HOLD_MS
+
+        for w in (W_SC1, W_SC2, W_SC3):
+            bs.fill(1, w)
+        repro.tdtest(write_hold_ms=hold_ms, write_hold_max=1, **tdtest_lba_window("write_hold", W_SC1),
+                     log=1, **tdtest_lba_window("log", Window.span(W_SC1, W_SC2)))
+        w1 = bs.start_write_sync(2, W_SC1)
+        repro.wait_tdtest(lambda e: e.ev == "hold", timeout=60, what="ev=hold of the W1 write")
+        repro.tdtest(intake_pause="current", write_hold_ms=0)
+        w2 = bs.start_write_sync(2, W_SC2)
+        time.sleep(3)
+
+        log.wait_for(XENVBD_RE_RESET, timeout=90, what="xenvbd TDTEST TargetReset")
+        disconnect = repro.wait_tdtest(lambda e: e.ev == "disconnect", timeout=60, what="ev=disconnect")
+        repro.wait_tdtest(lambda e: e.ev == "connect" and e.index > disconnect.index, timeout=90,
+                          what="ev=connect of the new ring")
+        res1 = bs.wait(w1)
+        res2 = bs.wait(w2)
+
+        # Write-only load through the new ring, so reissued grefs back write buffers.
+        run3 = bs.start_load(3, W_SC3, threads=2, io_size=64 * 1024, seconds=25, read_percent=0)
+        time.sleep(4)
+        # Unpause the dead ring (not kicked yet: only live rings are kicked), pause the new ring, let the load's
+        # writes queue on it, then kick the dead ring.
+        repro.tdtest(intake_pause=0, write_hold_ms=0)
+        repro.tdtest(intake_pause="current", write_hold_ms=0)
+        time.sleep(1.5)
+        repro.tdtest(intake_pause="current", write_hold_ms=0, dead_chkrng_kick=1)
+        time.sleep(1.0)
+        repro.tdtest(intake_pause=0, write_hold_ms=0)
+        load3 = bs.wait(run3)
+
+        repro.wait_tdtest(lambda e: e.ev == "release", timeout=hold_ms / 1000 + 60, what="ev=release of W1")
+        try:
+            log.wait_for(TD_RE_DEAD_RING_DESTROY, timeout=60, what="destroying dead ring")
+        except TimeoutError:
+            pass
+        verifies = {name: bs.verify(w) for name, w in (("W1", W_SC1), ("W2", W_SC2), ("W3", W_SC3))}
+
+        lines = log.lines
+        events = repro.tdtest_events()
+        dead_intake = [e for e in events if e.ev == "dead-intake" and e.index > disconnect.index]
+        first_dead = min((e.index for e in dead_intake), default=len(lines))
+        gcf = [m.group(0) for i, m in matching(TD_RE_GRANT_COPY_FAIL, lines) if i > first_dead]
+        dead_copyins = [e.line for e in events if e.ev == "copyin" and e.dead is True and e.index > disconnect.index]
+        w2_misdirected = verifies["W2"].problems_in(W_SC2, ("MISDIRECTED", "CRC"))
+        from_w3 = [p for p in w2_misdirected if p.hdr_lba is not None and W_SC3.contains_block(p.hdr_lba)]
+
+        ev = Evidence("S-C-write", repro.variant.label, repro.options.expect)
+        ev.host = {
+            "disconnect": disconnect.line,
+            "dead_intake": [e.line for e in dead_intake][:20],
+            "dead_ring_copyins": dead_copyins[:20],
+            "grant_copy_failures_after_dead_intake": gcf[:20],
+            "pauses": [e.line for e in events if e.ev in ("intake-pause", "intake-resume", "dead-kick")][:20],
+            "dead_ring_destroyed": [m.group(0) for _, m in matching(TD_RE_DEAD_RING_DESTROY, lines)],
+            "resets": len(matching(XENVBD_RE_RESET, lines)),
+        }
+        ev.guest = {
+            "w1_write": {k: res1.raw.get(k) for k in ("status", "win32err", "durationMs")},
+            "w2_write": {k: res2.raw.get(k) for k in ("status", "win32err", "durationMs")},
+            "load3": {k: load3.raw.get(k) for k in ("reads", "writes", "readMismatches", "errorCodes")},
+            "verify_counts": {name: v.counts for name, v in verifies.items()},
+            "w2_problems": problems_summary(verifies["W2"], W_SC2, ("MISDIRECTED", "CRC")),
+        }
+        if dead_intake:
+            ev.notes.append("dead-ring intake with " + ("grant-copy failure" if gcf else "successful copy"))
+        if from_w3:
+            ev.notes.append(f"{len(from_w3)} W2 block(s) carry W3 data: misdirected write from the dead ring")
+        ev.host_evidence = bool(dead_intake) and bool(dead_copyins)
+        ev.guest_evidence = bool(from_w3)
+        ev.reproduced = ev.host_evidence and ev.guest_evidence
+        conclude(repro, ev)
