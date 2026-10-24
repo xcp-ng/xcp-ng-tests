@@ -52,7 +52,8 @@ QEMU_LOG_LEVEL = ("INFO", "WARNING", "ERROR", "CRITICAL")
 # --------------------------------------------------------------------------------------------------
 
 XENVBD_TOKEN = "TDTEST"
-XENVBD_RE_ANY = re.compile(r"xenvbd\|(?P<func>[^:]*): TDTEST (?P<event>[\w-]+)(?: (?P<body>.*))?$")
+# xenbus forwards Warning() as `xenvbd|<Function>:<text>` with no space after the colon (seen on the host).
+XENVBD_RE_ANY = re.compile(r"xenvbd\|(?P<func>[^:]*):\s*TDTEST (?P<event>[\w-]+)(?: (?P<body>.*))?$")
 XENVBD_RE_BANNER = re.compile(r"TDTEST banner.*variant=(?P<variant>[\w.+-]+)")
 XENVBD_RE_RESET = re.compile(r"TDTEST TargetReset target=(?P<target>\d+) caller=(?P<caller>\S+)")
 XENVBD_RE_DISABLE = re.compile(
@@ -121,7 +122,7 @@ def _gref_list(value: str | None) -> list[int]:
 
 
 def parse_xenvbd_events(lines: Iterable[str]) -> list[XenvbdEvent]:
-    """Parse every `xenvbd|<Function>: TDTEST <event> ...` line; `index` is the line's index in `lines`."""
+    """Parse every `xenvbd|<Function>:TDTEST <event> ...` line; `index` is the line's index in `lines`."""
     events = []
     for i, line in enumerate(lines):
         m = XENVBD_RE_ANY.search(line)
