@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import lib.commands as commands
 from lib.common import strtobool, wait_for
@@ -75,13 +76,24 @@ def wait_for_xapi(fn: Callable[[], bool], msg: str, timeout_secs: int) -> None:
     wait_for(attempt, msg, timeout_secs=timeout_secs, retry_delay_secs=5)
 
 
-def wait_for_pool_master(pool: Pool, host: Host) -> None:
-    wait_for_xapi(
-        lambda: pool.is_live_master(host),
-        f'Wait for {host} to be pool master',
-        HA_FAILOVER_TIMEOUT_SECS,
-    )
-    pool.master = host
+def wait_for_pool_master(pool: Pool, hosts: Host | list[Host]) -> Host:
+    if not isinstance(hosts, list):
+        hosts = [hosts]
+    # We will try each hosts for 1 sec for a total of HA_FAILOVER_TIMEOUT_SECS
+    start = time.monotonic()
+    while time.monotonic() - start < HA_FAILOVER_TIMEOUT_SECS:
+        for host in hosts:
+            try:
+                wait_for_xapi(
+                    lambda: pool.is_live_master(host),
+                    f'Wait for {host} to be pool master',
+                    1,
+                )
+            except TimeoutError:
+                continue
+            pool.master = host
+            return host
+    raise TimeoutError(f"Could not find any pool master in {hosts}")
 
 
 def wait_for_live_master(pool: Pool) -> Host:
@@ -196,12 +208,15 @@ def rejoin(
 def recover_from_fence(
     pool: Pool,
     failed: Host,
-    survivor: Host,
+    survivors: Host | list[Host],
     *,
     after_ssh: Callable[[Host], None] | None = None,
 ) -> None:
+    if not isinstance(survivors, list):
+        survivors = [survivors]
     # Disable HA only once failed is back: xapi releases the statefile and metadata VDIs
     # on every host that is up and skips the others.
+    survivor = next(host for host in survivors if host.is_master())
     rejoin(pool, failed, after_ssh=after_ssh)
     restore_pool_after_ha(pool)
     assert survivor.is_master(), f'{survivor} should still be master after recovery'
@@ -222,17 +237,17 @@ def cleanup_ha_scenario(pool: Pool) -> None:
         logging.warning('Pool restore failed during cleanup', exc_info=True)
 
 
-def prepare_pool_for_ha(pool: Pool) -> tuple[Host, Host]:
+def prepare_pool_for_ha(pool: Pool) -> tuple[Host, list[Host]]:
     """Check the pool is ready for an HA scenario and return (master, slave)."""
-    assert len(pool.hosts) == 2, f'HA scenarios need a 2-host pool, got {len(pool.hosts)}'
+    assert len(pool.hosts) > 2, f'HA scenarios need a 2 hosts on the pool, got {len(pool.hosts)}'
     master = wait_for_live_master(pool)
-    slave = next(h for h in pool.hosts if h.uuid != master.uuid)
+    slaves = [h for h in pool.hosts if h.uuid != master.uuid]
 
     for member in pool.hosts:
         assert member.is_ssh_reachable(), f'{member} must be reachable before HA scenario'
         member.wait_for_xapi_enabled(timeout_secs=HA_RECOVERY_TIMEOUT_SECS)
     assert_pool_ready(pool)
-    return master, slave
+    return master, slaves
 
 
 def destroy_ha_vdis(pool: Pool, sr: SR) -> None:
@@ -276,28 +291,45 @@ def enable_pool_ha(pool: Pool, nfs_sr: SR) -> None:
     )
 
 
-def wait_for_vm_on_host(
+def wait_for_vm_on_hosts(
     vm: VM,
-    on_host: Host,
+    on_hosts: Host | list[Host],
     msg: str,
     *,
     booted: bool = True,
-) -> None:
-    # The previous vm.host may have been fenced.
-    vm.host = on_host
+) -> Host:
+    if not isinstance(on_hosts, list):
+        on_hosts = [on_hosts]
 
-    def check() -> bool:
-        try:
-            return vm.is_running_on_host(on_host)
-        except commands.SSHCommandFailed as exc:
-            logging.debug(f'VM state check failed: {exc}')
-            return False
+    # We will try each hosts for 1 sec for a total of HA_FAILOVER_TIMEOUT_SECS
+    start = time.monotonic()
 
-    wait_for(check, msg, timeout_secs=HA_FAILOVER_TIMEOUT_SECS, retry_delay_secs=5)
-    if booted:
-        vm.wait_for_os_booted()
+    while time.monotonic() - start < HA_FAILOVER_TIMEOUT_SECS:
+        for host in on_hosts:
+            # The previous vm.host may have been fenced.
+            vm.host = host
+
+            def check() -> bool:
+                try:
+                    return vm.is_running_on_host(host)
+                except commands.SSHCommandFailed as exc:
+                    logging.debug(f'VM state check failed: {exc}')
+                    return False
+
+            try:
+                wait_for(check, msg, timeout_secs=1, retry_delay_secs=5)
+            except TimeoutError:
+                continue
+
+            if booted:
+                vm.wait_for_os_booted()
+
+            return host
+    raise TimeoutError
 
 
-def wait_for_failover(pool: Pool, vm: VM, survivor: Host, reason: str) -> None:
-    wait_for_pool_master(pool, survivor)
-    wait_for_vm_on_host(vm, survivor, f'Wait for VM to restart on {survivor} {reason}')
+def wait_for_failover(pool: Pool, vm: VM, survivors: Host | list[Host], reason: str) -> None:
+    if not isinstance(survivors, list):
+        survivors = [survivors]
+    wait_for_pool_master(pool, survivors)
+    wait_for_vm_on_hosts(vm, pool.hosts, f'Wait for VM to restart on {pool.master} {reason}')
