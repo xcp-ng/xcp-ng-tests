@@ -1,15 +1,21 @@
 import pytest
 
 import hashlib
+import shlex
+from pathlib import Path
 
 from lib import commands
 from lib.host import Host
 
+from typing import Generator
+
 # This test is designed to verify the accessibility of the XOA deployment script,
-# also testing the following packages: ca-certificates, curl, wget
+# also testing the following packages: ca-certificates, curl, wget, libssh2
 #
 # Requirements:
 # - an XCP-ng host with xcp-ng-release >= 8.3.0.29
+# - for the sftp/scp tests: the host's root password set in data.py
+#   (HOSTS or HOST_DEFAULT_PASSWORD)
 
 @pytest.mark.parametrize("command_id", ["curl", "wget"])
 @pytest.mark.parametrize("url_id", [
@@ -89,3 +95,50 @@ def test_wget_url(host: Host, url: str, expected_returncode: int) -> None:
         f"wget returned {result.returncode} for {url} (expected {expected_returncode}).\n"
         f"stderr: {result.ssherr}"
     )
+
+
+# sftp/scp tests, exercising libssh2 through curl.
+#
+# curl connects to the host's own sshd (127.0.0.1:22) to upload and download
+# a file, checking its integrity with sha256.
+#
+# The server's host key is verified by libssh2 against $HOME/.ssh/known_hosts:
+# HOME points to a temporary directory holding a known_hosts file generated
+# with ssh-keyscan, leaving root's ~/.ssh untouched.
+
+SSH_SCHEMES = ["sftp", "scp"]
+SSH_TEST_FILE = "curl-testfile"
+
+@pytest.fixture(scope="module")
+def ssh_workdir(host: Host) -> Generator[Path, None, None]:
+    if not host.password:
+        pytest.fail("no root password for this host in data.py")
+    workdir = Path(host.ssh("mktemp -d"))
+    try:
+        host.ssh(f"mkdir -m 700 {workdir / '.ssh'}")
+        host.ssh(f"ssh-keyscan 127.0.0.1 > {workdir / '.ssh/known_hosts'}")
+        host.ssh(f"head -c 32M /dev/urandom > {workdir / SSH_TEST_FILE}")
+        yield workdir
+    finally:
+        host.ssh(f"rm -rf {workdir}")
+
+def _curl_ssh(host: Host, home: Path, args: str) -> None:
+    credentials = shlex.quote(f"root:{host.password}")
+    host.ssh(f"HOME={home} curl --silent --show-error --user {credentials} {args}")
+
+def _ssh_url(scheme: str, path: Path) -> str:
+    return f"{scheme}://127.0.0.1{path}"
+
+@pytest.mark.parametrize("scheme", SSH_SCHEMES)
+def test_curl_ssh_download(host: Host, ssh_workdir: Path, scheme: str) -> None:
+    source = ssh_workdir / SSH_TEST_FILE
+    downloaded = ssh_workdir / f"downloaded-{scheme}"
+    _curl_ssh(host, ssh_workdir, f"--output {downloaded} {_ssh_url(scheme, source)}")
+    assert host.sha256sum(downloaded) == host.sha256sum(source)
+
+@pytest.mark.parametrize("scheme", SSH_SCHEMES)
+def test_curl_ssh_upload(host: Host, ssh_workdir: Path, scheme: str) -> None:
+    source = ssh_workdir / SSH_TEST_FILE
+    uploaded = ssh_workdir / f"uploaded-{scheme}"
+    _curl_ssh(host, ssh_workdir, f"--upload-file {source} {_ssh_url(scheme, uploaded)}")
+    assert host.sha256sum(uploaded) == host.sha256sum(source)
