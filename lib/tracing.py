@@ -54,3 +54,23 @@ class Tracing:
 
         logging.debug(f'Span {name} not found')
         return span
+
+    def stats_migration(self, traceid: str) -> None:
+        """ Prints a migration's general durations from a trace ID. """
+        if not self.enabled:
+            return
+        logging.info(f'Migration trace ID: {traceid}')
+        logging.info("Locating migration spans")
+        span_migration = self.span_from_traceid("VM.pool_migrate", traceid)
+        if span_migration == {}:
+            # retry with cross-pool migration span
+            span_migration = self.span_from_traceid("VM.migrate_send", traceid)
+        duration = span_migration.get("duration")
+        if duration:
+            logging.info(f'Migration duration: {duration / 10**6}s')
+        span_downtime_begin = self.span_from_traceid("VM_migrate_downtime_begin", traceid)
+        span_downtime_end = self.span_from_traceid("VM_migrate_downtime_end", traceid)
+        downtime_start = span_downtime_begin.get("timestamp")
+        downtime_end = span_downtime_end.get("timestamp")
+        if downtime_start and downtime_end:
+            logging.info(f'VM downtime duration: {(downtime_end - downtime_start) / 10**6}s')
