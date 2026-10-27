@@ -73,12 +73,15 @@ class VIF:
         mode: str,
         address: str | None = None,
         gateway: str | None = None,
+        dns: list[str] | None = None,
     ) -> None:
         args: XeParams = {"uuid": self.uuid, "mode": mode}
         if address is not None:
             args["address"] = address
         if gateway is not None:
             args["gateway"] = gateway
+        if dns is not None:
+            args["dns"] = ",".join(dns)
         self.vm.host.xe(f"vif-configure-{address_family}", args)
         # HACK: xe returns after publishing the request, before the guest has acknowledged it. Give the guest time to
         # consume it so a following request cannot overwrite the pending one.
@@ -90,6 +93,7 @@ class VIF:
         mode: Literal["static"],
         address: str,
         gateway: str | None = ...,
+        dns: list[str] | None = ...,
     ) -> None:  #
         ...
 
@@ -99,6 +103,7 @@ class VIF:
         mode: Literal["dhcp"] | Literal["none"],
         address: None = ...,
         gateway: None = ...,
+        dns: None = ...,
     ) -> None:  #
         ...
 
@@ -107,8 +112,9 @@ class VIF:
         mode: str,
         address: str | None = None,
         gateway: str | None = None,
+        dns: list[str] | None = None,
     ) -> None:
-        self._configure("ipv4", mode, address, gateway)
+        self._configure("ipv4", mode, address, gateway, dns)
 
     @overload
     def configure_ipv6(
@@ -116,6 +122,7 @@ class VIF:
         mode: Literal["static"],
         address: str,
         gateway: str | None = ...,
+        dns: list[str] | None = ...,
     ) -> None:  #
         ...
 
@@ -125,6 +132,7 @@ class VIF:
         mode: Literal["autoconf"] | Literal["none"],
         address: None = ...,
         gateway: None = ...,
+        dns: None = ...,
     ) -> None:  #
         ...
 
@@ -133,8 +141,9 @@ class VIF:
         mode: str,
         address: str | None = None,
         gateway: str | None = None,
+        dns: list[str] | None = None,
     ) -> None:
-        self._configure("ipv6", mode, address, gateway)
+        self._configure("ipv6", mode, address, gateway, dns)
 
     def network(self) -> Network:
         network_uuid = self.param_get('network-uuid')

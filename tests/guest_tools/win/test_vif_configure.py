@@ -9,6 +9,7 @@ from lib.windows import (
     vif_add_manual_configuration,
     vif_execute_powershell_script,
     vif_exists,
+    vif_get_dns,
     vif_has_static_configuration,
     vif_uses_dhcp,
 )
@@ -23,8 +24,8 @@ from typing import Generator
 @pytest.mark.usefixtures("windows_vm")
 class TestVifConfigure:
     @pytest.fixture
-    def temporary_vif(self, vm_install_test_tools_per_test_class: VM, defer: Defer) -> Generator[VIF, None, None]:
-        vm = vm_install_test_tools_per_test_class
+    def temporary_vif(self, running_vm: VM, defer: Defer) -> Generator[VIF, None, None]:
+        vm = running_vm
         existing_vifs = vm.vifs()
         network_uuid = existing_vifs[0].param_get("network-uuid")
         assert network_uuid is not None
@@ -57,23 +58,35 @@ Set-NetIPInterface -InterfaceIndex $adapter.ifIndex `
         gateway1 = "192.0.2.1"
         address2 = "198.51.100.2"
         gateway2 = "198.51.100.1"
+        dns1 = ["192.0.2.53", "198.51.100.53"]
+        dns2 = ["203.0.113.53"]
 
         logging.info("Configure DHCP IPv4")
         vif.configure_ipv4("dhcp")
         wait_for(lambda: vif_uses_dhcp(vif))
 
         logging.info("Configure static IPv4")
-        vif.configure_ipv4("static", f"{address1}/{prefix}", gateway1)
-        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1))
+        vif.configure_ipv4("static", f"{address1}/{prefix}", gateway1, dns=dns1)
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1, dns1))
 
         logging.info("Configure noop IPv4")
         vif.configure_ipv4("none")
-        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1, dns1))
 
         logging.info("Reconfigure static IPv4")
+        vif.configure_ipv4("static", f"{address2}/{prefix}", gateway2, dns=dns2)
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1, present=False))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address2, prefix, gateway2, dns2))
+
+        logging.info("Reconfigure static IPv4 with empty DNS, preserving existing DNS")
+        vif.configure_ipv4("static", f"{address1}/{prefix}", gateway1, dns=[])
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address2, prefix, gateway2, present=False))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1, dns2))
+
+        logging.info("Reconfigure static IPv4 without DNS, preserving existing DNS")
         vif.configure_ipv4("static", f"{address2}/{prefix}", gateway2)
         wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address1, prefix, gateway1, present=False))
-        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address2, prefix, gateway2))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv4", address2, prefix, gateway2, dns2))
 
         logging.info("Configure DHCP IPv4")
         vif.configure_ipv4("dhcp")
@@ -105,22 +118,34 @@ Set-NetIPInterface -InterfaceIndex $adapter.ifIndex `
         gateway1 = "2001:db8:1::1"
         address2 = "2001:db8:2::3"
         gateway2 = "2001:db8:2::254"
+        dns1 = ["2001:db8:1::53", "2001:db8:2::53"]
+        dns2 = ["2001:db8:3::53"]
 
         logging.info("Configure autoconf IPv6")
         vif.configure_ipv6("autoconf")
 
         logging.info("Configure static IPv6")
-        vif.configure_ipv6("static", f"{address1}/{prefix}", gateway1)
-        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1))
+        vif.configure_ipv6("static", f"{address1}/{prefix}", gateway1, dns=dns1)
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1, dns1))
 
         logging.info("Reconfigure noop IPv6")
         vif.configure_ipv6("none")
-        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1, dns1))
 
         logging.info("Reconfigure static IPv6")
+        vif.configure_ipv6("static", f"{address2}/{prefix}", gateway2, dns=dns2)
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1, present=False))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address2, prefix, gateway2, dns2))
+
+        logging.info("Reconfigure static IPv6 with empty DNS, preserving existing DNS")
+        vif.configure_ipv6("static", f"{address1}/{prefix}", gateway1, dns=[])
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address2, prefix, gateway2, present=False))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1, dns2))
+
+        logging.info("Reconfigure static IPv6 without DNS, preserving existing DNS")
         vif.configure_ipv6("static", f"{address2}/{prefix}", gateway2)
         wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address1, prefix, gateway1, present=False))
-        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address2, prefix, gateway2))
+        wait_for(lambda: vif_has_static_configuration(vif, "IPv6", address2, prefix, gateway2, dns2))
 
         logging.info("Configure autoconf IPv6")
         vif.configure_ipv6("autoconf")
