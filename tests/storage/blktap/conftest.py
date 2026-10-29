@@ -143,8 +143,8 @@ class TrackingTapCtl(TapCtl):
         self.attached[minor] = pid
 
     def open(self, pid: int, minor: int, path: str, readonly: bool = False, no_o_direct: bool = False,
-             timeout: int | None = None) -> None:
-        super().open(pid, minor, path, readonly, no_o_direct, timeout)
+             timeout: int | None = None, log: str | None = None) -> None:
+        super().open(pid, minor, path, readonly, no_o_direct, timeout, log)
         self.opened[minor] = pid
 
     def close(self, pid: int, minor: int, force: bool = False, timeout: int | None = None) -> None:
@@ -160,13 +160,20 @@ class TrackingTapCtl(TapCtl):
         if minor in self.minors:
             self.minors.remove(minor)
 
-    def create(self, path: str, readonly: bool = False) -> tuple[int, int]:
-        pid, minor = super().create(path, readonly)
+    def create(self, path: str, readonly: bool = False, log: str | None = None) -> tuple[int, int]:
+        pid, minor = super().create(path, readonly, log)
         self.spawned.append(pid)
         self.minors.append(minor)
         self.attached[minor] = pid
         self.opened[minor] = pid
         return pid, minor
+
+    def destroy(self, pid: int, minor: int, timeout: int | None = None) -> None:
+        super().destroy(pid, minor, timeout)
+        self.opened.pop(minor, None)
+        self.attached.pop(minor, None)
+        if minor in self.minors:
+            self.minors.remove(minor)
 
     def cleanup(self) -> None:
         """Close and detach the minors left, kill the spawned tapdisks, then free the minors."""
@@ -204,10 +211,10 @@ class TrackingVBDConnector(VBDConnector):
         # (VM uuid, device) -> (VM, "connect" (tapdisk owned) or "attach" (tapdisk not owned))
         self.tracked: dict[tuple[str, str], tuple[VM, str]] = {}
 
-    def connect(self, vm: VM, image: str, device: str,
-                readonly: bool = False) -> tuple[int, int]:
+    def connect(self, vm: VM, image: str, device: str, readonly: bool = False,
+                log: str | None = None) -> tuple[int, int]:
         # connect() calls attach(), which records "attach" first: override it
-        result = super().connect(vm, image, device, readonly)
+        result = super().connect(vm, image, device, readonly, log)
         self.tracked[(vm.uuid, device)] = (vm, "connect")
         return result
 

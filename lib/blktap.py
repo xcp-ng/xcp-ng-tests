@@ -82,8 +82,8 @@ class TapCtl:
         self._run("detach", "-p", pid, "-m", minor)
 
     def open(self, pid: int, minor: int, path: str, readonly: bool = False, no_o_direct: bool = False,
-             timeout: int | None = None) -> None:
-        """Open an image, given as "type:/path/to/file"."""
+             timeout: int | None = None, log: str | None = None) -> None:
+        """Open an image, given as "type:/path/to/file", with a CBT log file if one is given."""
         args: list[object] = ["open", "-p", pid, "-m", minor, "-a", path]
         if readonly:
             args.append("-R")
@@ -91,6 +91,8 @@ class TapCtl:
             args.append("-D")
         if timeout is not None:
             args += ["-t", timeout]
+        if log:
+            args += ["-C", log]
         self._run(*args)
 
     def close(self, pid: int, minor: int, force: bool = False, timeout: int | None = None) -> None:
@@ -107,11 +109,13 @@ class TapCtl:
             args += ["-t", timeout]
         self._run(*args)
 
-    def unpause(self, pid: int, minor: int, path: str | None = None) -> None:
-        """Resume the I/O, optionally reopening the image or switching to a new one."""
+    def unpause(self, pid: int, minor: int, path: str | None = None, log: str | None = None) -> None:
+        """Resume the I/O, optionally reopening the image or switching to a new one, with a CBT log file."""
         args: list[object] = ["unpause", "-p", pid, "-m", minor]
         if path:
             args += ["-a", path]
+        if log:
+            args += ["-c", log]
         self._run(*args)
 
     def list(self, pid: int | None = None, minor: int | None = None) -> list[TapdiskInfo]:
@@ -150,11 +154,13 @@ class TapCtl:
             except Exception:
                 raise TapCtlError(f"Could not parse stats output: {result}")
 
-    def create(self, path: str, readonly: bool = False) -> tuple[int, int]:
+    def create(self, path: str, readonly: bool = False, log: str | None = None) -> tuple[int, int]:
         """Create a tapdisk (spawn, allocate, attach, open) for "type:/path", return (pid, minor)."""
         args: list[object] = ["create", "-a", path]
         if readonly:
             args.append("-R")
+        if log:
+            args += ["-C", log]
 
         # The output is the tapdev path (e.g. "/dev/xen/blktap-2/tapdev13"): the minor is
         # the trailing number, then look up the pid owning it (same method as connect-vbd.sh)
@@ -327,14 +333,18 @@ class VBDConnector:
         if not self._wait_frontend_state(vm, frontend, 4, timeout=15):
             raise VBDConnectorError("Frontend did not reach Connected state")
 
-    def connect(self, vm: VM, image: str, device: str, readonly: bool = False) -> tuple[int, int]:
-        """Create a tapdisk for image ("type:/path/to/file") and connect it to the VM, return (pid, minor)."""
+    def connect(self, vm: VM, image: str, device: str, readonly: bool = False,
+                log: str | None = None) -> tuple[int, int]:
+        """Create a tapdisk for image ("type:/path/to/file") and connect it to the VM, return (pid, minor).
+
+        The tapdisk tracks the written blocks in the CBT log file if one is given.
+        """
         logging.info(f"Connecting {device}: {image} (readonly={readonly})")
         # Check the VM is running before creating the tapdisk (like connect-vbd.sh)
         if not vm.is_running():
             raise VBDConnectorError(f"VM {vm.uuid} not running")
 
-        pid, minor = self.tapctl.create(image, readonly=readonly)
+        pid, minor = self.tapctl.create(image, readonly=readonly, log=log)
         try:
             self.attach(vm, pid, minor, device, readonly=readonly)
         except Exception as e:
