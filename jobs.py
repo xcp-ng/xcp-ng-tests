@@ -331,16 +331,18 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/storage/benchmarks"],
     },
     "blktap-benchmarks": {
-        "description": "runs the fio and application benchmarks of images served by tapdisk",
+        "description": "runs the fio, application and PTS benchmarks of images served by tapdisk",
         "requirements": [
-            "An XCP-ng host with blktap and tapback, and 10 GiB free in dom0 /tmp.",
+            "An XCP-ng host with blktap and tapback, and 50 GiB free in --blktap bench-image-dir (10 GiB for "
+            "all but the PTS benchmark).",
             "A Debian 12 VM with internet access (cloned with up to 8 vCPUs and 4 GiB of RAM).",
         ],
         "nb_pools": 1,
         "params": {
             "--vm": "single/debian_bios_vm",
         },
-        "paths": ["tests/storage/blktap/test_fio_bench.py", "tests/storage/blktap/test_app_bench.py"],
+        "paths": ["tests/storage/blktap/test_fio_bench.py", "tests/storage/blktap/test_app_bench.py",
+                  "tests/storage/blktap/test_pts_bench.py"],
     },
     "linstor-main": {
         "description": "tests the linstor storage driver, but avoids migrations and reboots",
