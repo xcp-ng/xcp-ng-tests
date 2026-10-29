@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+import functools
+import hashlib
 import logging
 import shlex
 from dataclasses import dataclass
@@ -23,6 +25,35 @@ class ConnectedVBD:
     image: str  # "<format>:<path>", as given to connect()
     pid: int
     minor: int
+
+@functools.cache
+def blktap_tool(host: Host, name: str) -> str:
+    """Path of a tool of the blktap build installed in /opt/blktap (e.g. the instrumented one), else its name."""
+    for directory in ('/opt/blktap/bin', '/opt/blktap/sbin'):
+        if host.ssh_with_result(f'test -x {directory}/{name}').returncode == 0:
+            return f'{directory}/{name}'
+    return name
+
+# (offset, length, fill byte) blocks written and read back through the NBD server of a tapdisk
+PATTERN_BLOCKS = [(0, 4096, 0xA1), (3 * 4096, 8192, 0xB2), (1 * MiB, 65536, 0xC3), (10 * MiB + 8192, 4096, 0xD4)]
+
+def nbd_socket(pid: int, minor: int) -> str:
+    return f'/var/run/blktap-control/nbd{pid}.{minor}'
+
+def nbd_blocks(blocks: list[tuple[int, int, int]]) -> str:
+    """The blocks as given to the "write" and "verify" scenarios of the NBD client of test_nbd.py."""
+    return ','.join(f'{offset}:{length}:{fill}' for offset, length, fill in blocks)
+
+def filled_md5(fill: int, length: int) -> str:
+    """MD5 of length bytes all equal to fill."""
+    return hashlib.md5(bytes([fill]) * length).hexdigest()
+
+def stop_tapdisk(host: Host, tapctl: TapCtl, pid: int, minor: int) -> None:
+    """Close, detach and free normally, so that the tapdisk exits by itself (and writes its coverage counters)."""
+    tapctl.close(pid, minor, timeout=30)
+    tapctl.detach(pid, minor)
+    wait_for_tapdisk_exit(host, pid)
+    tapctl.free(minor)
 
 def wait_for_guest_device(vm: VM, device: str, present: bool = True) -> None:
     """Wait for /dev/<device> to appear in the guest (or to disappear, if present is False)."""

@@ -31,13 +31,19 @@ if TYPE_CHECKING:
 #   sector; prints the export size;
 # - "reads": a full handshake, then 1 MiB reads all over the export, always
 #   READS_IN_FLIGHT of them in flight, until the server closes the connection;
-#   prints the number of reads completed.
+#   prints the number of reads completed;
+# - "write": a full handshake, then a write of each block given as third argument ("offset:length:fill,...")
+#   filled with its fill byte;
+# - "verify": a full handshake, then a read of each block given as third argument, checked against its fill byte.
 NBD_CLIENT = r'''
 import socket, struct, sys
 
 path, scenario = sys.argv[1], sys.argv[2]
 READS_IN_FLIGHT = 8
 READ_SIZE = 1024 * 1024
+# (offset, length, fill byte) of the write and verify scenarios, given as "offset:length:fill,..."
+BLOCKS = [tuple(int(value, 0) for value in block.split(':')) for block in sys.argv[3].split(',')] \
+    if len(sys.argv) > 3 else []
 
 def recv(s, size):
     data = b''
@@ -68,11 +74,16 @@ def handshake():
 def send_read(s, handle, offset, length):
     s.sendall(struct.pack('>IHHQQI', 0x25609513, 0, 0, handle, offset, length))  # NBD_CMD_READ
 
-def recv_read(s, length):
+def recv_read_data(s, length):
     magic, error, handle = struct.unpack('>IIQ', recv(s, 16))
     assert (magic, error) == (0x67446698, 0), f"unexpected reply {(magic, error, handle)}"
-    recv(s, length)
-    return handle
+    return handle, recv(s, length)
+
+def recv_read(s, length):
+    return recv_read_data(s, length)[0]
+
+def send_write(s, handle, offset, data):
+    s.sendall(struct.pack('>IHHQQI', 0x25609513, 0, 1, handle, offset, len(data)) + data)  # NBD_CMD_WRITE
 
 if scenario == 'overlapping':
     first = connect()
@@ -104,13 +115,26 @@ elif scenario == 'reads':
     except (EOFError, OSError):
         pass
     print(completed, flush=True)
+elif scenario == 'write':
+    s, size = handshake()
+    for handle, (offset, length, fill) in enumerate(BLOCKS):
+        send_write(s, handle, offset, bytes([fill]) * length)
+        magic, error, reply_handle = struct.unpack('>IIQ', recv(s, 16))
+        assert (magic, error, reply_handle) == (0x67446698, 0, handle), f"unexpected reply {magic, error}"
+    s.close()
+elif scenario == 'verify':
+    s, size = handshake()
+    for handle, (offset, length, fill) in enumerate(BLOCKS):
+        send_read(s, handle, offset, length)
+        assert recv_read_data(s, length) == (handle, bytes([fill]) * length), f"unexpected data at {offset}"
+    s.close()
 '''
 
 # a spinning tapdisk logs ~120k lines per second: a short wait is enough to see it
 SPIN_OBSERVATION_SECS = 2
 
-def nbd_client(host: Host, socket_path: str, scenario: str) -> str:
-    return host.ssh(shlex.join(['python3', '-c', NBD_CLIENT, socket_path, scenario]))
+def nbd_client(host: Host, socket_path: str, scenario: str, *arguments: str) -> str:
+    return host.ssh(shlex.join(['python3', '-c', NBD_CLIENT, socket_path, scenario, *arguments]))
 
 @pytest.fixture
 def raw_image_path(host: Host) -> Generator[str, None, None]:
