@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
+from lib.common import QCOW2_MAX, VHD_MAX, InterruptShield, MiB, PackageManagerEnum, strtobool, wait_for
 from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
@@ -193,20 +193,22 @@ def randstream(vm: VM, args: str) -> str:
 
 CoalesceOperation = Literal['snapshot', 'clone']
 
-def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer) -> None:
+def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, interrupt_shield: InterruptShield) -> None:
     vdi_size = vdi.get_virtual_size()
-    vbd = vm.connect_vdi(vdi)
-    defer(lambda: vm.disconnect_vdi(vdi))
+    with interrupt_shield() as defer:
+        vbd = vm.connect_vdi(vdi)
+        defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
     # generate at the start, in the middle and the end of the disk
     spans = partially_populate_device(vm, dev, vdi_size, 4, skip_spans=[1])
     # make sure we can read that exact data before the snapshot/clone
     validate_partially_populated_device(vm, dev, spans)
-    match vdi_op:
-        case 'clone': new_vdi = vdi.clone()
-        case 'snapshot': new_vdi = vdi.snapshot()
-    defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
+    with interrupt_shield() as defer:
+        match vdi_op:
+            case 'clone': new_vdi = vdi.clone()
+            case 'snapshot': new_vdi = vdi.snapshot()
+        defer(lambda: new_vdi.destroy() if new_vdi is not None else None)
 
     # add some data in a non-used place (span 1), and overwrite an already used one (span 2)
     spans[1].generate(vm, dev, seed=1)
@@ -226,14 +228,15 @@ def coalesce_integrity(vm: VM, vdi: VDI, vdi_op: CoalesceOperation, defer: Defer
 XVACompression = Literal['none', 'gzip', 'zstd']
 
 def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir: str,
-                      defer: Defer, *, with_snapshot: bool = False) -> None:
+                      interrupt_shield: InterruptShield, *, with_snapshot: bool = False) -> None:
     # clone the vm, so we can resize the disk without affecting the vm from the fixture
-    vm = source_vm.clone()
-    snap1 = None
-    snap2 = None
-    defer(lambda: vm.destroy() if vm is not None else None)
-    defer(lambda: snap1.destroy() if snap1 is not None else None)
-    defer(lambda: snap2.destroy() if snap2 is not None else None)
+    with interrupt_shield() as defer:
+        vm = source_vm.clone()
+        snap1 = None
+        snap2 = None
+        defer(lambda: vm.destroy() if vm is not None else None)
+        defer(lambda: snap1.destroy() if snap1 is not None else None)
+        defer(lambda: snap2.destroy() if snap2 is not None else None)
 
     host = vm.host
     sr = vm.vdis[0].sr
@@ -260,13 +263,17 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     randstream(vm, f'validate --expected-checksum {checksum1} /root/data1')
 
     if with_snapshot:
-        snap1 = vm.snapshot()
+        # Its cleanup is registered above
+        with interrupt_shield():
+            snap1 = vm.snapshot()
 
     checksum2 = randstream(vm, f'generate --size {file_size} /root/data2')
     randstream(vm, f'validate --expected-checksum {checksum2} /root/data2')
 
     if with_snapshot:
-        snap2 = vm.snapshot()
+        # Its cleanup is registered above
+        with interrupt_shield():
+            snap2 = vm.snapshot()
 
     checksum3 = randstream(vm, f'generate --size {file_size} /root/data3')
     randstream(vm, f'validate --expected-checksum {checksum3} /root/data3')
@@ -274,8 +281,9 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     vm.shutdown(verify=True)
 
     xva_path = f'{temp_large_dir}/{vm.uuid}.xva'
-    defer(lambda: host.ssh(f'rm -f {xva_path}'))
-    vm.export(xva_path, compression)
+    with interrupt_shield() as defer:
+        defer(lambda: host.ssh(f'rm -f {xva_path}'))
+        vm.export(xva_path, compression)
     # check that the zero blocks are not part of the result. Most of the data is from the random stream, so
     # compression has little effect. We just take into account the system size
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {xva_path}').split()[0])
@@ -289,8 +297,9 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     vm.destroy()
     vm = None
 
-    imported_vm = host.import_vm(xva_path, sr.uuid)
-    defer(lambda: imported_vm.destroy())
+    with interrupt_shield() as defer:
+        imported_vm = host.import_vm(xva_path, sr.uuid)
+        defer(lambda: imported_vm.destroy())
     assert imported_vm.vdis[0].get_virtual_size() == volume_size
 
     imported_vm.start()
@@ -299,12 +308,15 @@ def xva_export_import(source_vm: VM, compression: XVACompression, temp_large_dir
     randstream(imported_vm, f'validate --expected-checksum {checksum2} /root/data2')
     randstream(imported_vm, f'validate --expected-checksum {checksum3} /root/data3')
 
-def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str, defer: Defer) -> None:
-    vdi_src = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
-    defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
+def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir: str,
+                      interrupt_shield: InterruptShield) -> None:
+    with interrupt_shield() as defer:
+        vdi_src = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
+        defer(lambda: vdi_src.destroy() if vdi_src is not None else None)
 
-    vbd = vm.connect_vdi(vdi_src)
-    defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
+    with interrupt_shield() as defer:
+        vbd = vm.connect_vdi(vdi_src)
+        defer(lambda: vm.disconnect_vdi(vdi_src) if vdi_src is not None and vdi_src.uuid in vm.vdis else None)
     dev = f'/dev/{vbd.param_get("device")}'
 
     spans = partially_populate_device(vm, dev, config.volume_size)
@@ -312,9 +324,9 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     vm.disconnect_vdi(vdi_src)
 
     image_path = f'{temp_large_dir}/{vdi_src.uuid}.{image_format}'
-    defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
-
-    vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})
+    with interrupt_shield() as defer:
+        defer(lambda: vm.host.ssh(f'rm -f {image_path}'))
+        vm.host.xe('vdi-export', {'uuid': vdi_src.uuid, 'filename': image_path, 'format': image_format})
     vdi_src.destroy()
     vdi_src = None
 
@@ -322,20 +334,23 @@ def vdi_export_import(vm: VM, sr: SR, image_format: ImageFormat, temp_large_dir:
     size_mb = int(vm.host.ssh(f'du -sm --apparent-size {image_path}').split()[0])
     total_span_size_mib = sum(span.size for span in spans) // MiB
     assert total_span_size_mib < size_mb < total_span_size_mib * 1.1, f"unexpected image size: {size_mb}"
-    vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
-    defer(lambda: vdi_dest.destroy())
+    with interrupt_shield() as defer:
+        vdi_dest = sr.create_vdi(image_format=image_format, virtual_size=config.volume_size)
+        defer(lambda: vdi_dest.destroy())
 
     vm.host.xe('vdi-import', {'uuid': vdi_dest.uuid, 'filename': image_path, 'format': image_format})
-    vbd = vm.connect_vdi(vdi_dest)
-    defer(lambda: vm.disconnect_vdi(vdi_dest))
+    with interrupt_shield() as defer:
+        vbd = vm.connect_vdi(vdi_dest)
+        defer(lambda: vm.disconnect_vdi(vdi_dest))
     dev = f'/dev/{vbd.param_get("device")}'
 
     validate_partially_populated_device(vm, dev, spans)
 
-def full_vdi_write(vm: VM, vdi: VDI, defer: Defer) -> None:
+def full_vdi_write(vm: VM, vdi: VDI, interrupt_shield: InterruptShield) -> None:
     vdi.get_virtual_size()
-    vbd = vm.connect_vdi(vdi)
-    defer(lambda: vm.disconnect_vdi(vdi))
+    with interrupt_shield() as defer:
+        vbd = vm.connect_vdi(vdi)
+        defer(lambda: vm.disconnect_vdi(vdi))
 
     dev = f'/dev/{vbd.param_get("device")}'
     install_randstream(vm)
