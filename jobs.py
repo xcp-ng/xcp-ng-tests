@@ -666,7 +666,21 @@ JOBS: dict[str, JobData] = {
             "--vm[]": "multi/limits",
         },
         "paths": ["tests/limits"],
-    }
+    },
+    "rpu": {
+        "description": "Test the rolling pool update process, both manually and through XO",
+        "requirements": [
+            "1 XCP-ng pool with at least two hosts and a shared SR",
+            "All hosts are expected to be already up-to-date",
+            "A set of VMs to be used during the RPU",
+            "xo-cli locally installed, in $PATH, and registered to an XO instance.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm[]": "multi/rpu",
+        },
+        "paths": ["tests/rpu"],
+    },
 }
 
 # List used by the 'check' action: tests listed here will not raise a check error
