@@ -23,6 +23,8 @@ class TestXtf:
         'test-pv64-xsa-182',
         # Will skip if DBEXT support is not present
         'test-pv64-xsa-444',
+        # Not supported on all AMD platforms
+        "test-pv64-cpuid-faulting",
     ]
 
     def _extract_skipped_tests(self, output: str) -> list[str]:
