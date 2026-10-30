@@ -7,7 +7,7 @@ from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vm import VM
-from lib.xo import xo_cli
+from lib.xo import xo_rest_action
 
 @pytest.fixture
 def up_to_date_pool(host: Host) -> Pool:
@@ -106,8 +106,11 @@ def test_rpu_without_xo(pool_ready_for_rpu: tuple[Pool, list[VM]], defer: Defer)
 def test_rpu_with_xo(pool_ready_for_rpu: tuple[Pool, list[VM]], hosts_with_xo: list[Host]) -> None:
     pool, vms = pool_ready_for_rpu
     logging.info("Starting rolling update")
-    result = xo_cli("pool.rollingUpdate", {"pool": pool.uuid})
-    assert result.strip() == "true"
+    timeout_for_boot = 10 * 60  # 10 minutes
+    timeout_for_migration = 5 * 60  # 5 minutes
+    timeout_per_host = timeout_for_boot + timeout_for_migration * len(vms)
+    task = xo_rest_action(f"pools/{pool.uuid}/actions/rolling_update", timeout_secs=timeout_per_host * len(pool.hosts))
+    assert task["status"] == "success", f"The rolling update failed: {task.get('result')}"
     assert not any(h.has_updates() for h in pool.hosts), "The hosts are not up to date after the RPU"
     logging.info("Rolling update completed")
     for vm in vms:
