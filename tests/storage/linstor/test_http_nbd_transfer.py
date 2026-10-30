@@ -18,6 +18,8 @@ def host_with_http_nbd_transfer_tests(
     host_with_saved_yum_state: Host,  # noqa: F811 # See pkgfixtures.py
 ) -> Generator[Host, None, None]:
     host = host_with_saved_yum_state
+    if not host.check_packages_available(["http-nbd-transfer-tests"]):
+        pytest.skip("Package http-nbd-transfer-tests is not available in yum repositories")
     host.yum_install(["http-nbd-transfer-tests"])
     yield host
 
