@@ -1,7 +1,5 @@
 from .storage import (
-    MAX_VDI_SIZE,
     CoalesceOperation,
-    ImageFormat,
     XVACompression,
     coalesce_integrity,
     cold_migration_then_come_back,
