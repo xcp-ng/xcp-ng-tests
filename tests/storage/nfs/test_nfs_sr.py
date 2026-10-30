@@ -13,12 +13,18 @@ from tests.storage import (
     MAX_VDI_SIZE,
     CoalesceOperation,
     ImageFormat,
+    MissingVDIRemoval,
     XVACompression,
+    base_copy_forgotten_by_sr_scan,
     coalesce_integrity,
     full_vdi_write,
+    missing_vdi_can_be_removed,
+    snapshot_survives_sr_scan,
     vdi_export_import,
     vdi_is_open,
     vdi_on_boot_reset,
+    vm_start_fails_with_missing_vdi,
+    vm_starts_after_missing_vdi_comes_back,
     xva_export_import,
 )
 
@@ -151,12 +157,43 @@ class TestNFSSR:
             pytest.skip("Skipping NFSv4 large VDI test (known performance issue)")
         vdi_export_import(storage_test_vm, dispatch_nfs, image_format, temp_large_dir, defer)
 
+    @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
+    def test_snapshot_survives_sr_scan(self, dispatch_nfs: SR, defer: Defer) -> None:
+        snapshot_survives_sr_scan(dispatch_nfs, defer)
+
+    @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
+    def test_snapshot_survives_sr_scan_after_miss(self, dispatch_nfs: SR, defer: Defer) -> None:
+        snapshot_survives_sr_scan(dispatch_nfs, defer, simulate_miss=True)
+
+    @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
+    @pytest.mark.parametrize('remove', ['forget', 'destroy'])
+    def test_missing_vdi_can_be_removed(self, dispatch_nfs: SR, remove: MissingVDIRemoval, defer: Defer) -> None:
+        missing_vdi_can_be_removed(dispatch_nfs, defer, remove)
+
+    @pytest.mark.parametrize('dispatch_nfs', ['nfs_sr', 'nfs4_sr'], indirect=True)
+    def test_base_copy_forgotten_by_sr_scan(self, dispatch_nfs: SR, defer: Defer) -> None:
+        base_copy_forgotten_by_sr_scan(dispatch_nfs, defer)
+
     @pytest.mark.small_vm
     # Make sure this fixture is called before the parametrized one
     @pytest.mark.usefixtures('vm_ref')
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
     def test_vdi_on_boot_reset(self, dispatch_nfs: VM, defer: Defer) -> None:
         vdi_on_boot_reset(dispatch_nfs, defer)
+
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_vm_start_fails_with_missing_vdi(self, dispatch_nfs: VM, defer: Defer) -> None:
+        vm_start_fails_with_missing_vdi(dispatch_nfs, defer)
+
+    @pytest.mark.small_vm
+    # Make sure this fixture is called before the parametrized one
+    @pytest.mark.usefixtures('vm_ref')
+    @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    def test_vm_starts_after_missing_vdi_comes_back(self, dispatch_nfs: VM, defer: Defer) -> None:
+        vm_starts_after_missing_vdi_comes_back(dispatch_nfs, defer)
 
     # *** tests with reboots (longer tests).
 

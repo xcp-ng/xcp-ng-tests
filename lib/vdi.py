@@ -53,6 +53,13 @@ class VDI:
         logging.info("Destroy %s", self)
         self.sr.pool.master.xe('vdi-destroy', {'uuid': self.uuid})
 
+    def forget(self) -> None:
+        logging.info("Forget %s", self)
+        self.sr.pool.master.xe('vdi-forget', {'uuid': self.uuid})
+
+    def exists(self) -> bool:
+        return self.sr.pool.master.xe('vdi-list', {'uuid': self.uuid}, minimal=True) == self.uuid
+
     def clone(self) -> VDI:
         uuid = self.sr.pool.master.xe('vdi-clone', {'uuid': self.uuid})
         return VDI(uuid, sr=self.sr)
