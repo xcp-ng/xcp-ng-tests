@@ -285,6 +285,7 @@ pci-passthrough: Testing PCI passthrough functionalities
 fs-diff: Check for differences between 2 hosts file system
 pool-reboot: Tests centered on pools with join/eject causing reboots
 limit-tests: Tests verifying we can hit our supported limits
+rpu: Test the rolling pool update process, both manually and through XO
 ```
 
 #### Display information about a job
