@@ -20,7 +20,11 @@ HostConfigs: TypeAlias = dict[HostAddress, HostConfig]
 class Inventory(TypedDict):
     hosts: HostConfigs
 
-def load_inventory(inventory_path: Path) -> Inventory:
+def load_inventory(
+    inventory_path: Path,
+    extra_repos: list[str] | None = None,
+    extra_disabled_repos: list[str] | None = None,
+) -> Inventory:
     """Create an inventory object from loaded inventory file."""
     with open(inventory_path, "rb") as f:
         data = tomllib.load(f)
@@ -30,14 +34,16 @@ def load_inventory(inventory_path: Path) -> Inventory:
 
     inventory_hosts: HostConfigs = {}
     for h, config in hosts.items():
-        repos = config.get("repositories", [])
-        disabled_repositories = config.get("disabled_repositories", [])
+        repositories = config.get("repositories") or default.get("repositories", [])
+        repositories = [*repositories, *(extra_repos or [])]
+        disabled_repositories = config.get("disabled_repositories") or default.get("disabled_repositories", [])
+        disabled_repositories = [*disabled_repositories, *(extra_disabled_repos or [])]
         hosting_pool = config.get("hosting_pool", None)
         if hosting_pool is None:
             hosting_pool = default.get("hosting_pool", None)
         host: HostConfig = {
-            "repositories": repos or default.get("repositories", []),
-            "disabled_repositories": disabled_repositories or default.get("disabled_repositories", []),
+            "repositories": repositories,
+            "disabled_repositories": disabled_repositories,
             "hosting_pool": hosting_pool,
         }
         inventory_hosts[h] = host
@@ -49,9 +55,9 @@ def load_inventory(inventory_path: Path) -> Inventory:
 
 def into_inventory(
     hosts: list[HostAddress],
-    repositories: list[str],
+    repositories: list[str] | None,
     hosting_pool: HostAddress | None,
-    disabled_repositories: list[str] = [],
+    disabled_repositories: list[str] | None = None,
 ) -> Inventory:
     """Create an inventory object from arguments.
 

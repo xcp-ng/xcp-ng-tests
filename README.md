@@ -728,4 +728,4 @@ hosting_pool = "B"
 > * `disabled_repositories` disables one or more repositories during the update. It can be set under `default` or overridden per host, and can also be passed with the `-x/--disablerepo` flag.
 > * `*` as a repository value disables **all** repositories (e.g. `disabled_repositories = ["*"]`).
 >
-> * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.
+> * When `--inventory` flag is present, repos passed to `-e/--enablerepo` and `-x/--disablerepo` flags are added to each host's `repositories` and `disabled_repositories`.
