@@ -16,10 +16,12 @@ from packaging import version
 
 import lib.config as global_config
 from lib import pxe
+from lib.blktap_options import blktap_options_help, parse_blktap_options
 from lib.common import (
     Defer,
     DiskDevName,
     HostAddress,
+    PackageManagerEnum,
     callable_marker,
     is_uuid,
     parse_size,
@@ -42,7 +44,7 @@ from lib.xo import _allow_xo_cli, xo_cli
 # need to import them in the global conftest.py so that they are recognized as fixtures.
 from pkgfixtures import formatted_and_mounted_ext4_disk, sr_disk_wiped
 
-from typing import Any, Generator, Iterable, Sequence
+from typing import Any, Generator, Iterable, Sequence, assert_never
 
 # Do we cache VMs?
 try:
@@ -149,6 +151,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="List of hosts (comma-separated) that will skip VG creation during linstor tests."
              " Those are indexes starting from 1 (pool master).",
     )
+    parser.addoption(
+        "--blktap",
+        action="append",
+        default=[],
+        metavar="KEY:VALUE",
+        help="Option of the blktap tests, as KEY:VALUE (repeated, or separated by commas); "
+             "--blktap help describes them."
+    )
+
+def pytest_cmdline_main(config: pytest.Config) -> int | None:
+    items = [item.strip() for argument in config.getoption('--blktap') or [] for item in argument.split(',')]
+    if 'help' in items:
+        print(blktap_options_help())
+        return 0
+    return None
 
 def pytest_configure(config: pytest.Config) -> None:
     global_config.ignore_ssh_banner = config.getoption('--ignore-ssh-banner')
@@ -164,6 +181,10 @@ def pytest_configure(config: pytest.Config) -> None:
     write_volume_align = config.getoption('--write-volume-align')
     assert write_volume_align is not None
     global_config.write_volume_align = parse_size(write_volume_align)
+    try:
+        global_config.blktap = parse_blktap_options(config.getoption('--blktap') or [])
+    except ValueError as e:
+        raise pytest.UsageError(str(e)) from e
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "vm_ref" in metafunc.fixturenames:
@@ -855,6 +876,36 @@ def unix_vm(imported_vm: VM) -> Generator[VM, None, None]:
 def running_unix_vm(unix_vm: VM, running_vm: VM) -> VM:
     return running_vm
     # no teardown
+
+@pytest.fixture(scope="module")
+def running_unix_vm_with_fio(running_unix_vm: VM) -> Generator[VM, None, None]:
+    vm = running_unix_vm
+    snapshot = vm.snapshot()
+
+    package_manager = vm.detect_package_manager()
+    match package_manager:
+        case PackageManagerEnum.APT_GET:
+            vm.ssh("apt-get update && apt install -y fio")
+        case PackageManagerEnum.YUM:
+            vm.ssh("yum install -y fio")
+        case PackageManagerEnum.DNF:
+            vm.ssh("dnf install -y fio")
+        case PackageManagerEnum.ZYPPER:
+            vm.ssh("zypper install -y fio")
+        case PackageManagerEnum.APK:
+            vm.ssh("apk add fio")
+        case PackageManagerEnum.UNKNOWN:
+            raise RuntimeError("Unsupported package manager: could not install fio")
+        case _:
+            assert_never(package_manager)
+
+    yield vm
+
+    # teardown
+    try:
+        snapshot.revert()
+    finally:
+        snapshot.destroy()
 
 @pytest.fixture(scope='module')
 def windows_vm(imported_vm: VM) -> Generator[VM, None, None]:

@@ -1,3 +1,4 @@
+from lib.blktap_options import BlktapOptions
 from lib.common import GiB
 
 ignore_ssh_banner = False
@@ -5,6 +6,7 @@ ssh_output_max_lines = 20
 volume_size = 1 * GiB
 write_volume_cap = 2 * GiB
 write_volume_align = 1
+blktap = BlktapOptions()
 
 def sr_device_config(datakey: str, *, required: list[str] = []) -> dict[str, str]:
     import data  # import here to avoid depending on this user file for collecting tests
