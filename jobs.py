@@ -165,7 +165,7 @@ JOBS: dict[str, JobData] = {
             "--vm": "single/small_vm",
         },
         "paths": ["tests/network"],
-        "markers": "complex_prerequisites or hosts_with_xo",
+        "markers": "complex_prerequisites or hosts_with_xo or reboot",
     },
     "packages": {
         "description": "tests that packages can be installed correctly",
