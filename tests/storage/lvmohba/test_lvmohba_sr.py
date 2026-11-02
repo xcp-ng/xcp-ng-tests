@@ -12,12 +12,18 @@ from tests.storage import (
     MAX_VDI_SIZE,
     CoalesceOperation,
     ImageFormat,
+    MissingVDIRemoval,
     XVACompression,
+    base_copy_forgotten_by_sr_scan,
     coalesce_integrity,
     full_vdi_write,
+    missing_vdi_can_be_removed,
+    snapshot_survives_sr_scan,
     vdi_export_import,
     vdi_is_open,
     vdi_on_boot_reset,
+    vm_start_fails_with_missing_vdi,
+    vm_starts_after_missing_vdi_comes_back,
     xva_export_import,
 )
 
@@ -91,6 +97,27 @@ class TestLVMOHBASR:
     @pytest.mark.small_vm
     def test_vdi_on_boot_reset(self, vm_on_lvmohba_sr: VM, defer: Defer) -> None:
         vdi_on_boot_reset(vm_on_lvmohba_sr, defer)
+
+    def test_snapshot_survives_sr_scan(self, lvmohba_sr: SR, defer: Defer) -> None:
+        snapshot_survives_sr_scan(lvmohba_sr, defer)
+
+    def test_snapshot_survives_sr_scan_after_miss(self, lvmohba_sr: SR, defer: Defer) -> None:
+        snapshot_survives_sr_scan(lvmohba_sr, defer, simulate_miss=True)
+
+    @pytest.mark.parametrize('remove', ['forget', 'destroy'])
+    def test_missing_vdi_can_be_removed(self, lvmohba_sr: SR, remove: MissingVDIRemoval, defer: Defer) -> None:
+        missing_vdi_can_be_removed(lvmohba_sr, defer, remove)
+
+    def test_base_copy_forgotten_by_sr_scan(self, lvmohba_sr: SR, defer: Defer) -> None:
+        base_copy_forgotten_by_sr_scan(lvmohba_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_vm_start_fails_with_missing_vdi(self, vm_on_lvmohba_sr: VM, defer: Defer) -> None:
+        vm_start_fails_with_missing_vdi(vm_on_lvmohba_sr, defer)
+
+    @pytest.mark.small_vm
+    def test_vm_starts_after_missing_vdi_comes_back(self, vm_on_lvmohba_sr: VM, defer: Defer) -> None:
+        vm_starts_after_missing_vdi_comes_back(vm_on_lvmohba_sr, defer)
 
     # *** tests with reboots (longer tests).
 

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import pytest
+
 import logging
 import time
 from dataclasses import dataclass
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, strtobool, wait_for
+from lib.common import QCOW2_MAX, VHD_MAX, Defer, MiB, PackageManagerEnum, randid, strtobool, wait_for
 from lib.host import Host
 from lib.snapshot import Snapshot
 from lib.sr import SR
+from lib.vbd import VBD
 from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
@@ -523,3 +526,183 @@ def vdi_on_boot_reset(vm: VM, defer: Defer) -> None:
     assert not vm.file_exists(tmp_file)
 
     vm.shutdown()
+
+def _safe_destroy(vdi: VDI) -> None:
+    if vdi.exists():
+        vdi.destroy()
+
+@dataclass
+class HiddenVDI:
+    """A VDI whose data is renamed on disk, so that sr-scan does not see it."""
+    vdi: VDI
+    original: str
+    hidden: str
+    lvm_vg: str | None = None
+    done: bool = False
+
+    def hide(self) -> None:
+        logging.info(f'Hide {self.vdi} on disk')
+        host = self.vdi.sr.main_host()
+        if self.lvm_vg:
+            host.ssh(f'lvrename {self.lvm_vg} {self.original} {self.hidden}')
+        else:
+            host.ssh(f'mv {self.original} {self.hidden}')
+
+    def restore(self) -> None:
+        if self.done:
+            return
+        host = self.vdi.sr.main_host()
+        if self.lvm_vg:
+            host.ssh(f'lvrename {self.lvm_vg} {self.hidden} {self.original}')
+        else:
+            host.ssh(f'mv {self.hidden} {self.original}')
+        self.done = True
+
+    def purge(self) -> None:
+        """Delete the hidden data, as if it was lost."""
+        if self.done:
+            return
+        host = self.vdi.sr.main_host()
+        if self.lvm_vg:
+            host.ssh(f'lvremove -f {self.lvm_vg}/{self.hidden}')
+        else:
+            host.ssh(f'rm -f {self.hidden}')
+        self.done = True
+
+    def cleanup(self) -> None:
+        """Restore the data if XAPI still knows the VDI, otherwise delete it."""
+        if self.vdi.exists():
+            self.restore()
+        else:
+            self.purge()
+
+def _hide_vdi(vdi: VDI) -> HiddenVDI:
+    """Rename the VDI data on disk so that sr-scan does not see it."""
+    sr = vdi.sr
+    host = sr.main_host()
+    if sr.get_type() in ('lvm', 'lvmohba', 'lvmoiscsi'):
+        vg = f'VG_XenStorage-{sr.uuid}'
+        # The LV prefix depends on the image format (VHD-, LV-, QCOW2-)
+        lv = next((name for name in host.lvs(vg) if name.endswith(vdi.uuid)), None)
+        assert lv, f'LV for {vdi.uuid} not found in {vg}'
+        # LVM scan skips uuids starting with OLD_
+        hidden = HiddenVDI(vdi, lv, lv.replace(vdi.uuid, f'OLD_{vdi.uuid}'), lvm_vg=vg)
+    else:
+        # File SR scans only look at <uuid>.<ext> files
+        image_format = vdi.get_image_format() or 'vhd'
+        path = f'/run/sr-mount/{sr.uuid}/{vdi.uuid}.{image_format}'
+        assert host.file_exists(path), f'{path} not found'
+        hidden = HiddenVDI(vdi, path, f'{path}.hidden')
+    hidden.hide()
+    return hidden
+
+def _make_missing(vdi: VDI, defer: Defer) -> HiddenVDI:
+    """Hide the VDI and scan: XAPI must mark it missing."""
+    hidden = _hide_vdi(vdi)
+    defer(hidden.cleanup)
+    vdi.sr.scan()
+    assert strtobool(vdi.param_get('missing'))
+    return hidden
+
+def snapshot_survives_sr_scan(sr: SR, defer: Defer, *, simulate_miss: bool = False) -> None:
+    """Check that a snapshot keeps its metadata across sr-scan.
+    With simulate_miss=True, the snapshot goes missing before coming back.
+    """
+    label = f'snap-label-{randid()}'
+    vdi = sr.create_vdi(f'snap-scan-{randid()}')
+    defer(lambda: _safe_destroy(vdi))
+    snap = vdi.snapshot()
+    defer(lambda: _safe_destroy(snap))
+    snap.param_set('name-label', label)
+
+    if simulate_miss:
+        # The GC doesn't see the hidden snapshot either: it would leaf-coalesce
+        # vdi into the base copy and break the snapshot chain.
+        sr.param_set('other-config', 'false', key='leaf-coalesce')
+        defer(lambda: sr.param_remove('other-config', 'leaf-coalesce', accept_unknown_key=True))
+        hidden = _make_missing(snap, defer)
+        assert snap.param_get('name-label') == label
+        assert strtobool(snap.param_get('is-a-snapshot'))
+        hidden.restore()
+
+    sr.scan()
+    assert not strtobool(snap.param_get('missing'))
+    assert strtobool(snap.param_get('is-a-snapshot'))
+    assert snap.param_get('snapshot-of') == vdi.uuid
+    assert snap.param_get('name-label') == label
+
+MissingVDIRemoval = Literal['forget', 'destroy']
+
+def missing_vdi_can_be_removed(sr: SR, defer: Defer, remove: MissingVDIRemoval) -> None:
+    """Check that a missing VDI can be forgotten or destroyed, and that sr-scan does not bring it back."""
+    vdi = sr.create_vdi(f'miss-{remove}-{randid()}')
+    defer(lambda: _safe_destroy(vdi))
+    hidden = _make_missing(vdi, defer)
+    if remove == 'forget':
+        vdi.forget()
+    else:
+        vdi.destroy()
+    assert not vdi.exists()
+    # The data is really gone now: a later scan must neither fail nor
+    # bring the VDI back (e.g. from LVHD MGT metadata).
+    hidden.purge()
+    sr.scan()
+    assert not vdi.exists()
+
+def base_copy_forgotten_by_sr_scan(sr: SR, defer: Defer) -> None:
+    """Check that sr-scan forgets a base copy waiting for the GC, instead of marking it missing.
+    The scan skips hidden leaves, so the base copy is "gone" although its data is still on disk.
+    """
+    vdi = sr.create_vdi(f'base-copy-{randid()}')
+    defer(lambda: _safe_destroy(vdi))
+    snap = vdi.snapshot()
+    defer(lambda: _safe_destroy(snap))
+    parent_uuid = snap.get_parent()
+    assert parent_uuid, f'no base copy found for snapshot {snap.uuid}'
+    base_copy = VDI(parent_uuid, sr=sr)
+    assert not strtobool(base_copy.param_get('managed'))
+
+    snap.destroy()
+    vdi.destroy()
+    sr.scan()
+    # Either forgotten by the scan or already deleted by the GC
+    assert not base_copy.exists(), f'base copy {base_copy.uuid} not forgotten by sr-scan'
+
+def _attach_new_vdi(vm: VM, defer: Defer) -> tuple[VDI, VBD]:
+    vdi = vm.get_sr().create_vdi(f'miss-vm-{randid()}')
+    defer(lambda: _safe_destroy(vdi))
+    vbd = vm.connect_vdi(vdi)
+    defer(lambda: vm.disconnect_vdi(vdi))
+
+    def shutdown_if_running() -> None:
+        if not vm.is_halted():
+            vm.shutdown(force=True, verify=True)
+    # The VM is module-scoped: never leave it running
+    defer(shutdown_if_running)
+    return vdi, vbd
+
+def vm_start_fails_with_missing_vdi(vm: VM, defer: Defer) -> None:
+    """Check that a VM with a missing VDI fails to start."""
+    vdi, _ = _attach_new_vdi(vm, defer)
+    _make_missing(vdi, defer)
+    with pytest.raises(SSHCommandFailed, match='SR_BACKEND_FAILURE'):
+        vm.start()
+    assert vm.is_halted()
+
+def vm_starts_after_missing_vdi_comes_back(vm: VM, defer: Defer) -> None:
+    """Check that a VDI coming back keeps its metadata and its VBD, and that the VM starts."""
+    vdi, vbd = _attach_new_vdi(vm, defer)
+    name_label = vdi.name()
+    hidden = _make_missing(vdi, defer)
+
+    hidden.restore()
+    vdi.sr.scan()
+    assert not strtobool(vdi.param_get('missing'))
+    assert vdi.name() == name_label
+    # Raises if the VBD was destroyed along with a forgotten VDI record
+    assert vbd.param_get('vdi-uuid') == vdi.uuid
+
+    vm.start()
+    vm.wait_for_os_booted()
+    assert strtobool(vbd.param_get('currently-attached'))
+    vm.shutdown(verify=True)
