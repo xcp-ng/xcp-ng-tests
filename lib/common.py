@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import traceback
+from contextlib import AbstractContextManager
 from datetime import datetime
 from enum import Enum
 from functools import lru_cache
@@ -78,6 +79,7 @@ T = TypeVar("T")
 HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
 Defer: TypeAlias = Callable[[Callable[[], object]], None]
+InterruptShield: TypeAlias = Callable[[], AbstractContextManager[Defer]]
 XeParams: TypeAlias = dict[str, str | bool | dict[str, str]]
 
 class PackageManagerEnum(Enum):

@@ -6,7 +6,7 @@ import logging
 import re
 from enum import StrEnum
 
-from lib.common import Defer, safe_split
+from lib.common import InterruptShield, safe_split
 from lib.host import Host
 
 # Requirements:
@@ -114,15 +114,16 @@ def host_ntpconf(host: Host) -> NtpService:
 @pytest.mark.no_vm
 class TestNtpMode:
 
-    def test_idempotence(self, host: Host, defer: Defer) -> None:
+    def test_idempotence(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test that mode -> newmode -> mode is idempotent
         """
-        initial_mode = host_ntp_mode(host)
-        defer(lambda: host_ntp_mode(host, initial_mode))
+        with interrupt_shield() as defer:
+            initial_mode = host_ntp_mode(host)
+            defer(lambda: host_ntp_mode(host, initial_mode))
 
-        previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
-        defer(lambda: host_ntp_custom_servers(host, previous_servers))
+            previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
+            defer(lambda: host_ntp_custom_servers(host, previous_servers))
 
         for mode1 in NtpMode:
             for mode2 in NtpMode:
@@ -139,12 +140,13 @@ class TestNtpMode:
                 if configA != configB:
                     pytest.fail(f"idempotence failed in {mode1} -> {mode2} -> {mode1}")
 
-    def test_factory(self, host: Host, defer: Defer) -> None:
+    def test_factory(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=Factory
         """
-        previous = host_ntp_mode(host, NtpMode.Factory)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.Factory)
+            defer(lambda: host_ntp_mode(host, previous))
 
         factory_defaults = host_xapi_factory_ntp_servers(host)
         logging.debug(f"Default factory servers: {factory_defaults}")
@@ -164,12 +166,13 @@ class TestNtpMode:
             if server not in factory_defaults:
                 pytest.fail("configured ntp servers aren't the factory ones")
 
-    def test_dhcp(self, host: Host, defer: Defer) -> None:
+    def test_dhcp(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=DHCP
         """
-        previous = host_ntp_mode(host, NtpMode.DHCP)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.DHCP)
+            defer(lambda: host_ntp_mode(host, previous))
 
         ntpconf = host_ntpconf(host)
 
@@ -182,15 +185,16 @@ class TestNtpMode:
         if ntpconf.servers != []:
             pytest.fail("ntp configuration has static servers configured")
 
-    def test_custom(self, host: Host, defer: Defer) -> None:
+    def test_custom(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=Custom
         """
-        previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
-        defer(lambda: host_ntp_custom_servers(host, previous_servers))
+        with interrupt_shield() as defer:
+            previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
+            defer(lambda: host_ntp_custom_servers(host, previous_servers))
 
-        previous = host_ntp_mode(host, NtpMode.Custom)
-        defer(lambda: host_ntp_mode(host, previous))
+            previous = host_ntp_mode(host, NtpMode.Custom)
+            defer(lambda: host_ntp_mode(host, previous))
 
         ntpconf = host_ntpconf(host)
 
@@ -205,12 +209,13 @@ class TestNtpMode:
         if servers != custom_servers:
             pytest.fail("ntp servers aren't the custom ones")
 
-    def test_disabled(self, host: Host, defer: Defer) -> None:
+    def test_disabled(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=Disabled
         """
-        previous = host_ntp_mode(host, NtpMode.Disabled)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.Disabled)
+            defer(lambda: host_ntp_mode(host, previous))
 
         ntpconf = host_ntpconf(host)
 
