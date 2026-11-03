@@ -491,6 +491,8 @@ JOBS: dict[str, JobData] = {
             "A host with HVM FEP enabled (`hvm_fep` Xen command line parameter).",
             "A small VM that can be imported on the SRs.",
             "The host will be rebooted by the tests.",
+            "The hypercall filter test requires a XCP-ng >= 9.0 host booted with Secure Boot enabled "
+            "(skipped otherwise).",
         ],
         "nb_pools": 1,
         "params": {
