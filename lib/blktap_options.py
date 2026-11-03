@@ -51,6 +51,18 @@ class BlktapOptions(BaseModel):
         default="qcow2",
         description="tapdisk driver serving the qcow2 image of the benchmarks: qcow2 (qemu's), or tdrs "
         "(blktap-rs', in a tapdisk built with --with-tdrs).")
+    coalesce_bench_size: int = Field(
+        default=4096,
+        description="Size, in MiB, of the VDI of the coalesce benchmark, all written after its snapshot: "
+        "the amount of data the GC merges.")
+    coalesce_bench_sr: str | None = Field(
+        default=None,
+        description="UUID of the SR of the VDI of the coalesce benchmark (default: the first local SR of the host).")
+    coalesce_bench_burst: int = Field(
+        default=0,
+        description="When not 0, fio of the coalesce benchmark reads in bursts on the snapshot and during the "
+        "coalesce: about this many seconds of I/O (counted with the IOPS before the snapshot), then as many seconds "
+        "without I/O. 0: fio reads all the time.")
     app_bench_vcpus: int = Field(
         default=8, description="vCPUs of the VM of the application benchmark, and jobs of its kernel build.")
     app_bench_workloads: list[APP_WORKLOADS] = Field(
