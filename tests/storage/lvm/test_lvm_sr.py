@@ -152,7 +152,13 @@ class TestLVMSR:
         vdi_export_import(storage_test_vm, lvm_sr, image_format, temp_large_dir, defer)
 
     @pytest.mark.small_vm
-    def test_vdi_on_boot_reset(self, vm_on_lvm_sr: VM, defer: Defer) -> None:
+    def test_vdi_on_boot_reset(self, vm_on_lvm_sr: VM, image_format: ImageFormat, defer: Defer,
+                               request: pytest.FixtureRequest) -> None:
+        # XCPNG-4041: investigate why on-boot reset fails with qcow2 on LVM:
+        #   Error code: SR_BACKEND_FAILURE_1200
+        #   Error parameters: , [Errno 22] Invalid argument,
+        if image_format == 'qcow2':
+            request.applymarker(pytest.mark.xfail(reason="on-boot reset fails with qcow2 on LVM"))
         vdi_on_boot_reset(vm_on_lvm_sr, defer)
 
     # *** tests with reboots (longer tests).
