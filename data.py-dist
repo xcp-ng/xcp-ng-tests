@@ -35,9 +35,22 @@ OBJECTS_NAME_PREFIX = None
 # skip_xo_config allows to not touch XO's configuration regarding the host
 # Else the default behaviour is to add the host to XO servers at the beginning
 # of the testing session and remove it at the end.
+# power_control: Info for HA hard power-on recovery (tests/ha).
+#   type "moonshot": chassis IP, cartridge slot (28 -> C28N1), BMC user/password.
 HOSTS: dict[str, dict[str, Any]] = {
 #    "10.0.0.1": {"user": "root", "password": ""},
 #    "testhost1": {"user": "root", "password": "", 'skip_xo_config': True},
+#    "192.168.11.10": {
+#        "user": "root",
+#        "password": "",
+#        "power_control": {
+#            "type": "moonshot",
+#            "chassis": "192.168.11.1",
+#            "slot": 28,
+#            "user": "<user>",
+#            "password": "<password>",
+#        },
+#    },
 }
 
 NETWORKS = {
