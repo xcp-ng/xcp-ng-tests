@@ -227,6 +227,7 @@ class TestLinstorSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.small_vm
+    @pytest.mark.skip(reason="not supported")
     def test_vdi_on_boot_reset(self, vm_on_linstor_sr: VM, defer: Defer) -> None:
         vdi_on_boot_reset(vm_on_linstor_sr, defer)
 

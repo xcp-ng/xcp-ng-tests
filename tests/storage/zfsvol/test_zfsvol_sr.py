@@ -102,6 +102,7 @@ class TestZfsvolVm:
         vdi_export_import(vm, sr, image_format, temp_large_dir, defer)
 
     @pytest.mark.small_vm
+    @pytest.mark.skip(reason="not supported (XCPNG-3984)")
     def test_vdi_on_boot_reset(self, vm_on_zfsvol_sr: VM, defer: Defer) -> None:
         vdi_on_boot_reset(vm_on_zfsvol_sr, defer)
 
