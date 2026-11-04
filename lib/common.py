@@ -315,15 +315,14 @@ def strip_suffix(string: str, suffix: str) -> str:
         return string[:-len(suffix)]
     return string
 
-def setup_formatted_and_mounted_disk(host: Host, sr_disk: str, fs_type: str, mountpoint: str) -> None:
+def setup_formatted_and_mounted_disk(host: Host, device: str, fs_type: str, mountpoint: str) -> None:
     if fs_type == 'ext4':
         option_force = '-F'
     elif fs_type == 'xfs':
         option_force = '-f'
     else:
         raise Exception(f"Unsupported fs_type '{fs_type}' in this function")
-    device = '/dev/' + sr_disk
-    logging.info(f">> Format sr_disk {sr_disk} and mount it on host {host}")
+    logging.info(f">> Format sr_disk {device} and mount it on host {host}")
     host.ssh(f'mkfs.{fs_type} {option_force} {device}')
     host.ssh(f'rm -rf {mountpoint}') # Remove any existing leftover to ensure rmdir will not fail in teardown
     host.ssh(f'mkdir -p {mountpoint}')

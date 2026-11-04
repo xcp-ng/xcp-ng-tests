@@ -24,9 +24,9 @@ class TestLARGEBLOCKSRCreateDestroy:
                                    unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
                                    image_format: ImageFormat) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
-        sr_disk = unused_4k_disks[host][0].name
+        sr_disk = unused_4k_disks[host][0].path
         sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
-                            {'device': '/dev/' + sr_disk,
+                            {'device': sr_disk,
                              'preferred-image-formats': image_format}, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
         # the next tests, because errors in fixtures break teardown

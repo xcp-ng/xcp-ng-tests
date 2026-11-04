@@ -17,9 +17,9 @@ def largeblock_sr(host: Host,
                   unused_4k_disks: dict[Host, list[Host.BlockDeviceInfo]],
                   image_format: ImageFormat) -> Generator[SR, None, None]:
     """ A LARGEBLOCK SR on first host. """
-    sr_disk = unused_4k_disks[host][0].name
+    sr_disk = unused_4k_disks[host][0].path
     sr = host.sr_create('largeblock', "LARGEBLOCK-local-SR-test",
-                        {'device': '/dev/' + sr_disk,
+                        {'device': sr_disk,
                          'preferred-image-formats': image_format})
     yield sr
     # teardown

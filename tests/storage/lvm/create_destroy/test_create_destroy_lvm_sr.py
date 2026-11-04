@@ -24,10 +24,10 @@ class TestLVMSRCreateDestroy:
                                    unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]],
                                    image_format: ImageFormat
                                    ) -> None:
-        sr_disk = unused_512B_disks[host][0].name
+        sr_disk = unused_512B_disks[host][0].path
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('lvm', "LVM-local-SR-test", {
-            'device': '/dev/' + sr_disk,
+            'device': sr_disk,
             'preferred-image-formats': image_format
         }, verify=True)
         # import a VM in order to detect vm import issues here rather than in the vm_on_xfs_fixture used in
