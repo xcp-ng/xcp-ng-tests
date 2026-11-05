@@ -4,9 +4,6 @@ import logging
 
 from lib.host import Host
 
-# Explicitly import package-scoped fixtures (see explanation in pkgfixtures.py)
-from pkgfixtures import host_with_saved_yum_state  # noqa: F401 # See pkgfixtures.py
-
 from typing import Generator
 
 # Requirements:
