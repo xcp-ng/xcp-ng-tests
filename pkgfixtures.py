@@ -18,8 +18,9 @@ if TYPE_CHECKING:
 
 # Due to a bug in the way pytest handles the setup and teardown of package-scoped fixtures,
 # we moved the following fixtures out of the main conftest.py.
-# To workaround the bug, the fixture must be imported either in a package's own conftest.py,
-# or directly in a test module. Then the fixtures will truly be handled as package-scoped.
+# To workaround the bug, the fixture must be imported in a package's own conftest.py.
+# Then the fixtures will truly be handled as package-scoped.
+# Importing them in a test module makes them session-scoped (enforced by the PKF001 flake8 check).
 # Reference: https://github.com/pytest-dev/pytest/issues/8189
 
 # package scope because previous test packages may have used the disk
