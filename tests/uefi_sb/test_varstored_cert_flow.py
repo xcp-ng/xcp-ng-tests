@@ -92,7 +92,7 @@ class TestVMCertMisc:
         filepath = formatted_and_mounted_ext4_disk + '/test-export-with-uefi-certs.xva'
         with interrupt_shield() as defer:
             vm.export(filepath, 'zstd')
-            defer(lambda: vm.host.ssh('rm -f {filepath}', check=False))
+            defer(lambda: vm.host.ssh(f'rm -f {filepath}', check=False))
         with interrupt_shield() as defer:
             vm2 = vm.host.import_vm(filepath)
             defer(lambda: vm2.destroy())
