@@ -95,6 +95,7 @@ class Host:
         self.saved_rollback_id: int | None = None
         self.inventory = self._get_xensource_inventory()
         self._bios_vendor: str | None = None
+        self._can_report_ignored_params: bool | None = None
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
@@ -171,6 +172,22 @@ class Host:
             self.hostname_or_ip, src, dest, check=check,
             suppress_fingerprint_warnings=suppress_fingerprint_warnings, local_dest=local_dest
         )
+
+    @property
+    def can_report_ignored_params(self) -> bool:
+        """Whether xe can report the command-line parameters a command ignored.
+
+        This is the report-ignored-params option of xe, which xe's help
+        mentions when xapi supports it. `xe help`, unlike `xe --help`, is
+        answered by xapi on the host, not by the xe client, so this checks
+        what the server supports.
+
+        Computed on first use rather than in __init__, because xapi may not be
+        ready yet when the Host object is created (see Pool.__init__).
+        """
+        if self._can_report_ignored_params is None:
+            self._can_report_ignored_params = 'report-ignored-params' in self.ssh('xe help')
+        return self._can_report_ignored_params
 
     @overload
     def xe(self, action: str, args: XeParams = ..., *, check: bool = ...,
