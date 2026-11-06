@@ -18,6 +18,9 @@ dependencies = [
     "requests",
     "ipdb",
     "rpm-version>=0.5.1",
+    "pyte",
+    "paramiko",
+    "types-paramiko",
 ]
 
 [dependency-groups]
