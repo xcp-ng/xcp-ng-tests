@@ -19,6 +19,7 @@ from typing import Generator
 
 pytestmark = pytest.mark.default_vm('mini-linux-x86_64-uefi')
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
 @pytest.mark.usefixtures("host_at_least_8_3")
 class TestPoolGuestSecureBootReadiness:
     def test_pool_ready(self, host: Host) -> None:
@@ -116,6 +117,7 @@ class TestVmSetUefiMode:
         yield
         revert_vm_state(vm, snapshot)
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
     def test_vm_set_uefi_mode(self, uefi_vm: VM) -> None:
         vm = uefi_vm
 

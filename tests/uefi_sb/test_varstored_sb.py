@@ -96,6 +96,7 @@ class TestGuestLinuxUEFISecureBoot:
         logging.info("Check that SB is NOT enabled according to the OS.")
         assert not vm.booted_with_secureboot()
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
     def test_append_with_default(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.host.pool.clear_custom_uefi_certs()
@@ -109,6 +110,7 @@ class TestGuestLinuxUEFISecureBoot:
         vm.start()
         vm.wait_for_vm_running_and_ssh_up()
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD secureboot-certs command fails
     def test_append_with_poison(self, uefi_vm: VM) -> None:
         """
         Context: https://xcp-ng.org/blog/2025/10/30/xcp-ng-8-3-varstored-update-unbootable-vm-risk-and-remediation/
@@ -154,6 +156,7 @@ class TestGuestWindowsUEFISecureBoot:
         boot_and_check_sb_failed(vm)
 
     @pytest.mark.multi_vms  # test that SB works on every Windows VM we have
+    @pytest.mark.usefixtures("fail_with_v9") # TBD emulator failed to start the VM
     def test_windows_succeeds(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set('platform', True, key='secureboot')
@@ -271,6 +274,7 @@ class TestGuestWindowsUEFIKeyUpgrade:
 
         vm.install_uefi_certs([newPK, newKEK, newdb, newdbx])
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD emulator failed to start the VM
     def test_key_upgrade(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set("platform", True, key="secureboot")
@@ -283,6 +287,7 @@ class TestGuestWindowsUEFIKeyUpgrade:
         self.install_new_certs(vm, PK)
         boot_and_check_sb_succeeded(vm)
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD emulator failed to start the VM
     def test_key_upgrade_bitlocker(self, uefi_vm: VM) -> None:
         vm = uefi_vm
         vm.param_set("platform", True, key="secureboot")

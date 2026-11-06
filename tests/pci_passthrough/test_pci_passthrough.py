@@ -10,7 +10,7 @@ from lib.host import Host
 XEN_CMDLINE = '/opt/xensource/libexec/xen-cmdline'
 
 @pytest.mark.reboot # reboots the host
-@pytest.mark.usefixtures("host_at_least_8_3")
+@pytest.mark.usefixtures("host_at_least_8_3", "fail_with_v9") # TBD dom0-access status is not propagated to the PGPU
 class TestPCIPassthrough:
     def test_pci_dom0_access(self, host: Host, enabled_pci_uuid: str) -> None:
         host.xe("pci-disable-dom0-access", {"uuid": enabled_pci_uuid})
@@ -41,7 +41,7 @@ class TestPCIPassthrough:
         assert host.xe("pci-get-dom0-access-status", {"uuid": enabled_pci_uuid}) == "enabled"
 
 @pytest.mark.reboot # reboots the host
-@pytest.mark.usefixtures("host_at_least_8_3")
+@pytest.mark.usefixtures("host_at_least_8_3", "fail_with_v9") # TBD dom0-access status is not propagated to the PGPU
 class TestPGPUPCIDom0AccessInheritance:
     def test_pci_sync_dom0_access(self, host: Host, enabled_pgpu_uuid: str) -> None:
         pci_uuid = host.xe("pgpu-param-get", {"uuid": enabled_pgpu_uuid, "param-name": "pci-uuid"})

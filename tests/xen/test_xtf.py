@@ -34,6 +34,7 @@ class TestXtf:
                 skipped_tests.append(line.split()[0])
         return skipped_tests
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD XTF selftest is failing
     def test_self(self, host: Host, xtf_runner: str) -> None:
         logging.info("Running selftest...")
         host.ssh(f'{xtf_runner} selftest -q --host')

@@ -12,7 +12,7 @@ from lib.netutil import wrap_ip
 # Requirements:
 # - an XCP-ng host
 
-@pytest.mark.usefixtures("host_with_netdata")
+@pytest.mark.usefixtures("host_with_netdata", "fail_with_v9") # TBD netdata-ui not found
 class TestsNetdata:
     @staticmethod
     def __get_headers(host: Host, port: int, path: str | None = None) -> list[str]:

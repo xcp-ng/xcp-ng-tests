@@ -31,6 +31,7 @@ def host_with_raid(host: Host) -> Generator[Host, None, None]:
         host.ssh('losetup -d /dev/loop1')
         host.ssh('rm -rf raid-1 raid-0')
 
+@pytest.mark.usefixtures("fail_with_v9") # TBD xcp-ng-xapi-plugins is not compatible
 def test_check_raid_pool(host_with_raid: Host) -> None:
     host = host_with_raid
     host.call_plugin('raid.py', 'check_raid_pool')

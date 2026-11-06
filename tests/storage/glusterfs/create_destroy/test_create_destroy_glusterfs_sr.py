@@ -33,6 +33,7 @@ class TestGlusterFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
+    @pytest.mark.usefixtures("fail_with_v9") # TBD package glusterfs-server is not available
     def test_create_and_destroy_sr(
         self,
         host: Host,
