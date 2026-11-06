@@ -10,14 +10,19 @@ from lib.host import Host
 from lib.network import Network
 from lib.sr import SR
 from lib.tunnel import Tunnel
+from lib.typing import JSONType
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli, xo_object_exists
+from lib.xo import xo_cli, xo_object_exists, xo_restapi
 
-from typing import Callable
+from typing import Callable, Literal, TypeAlias
+
+XOProtocol: TypeAlias = Literal['JSONRPC', 'RESTAPI']
+TrafficRuleAction: TypeAlias = Literal['addRule', 'deleteRule', 'addNetworkRule', 'deleteNetworkRule']
 
 # Requirements:
-# xo-cli (on the host running the test) is expected to be usable
+# xo-cli (on the host running the test) is expected to be configured
+# XO_URL + XO_AUTH_* are expected to be configured (and consistents with xo-cli)
 # From --hosts parameter:
 # - host(A1): first XCP-ng host (no traffic rules should be already present on the host)
 # From --vm parameter
@@ -93,36 +98,64 @@ def ofproto_trace_drop(
 
 def sync_sdnController_action(
     host: Host,
-    action: str,
-    args: dict[str, str] = {},
-) -> str:
-    def log_date(host: Host) -> str:
-        # %y : file modification date, example: "2026-08-24 15:15:58.982053917 +0200"
-        return host.ssh("stat -c %y /var/log/sdn-controller-plugin.log", check=False)
-
-    hosts = {}
-
-    # on each host, get the number of Host.call_plugin calls
-    for h in host.pool.hosts:
-        hosts[h.name()] = log_date(h)
-
+    action: TrafficRuleAction,
+    args: dict[str, JSONType] = {},
+    protocol: XOProtocol = 'RESTAPI',
+) -> None:
     # wait for XO to sync
     if 'vifId' in args:
+        assert isinstance(args['vifId'], str)
+        uuid = args['vifId']
         wait_for(
-            lambda: xo_object_exists(args['vifId']),
+            lambda: xo_object_exists(uuid),
             "Wait for XO to sync VIF",
         )
     if 'networkId' in args:
+        assert isinstance(args['networkId'], str)
+        uuid = args['networkId']
         wait_for(
-            lambda: xo_object_exists(args['networkId']),
+            lambda: xo_object_exists(uuid),
             "Wait for XO to sync Network",
         )
 
     # run the sdnController action
     logging.info(f"sdnController.{action}")
-    ret = xo_cli(f"sdnController.{action}", args)
+    if protocol == 'JSONRPC':
+        sync_sdnController_action_jsonrpc(host, action, args)
+    else:
+        sync_sdnController_action_restapi(action, args)
 
-    # as XO is contacting only involved hosts, so some hosts in the pool might *not* be contacted at all
+def sync_sdnController_action_jsonrpc(host: Host, action: TrafficRuleAction, args: dict[str, JSONType]) -> None:
+    def log_date(host: Host) -> str:
+        # %y : file modification date, example: "2026-08-24 15:15:58.982053917 +0200"
+        return host.ssh("stat -c %y /var/log/sdn-controller-plugin.log", check=False)
+
+    # modify a copy of the dict
+    args = args.copy()
+
+    # xo-cli expects strings
+    if 'allow' in args:
+        args['allow'] = 'true' if args['allow'] else 'false'
+    if 'port' in args:
+        args['port'] = f"json:{args['port']}"
+
+    # json-rpc deleteRule/deleteNetworkRule doesn't have 'allow'
+    if action.startswith("delete"):
+        del args['allow']
+
+    # conversion from dict[str,JSONType] to dict[str,str]
+    xocli_args: dict[str, str] = {key: "%s" % value for key, value in args.items()}
+
+    # on each host, get the number of Host.call_plugin calls
+    hosts = {}
+    for h in host.pool.hosts:
+        hosts[h.name()] = log_date(h)
+
+    # do the xo-cli call
+    xo_cli(f"sdnController.{action}", xocli_args)
+
+    # wait for the hosts to see the XO messaging
+    # but as XO is contacting only involved hosts, some hosts in the pool might *not* be contacted at all
     # wait max 5 sec, and discard TimeoutError exception
     try:
         for h in host.pool.hosts:
@@ -133,7 +166,45 @@ def sync_sdnController_action(
     except TimeoutError:
         pass
 
-    return ret
+def sync_sdnController_action_restapi(action: TrafficRuleAction, args: dict[str, JSONType]) -> None:
+    if action == 'addRule':
+        uuid = args["vifId"]
+        response = xo_restapi(
+            'POST',
+            f'/plugins/sdn-controller/vifs/{uuid}/actions/add_traffic_rule?sync=true',
+            json=args,
+        )
+    elif action == 'deleteRule':
+        uuid = args["vifId"]
+        response = xo_restapi(
+            'POST',
+            f'/plugins/sdn-controller/vifs/{uuid}/actions/delete_traffic_rule?sync=true',
+            json=args,
+        )
+    elif action == 'addNetworkRule':
+        uuid = args["networkId"]
+        response = xo_restapi(
+            'POST',
+            f'/plugins/sdn-controller/networks/{uuid}/actions/add_traffic_rule?sync=true',
+            json=args,
+        )
+    elif action == 'deleteNetworkRule':
+        uuid = args["networkId"]
+        response = xo_restapi(
+            'POST',
+            f'/plugins/sdn-controller/networks/{uuid}/actions/delete_traffic_rule?sync=true',
+            json=args,
+        )
+
+    if response.status_code == 204:
+        # ok (with sync=true)
+        return
+    elif response.status_code == 404 and action.startswith("delete"):
+        # uuid (vif or network) not found : ignore it to match xo-cli behavior on deletion
+        logging.warning(f"{action}: uuid={uuid}: ignoring status_code=404")
+        return
+
+    pytest.fail(f"status_code error ({response.status_code}): {response.text}")
 
 def ofctl_replaceflows(host: Host, br: str, flows: list[str] | None) -> list[str]:
     """
@@ -173,7 +244,7 @@ def set_clean_rules_state(defer: Defer, host: Host, bridge: str) -> None:
     if of_rules is not None:
         network.param_remove('other-config', 'xo:sdn-controller:of-rules')
         defer(lambda: network.param_set('other-config', of_rules, 'xo:sdn-controller:of-rules'))
-        logging.warn(f"Network '{network_uuid}' has of-rules present (will be cleared for the test): {of_rules}")
+        logging.warning(f"Network '{network_uuid}' has of-rules present (will be cleared for the test): {of_rules}")
 
     # low level OpenFlow rules check
     flows = ofctl_replaceflows(host, bridge, [])
@@ -182,8 +253,8 @@ def set_clean_rules_state(defer: Defer, host: Host, bridge: str) -> None:
     n = len(flows)
     if n != 1:
         # we reseted the flows, but give a warning that it wasn't clean
-        logging.warn(f"OpenFlow rules were already present on the bridge '{bridge}' on host '{host.name()}': "
-                     f"found {n} rules (see `ovs-ofctl dump-flows {bridge}`).")
+        logging.warning(f"OpenFlow rules were already present on the bridge '{bridge}' on host '{host.name()}': "
+                        f"found {n} rules (see `ovs-ofctl dump-flows {bridge}`).")
 
 def assert_clean_openflow_state(host: Host, bridge: str) -> None:
     """
@@ -238,8 +309,11 @@ def has_running_vm_on_network(host: Host, network_uuid: str) -> bool:
     return False
 
 @pytest.mark.small_vm
+@pytest.mark.parametrize("protocol", ["JSONRPC", "RESTAPI"])
 class TestSimple:
-    def test_vifRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer) -> None:
+    def test_vifRule(
+        self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer, protocol: XOProtocol
+    ) -> None:
         host = hosts_with_traffic_rules[0]
         vm = imported_vm.clone()
         defer(lambda: vm.destroy())
@@ -257,9 +331,9 @@ class TestSimple:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:80',
-            'allow': 'false',
-        })
+            'port': 80,
+            'allow': False,
+        }, protocol)
 
         # before starting the VM, traffic pass
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
@@ -279,9 +353,9 @@ class TestSimple:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:81',
-            'allow': 'false',
-        })
+            'port': 81,
+            'allow': False,
+        }, protocol)
 
         # new rule added, both traffic dropped
         assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
@@ -293,8 +367,9 @@ class TestSimple:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:80',
-        })
+            'port': 80,
+            'allow': False,
+        }, protocol)
 
         # first rule deleted, traffic should pass (and 2nd rule drop traffic)
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
@@ -321,8 +396,9 @@ class TestSimple:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:81',
-        })
+            'port': 81,
+            'allow': False,
+        }, protocol)
 
         # no more traffic blocked
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
@@ -330,7 +406,9 @@ class TestSimple:
 
         assert_clean_openflow_state(host, hostBr)
 
-    def test_networkRule(self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer) -> None:
+    def test_networkRule(
+        self, hosts_with_traffic_rules: list[Host], imported_vm: VM, defer: Defer, protocol: XOProtocol
+    ) -> None:
         host = hosts_with_traffic_rules[0]
         vm = imported_vm.clone()
         defer(lambda: vm.destroy())
@@ -345,8 +423,8 @@ class TestSimple:
             'ipRange': '10.0.0.1',
             'direction': 'to',
             'protocol': 'icmp',
-            'allow': 'false',
-        })
+            'allow': False,
+        }, protocol)
         defer(
             lambda:
                 sync_sdnController_action(host, 'deleteNetworkRule', {
@@ -354,7 +432,8 @@ class TestSimple:
                     'ipRange': '10.0.0.1',
                     'direction': 'to',
                     'protocol': 'icmp',
-                })
+                    'allow': False,
+                }, protocol)
         )
 
         # the rule is not applied if there is no interface in the network at the time
@@ -380,8 +459,8 @@ class TestSimple:
             'ipRange': '10.0.0.2',
             'direction': 'to',
             'protocol': 'icmp',
-            'allow': 'false',
-        })
+            'allow': False,
+        }, protocol)
         defer(
             lambda:
                 sync_sdnController_action(host, 'deleteNetworkRule', {
@@ -389,7 +468,8 @@ class TestSimple:
                     'ipRange': '10.0.0.2',
                     'direction': 'to',
                     'protocol': 'icmp',
-                })
+                    'allow': False,
+                }, protocol)
         )
 
         # both rules are applied
@@ -402,7 +482,8 @@ class TestSimple:
             'ipRange': '10.0.0.1',
             'direction': 'to',
             'protocol': 'icmp',
-        })
+            'allow': False,
+        }, protocol)
 
         # second rule only is applied
         assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
@@ -425,7 +506,8 @@ class TestSimple:
             'ipRange': '10.0.0.2',
             'direction': 'to',
             'protocol': 'icmp',
-        })
+            'allow': False,
+        }, protocol)
 
         # no more rules
         assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
@@ -469,7 +551,7 @@ class TestMigrate:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'icmp',
-            'allow': 'false',
+            'allow': False,
         })
         try:
             # drop after adding the rule
@@ -489,6 +571,7 @@ class TestMigrate:
                 'ipRange': '0.0.0.0/0',
                 'direction': 'to',
                 'protocol': 'icmp',
+                'allow': False,
             })
 
         # no more drop after deleting the rule
@@ -531,7 +614,7 @@ class TestMigrate:
             'ipRange': '10.0.0.1',
             'direction': 'to',
             'protocol': 'icmp',
-            'allow': 'false',
+            'allow': False,
         })
         try:
             logging.info("check pre-migrate")
@@ -556,6 +639,7 @@ class TestMigrate:
                 'ipRange': '10.0.0.1',
                 'direction': 'to',
                 'protocol': 'icmp',
+                'allow': False,
             })
 
         # no more rule
@@ -611,8 +695,8 @@ class TestVLAN:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:81',
-            'allow': 'false',
+            'port': 81,
+            'allow': False,
         })
 
         vm.wait_for_os_booted()
@@ -636,8 +720,8 @@ class TestVLAN:
             'ipRange': '0.0.0.0/0',
             'direction': 'from',
             'protocol': 'tcp',
-            'port': 'json:82',
-            'allow': 'false',
+            'port': 82,
+            'allow': False,
         })
 
         assert ofproto_trace_drop(
@@ -658,7 +742,8 @@ class TestVLAN:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:81',
+            'port': 81,
+            'allow': False,
         })
 
         assert not ofproto_trace_drop(
@@ -679,7 +764,8 @@ class TestVLAN:
             'ipRange': '0.0.0.0/0',
             'direction': 'from',
             'protocol': 'tcp',
-            'port': 'json:82',
+            'port': 82,
+            'allow': False,
         })
 
         # rule not applied
@@ -734,7 +820,7 @@ class TestVLAN:
                 'ipRange': '10.0.0.1',
                 'direction': 'to',
                 'protocol': 'icmp',
-                'allow': 'false',
+                'allow': False,
             })
 
             # XXX weird, but no OF so seems expected
@@ -787,6 +873,7 @@ class TestVLAN:
                 'ipRange': '10.0.0.1',
                 'direction': 'to',
                 'protocol': 'icmp',
+                'allow': False,
             })
 
         # no rule applied
@@ -824,8 +911,8 @@ class TestTunnel:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:81',
-            'allow': 'false',
+            'port': 81,
+            'allow': False,
         })
 
         # rule applied
@@ -840,7 +927,8 @@ class TestTunnel:
             'ipRange': '0.0.0.0/0',
             'direction': 'to',
             'protocol': 'tcp',
-            'port': 'json:81',
+            'port': 81,
+            'allow': False,
         })
 
         wait_for_not(
@@ -877,7 +965,7 @@ class TestTunnel:
                 'ipRange': '10.0.0.1',
                 'direction': 'to',
                 'protocol': 'icmp',
-                'allow': 'false',
+                'allow': False,
             })
 
             # XXX weird, but no OF so seems expected
@@ -922,6 +1010,7 @@ class TestTunnel:
                 'ipRange': '10.0.0.1',
                 'direction': 'to',
                 'protocol': 'icmp',
+                'allow': False,
             })
 
         # no rule applied

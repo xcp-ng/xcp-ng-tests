@@ -2,11 +2,36 @@ import pytest
 
 import json
 
+import requests
+import requests.auth
+
 from data import TOOLS
 from lib.commands import local_cmd
 from lib.typing import JSONType
 
-from typing import Literal, overload
+from typing import Any, Literal, TypeAlias, overload
+
+RestApiMethodType: TypeAlias = Literal['GET', 'OPTIONS', 'PATCH', 'POST', 'PUT', 'DELETE']
+
+try:
+    from data import XO_URL
+except ImportError:
+    XO_URL = ""
+
+try:
+    from data import XO_AUTH_USERNAME
+except ImportError:
+    XO_AUTH_USERNAME = ""
+try:
+    from data import XO_AUTH_PASSWORD
+except ImportError:
+    XO_AUTH_PASSWORD = ""
+
+try:
+    from data import XO_AUTH_TOKEN
+except ImportError:
+    XO_AUTH_TOKEN = ""
+
 
 __allow_xo_cli = False
 def _allow_xo_cli(value: bool) -> bool:
@@ -36,6 +61,7 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
     cmd = [TOOLS.get('xo-cli', 'xo-cli'), action]
     if action != 'list-objects' and use_json:
         cmd += ['--json']
+
     cmd += ["%s=%s" % (key, value) for key, value in args.items()]
 
     res = local_cmd(cmd, check=check)
@@ -44,6 +70,46 @@ def xo_cli(action: str, args: dict[str, str] = {}, *, check: bool = True, use_js
         return json.loads(res.stdout)
 
     return res.stdout
+
+def xo_restapi(
+    method: RestApiMethodType,
+    api_url: str,
+    api_version: str = "v0",
+    timeout: float = 60.,
+    **kwargs: Any, # noqa (any-type)
+) -> requests.Response:
+    if not __allow_xo_cli:
+        pytest.fail("xo_restapi function requires hosts_with_xo fixture usage.")
+
+    if not XO_URL:
+        pytest.fail("xo_restapi function needs XO_URL to be set.")
+
+    # remove first / from api_url. it could cause error in some cases
+    if api_url.startswith('/'):
+        api_url = api_url[1:]
+
+    # build full url
+    url = f"{XO_URL}/rest/{api_version}/{api_url}"
+
+    # configure BasicAuth (if username is present)
+    if XO_AUTH_USERNAME:
+        basic = requests.auth.HTTPBasicAuth(XO_AUTH_USERNAME, XO_AUTH_PASSWORD)
+    else:
+        basic = None
+
+    # configure auth via token (if present)
+    if XO_AUTH_TOKEN:
+        # update kwargs['cookies']
+        cookies = kwargs.setdefault('cookies', {})
+        cookies.setdefault('authenticationToken', XO_AUTH_TOKEN)
+
+    return requests.request(
+        method,
+        url,
+        auth=basic,
+        timeout=timeout,
+        **kwargs,
+    )
 
 
 def json_check_get_str(d: dict[str, JSONType], key: str, default: str | None = None) -> str:
