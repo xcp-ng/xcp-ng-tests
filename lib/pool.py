@@ -7,14 +7,14 @@ import traceback
 from packaging import version
 
 import lib.commands as commands
-from lib.common import HostAddress, _param_get, _param_set, safe_split, strtobool, wait_for, wait_for_not
+from lib.common import HostAddress, XeObject, safe_split, strtobool, wait_for, wait_for_not
 from lib.efi import EFIAuth
 from lib.host import Host
 from lib.sr import SR
 
 from typing import Any, Callable, Iterable
 
-class Pool:
+class Pool(XeObject):
     """Pool
 
     :raises NotAMasterHostError: if initial host is not a master
@@ -40,12 +40,7 @@ class Pool:
         self.uuid = self.master.xe('pool-list', minimal=True)
         self.saved_uefi_certs: dict[str, str] | None = None
         self.pre_existing_sr_uuids = safe_split(self.master.xe('sr-list', {'minimal': 'true'}), ',')
-
-    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
-        return _param_get(self.master, Pool.xe_prefix, self.uuid, param_name, key, accept_unknown_key)
-
-    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
-        _param_set(self.master, Pool.xe_prefix, self.uuid, param_name, value, key)
+        super().__init__(self.master, self.uuid)
 
     def is_ha_enabled(self) -> bool:
         return strtobool(self.param_get('ha-enabled'))

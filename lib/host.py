@@ -14,12 +14,8 @@ from packaging import version
 import lib.commands as commands
 from lib.bond import Bond
 from lib.common import (
+    XeObject,
     XeParams,
-    _param_add,
-    _param_clear,
-    _param_get,
-    _param_remove,
-    _param_set,
     prefix_object_name,
     safe_split,
     strip_suffix,
@@ -58,7 +54,7 @@ def host_data(hostname_or_ip: str) -> dict[str, str]:
     else:
         return {'user': HOST_DEFAULT_USER, 'password': HOST_DEFAULT_PASSWORD}
 
-class Host:
+class Host(XeObject):
     xe_prefix = "host"
     pool: Pool
     package_manager: str
@@ -98,6 +94,7 @@ class Host:
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
         self._dom0: VM | None = None
+        super().__init__(self, self.uuid)
 
         self.rescan_block_devices_info()
 
@@ -203,36 +200,6 @@ class Host:
             return self.ssh(command, check=check, simple_output=True)
         else:
             return self.ssh(command, check=check, simple_output=False)
-
-    @overload
-    def param_get(self, param_name: str, key: str | None = ...,
-                  accept_unknown_key: Literal[False] = ...) -> str:
-        ...
-
-    @overload
-    def param_get(self, param_name: str, key: str | None = ...,
-                  accept_unknown_key: Literal[True] = ...) -> str | None:
-        ...
-
-    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
-        return _param_get(self, self.xe_prefix, self.uuid,
-                          param_name, key, accept_unknown_key)
-
-    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
-        _param_set(self, self.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
-        _param_remove(self, self.xe_prefix, self.uuid,
-                      param_name, key, accept_unknown_key)
-
-    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
-        _param_add(self, self.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_clear(self, param_name: str) -> None:
-        _param_clear(self, self.xe_prefix, self.uuid,
-                     param_name)
 
     def create_file(self, filename: str, text: str) -> None:
         with tempfile.NamedTemporaryFile('w') as file:
