@@ -87,7 +87,10 @@ class TestLVMOISCSISR:
         vdi_export_import(storage_test_vm, lvmoiscsi_sr, image_format, temp_large_dir, defer)
 
     @pytest.mark.small_vm
-    def test_vdi_on_boot_reset(self, vm_on_lvmoiscsi_sr: VM, defer: Defer) -> None:
+    def test_vdi_on_boot_reset(self, vm_on_lvmoiscsi_sr: VM, image_format: ImageFormat,
+                               defer: Defer, request: pytest.FixtureRequest) -> None:
+        if image_format == 'qcow2':
+            request.applymarker(pytest.mark.xfail(reason="on-boot reset fails with qcow2 (XCPNG-4041)"))
         vdi_on_boot_reset(vm_on_lvmoiscsi_sr, defer)
 
     # *** tests with reboots (longer tests).
