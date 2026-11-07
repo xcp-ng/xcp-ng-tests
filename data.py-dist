@@ -108,6 +108,8 @@ OTHER_GUEST_TOOLS = {
         "patches": ["XenDrivers-patch.msp"],
         # Relative path of root cert file (optional)
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
+        # If this is a XenServer MSI package, we'll wait for the XenServer install service to complete
+        "is_xenserver_msi": False,
         # Whether this guest tool version wants vendor device to be activated (optional, defaults to False)
         # Note: other guest tools may not install correctly with this setting enabled
         "vendor_device": False,

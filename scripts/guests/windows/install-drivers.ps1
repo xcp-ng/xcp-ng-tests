@@ -6,8 +6,8 @@ param (
     [string]$MsiPath,
     [Parameter(ParameterSetName = "Msi")]
     [string[]]$Patches,
-    [Parameter()]
-    [switch]$Shutdown
+    [Parameter(ParameterSetName = "Msi")]
+    [switch]$WaitXenServerInstallAgent
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,8 +58,17 @@ Start-Sleep -Seconds 15
 Write-Output "Waiting for install events"
 $nativeMethods::CMP_WaitNoPendingInstallEvents($nativeMethods::INFINITE)
 
-if ($Shutdown) {
-    Write-Output "Shutting down"
-    Start-Sleep -Seconds 5
-    Stop-Computer -Force
+if ($WaitXenServerInstallAgent) {
+    # The XenServer InstallAgent may reload NICs among other things until it marks the installation as done.
+    # With /norestart, we should wait for it to reaches NeedsReboot or Installed, it won't reboot by itself.
+    Write-Output "Waiting for XenServer InstallAgent"
+    $deadline = (Get-Date).AddMinutes(5)
+    do {
+        Start-Sleep -Seconds 10
+        $status = (Get-ItemProperty `
+            -Path HKLM:\SOFTWARE\XenServer\XenTools\InstallAgent `
+            -Name InstallStatus `
+            -ErrorAction SilentlyContinue).InstallStatus
+    } while ($status -notin @("NeedsReboot", "Installed") -and (Get-Date) -lt $deadline)
+    Write-Output "XenServer InstallAgent status: $status"
 }
