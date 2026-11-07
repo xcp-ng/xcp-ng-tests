@@ -1,5 +1,5 @@
 import logging
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 from lib.commands import SSHCommandFailed
 from lib.common import strtobool, wait_for
@@ -71,9 +71,16 @@ def install_other_drivers(vm: VM, other_tools_iso_name: str, param: dict[str, An
                 logging.warning("CD drive not detected, retrying")
                 insert_cd_safe(vm, other_tools_iso_name)
 
+        logging.info("Copying install-drivers.ps1")
+        # sftp sees the guest's C: drive as its root, see VM.start_background_process().
+        vm.sftp_put(
+            str(Path(__file__).parents[2] / "scripts" / "guests" / "windows" / "install-drivers.ps1"),
+            "/install-drivers.ps1",
+        )
+
         root_path = PureWindowsPath("D:\\") / param["path"]
         package_path = root_path / param["package"]
-        install_cmd = "D:\\install-drivers.ps1 "
+        install_cmd = "C:\\install-drivers.ps1 "
         if driver_type == "msi":
             logging.info(f"Install MSI drivers: {package_path}")
             install_cmd += f"-MsiPath '{package_path}' "

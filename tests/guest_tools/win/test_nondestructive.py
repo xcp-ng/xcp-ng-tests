@@ -51,12 +51,11 @@ from typing import Any
 #   │   └───managementagent-9.4.0-x64.msi
 #   ├───xcp-ng-8.2.2.200
 #   │   └───managementagentx64.msi
-#   ├───xcp-ng-9.0.9000
-#   │   ├───package
-#   │   │   └───XenDrivers-x64.msi
-#   │   └───testsign
-#   │       └───*.crt
-#   └───install-drivers.ps1
+#   └───xcp-ng-9.0.9000
+#       ├───package
+#       │   └───XenDrivers-x64.msi
+#       └───testsign
+#           └───*.crt
 
 
 @pytest.mark.multi_vms
