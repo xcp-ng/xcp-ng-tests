@@ -74,6 +74,8 @@ def enable_testsign(vm: VM, rootcert: PureWindowsPath | None) -> None:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
 
+    logging.info("Enable setupapi logging")
+    vm.execute_powershell_script("reg add HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Setup /v LogLevel /t REG_DWORD /d 0x2000ffff /f; if ($LASTEXITCODE -ne 0) {{throw}}")
     if rootcert is not None:
         vm.execute_powershell_script(
             f"""certutil -addstore -f Root '{rootcert}';
