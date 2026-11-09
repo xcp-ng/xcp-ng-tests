@@ -172,6 +172,11 @@ NAME="md0" KNAME="md0" PKNAME="nvme1n1" SIZE="30721630535680" LOG-SEC="512" TYPE
 def _rescan(lsblk_output: str) -> list[Host.BlockDeviceInfo]:
     host = MagicMock(spec=Host)
     host.ssh.return_value = lsblk_output
+
+    def get_side_effect(key: str, default: list[str]) -> list[str]:
+        return [f"/dev/by-id/id-for-disk-{key}", "some-other-link"]
+
+    host.disk_by_id_symlinks.return_value.get.side_effect = get_side_effect
     Host.rescan_block_devices_info(host)
     return host.block_devices_info
 
@@ -193,7 +198,7 @@ def test_plain_disk_no_children() -> None:
     assert len(devices) == 1
     d = devices[0]
     assert d.name == 'sda'
-    assert d.path == '/dev/sda'
+    assert d.path == '/dev/by-id/id-for-disk-sda'
     assert d.type == 'disk'
     assert d.size == 500107862016
     assert d.log_sec == 512
@@ -450,7 +455,7 @@ NAME="nvme1n1p6" KNAME="nvme1n1p6" PKNAME="nvme1n1" SIZE="1073741824" LOG-SEC="5
 def test_4k_block_device_detected() -> None:
     devices = _rescan(LSBLK_4K_BLOCK_DEVICE)
     d = _by_name(devices, 'nvme0n1')
-    assert d.path == '/dev/nvme0n1'
+    assert d.path == '/dev/by-id/id-for-disk-nvme0n1'
     assert d.type == 'disk'
     assert d.size == 1000204886016
     assert d.log_sec == 4 * KiB

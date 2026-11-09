@@ -137,6 +137,21 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/misc", "tests/migration"],
         "markers": "multi_vms and not flaky and not reboot",
     },
+    "main-multi-all": {
+        "description": "a group of tests that need to run on the largest variety of VMs - both unix and windows",
+        "requirements": [
+            "A pool with at least 2 hosts, each with a local SR and a shared SR.",
+            "An additional free disk on the first host.",
+            "A second pool with a SR to receive migrated VMs.",
+            "Windows and Unix VMs of all sorts (HVM, PV, PV-shim, BIOS, UEFI...).",
+        ],
+        "nb_pools": 2,
+        "params": {
+            "--vm[]": "multi/all",
+        },
+        "paths": ["tests/misc", "tests/migration"],
+        "markers": "multi_vms and not flaky and not reboot",
+    },
     "network-advanced": {
         "description": "a group of network tests with complex prerequisites",
         "requirements": [
@@ -151,6 +166,20 @@ JOBS: dict[str, JobData] = {
         },
         "paths": ["tests/network"],
         "markers": "complex_prerequisites or hosts_with_xo",
+    },
+    "ha": {
+        "description": "pool HA failover scenarios on a 2-node Moonshot pool",
+        "requirements": [
+            "A 2-node pool on Moonshot whose hosts can be hard power-cycled.",
+            "data.py HOSTS[..].power_control with type=moonshot, chassis, slot, user, password for each host.",
+            "NFS_DEVICE_CONFIG in data.py (shared NFS for VM disks + HA heartbeat).",
+            "A small VM that can be imported on the NFS SR.",
+        ],
+        "nb_pools": 1,
+        "params": {
+            "--vm": "single/small_vm",
+        },
+        "paths": ["tests/ha"],
     },
     "packages": {
         "description": "tests that packages can be installed correctly",
@@ -180,7 +209,8 @@ JOBS: dict[str, JobData] = {
     },
     "storage-main-large-thin": {
         "description":
-            "same as storage-main with 3TiB VDIs, no large gzip XVAs creation and no test requiring 3TiB allocation",
+            "same as storage-main with per-format max VDIs, no large gzip XVAs creation"
+            " and no test requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -190,7 +220,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -199,7 +229,7 @@ JOBS: dict[str, JobData] = {
     },
     "storage-main-large-thick": {
         "description":
-            "same as storage-main with 3TiB VDIs, no gzip XVAs and tests requiring 3TiB allocation",
+            "same as storage-main with per-format max VDIs, no gzip XVAs and tests requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -209,7 +239,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -217,7 +247,7 @@ JOBS: dict[str, JobData] = {
         "name_filter": "not migration and not linstor and not gzip",
     },
     "storage-main-large-full-write": {
-        "description": "storage tests actually writing the full 3TiB volumes",
+        "description": "storage tests actually writing the full per-format max volumes",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -227,7 +257,9 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
+            "--write-volume-cap": "100%",
+            "--write-volume-align": "4KiB",
         },
         "paths": ["tests/storage"],
         "markers": "(small_vm or no_vm) and not reboot and not quicktest and not unused_4k_disks"
@@ -252,7 +284,8 @@ JOBS: dict[str, JobData] = {
         "name_filter": "migration and not linstor and not glusterfs", # FIXME: glusterfs temporarily excluded
     },
     "storage-migrations-large-thin": {
-        "description": "same as storage-migrations with 3TiB VDIs, and no test requiring 3TiB allocation",
+        "description": "same as storage-migrations with per-format max VDIs,"
+                       " and no test requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -263,14 +296,15 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks and not thick_provisioned",
         "name_filter": "migration and not linstor",
     },
     "storage-migrations-large-thick": {
-        "description": "same as storage-migrations with 3TiB VDIs, and tests requiring 3TiB allocation",
+        "description": "same as storage-migrations with per-format max VDIs,"
+                       " and tests requiring full-volume allocation",
         "requirements": [
             "A pool with at least 3 hosts.",
             "An additional free disk on every host.",
@@ -281,7 +315,7 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 2,
         "params": {
             "--vm": "single/small_vm",
-            "--volume-size": "3TiB",
+            "--volume-size": "FORMAT_MAX",
         },
         "paths": ["tests/storage"],
         "markers": "not unused_4k_disks and thick_provisioned",

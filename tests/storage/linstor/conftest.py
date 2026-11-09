@@ -15,7 +15,7 @@ from lib import config
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 
 try:
@@ -140,7 +140,8 @@ def pool_with_linstor(
             )
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(ensure_linstor_not_installed, pool.hosts)
+        # list consumes the iterator so tasks' exceptions can propagated here.
+        list(executor.map(ensure_linstor_not_installed, pool.hosts))
 
     def install_linstor(host: Host) -> None:
         logging.info(f"Installing {LINSTOR_PACKAGE} on host {host}...")
@@ -152,7 +153,8 @@ def pool_with_linstor(
         host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(install_linstor, pool.hosts)
+        # list consumes the iterator so tasks' exceptions can propagated here.
+        list(executor.map(install_linstor, pool.hosts))
 
     yield pool
 
@@ -171,7 +173,8 @@ def pool_with_linstor(
         host.restart_toolstack(verify=True)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(remove_linstor, pool.hosts)
+        # list consumes the iterator so tasks' exceptions can propagated here.
+        list(executor.map(remove_linstor, pool.hosts))
 
 @pytest.fixture(scope='package')
 def linstor_redundancy(linstor_hosts_with_lvm_disks: list[Host]) -> int:
@@ -201,8 +204,8 @@ linstor_sr = pytest.fixture(_linstor_sr, scope='package')
 linstor_sr_ephemeral = pytest.fixture(_linstor_sr, scope='function')
 
 @pytest.fixture(scope='module')
-def vdi_on_linstor_sr(linstor_sr: SR) -> Generator[VDI, None, None]:
-    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test', virtual_size=config.volume_size)
+def vdi_on_linstor_sr(linstor_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = linstor_sr.create_vdi('LINSTOR-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

@@ -37,8 +37,8 @@ def ext_sr(host: Host,
     sr.destroy()
 
 @pytest.fixture(scope='module')
-def vdi_on_ext_sr(ext_sr: SR) -> Generator[VDI, None, None]:
-    vdi = ext_sr.create_vdi('EXT-local-VDI-test', virtual_size=config.volume_size)
+def vdi_on_ext_sr(ext_sr: SR, image_format: ImageFormat) -> Generator[VDI, None, None]:
+    vdi = ext_sr.create_vdi('EXT-local-VDI-test', virtual_size=config.volume_size(image_format))
     yield vdi
     vdi.destroy()
 

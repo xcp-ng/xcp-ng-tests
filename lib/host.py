@@ -35,7 +35,7 @@ from lib.sr import SR
 from lib.tunnel import Tunnel
 from lib.vlan import VLAN
 from lib.vm import VM
-from lib.xo import xo_cli, xo_object_exists
+from lib.xo import xo_server_add, xo_server_remove, xo_servers
 
 from typing import TYPE_CHECKING, Literal, overload
 
@@ -45,6 +45,8 @@ if TYPE_CHECKING:
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
+
+CACHED_VM_UUID_KEY = "xcpng_tests.cached_vm_uuid"
 
 
 def host_data(hostname_or_ip: str) -> dict[str, str]:
@@ -83,6 +85,10 @@ class Host:
         self.user = h_data['user']
         self.password = h_data['password']
         self.skip_xo_config = h_data.get('skip_xo_config', False)
+
+        # SSH to a host that is down hangs for minutes instead of failing.
+        if not Host.ssh_reachable(hostname_or_ip):
+            raise Exception(f"Host {hostname_or_ip} is unreachable: is it powered on?")
 
         self.saved_packages_list: list[str] | None = None
         self.saved_rollback_id: int | None = None
@@ -311,76 +317,41 @@ class Host:
             self._bios_vendor = self._get_bios_vendor()
         return 'Xen' in self._bios_vendor
 
-    def xo_get_server_id(self, store: bool = True) -> str | None:
-        servers = xo_cli('server.getAll', use_json=True)
-        assert isinstance(servers, list)
-        for server in servers:
-            assert isinstance(server, dict)
-            assert isinstance(server['host'], str)
-            assert isinstance(server['id'], str)
-            if server['host'] == wrap_ip(self.hostname_or_ip):
-                if store:
-                    self.xo_srv_id = server['id']
-                return server['id']
-        return None
+    def xo_get_server_id(self) -> str | None:
+        if self.xo_srv_id is None:
+            servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
+
+            if len(servers) == 0:
+                return None
+
+            self.xo_srv_id = servers[0].id
+
+        return self.xo_srv_id
 
     def xo_server_remove(self) -> None:
-        if self.xo_srv_id is not None:
-            xo_cli('server.remove', {'id': self.xo_srv_id})
-        else:
-            servers = xo_cli('server.getAll', use_json=True)
-            assert isinstance(servers, list)
-            for server in servers:
-                assert isinstance(server, dict)
-                assert isinstance(server['host'], str)
-                assert isinstance(server['id'], str)
-                if server['host'] == wrap_ip(self.hostname_or_ip):
-                    xo_cli('server.remove', {'id': server['id']})
+        server_id = self.xo_get_server_id()
+        if server_id is not None:
+            xo_server_remove(server_id)
+            self.xo_srv_id = None
 
-    def xo_server_add(self, username: str, password: str, label: str | None = None,
-                      unregister_first: bool = True) -> None:
-        """ Returns the server ID created by XO's `server.add`. """
-        if unregister_first:
-            self.xo_server_remove()
-        if label is None:
-            label = 'Auto tests %s' % self.hostname_or_ip
-        xo_srv_id = xo_cli(
-            'server.add',
-            {
-                'host': wrap_ip(self.hostname_or_ip),
-                'username': username,
-                'password': password,
-                'allowUnauthorized': 'true',
-                'label': label
-            },
-            use_json=True,
+    def xo_server_add(self, username: str, password: str, label: str | None = None) -> None:
+        """Add this host to XO and set `self.xo_srv_id` property."""
+        self.xo_server_remove()
+        self.xo_srv_id = xo_server_add(
+            label or f"Auto tests {self.hostname_or_ip}",
+            wrap_ip(self.hostname_or_ip),
+            username,
+            password,
+            allowUnauthorized=True,
         )
-        assert isinstance(xo_srv_id, str)
-        self.xo_srv_id = xo_srv_id
-
-    def xo_server_status(self) -> str | None:
-        servers = xo_cli('server.getAll', use_json=True)
-        assert isinstance(servers, list)
-        for server in servers:
-            assert isinstance(server, dict)
-            assert isinstance(server['host'], str)
-            assert isinstance(server['status'], str | None)
-            if server['host'] == wrap_ip(self.hostname_or_ip):
-                return server['status']
-        return None
 
     def xo_server_connected(self) -> bool:
-        return self.xo_server_status() == "connected"
+        servers = xo_servers(host=wrap_ip(self.hostname_or_ip))
 
-    def xo_server_reconnect(self) -> None:
-        assert self.xo_srv_id is not None
-        logging.info(f"[{self}] Reconnect XO to host")
-        xo_cli('server.disable', {'id': self.xo_srv_id})
-        xo_cli('server.enable', {'id': self.xo_srv_id})
-        wait_for(self.xo_server_connected, timeout_secs=10)
-        # wait for XO to know about the host. Apparently a connected server status
-        # is not enough to guarantee that the host object exists yet.
-        wait_for(lambda: xo_object_exists(self.uuid), f"[{self}] Wait for XO to know about HOST {self.uuid}")
+        if len(servers) == 0:
+            return False
+
+        return servers[0].status == "connected"
 
     @staticmethod
     def vm_cache_key(uri: str) -> str:
@@ -389,11 +360,14 @@ class Host:
     def cached_vm(self, uri: str, sr_uuid: str) -> VM | None:
         assert sr_uuid, "A SR UUID is necessary to use import cache"
         cache_key = self.vm_cache_key(uri)
-        # Look for an existing cache VM
+        # Look for an existing cached VM
         vm_uuids = safe_split(self.xe('vm-list', {'name-description': cache_key}, minimal=True), ',')
 
         for vm_uuid in vm_uuids:
             vm = VM(vm_uuid, self)
+            vm_cached_uuid = vm.param_get('other-config', key=CACHED_VM_UUID_KEY, accept_unknown_key=True)
+            if vm_uuid != vm_cached_uuid:
+                continue
             # Make sure the VM is on the wanted SR.
             # Assumption: if the first disk is on the SR, the VM is.
             # If there's no VDI at all, then it is virtually on any SR.
@@ -445,6 +419,7 @@ class Host:
             cache_key = self.vm_cache_key(uri)
             logging.info(f"[{self}] Marking VM {vm.uuid} as cached")
             vm.param_set('name-description', cache_key)
+            vm.param_set('other-config', vm.uuid, key=CACHED_VM_UUID_KEY)
         return vm
 
     def import_iso(self, uri: str, sr: SR) -> VDI:
@@ -599,12 +574,34 @@ class Host:
             retry_delay_secs=10,
         )
 
+    # Static so that an address can be checked without a Host object.
+    @staticmethod
+    def ssh_reachable(hostname_or_ip: str) -> bool:
+        return commands.local_cmd(["nc", "-zw5", hostname_or_ip, "22"], check=False).returncode == 0
+
+    def is_ssh_reachable(self) -> bool:
+        return Host.ssh_reachable(self.hostname_or_ip)
+
     def wait_for_ssh_reachable(self, timeout_secs: int = 10 * 60) -> None:
         wait_for(
-            lambda: commands.local_cmd(["nc", "-zw5", self.hostname_or_ip, "22"], check=False).returncode == 0,
+            self.is_ssh_reachable,
             f"[{self}] Wait for ssh up on host",
             timeout_secs=timeout_secs,
             retry_delay_secs=5
+        )
+
+    def boot_id(self) -> str:
+        return self.ssh('cat /proc/sys/kernel/random/boot_id')
+
+    def xapi_pid(self) -> str:
+        return self.ssh('pidof -s xapi', check=False)
+
+    def wait_for_xapi_restart(self, old_pid: str, timeout_secs: int = 10 * 60) -> None:
+        """Until a new xapi process runs, xapi-wait-init-complete may still answer for the old one."""
+        wait_for(
+            lambda: self.xapi_pid() not in ('', old_pid),
+            f"[{self}] Wait for xapi to restart",
+            timeout_secs=timeout_secs,
         )
 
     def wait_for_xapi_enabled(self, timeout_secs: int = 30 * 60) -> None:
@@ -758,12 +755,66 @@ class Host:
             self.wait_for_ssh_reachable()
             self.wait_for_xapi_enabled()
 
+    def hard_power_off(self, verify: bool = False) -> None:
+        logging.info(f"[{self}] Hard power-off")
+        # SysRq 'o' powers off immediately. SSH often fails once the host dies - that is expected.
+        try:
+            self.ssh('echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger')
+        except commands.SSHCommandFailed:
+            pass
+        if verify:
+            # Host should die quickly; keep a short timeout unlike reboot's 3 min default.
+            self.wait_for_host_down(timeout_secs=30)
+
     def management_network(self) -> str:
         return self.xe('network-list', {'bridge': self.inventory['MANAGEMENT_INTERFACE']}, minimal=True)
 
     def management_pif(self) -> PIF:
         uuid = self.xe('pif-list', {'management': True, 'host-uuid': self.uuid}, minimal=True)
         return PIF(uuid, self)
+
+    def disk_by_id_symlinks(self) -> dict[str, list[str]]:
+        """
+        Extract the `/dev/disk/by-id` symlinks of every device, as a dict of
+        {device_name: [list of symlinks], ...}.
+
+        Same approach as the one used by the `lsblk.py` XAPI plugin:
+        https://github.com/xcp-ng/xcp-ng-xapi-plugins/blob/d3a89f29eefad5c714c302f24d6ced0934448e66/SOURCES/etc/xapi.d/plugins/lsblk.py
+
+        The differences are:
+        - the output of `udevadm info` is filtered on the server, to transfer only the useful
+          lines instead of the whole database, which weighs several hundreds of kilobytes
+        - devices having no `disk/by-id` symlink are not present in the dict at all, instead of
+          being mapped to an empty list
+        """
+        result: dict[str, list[str]] = {}
+        # udev exports each device as a block of `KEY: value` lines: `P:`, `N:` for the device name,
+        # then the properties (`E:`) and the symlinks (`S:`). Grep is used to reduce what is
+        # transferred over SSH, in three steps:
+        # - keep only the name lines and the `disk/by-id` symlinks, ignoring the other symlinks
+        #   (`by-label`, `by-path`, ...) and all the properties: the name of a device then sits
+        #   right before its own symlinks
+        # - keep the line preceding each symlink: only the names having at least one symlink are
+        #   kept, and this also prints the other symlinks of the same device once more
+        # - filter that output again to drop the duplicated symlinks and the `--` separators that
+        #   `grep -B1` inserts between non-contiguous blocks
+        udev_export = self.ssh(
+            "set -o pipefail; udevadm info --export-db | "
+            "grep -E '^(N: |S: disk/by-id/)' | "
+            "grep -B1 '^S: disk/by-id/' | "
+            "grep -E '^(N: |S: disk/by-id/)'"
+        )
+        for device in udev_export.split("N: "):
+            if not device:
+                continue
+            name, *symlinks = device.splitlines()
+            symlinks = sorted(
+                "/dev/" + symlink.removeprefix("S: ")
+                for symlink in symlinks
+                if symlink.startswith("S: ")
+            )
+            result[name] = symlinks
+        return result
 
     def rescan_block_devices_info(self) -> None:
         """
@@ -821,6 +872,7 @@ class Host:
         devices: list[Host.BlockDeviceInfo] = []
 
         raw = self.ssh(f'lsblk --pairs --bytes --output {LSBLK_FIELDS} --include {LSBLK_MAJOR_NUMBERS}')
+        by_id_symlinks = self.disk_by_id_symlinks()
 
         def _split_keys(line: str) -> list[tuple[str, str]]:
             return re.findall(r'(\S+)=(".*?"|\S+)', line)
@@ -862,9 +914,16 @@ class Host:
                     if wwn in seen_wwns:
                         continue
                     seen_wwns.add(wwn)
+                symlinks = by_id_symlinks.get(r['name'], [])
+                if symlinks:
+                    path, *_ = symlinks
+                else:
+                    # Fallback to `/dev/{name}` if no symlinks have been reported
+                    path = f'/dev/{r["name"]}'
+                    logging.warning(f"No symlinks were reported for {path} on {self.hostname_or_ip}")
                 devices.append(Host.BlockDeviceInfo(
                     name=r['name'],
-                    path=f'/dev/{r["name"]}',
+                    path=path,
                     size=int(r['size']),
                     log_sec=int(r['log-sec']),
                     type='disk',

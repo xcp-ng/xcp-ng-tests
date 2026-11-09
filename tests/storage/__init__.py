@@ -1,7 +1,5 @@
 from .storage import (
-    MAX_VDI_SIZE,
     CoalesceOperation,
-    ImageFormat,
     XVACompression,
     coalesce_integrity,
     cold_migration_then_come_back,
@@ -12,5 +10,6 @@ from .storage import (
     try_to_create_sr_with_missing_device,
     vdi_export_import,
     vdi_is_open,
+    vdi_on_boot_reset,
     xva_export_import,
 )

@@ -175,9 +175,16 @@ Some tests accept an optional `--vm=OVA_URL|VM_key|IP_address` parameter. Those 
 If `--vm` is not specified, defaults defined by the tests will be used.
 The `--vm` parameter can be specified several times. Then pytest will run several instances of the tests sequentially, one for each VM.
 
-Some tests support an optional `--volume-size` parameter to configure the size of test VDIs (virtual disk images). This parameter accepts size strings like `1GiB`, `2.5TiB`, `500MiB`, or byte values. The default is `1GiB`. This is useful for testing with larger volumes. Example:
+Some tests support an optional `--volume-size` parameter to configure the size of test VDIs (virtual disk images). This parameter accepts size strings like `1GiB`, `2.5TiB`, `500MiB`, byte values, or symbolic values `VHD_MAX` and `QCOW2_MAX`. The default is `1GiB`. This is useful for testing with larger volumes. Example:
 ```
 pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1 --volume-size=10GiB
+```
+
+`--volume-size` also accepts `FORMAT_MAX`, which resolves to the maximum VDI size for the image format each test runs on (`VHD_MAX` for `vhd`, `QCOW2_MAX` for `qcow2`). This allows a single command to cover both formats, e.g. with `--image-format=qcow2,vhd`.
+
+Related `--write-volume-cap` parameter caps the amount of data actually written to a volume (default `2GiB`). Besides absolute sizes, it accepts `FORMAT_MAX` (write the whole volume) or a percentage of the resolved `--volume-size`, e.g. `50%`. Example:
+```
+pytest tests/storage/ext/test_ext_sr.py --hosts=10.0.0.1 --volume-size=FORMAT_MAX --write-volume-cap=100% --image-format=qcow2,vhd
 ```
 
 See also, below: "Markers and test selection" and "Running test jobs with `jobs.py`"
@@ -242,13 +249,33 @@ The output of commands below is given as example and may not reflect the current
 #### List jobs
 ```
 $ ./jobs.py list
+postinstall: Minimal set of tests to run after an installation or an upgrade.
+postinstall-intrapool-migrate: Minimal intra-pool live-migrate tests to run after an installation or an upgrade.
+postinstall-with-tls: Minimal set of tests to run after an installation or an upgrade, and after enabling TLS verification in the case of an upgrade. Includes a pool join test.
 main: a group of not-too-long tests that run either without a VM, or with a single small one
-main-multi: a group of tests that need to run on the largest variety of VMs
+main-multi-unix: a group of tests that need to run on the largest variety of VMs - unix split
+main-multi-windows: a group of tests that need to run on the largest variety of VMs - windows split
+main-multi-all: a group of tests that need to run on the largest variety of VMs - both unix and windows
+network-advanced: a group of network tests with complex prerequisites
 packages: tests that packages can be installed correctly
-quicktest: XAPI's quicktest, not so quick by the way
 storage-main: tests all storage drivers, but avoids migrations and reboots
+storage-main-large-thin: same as storage-main with 3TiB VDIs, no large gzip XVAs creation and no test requiring 3TiB allocation
+storage-main-large-thick: same as storage-main with 3TiB VDIs, no gzip XVAs and tests requiring 3TiB allocation
+storage-main-large-full-write: storage tests actually writing the full 3TiB volumes
 storage-migrations: tests migrations with all storage drivers
+storage-migrations-large-thin: same as storage-migrations with 3TiB VDIs, and no test requiring 3TiB allocation
+storage-migrations-large-thick: same as storage-migrations with 3TiB VDIs, and tests requiring 3TiB allocation
 storage-reboots: storage driver tests that involve rebooting hosts (except flaky tests)
+storage-quicktest: runs `quicktest` on all storage drivers
+storage-benchmarks: runs disk benchmark tests
+linstor-main: tests the linstor storage driver, but avoids migrations and reboots
+linstor-migrations: tests migrations with the linstor storage driver
+linstor-reboots: linstor storage driver tests that involve rebooting hosts
+linstor-quicktest: runs `quicktest` on the linstor storage driver`
+largeblock-main: tests the largeblock storage driver. avoids quicktest, migrations and reboots
+largeblock-migrations: a group of tests that need to run on hosts with 4KiB disks and migrates the VDI around
+largeblock-reboots: largeblock storage driver tests that involve rebooting hosts
+largeblock-quicktest: runs `quicktest` on the largeblock storage driver
 sb-main: tests uefistored/varstored and SecureBoot using a small unix VM (or no VM when none needed)
 sb-certificates: tests certificate propagation to disk by XAPI, and to VMs by uefistored/varstored
 sb-windows: tests uefistored/varstored and SecureBoot using a Windows VM
@@ -256,9 +283,15 @@ sb-unix-multi: checks basic Secure-Boot support on a variety of Unix VMs
 sb-windows-multi: checks basic Secure-Boot support on a variety of Windows VMs
 tools-unix: tests our unix guest tools on a single small VM
 tools-unix-multi: tests our unix guest tools on a variety of VMs
+tools-windows: tests our windows guest tools on a variety of VMs
 xen: Testing of the Xen hypervisor itself
 vtpm: Testing vTPM functionalities
 flaky: tests that usually pass, but sometimes fail unexpectedly
+xo: tests that use Xen Orchestra, via xo-cli
+pci-passthrough: Testing PCI passthrough functionalities
+fs-diff: Check for differences between 2 hosts file system
+pool-reboot: Tests centered on pools with join/eject causing reboots
+limit-tests: Tests verifying we can hit our supported limits
 ```
 
 #### Display information about a job
@@ -702,4 +735,4 @@ hosting_pool = "B"
 > * `disabled_repositories` disables one or more repositories during the update. It can be set under `default` or overridden per host, and can also be passed with the `-x/--disablerepo` flag.
 > * `*` as a repository value disables **all** repositories (e.g. `disabled_repositories = ["*"]`).
 >
-> * When `--inventory` flag is present, repos passed to `-e` flag won't be considered.
+> * When `--inventory` flag is present, repos passed to `-e/--enablerepo` and `-x/--disablerepo` flags are added to each host's `repositories` and `disabled_repositories`.

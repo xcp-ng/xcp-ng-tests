@@ -18,13 +18,13 @@ from jobs import VMSDef
 
 # If host version is not specified, the vm filename will be used whatever the host version
 
-# The "multi" element contains a list of VMs per entry
-# "all": ["alpine-minimal-3.12.0.xva",
+# The "multi" element contains a list of VMs per entry, e.g.
+# "all_unix": ["alpine-minimal-3.12.0.xva",
 #         "alpine-uefi-minimal-efitools-3.12.0.xva",
 #         ...],
 
-# Same as "single", a vm can be bound to a given host version:
-# "all": ["alpine-minimal-3.12.0.xva",
+# Same as "single", a vm can be bound to a given host version, e.g.
+# "all_unix": ["alpine-minimal-3.12.0.xva",
 #         ("alpine-uefi-minimal-efitools-3.12.0.xva", r"8\.2\."),
 #         ...],
 
@@ -66,6 +66,9 @@ VMS["multi"]["limits"] = [vm for vm in [
     VMS["single"]["debian_uefi_vm"],
     VMS["single"]["small_vm_windows"],
 ] if vm]
+
+# Construct the list of all VM by merging the "all_unix" and "all_windows" list
+VMS["multi"]["all"] = VMS["multi"]["all_unix"] + VMS["multi"]["all_windows"]
 
 # Example of use for a common XVA_LOCATION
 #

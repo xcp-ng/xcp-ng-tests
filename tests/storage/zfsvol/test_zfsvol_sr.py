@@ -6,19 +6,18 @@ import logging
 
 from lib import config
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, GiB, KiB, MiB, vm_image, wait_for
+from lib.common import MAX_VDI_SIZE, Defer, GiB, KiB, MiB, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
-from lib.vdi import VDI
+from lib.vdi import VDI, ImageFormat
 from lib.vm import VM
 from tests.storage import (
-    MAX_VDI_SIZE,
     CoalesceOperation,
-    ImageFormat,
     XVACompression,
     coalesce_integrity,
     full_vdi_write,
     vdi_export_import,
+    vdi_on_boot_reset,
     xva_export_import,
 )
 
@@ -60,9 +59,9 @@ class TestZfsvolVm:
     @pytest.mark.small_vm
     @pytest.mark.parametrize("vdi_op", ["snapshot"])  # "clone" requires a snapshot
     @pytest.mark.skip("zfsvol doesn't provide vhd-parent")
-    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfsvol_sr: VDI, vdi_op: CoalesceOperation, defer: Defer) \
-            -> None:
-        coalesce_integrity(storage_test_vm, vdi_on_zfsvol_sr, vdi_op, defer)
+    def test_coalesce(self, storage_test_vm: VM, vdi_on_zfsvol_sr: VDI, vdi_op: CoalesceOperation, defer: Defer,
+                      image_format: ImageFormat) -> None:
+        coalesce_integrity(storage_test_vm, vdi_on_zfsvol_sr, vdi_op, defer, image_format)
 
     @pytest.mark.small_vm
     @pytest.mark.disk_throughput_intensive
@@ -80,26 +79,32 @@ class TestZfsvolVm:
     @pytest.mark.small_vm
     @pytest.mark.parametrize("compression", ["none", "gzip", "zstd"])
     def test_xva_export_import(self, vm_on_zfsvol_sr: VM, compression: XVACompression, temp_large_dir: str,
-                               defer: Defer) -> None:
-        if config.write_volume_cap > 20 * GiB:
+                               defer: Defer, image_format: ImageFormat) -> None:
+        if config.write_volume_cap(image_format) > 20 * GiB:
             pytest.skip("Skipping large VDI test (known performance issue)")
-        xva_export_import(vm_on_zfsvol_sr, compression, temp_large_dir, defer)
+        xva_export_import(vm_on_zfsvol_sr, compression, temp_large_dir, defer, image_format)
 
     @pytest.mark.xfail # Failing on Exception "Only snapshots can be cloned!"
     @pytest.mark.small_vm
-    def test_xva_export_import_with_snapshot(self, vm_on_zfsvol_sr: VM, temp_large_dir: str, defer: Defer) -> None:
-        if config.write_volume_cap > 20 * GiB:
+    def test_xva_export_import_with_snapshot(self, vm_on_zfsvol_sr: VM, temp_large_dir: str, defer: Defer,
+                                             image_format: ImageFormat) -> None:
+        if config.write_volume_cap(image_format) > 20 * GiB:
             pytest.skip("Skipping large VDI test (known performance issue)")
-        xva_export_import(vm_on_zfsvol_sr, 'zstd', temp_large_dir, defer, with_snapshot=True)
+        xva_export_import(vm_on_zfsvol_sr, 'zstd', temp_large_dir, defer, image_format, with_snapshot=True)
 
     @pytest.mark.small_vm
     def test_vdi_export_import(self, storage_test_vm: VM, zfsvol_sr: SR, image_format: ImageFormat, temp_large_dir: str,
                                defer: Defer) -> None:
-        if config.write_volume_cap > 20 * GiB:
+        if image_format == 'qcow2' and config.volume_size(image_format) > 20 * GiB:
             pytest.skip("Skipping large VDI test (known performance issue)")
         vm = storage_test_vm
         sr = zfsvol_sr
         vdi_export_import(vm, sr, image_format, temp_large_dir, defer)
+
+    @pytest.mark.small_vm
+    @pytest.mark.skip(reason="not supported (XCPNG-3984)")
+    def test_vdi_on_boot_reset(self, vm_on_zfsvol_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_zfsvol_sr, defer)
 
     # *** tests with reboots (longer tests).
 

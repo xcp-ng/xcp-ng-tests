@@ -3,13 +3,13 @@ import pytest
 import logging
 
 from lib.commands import SSHCommandFailed
-from lib.common import vm_image, wait_for
+from lib.common import Defer, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
-from tests.storage import vdi_is_open
+from tests.storage import vdi_is_open, vdi_on_boot_reset
 
 # Requirements:
 # - one XCP-ng host >= 8.2 with an additional unused disk for the SR
@@ -60,6 +60,10 @@ class TestGlusterFSSR:
         finally:
             if not volume_running:
                 host.ssh('gluster --mode=script volume start vol0')
+
+    @pytest.mark.small_vm
+    def test_vdi_on_boot_reset(self, vm_on_glusterfs_sr: VM, defer: Defer) -> None:
+        vdi_on_boot_reset(vm_on_glusterfs_sr, defer)
 
     # *** tests with reboots (longer tests).
 
