@@ -25,7 +25,7 @@ def host_with_zfsvol(host_with_saved_yum_state_toolstack_restart: Host) -> Gener
 @pytest.fixture(scope='package')
 def zfsvol_sr(host: Host, sr_disk_wiped: str, host_with_zfsvol: Host) -> Generator[SR, None, None]:
     """ A ZFS Volume SR on first host. """
-    device = '/dev/' + sr_disk_wiped
+    device = sr_disk_wiped
     sr = host.sr_create('zfs-vol', "ZFS-local-SR-test", {'device': device})
     yield sr
     # teardown violently - we don't want to require manual recovery when a test fails

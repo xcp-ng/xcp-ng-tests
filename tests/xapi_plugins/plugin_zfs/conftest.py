@@ -22,7 +22,7 @@ def host_with_zfs(host_without_zfs: Host, host_with_saved_yum_state: Host) -> Ge
 
 @pytest.fixture(scope='package')
 def zpool_vol0(sr_disk_wiped: str, host_with_zfs: Host) -> Generator[None, None, None]:
-    host_with_zfs.ssh(f'zpool create -f vol0 /dev/{sr_disk_wiped}')
+    host_with_zfs.ssh(f'zpool create -f vol0 {sr_disk_wiped}')
     yield
     # teardown
     host_with_zfs.ssh('zpool destroy vol0')
