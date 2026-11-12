@@ -5,6 +5,7 @@ import shlex
 from pathlib import Path
 
 from lib import commands
+from lib.commands import SSHCommandFailed
 from lib.host import Host
 
 from typing import Generator
@@ -105,9 +106,12 @@ def test_wget_url(host: Host, url: str, expected_returncode: int) -> None:
 # The server's host key is verified by libssh2 against $HOME/.ssh/known_hosts:
 # HOME points to a temporary directory holding a known_hosts file generated
 # with ssh-keyscan, leaving root's ~/.ssh untouched.
+# A negative test checks that an unknown host key is rejected.
 
 SSH_SCHEMES = ["sftp", "scp"]
 SSH_TEST_FILE = "curl-testfile"
+# "SSL peer certificate or SSH remote key was not OK"
+CURL_ERROR_PEER_FAILED_VERIFICATION = 60
 
 @pytest.fixture(scope="module")
 def ssh_workdir(host: Host) -> Generator[Path, None, None]:
@@ -121,6 +125,19 @@ def ssh_workdir(host: Host) -> Generator[Path, None, None]:
         yield workdir
     finally:
         host.ssh(f"rm -rf {workdir}")
+
+@pytest.fixture(scope="module")
+def untrusted_home(host: Host, ssh_workdir: Path) -> Generator[Path, None, None]:
+    # known_hosts only holds a freshly generated key, which can't match the server's one
+    home = ssh_workdir / "untrusted-home"
+    fake_key = home / "fake_host_key"
+    try:
+        host.ssh(f"mkdir -p -m 700 {home / '.ssh'}")
+        host.ssh(f"ssh-keygen -q -t ed25519 -N '' -f {fake_key}")
+        host.ssh(f"echo \"127.0.0.1 $(cat {fake_key}.pub)\" > {home / '.ssh/known_hosts'}")
+        yield home
+    finally:
+        host.ssh(f"rm -rf {home}")
 
 def _curl_ssh(host: Host, home: Path, args: str) -> None:
     credentials = shlex.quote(f"root:{host.password}")
@@ -142,3 +159,12 @@ def test_curl_ssh_upload(host: Host, ssh_workdir: Path, scheme: str) -> None:
     uploaded = ssh_workdir / f"uploaded-{scheme}"
     _curl_ssh(host, ssh_workdir, f"--upload-file {source} {_ssh_url(scheme, uploaded)}")
     assert host.sha256sum(uploaded) == host.sha256sum(source)
+
+@pytest.mark.parametrize("scheme", SSH_SCHEMES)
+def test_curl_ssh_unknown_host_key_rejected(host: Host, ssh_workdir: Path, untrusted_home: Path,
+                                            scheme: str) -> None:
+    source = ssh_workdir / SSH_TEST_FILE
+    rejected = ssh_workdir / f"rejected-{scheme}"
+    with pytest.raises(SSHCommandFailed) as excinfo:
+        _curl_ssh(host, untrusted_home, f"--output {rejected} {_ssh_url(scheme, source)}")
+    assert excinfo.value.returncode == CURL_ERROR_PEER_FAILED_VERIFICATION
