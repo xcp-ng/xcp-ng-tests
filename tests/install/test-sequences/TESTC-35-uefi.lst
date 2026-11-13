@@ -1,0 +1,5 @@
+tests/install/test.py::TestNested::test_install[uefi-830-iso-ext]
+tests/install/test.py::TestNested::test_tune_firstboot[None-uefi-830-host1-iso-ext]
+tests/install/test.py::TestNested::test_boot_inst[uefi-830-host1-iso-ext]
+tests/install/test.py::TestNested::test_upgrade[uefi-830-83nightly-host1-iso-ext]
+tests/install/test.py::TestNested::test_boot_upg[uefi-830-83nightly-host1-iso-ext]
