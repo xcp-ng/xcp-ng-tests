@@ -101,6 +101,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
                     help="How S-A triggers the StorPort reset: disk TimeOutValue expiry, or IOCTL_STORAGE_RESET_DEVICE")
     group.addoption("--repro-artifacts", default="repro-artifacts",
                     help="Directory for log slices, guest JSON/ledgers and evidence (a timestamped subdir per session)")
+    group.addoption("--repro-installed-tdtest", action="store_true", default=False,
+                    help="The host's blktap package is a tdtest build: the live tapdisk must equal --repro-tapdisk; "
+                         "no stock copy and no swap windows")
     group.addoption("--repro-run-shutdown", action="store_true", default=False,
                     help="Also run the optional, observation-only S-D shutdown-with-held-read test")
 
@@ -159,6 +162,7 @@ def repro_options(pytestconfig: pytest.Config) -> ReproOptions:
         reset=str(pytestconfig.getoption("--repro-reset")),
         artifacts=artifacts,
         run_shutdown=bool(pytestconfig.getoption("--repro-run-shutdown")),
+        installed_tdtest=bool(pytestconfig.getoption("--repro-installed-tdtest")),
     )
 
 
@@ -211,7 +215,8 @@ def tdtest_deployed(test_host_guard: ReproHost, repro_options: ReproOptions) -> 
     """Upload the tdtest artifacts once, after recording the host baseline and securing a stock copy."""
     host = test_host_guard.host
     try:
-        deployment = deploy_tdtest(host, repro_options.tapdisk, repro_options.tdtest_ctl)
+        deployment = deploy_tdtest(host, repro_options.tapdisk, repro_options.tdtest_ctl,
+                                     installed=repro_options.installed_tdtest)
     except TdtestSafetyError as e:
         pytest.exit(f"STOP: {e}", returncode=3)
     deployment.save(repro_options.artifacts / "tdtest-deployment.json")

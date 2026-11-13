@@ -129,6 +129,7 @@ class ReproOptions:
     reset: str
     artifacts: Path
     run_shutdown: bool
+    installed_tdtest: bool = False
 
 
 @dataclass

@@ -251,6 +251,7 @@ class TdtestDeployment:
     ctl_sha256: str
     baseline: dict[str, str]
     swap_windows: list[dict[str, object]] = field(default_factory=list)
+    installed: bool = False  # the system tapdisk already is the tdtest binary (no swap windows)
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -283,12 +284,15 @@ def _rpm_v_flags(rpm_v: str, path: str) -> str | None:
     return None
 
 
-def deploy_tdtest(host: Host, tapdisk_local: Path, ctl_local: Path) -> TdtestDeployment:
+def deploy_tdtest(host: Host, tapdisk_local: Path, ctl_local: Path, installed: bool = False) -> TdtestDeployment:
     """
     Upload the tdtest artifacts to /root/tdtest/ and keep a verified stock copy of the live tapdisk.
 
     Refuses (TdtestSafetyError) if the live tapdisk does not match the RPM, unless it equals the recorded
     stock hash, or if a previously saved stock copy no longer matches the live binary.
+
+    installed=True: the blktap package on the host is itself a tdtest build, so the live tapdisk must equal
+    the supplied tdtest binary and match the RPM. There is no stock copy and no swap window.
     """
     baseline = record_baseline(host)
     live_sha = baseline["sha256_live_tapdisk"]
@@ -298,6 +302,19 @@ def deploy_tdtest(host: Host, tapdisk_local: Path, ctl_local: Path) -> TdtestDep
     modified = flags is not None and (flags == "missing" or any(c in flags for c in "S5M"))
 
     host.ssh(f"mkdir -p {TDTEST_DIR} && chmod 700 {TDTEST_DIR}")
+    if installed:
+        if modified:
+            raise TdtestSafetyError(f"{LIVE_BIN} does not match the blktap RPM (rpm -V: {flags}); check the host by hand")
+        tdtest_sha = _upload_verified(host, tapdisk_local, TDTEST_BIN)
+        ctl_sha = _upload_verified(host, ctl_local, TDTEST_CTL)
+        if tdtest_sha != live_sha:
+            raise TdtestSafetyError(
+                f"installed-tdtest mode: the live {LIVE_BIN} ({live_sha}) is not the supplied tdtest tapdisk ({tdtest_sha})"
+            )
+        record = json.dumps({**baseline, "stock_sha256": None, "tdtest_sha256": tdtest_sha, "ctl_sha256": ctl_sha,
+                             "installed": True}, indent=2)
+        _write_host_file(host, f"{TDTEST_DIR}/baseline-{time.strftime('%Y%m%d-%H%M%S')}.json", record)
+        return TdtestDeployment(live_sha, tdtest_sha, ctl_sha, baseline, installed=True)
     has_stock = host.ssh_with_result(f"test -f {STOCK_BIN}").returncode == 0
     if has_stock:
         stock_sha = host_sha256(host, STOCK_BIN)
@@ -377,6 +394,10 @@ def swap_window(host: Host, deployment: TdtestDeployment, label: str = "") -> Ge
     Tapdisks spawned inside the window (normally only the test VBD's) run the patched but inert binary.
     The stock binary is restored in `finally` and its sha256 is checked; failure raises TapdiskRestoreError.
     """
+    if deployment.installed:
+        host_log(host, f"no swap window (tdtest tapdisk is installed) {label}")
+        yield
+        return
     record: dict[str, object] = {"label": label}
     host_log(host, f"swap-window begin {label}")
     record["begin"] = host_now(host)
