@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lib.common import Defer, vm_image, wait_for
+from lib.common import InterruptShield, vm_image, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vdi import VDI, ImageFormat
@@ -50,8 +50,8 @@ class TestLARGEBLOCKSR:
         vm.shutdown(verify=True)
 
     @pytest.mark.small_vm
-    def test_vdi_on_boot_reset(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
-        vdi_on_boot_reset(vm_on_largeblock_sr, defer)
+    def test_vdi_on_boot_reset(self, vm_on_largeblock_sr: VM, interrupt_shield: InterruptShield) -> None:
+        vdi_on_boot_reset(vm_on_largeblock_sr, interrupt_shield)
 
     # *** tests with reboots (longer tests).
 

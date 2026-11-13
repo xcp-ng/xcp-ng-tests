@@ -2,7 +2,7 @@ import pytest
 
 import subprocess
 
-from lib.common import Defer
+from lib.common import InterruptShield
 from lib.host import Host
 
 # This smoke test runs xen-bugtool and verifies that the archive it generates
@@ -18,9 +18,10 @@ def verify_contains(host: Host, archive: str, files: list[str]) -> None:
 
 class TestsBugtool:
     # Verify a minimal bugtool invocation that only queries certain capabilities
-    def test_bugtool_entries(self, host: Host, defer: Defer) -> None:
-        filename = host.ssh('xen-bugtool -y -s --entries=xenserver-logs,xenserver-databases,system-logs')
-        defer(lambda: host.ssh(f'rm -f {filename}'))
+    def test_bugtool_entries(self, host: Host, interrupt_shield: InterruptShield) -> None:
+        with interrupt_shield() as defer:
+            filename = host.ssh('xen-bugtool -y -s --entries=xenserver-logs,xenserver-databases,system-logs')
+            defer(lambda: host.ssh(f'rm -f {filename}'))
         verify_contains(host, filename,
                         [
                             "var/log/xensource.log",
@@ -29,9 +30,10 @@ class TestsBugtool:
                         ])
 
     # Verify that a full xen-bugtool invocation contains the most essential files
-    def test_bugtool_all(self, host: Host, defer: Defer) -> None:
-        filename = host.ssh('xen-bugtool -y -s')
-        defer(lambda: host.ssh(f'rm -f {filename}'))
+    def test_bugtool_all(self, host: Host, interrupt_shield: InterruptShield) -> None:
+        with interrupt_shield() as defer:
+            filename = host.ssh('xen-bugtool -y -s')
+            defer(lambda: host.ssh(f'rm -f {filename}'))
         verify_contains(host, filename,
                         [
                             "var/log/xensource.log",

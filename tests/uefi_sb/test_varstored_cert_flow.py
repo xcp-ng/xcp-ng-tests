@@ -2,7 +2,7 @@ import pytest
 
 import logging
 
-from lib.common import Defer, wait_for
+from lib.common import InterruptShield, wait_for
 from lib.efi import EFIAuth
 from lib.host import Host
 from lib.snapshot import Snapshot
@@ -70,12 +70,13 @@ class TestVMCertMisc:
         # Revert the VM, which has the interesting effect of also shutting it down instantly
         revert_vm_state(vm, snapshot)
 
-    def test_snapshot_revert_restores_certs(self, uefi_vm: VM, defer: Defer) -> None:
+    def test_snapshot_revert_restores_certs(self, uefi_vm: VM, interrupt_shield: InterruptShield) -> None:
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
-        snapshot = vm.snapshot()
-        defer(lambda: snapshot.destroy())
+        with interrupt_shield() as defer:
+            snapshot = vm.snapshot()
+            defer(lambda: snapshot.destroy())
         # clear all certs
         vm.set_uefi_setup_mode()
         snapshot.revert()
@@ -83,15 +84,17 @@ class TestVMCertMisc:
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm, key, vm_auths[key].auth())
 
-    def test_vm_import_restores_certs(self, uefi_vm: VM, formatted_and_mounted_ext4_disk: str, defer: Defer) -> None:
+    def test_vm_import_restores_certs(self, uefi_vm: VM, formatted_and_mounted_ext4_disk: str,
+                                      interrupt_shield: InterruptShield) -> None:
         vm = uefi_vm
         vm_auths = generate_keys(as_dict=True)
         vm.install_uefi_certs([vm_auths[key] for key in ['PK', 'KEK', 'db', 'dbx']])
         filepath = formatted_and_mounted_ext4_disk + '/test-export-with-uefi-certs.xva'
-        vm.export(filepath, 'zstd')
-        defer(lambda: vm.host.ssh('rm -f {filepath}', check=False))
-        vm2 = vm.host.import_vm(filepath)
-        defer(lambda: vm2.destroy())
+        with interrupt_shield() as defer:
+            vm.export(filepath, 'zstd')
+            defer(lambda: vm.host.ssh('rm -f {filepath}', check=False))
+            vm2 = vm.host.import_vm(filepath)
+            defer(lambda: vm2.destroy())
         logging.info("Check that the VM certs were imported with the VM")
         for key in ['PK', 'KEK', 'db', 'dbx']:
             check_vm_cert_md5sum(vm2, key, vm_auths[key].auth())

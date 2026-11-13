@@ -4,7 +4,7 @@ import logging
 import time
 
 from lib.commands import SSHCommandFailed
-from lib.common import Defer, vm_image, wait_for
+from lib.common import InterruptShield, vm_image, wait_for
 from lib.host import Host
 from lib.pool import Pool
 from lib.sr import SR
@@ -83,8 +83,8 @@ class TestMooseFSSR:
                 host.yum_install(['moosefs-client'])
 
     @pytest.mark.small_vm
-    def test_vdi_on_boot_reset(self, vm_on_moosefs_sr: VM, defer: Defer) -> None:
-        vdi_on_boot_reset(vm_on_moosefs_sr, defer)
+    def test_vdi_on_boot_reset(self, vm_on_moosefs_sr: VM, interrupt_shield: InterruptShield) -> None:
+        vdi_on_boot_reset(vm_on_moosefs_sr, interrupt_shield)
 
     # *** tests with reboots (longer tests).
 
