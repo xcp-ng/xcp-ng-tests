@@ -112,6 +112,26 @@ def host_ntpconf(host: Host) -> NtpService:
     # support only chrony
     return Chrony(host, "/etc/chrony.conf")
 
+def defer_ntp_restore(host: Host, defer: Defer) -> None:
+    mode = host_ntp_mode(host)
+    servers = host_ntp_custom_servers(host)
+
+    def restore() -> None:
+        target = mode
+        if target == NtpMode.Custom and not servers:
+            # xapi may set this up on first boot, but refuses to set it back
+            logging.warning("Can't restore ntp-mode Custom without custom servers: falling back to Factory")
+            target = NtpMode.Factory
+        # Custom mode can't have empty custom servers: set them before entering Custom, clear them after leaving it
+        if target == NtpMode.Custom:
+            host_ntp_custom_servers(host, servers)
+            host_ntp_mode(host, target)
+        else:
+            host_ntp_mode(host, target)
+            host_ntp_custom_servers(host, servers)
+
+    defer(restore)
+
 @pytest.mark.no_vm
 class TestNtpMode:
 
@@ -119,11 +139,8 @@ class TestNtpMode:
         """
         Test that mode -> newmode -> mode is idempotent
         """
-        initial_mode = host_ntp_mode(host)
-        defer(lambda: host_ntp_mode(host, initial_mode))
-
-        previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
-        defer(lambda: host_ntp_custom_servers(host, previous_servers))
+        defer_ntp_restore(host, defer)
+        host_ntp_custom_servers(host, TEST_NTP_SERVERS)
 
         for mode1 in NtpMode:
             for mode2 in NtpMode:
@@ -144,8 +161,8 @@ class TestNtpMode:
         """
         Test for ntp-mode=Factory
         """
-        previous = host_ntp_mode(host, NtpMode.Factory)
-        defer(lambda: host_ntp_mode(host, previous))
+        defer_ntp_restore(host, defer)
+        host_ntp_mode(host, NtpMode.Factory)
 
         factory_defaults = host_xapi_factory_ntp_servers(host)
         logging.debug(f"Default factory servers: {factory_defaults}")
@@ -169,8 +186,8 @@ class TestNtpMode:
         """
         Test for ntp-mode=DHCP
         """
-        previous = host_ntp_mode(host, NtpMode.DHCP)
-        defer(lambda: host_ntp_mode(host, previous))
+        defer_ntp_restore(host, defer)
+        host_ntp_mode(host, NtpMode.DHCP)
 
         ntpconf = host_ntpconf(host)
 
@@ -187,11 +204,9 @@ class TestNtpMode:
         """
         Test for ntp-mode=Custom
         """
-        previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
-        defer(lambda: host_ntp_custom_servers(host, previous_servers))
-
-        previous = host_ntp_mode(host, NtpMode.Custom)
-        defer(lambda: host_ntp_mode(host, previous))
+        defer_ntp_restore(host, defer)
+        host_ntp_custom_servers(host, TEST_NTP_SERVERS)
+        host_ntp_mode(host, NtpMode.Custom)
 
         ntpconf = host_ntpconf(host)
 
@@ -210,8 +225,8 @@ class TestNtpMode:
         """
         Test for ntp-mode=Disabled
         """
-        previous = host_ntp_mode(host, NtpMode.Disabled)
-        defer(lambda: host_ntp_mode(host, previous))
+        defer_ntp_restore(host, defer)
+        host_ntp_mode(host, NtpMode.Disabled)
 
         ntpconf = host_ntpconf(host)
 
