@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import logging
+import re
 import uuid
 from dataclasses import asdict
 
@@ -79,6 +80,9 @@ class TestReproSmoke:
         disconnects = log.wait_for(TD_RE_DISCONNECT_PENDING, timeout=60,
                                    what="tapdisk disconnect from ring with N pending requests")
         faked = [int(m["faked"]) for m in disables]
+        # R1 in the base (D445-hooks): BlkifRingDisable only defers (`deferred=N`, faked is always 0); the fakes
+        # are logged at the disconnect.
+        deferred = [int(d.group(1)) for m in disables if (d := re.search(r"\bdeferred=(\d+)", m.group(0)))]
         pending = [int(m["n"]) for m in disconnects]
 
         recover = bs.write_sync(2, W_RECOVER)
@@ -87,13 +91,16 @@ class TestReproSmoke:
         ev.host = {
             "resets": [m.group(0) for _, m in matching(XENVBD_RE_RESET, log.lines)],
             "faked": faked,
+            "deferred": deferred,
             "disconnect_pending": pending,
         }
         ev.guest = {"held_write": held.raw, "recover_write": recover.raw, "recover_verify": recover_verify.counts}
         repro.save_json("evidence.json", asdict(ev))
         logging.info("reset observed: faked=%s pending=%s held write status=%s err=%s", faked, pending,
                      held.status, held.win32err)
-        assert any(n > 0 for n in faked), f"BlkifRingDisable never faked a request: {faked}"
+        assert any(n > 0 for n in faked + deferred), (
+            f"BlkifRingDisable neither faked nor deferred a request: faked={faked} deferred={deferred}"
+        )
         assert any(n > 0 for n in pending), f"tapdisk never disconnected with pending requests: {pending}"
         assert repro.vm.is_ssh_up()
         assert recover.status == "OK" and recover_verify.ok, "the guest did not recover after the reset"
