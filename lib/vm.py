@@ -799,8 +799,9 @@ class VM(BaseVM):
         session = f"detached-cat-{self.uuid}"
         ret = False
         # The screen package installation is broken on el10, see https://bugzilla.redhat.com/show_bug.cgi?id=2385964
-        if res_host.xcp_version.major == 9 and not res_host.ssh('ls -ld /run/screen').startswith('drwxrwxrwx'):
-            res_host.ssh('dnf reinstall -y screen')
+        # Restore the binary's packaged setgid group, without needing the package in a repo.
+        if res_host.xcp_version.major == 9:
+            res_host.ssh('rpm --setugids screen && rpm --setperms screen')
         try:
             res_host.ssh(f'screen -dmS {session}')
             # run `cat` on the pty in a background screen session and redirect to a tmp file.
