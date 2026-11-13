@@ -41,7 +41,7 @@ class TestSDShutdownWithHeldRead:
         def settled() -> bool:
             return vm.is_halted() or (vm.is_running() and vm.param_get("dom-id") not in (domid, "-1"))
 
-        wait_for(settled, "Wait for the guest to halt (or to restart after a crash)", timeout_secs=600,
+        wait_for(settled, "Wait for the guest to halt (or to restart after a crash)", timeout_secs=300,
                  retry_delay_secs=5)
         elapsed = time.monotonic() - t0
         state = vm.power_state()
