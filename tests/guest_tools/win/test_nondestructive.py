@@ -12,6 +12,9 @@ from lib.windows import (
     vif_has_rss,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
+from lib.windows.guest_tools import check_vm_driver_versions
+
+from typing import Any
 
 # Requirements:
 # - XCP-ng >= 8.2.
@@ -48,12 +51,11 @@ from lib.windows import (
 #   │   └───managementagent-9.4.0-x64.msi
 #   ├───xcp-ng-8.2.2.200
 #   │   └───managementagentx64.msi
-#   ├───xcp-ng-9.0.9000
-#   │   ├───package
-#   │   │   └───XenDrivers-x64.msi
-#   │   └───testsign
-#   │       └───*.crt
-#   └───install-drivers.ps1
+#   └───xcp-ng-9.0.9000
+#       ├───package
+#       │   └───XenDrivers-x64.msi
+#       └───testsign
+#           └───*.crt
 
 
 @pytest.mark.multi_vms
@@ -84,7 +86,9 @@ class TestGuestToolsWindowsNondestructive:
         for vif in vifs:
             assert vif_has_rss(vif)
 
-    def test_reporting_after_xeniface_disable(self, vm_install_test_tools_per_test_class: VM) -> None:
+    def test_reporting_after_xeniface_disable(
+        self, vm_install_test_tools_per_test_class: VM, guest_tools_iso: dict[str, Any]
+    ) -> None:
         vm = vm_install_test_tools_per_test_class
         for _iter in range(3):
             logging.info("Disable Xeniface")
@@ -92,15 +96,19 @@ class TestGuestToolsWindowsNondestructive:
             vm.xenstore_rm("data/os_distro", accept_unknown_key=True)
             logging.info("Enable Xeniface")
             vm.execute_powershell_script(r'Enable-PnpDevice "XENBUS\VEN_XN&DEV_IFACE\_" -Confirm:$false')
+            check_vm_driver_versions(vm, guest_tools_iso)
             check_vm_distro(vm)
             check_vm_clipboard(vm)
 
-    def test_reporting_after_migration(self, vm_install_test_tools_per_test_class: VM) -> None:
+    def test_reporting_after_migration(
+        self, vm_install_test_tools_per_test_class: VM, guest_tools_iso: dict[str, Any]
+    ) -> None:
         vm = vm_install_test_tools_per_test_class
         residence = vm.get_residence_host()
         for _iter in range(3):
             vm.migrate(residence)
             wait_for_vm_running_and_ssh_up_without_tools(vm)
+            check_vm_driver_versions(vm, guest_tools_iso)
             check_vm_distro(vm)
             check_vm_clipboard(vm)
 
