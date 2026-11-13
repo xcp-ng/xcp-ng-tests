@@ -265,6 +265,11 @@ class TestLinstorSR:
             host.yum_install(['xcp-ng-linstor'])
             linstor_installed = True
 
+            # Needed because the `xcp-ng-linstor` package provides a systemd
+            # drop-in that is required to start the LINSTOR satellite since the
+            # LINSTOR v1.35.3 update.
+            host.ssh("systemctl start linstor-satellite")
+
             # Needed because the linstor driver is not in the xapi
             # sm-plugins list because xcp-ng-linstor RPM has been
             # removed by the `yum remove ...` call.
