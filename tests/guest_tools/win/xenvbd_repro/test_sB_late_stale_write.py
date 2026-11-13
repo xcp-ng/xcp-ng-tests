@@ -31,7 +31,7 @@ class TestSBLateStaleWrite:
 
     def test_sB_late_stale_write(self, repro: ReproContext) -> None:
         bs, log = repro.bs, repro.log
-        hold_ms = HOLD_MS_GATED if repro.variant.r3 else HOLD_MS
+        hold_ms = HOLD_MS_GATED if repro.variant.gated else HOLD_MS
 
         bs.fill(1, W_SB)
         repro.tdtest(write_hold_ms=hold_ms, write_hold_max=1, **tdtest_lba_window("write_hold", W_SB),
@@ -94,7 +94,7 @@ class TestSBLateStaleWrite:
             "verify_counts": verify.counts,
             "verify_problems": problems_summary(verify, W_SB, ("STALE", "MISDIRECTED", "CRC", "UNWRITTEN")),
         }
-        if repro.variant.r3:
+        if repro.variant.gated:
             ev.notes.append(f"R3' guest stall: gen3 write took {gen3.raw.get('durationMs')} ms, "
                             f"{ev.host['resets']} reset(s)")
         if crc_match is None:

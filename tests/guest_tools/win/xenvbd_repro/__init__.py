@@ -70,13 +70,20 @@ BANNER_FOR_BUILD = {"D0": "D0-hooks"}
 
 @dataclass(frozen=True)
 class Variant:
-    """--repro-variant: `<build>[+R1][+R2][+R3]`, e.g. D0, D0-legacy, D0+R1, D0+R2+R3, D2-r4."""
+    """
+    --repro-variant: `<build>[+R1][+R2][+R3][+dev]`, e.g. D0, D0-legacy, D0+R1, D0+R2+R3, D2-r4, D0+dev.
+
+    `+dev` is for a tapdisk built from blktap `dev` plus the tdtest fixtures: R2 and R3 are built in, so no
+    tdtest fix_* key is sent (that tapdisk's config parser rejects them), and the gated hold is used because the
+    real R3 also holds the new ring back until the dead ring drains (it refuses the connect with EBUSY).
+    """
 
     label: str
     build: str
     r1: bool = False
     r2: bool = False
     r3: bool = False
+    dev: bool = False
 
     @classmethod
     def parse(cls, label: str) -> Variant:
@@ -84,10 +91,10 @@ class Variant:
         if not tokens:
             raise ValueError("empty variant label")
         fixes = {t.upper().rstrip("'") for t in tokens[1:]}
-        unknown = fixes - {"R1", "R2", "R3"}
+        unknown = fixes - {"R1", "R2", "R3", "DEV"}
         if unknown:
             raise ValueError(f"unknown remediation(s) {sorted(unknown)} in variant {label!r}")
-        return cls(label, tokens[0], "R1" in fixes, "R2" in fixes, "R3" in fixes)
+        return cls(label, tokens[0], "R1" in fixes, "R2" in fixes, "R3" in fixes, "DEV" in fixes)
 
     @property
     def legacy(self) -> bool:
@@ -97,7 +104,14 @@ class Variant:
     def expected_banner(self) -> str:
         return BANNER_FOR_BUILD.get(self.build, self.build)
 
+    @property
+    def gated(self) -> bool:
+        """The new ring is held back until the dead ring drains (tdtest R3', or the real R3 built into dev)."""
+        return self.r3 or self.dev
+
     def tdtest_fixes(self) -> dict[str, int]:
+        if self.dev:
+            return {}
         return {"fix_dead_intake": int(self.r2), "fix_gate_new_ring": int(self.r3)}
 
     def xenvbd_knobs(self) -> dict[str, int]:
@@ -291,9 +305,36 @@ def problems_summary(result: BlockstampResult, window: Window, classes: tuple[st
     ]
 
 
+DEV_RE_REFUSE = re.compile(r"refusing to connect")
+DEV_RE_RETRY = re.compile(r"will retry")
+DEV_RE_RETRIED = re.compile(r"after retrying")
+DEV_RE_DEAD_INTAKE = re.compile(r"\bev=dead-intake\b")
+DEV_RE_DEAD_KICK = re.compile(r"\bev=dead-kick\b")
+DEV_DEAD_KICK_OK = "skipped=chkrng-unregistered"
+
+
+def dev_fix_evidence(lines: list[str]) -> dict[str, Any]:
+    """
+    Evidence that the fixes built into blktap `dev` acted (variant `+dev`): tapdisk refused the connect while a
+    dead ring drained (R3), tapback retried it (needs dev's tapback), no dead-ring intake (R2), and every
+    dead-ring kick skipped because the events were unregistered (R2). Recorded, not asserted.
+    """
+    kicks = [line for line in lines if DEV_RE_DEAD_KICK.search(line)]
+    return {
+        "refusing_to_connect": [line for line in lines if DEV_RE_REFUSE.search(line)][:10],
+        "tapback_will_retry": [line for line in lines if DEV_RE_RETRY.search(line)][:10],
+        "tapback_after_retrying": [line for line in lines if DEV_RE_RETRIED.search(line)][:10],
+        "dead_intake_count": sum(1 for line in lines if DEV_RE_DEAD_INTAKE.search(line)),
+        "dead_kicks": len(kicks),
+        "dead_kicks_not_skipped": [line for line in kicks if DEV_DEAD_KICK_OK not in line][:10],
+    }
+
+
 def conclude(ctx: ReproContext, ev: Evidence) -> None:
     """Save the evidence next to the log slice and assert according to --repro-expect."""
     ctx.log.refresh()
+    if ctx.variant.dev:
+        ev.host["dev_fix"] = dev_fix_evidence(ctx.log.lines)
     ev.paths["log_slice"] = ", ".join(str(p) for p in ctx.log.save())
     ev.paths["artifacts"] = str(ctx.artifacts)
     ev.host.setdefault("banner", ctx.guest.banner)

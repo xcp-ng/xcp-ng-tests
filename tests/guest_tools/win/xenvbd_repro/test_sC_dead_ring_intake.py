@@ -40,7 +40,7 @@ class TestSCDeadRingIntake:
         if repro.variant.legacy:
             pytest.skip("legacy drivers reuse the ring after a reset: there is no dead ring to take requests from")
         bs, log = repro.bs, repro.log
-        hold_ms = HOLD_MS_GATED if repro.variant.r3 else HOLD_MS
+        hold_ms = HOLD_MS_GATED if repro.variant.gated else HOLD_MS
 
         for w in (W_SC1, W_SC2, W_SC3):
             bs.fill(1, w)
@@ -135,7 +135,7 @@ class TestSCMisdirectedWrite:
         if repro.variant.legacy:
             pytest.skip("legacy drivers reuse the ring after a reset: there is no dead ring to take requests from")
         bs, log = repro.bs, repro.log
-        hold_ms = HOLD_MS_GATED if repro.variant.r3 else HOLD_MS
+        hold_ms = HOLD_MS_GATED if repro.variant.gated else HOLD_MS
 
         for w in (W_SC1, W_SC2, W_SC3):
             bs.fill(1, w)
