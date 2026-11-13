@@ -980,6 +980,9 @@ class Host:
     def is_symlink(self, filepath: str) -> bool:
         return self.ssh_with_result(f'test -L {filepath}').returncode == 0
 
+    def sha256sum(self, filepath: str | os.PathLike[str]) -> str:
+        return self.ssh(f'sha256sum {filepath}').split()[0]
+
     def sr_create(self, sr_type: str, label: str, device_config: dict[str, str], shared: bool = False,
                   verify: bool = False) -> SR:
         params: XeParams = {
