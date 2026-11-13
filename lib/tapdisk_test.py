@@ -59,6 +59,8 @@ UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 # Python `re`. `{pids}` / `{domids}` are `|`-joined lists of integers.
 TAPDISK_IDENT_ERE = r"tapdisk\[({pids})\]: "
 QEMU_IDENT_ERE = r"qemu-dm-({domids})\["
+# tapback lines about the test tapdisk only: `tapback[N]: frontend.c:245 <devid> tapdisk[<pid>] minor=...`
+TAPBACK_IDENT_ERE = r"tapback\[[0-9]+\]: [^ ]+ [0-9]+ tapdisk\[({pids})\] "
 REPRO_TAG_ERE = r"xcpng-repro(\[[0-9]+\])?: "
 
 # tdtest control lines (the exact formats are in blktap's TDTEST.md). The trailing space after `seq=<seq>` is
@@ -704,7 +706,8 @@ class LogSlice:
     """
     Slice of the host log between BEGIN and END markers, restricted to the test VM and test tapdisk.
 
-    Only lines from `tapdisk[<test pid>]`, `qemu-dm-<test domid>[` and the `xcpng-repro` tag are ever
+    Only lines from `tapdisk[<test pid>]`, tapback lines naming that tapdisk, `qemu-dm-<test domid>[` and the
+    `xcpng-repro` tag are ever
     collected (the filter runs on the host), so other VMs' lines never leave the host. The VM's domid
     changes on every reboot, so `domid_fn` is called again on every refresh and all domids seen are kept.
     """
@@ -748,6 +751,7 @@ class LogSlice:
         parts = [REPRO_TAG_ERE]
         if self.pids:
             parts.append(TAPDISK_IDENT_ERE.format(pids="|".join(str(p) for p in sorted(self.pids))))
+            parts.append(TAPBACK_IDENT_ERE.format(pids="|".join(str(p) for p in sorted(self.pids))))
         if self.domids:
             parts.append(QEMU_IDENT_ERE.format(domids="|".join(str(d) for d in sorted(self.domids))))
         return "|".join(f"({p})" for p in parts)
