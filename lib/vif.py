@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import XeObject, XeParams
 from lib.network import Network
 
 from typing import TYPE_CHECKING, Literal, overload
@@ -12,34 +12,14 @@ if TYPE_CHECKING:
     from lib.vm import VM
 
 
-class VIF:
+class VIF(XeObject):
     xe_prefix = "vif"
     uuid: str
     vm: VM
 
     def __init__(self, uuid: str, vm: VM):
-        self.uuid = uuid
+        super().__init__(vm.host, uuid)
         self.vm = vm
-
-    def param_get(self, param_name: str, key: str | None = None, accept_unknown_key: bool = False) -> str | None:
-        return _param_get(self.vm.host, VIF.xe_prefix, self.uuid,
-                          param_name, key, accept_unknown_key)
-
-    def param_set(self, param_name: str, value: str, key: str | None = None) -> None:
-        _param_set(self.vm.host, VIF.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
-        _param_add(self.vm.host, VIF.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_clear(self, param_name: str) -> None:
-        _param_clear(self.vm.host, VIF.xe_prefix, self.uuid,
-                     param_name)
-
-    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
-        _param_remove(self.vm.host, VIF.xe_prefix, self.uuid,
-                      param_name, key, accept_unknown_key)
 
     def device_id(self) -> str:
         """ Build the identifier that will allow to grep for the VIF's interrupts. """

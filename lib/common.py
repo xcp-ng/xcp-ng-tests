@@ -24,6 +24,8 @@ import requests
 from passlib.hash import sha512_crypt
 from pydantic import TypeAdapter
 
+from lib import commands
+
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -54,6 +56,110 @@ _SYMBOLIC_SIZES: dict[str, int] = {
     'VHD_MAX': VHD_MAX,
     'QCOW2_MAX': QCOW2_MAX,
 }
+
+class XeObject:
+    xe_prefix: str  # must be set by subclasses
+    xe_host: Host
+    uuid: str
+
+    def __init_subclass__(
+        cls,
+        **kwargs: Any, # noqa (any-type)
+    ):
+        super().__init_subclass__(**kwargs)
+        if not isinstance(getattr(cls, "xe_prefix", None), str):
+            raise TypeError(f"{cls.__name__} must define a str 'xe_prefix'")
+
+    # ----------------------------------------------------------------
+    def __init__(self, host: Host, uuid: str):
+        self.xe_host = host
+        self.uuid = uuid
+
+    # ----------------------------------------------------------------
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.xe_prefix}, uuid={self.uuid!r})'
+
+    # ----------------------------------------------------------------
+    @overload
+    def param_get(
+        self, param_name: str, key: str | None = ..., accept_unknown_key: Literal[False] = ...
+    ) -> str:
+        ...
+
+    @overload
+    def param_get(
+        self, param_name: str, key: str | None = ..., accept_unknown_key: Literal[True] = ...
+    ) -> str | None:
+        ...
+
+    @overload
+    def param_get(
+        self, param_name: str, key: str | None = ..., accept_unknown_key: bool = ...
+    ) -> str | None:
+        ...
+
+    def param_get(
+        self, param_name: str, key: str | None = None, accept_unknown_key: bool = False
+    ) -> str | None:
+        args: XeParams = {
+            'uuid': self.uuid,
+            'param-name': param_name,
+        }
+        if key is not None:
+            args['param-key'] = key
+        try:
+            value = self.xe_host.xe(f'{self.xe_prefix}-param-get', args)
+        except commands.SSHCommandFailed as e:
+            if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
+                value = None
+            else:
+                raise
+        return value
+
+    # ----------------------------------------------------------------
+    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
+        if key is not None:
+            param_name = f'{param_name}:{key}'
+
+        args: XeParams = {
+            'uuid': self.uuid,
+            param_name: value,
+        }
+
+        self.xe_host.xe(f'{self.xe_prefix}-param-set', args)
+
+    # ----------------------------------------------------------------
+    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
+        param_key = f'{key}={value}' if key is not None else value
+        args: XeParams = {
+            'uuid': self.uuid,
+            'param-name': param_name,
+            'param-key': param_key,
+        }
+        self.xe_host.xe(f'{self.xe_prefix}-param-add', args)
+
+    # ----------------------------------------------------------------
+    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
+        import lib.commands as commands
+        args: XeParams = {
+            'uuid': self.uuid,
+            'param-name': param_name,
+            'param-key': key,
+        }
+        try:
+            self.xe_host.xe(f'{self.xe_prefix}-param-remove', args)
+        except commands.SSHCommandFailed as e:
+            if not accept_unknown_key or e.stdout != "Error: Key %s not found in map" % key:
+                raise
+
+    # ----------------------------------------------------------------
+    def param_clear(self, param_name: str) -> None:
+        args: XeParams = {
+            'uuid': self.uuid,
+            'param-name': param_name,
+        }
+        self.xe_host.xe(f'{self.xe_prefix}-param-clear', args)
+
 
 def parse_size(size_str: str) -> int:
     """
@@ -413,72 +519,6 @@ def randid(length: int = 6) -> str:
     """
     characters = string.ascii_lowercase + string.digits
     return ''.join(random.choices(characters, k=length))
-
-@overload
-def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str | None = ...,
-               accept_unknown_key: Literal[False] = ...) -> str:
-    ...
-
-@overload
-def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str | None = ...,
-               accept_unknown_key: Literal[True] = ...) -> str | None:
-    ...
-
-@overload
-def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str | None = ...,
-               accept_unknown_key: bool = ...) -> str | None:
-    ...
-
-def _param_get(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str | None = None,
-               accept_unknown_key: bool = False) -> str | None:
-    """ Common implementation for param_get. """
-    import lib.commands as commands
-    args: XeParams = {'uuid': uuid, 'param-name': param_name}
-    if key is not None:
-        args['param-key'] = key
-    try:
-        value = host.xe(f'{xe_prefix}-param-get', args)
-    except commands.SSHCommandFailed as e:
-        if key and accept_unknown_key and e.stdout == "Error: Key %s not found in map" % key:
-            value = None
-        else:
-            raise
-    return value
-
-def _param_set(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str | bool | dict[str, str],
-               key: str | None = None) -> None:
-    """ Common implementation for param_set. """
-    args: XeParams = {'uuid': uuid}
-
-    if key is not None:
-        param_name = '{}:{}'.format(param_name, key)
-
-    args[param_name] = value
-
-    host.xe(f'{xe_prefix}-param-set', args)
-
-def _param_add(host: Host, xe_prefix: str, uuid: str, param_name: str, value: str, key: str | None = None) -> None:
-    """ Common implementation for param_add. """
-    param_key = f'{key}={value}' if key is not None else value
-    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': param_key}
-
-    host.xe(f'{xe_prefix}-param-add', args)
-
-def _param_remove(host: Host, xe_prefix: str, uuid: str, param_name: str, key: str,
-                  accept_unknown_key: bool = False) -> None:
-    """ Common implementation for param_remove. """
-    import lib.commands as commands
-    args: XeParams = {'uuid': uuid, 'param-name': param_name, 'param-key': key}
-    try:
-        host.xe(f'{xe_prefix}-param-remove', args)
-    except commands.SSHCommandFailed as e:
-        if not accept_unknown_key or e.stdout != "Error: Key %s not found in map" % key:
-            raise
-
-def _param_clear(host: Host, xe_prefix: str, uuid: str, param_name: str) -> None:
-    """ Common implementation for param_clear. """
-    args: XeParams = {'uuid': uuid, 'param-name': param_name}
-    host.xe(f'{xe_prefix}-param-clear', args)
 
 def hash_password(password: str) -> str:
     """Hash password for /etc/shadow."""

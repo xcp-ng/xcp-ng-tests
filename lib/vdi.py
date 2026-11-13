@@ -3,11 +3,7 @@ from __future__ import annotations
 import logging
 
 from lib.common import (
-    _param_add,
-    _param_clear,
-    _param_get,
-    _param_remove,
-    _param_set,
+    XeObject,
     ensure_type,
     strtobool,
     wait_for,
@@ -23,7 +19,7 @@ R = TypeVar("R")
 
 ImageFormat: TypeAlias = Literal['qcow2', 'raw', 'vhd']
 
-class VDI:
+class VDI(XeObject):
     xe_prefix = "vdi"
     sr: SR
 
@@ -45,6 +41,7 @@ class VDI:
             self.sr = sr
         else:
             self.sr = sr
+        super().__init__(sr.pool.master, uuid)
 
     def name(self) -> str:
         return self.param_get('name-label')
@@ -82,37 +79,6 @@ class VDI:
         if v is None:
             return None
         return ensure_type(ImageFormat, v)
-
-    @overload
-    def param_get(self, param_name: str, key: str | None = ...,
-                  accept_unknown_key: Literal[False] = ...) -> str:
-        ...
-
-    @overload
-    def param_get(self, param_name: str, key: str | None = ...,
-                  accept_unknown_key: Literal[True] = ...) -> str | None:
-        ...
-
-    def param_get(self, param_name: str, key: str | None = None,
-                  accept_unknown_key: bool = False) -> str | None:
-        return _param_get(self.sr.pool.master, self.xe_prefix, self.uuid,
-                          param_name, key, accept_unknown_key)
-
-    def param_set(self, param_name: str, value: str, key: str | None = None) -> None:
-        _param_set(self.sr.pool.master, self.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
-        _param_add(self.sr.pool.master, self.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_clear(self, param_name: str) -> None:
-        _param_clear(self.sr.pool.master, self.xe_prefix, self.uuid,
-                     param_name)
-
-    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
-        _param_remove(self.sr.pool.master, self.xe_prefix, self.uuid,
-                      param_name, key, accept_unknown_key)
 
     def wait_for_coalesce(self, fn: Callable[[], R] | None = None) -> R | None:
         previous_parent = self.get_parent()
