@@ -84,9 +84,10 @@ def _run_sa(repro: ReproContext, load_seconds: int) -> tuple[Evidence, list[Tdte
     lines = log.lines
     tdevents = repro.tdtest_events()
     releases = [e for e in tdevents if e.ev == "release" and e.dead is False]
-    # xenvbd fakes (event token exactly `fake`) with their grefs, from the `fake-grefs` lines. Both ids are
-    # ints here: xenvbd's are hex in the log, tapdisk's decimal.
-    fakes = [r for r in group_xenvbd_requests(repro.xenvbd_events()) if r.event == "fake"]
+    # xenvbd fakes with their grefs, from the `fake-grefs` lines: event token `fake` (pre-R1 drivers) or
+    # `deferred-fake` (R1 in the base, e.g. D445-hooks). Both ids are ints here: xenvbd's are hex in the log,
+    # tapdisk's decimal.
+    fakes = [r for r in group_xenvbd_requests(repro.xenvbd_events()) if r.event in ("fake", "deferred-fake")]
     gcf = matching(TD_RE_GRANT_COPY_FAIL, lines)
 
     # The guest's lines reach daemon.log through qemu a few seconds late (a fake was seen logged 3 s after the
