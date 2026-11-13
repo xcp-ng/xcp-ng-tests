@@ -17,6 +17,7 @@ from tests.storage import (
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
 
 @pytest.mark.usefixtures("largeblock_sr")
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no LargeBlock SR driver
 class TestLARGEBLOCKSR:
     @pytest.mark.quicktest
     def test_quicktest(self, largeblock_sr: SR) -> None:

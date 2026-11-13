@@ -22,10 +22,12 @@ class Test:
         sr = vm_on_lvmoiscsi_sr.get_sr()
         live_storage_migration_then_come_back(vm_on_lvmoiscsi_sr, host, hostA2, sr, image_format)
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver for the destination SR
     def test_cold_intrapool_migration(self, host: Host, hostA2: Host, vm_on_lvmoiscsi_sr: VM, xfs_sr_on_hostA2: SR,
                                       image_format: ImageFormat) -> None:
         cold_migration_then_come_back(vm_on_lvmoiscsi_sr, host, hostA2, xfs_sr_on_hostA2, image_format)
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver for the destination SR
     def test_live_intrapool_migration(self, host: Host, hostA2: Host, vm_on_lvmoiscsi_sr: VM, xfs_sr_on_hostA2: SR,
                                       image_format: ImageFormat) -> None:
         live_storage_migration_then_come_back(vm_on_lvmoiscsi_sr, host, hostA2, xfs_sr_on_hostA2, image_format)

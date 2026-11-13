@@ -20,6 +20,7 @@ class TestGlusterFSSRCreateDestroy:
     and VM import.
     """
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD package glusterfs-server is not available
     def test_create_glusterfs_sr_without_gluster(self, host: Host, glusterfs_device_config: dict[str, str]) -> None:
         # This test must be the first in the series in this module
         assert not host.file_exists('/usr/sbin/glusterd'), \
@@ -33,6 +34,7 @@ class TestGlusterFSSRCreateDestroy:
             sr.destroy()
             assert False, "SR creation should not have succeeded!"
 
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD package glusterfs-server is not available
     def test_create_and_destroy_sr(
         self,
         host: Host,

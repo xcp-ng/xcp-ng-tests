@@ -109,6 +109,7 @@ class TestXenPlatformPciBarUc:
             pytest.fail("Grant_tables are outside of the uncachable MTRR ranges but 'xen-platform-pci-bar-uc' is true")
 
     # Check the alternate behavior when 'xen_platform_pci_bar_uc' is explicitely set to false
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD grant tables are inside the uncachable MTRR ranges
     def test_xen_platform_pci_bar_uc_false(
         self, host_with_xen_platform_pci_bar_uc_set_to_false: Host,
         vm_with_xen_platform_pci_bar_uc_set_to_false: VM

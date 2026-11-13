@@ -11,6 +11,7 @@ from lib.host import Host
 # And:
 # - access to XCP-ng RPM repository from hostA1
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD xcp-ng-xapi-plugins is not compatible
 @pytest.mark.usefixtures("zpool_vol0")
 def test_list_zfs_pools(host: Host) -> None:
     logging.info("List ZFS pools on host")

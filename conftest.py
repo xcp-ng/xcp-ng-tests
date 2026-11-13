@@ -455,6 +455,11 @@ def host_less_than_8_3(host: Host) -> None:
     if not host.xcp_version < version.parse(version_str):
         pytest.skip(f"This test requires an XCP-ng < {version_str} host")
 
+@pytest.fixture(scope='session')
+def xfail_on_xcpng_9_0(host: Host) -> None:
+    """ Test that is relevant but expected to fail in current state of XCP-ng 8.3. """
+    if host.xcp_version >= version.parse("8.99"):
+        pytest.xfail(f"This test currently doesn't work with XCP-ng 9 ({host.xcp_version})")
 
 @pytest.fixture(scope='function')
 def xfail_on_xcpng_8_3(host: Host, request: pytest.FixtureRequest) -> None:

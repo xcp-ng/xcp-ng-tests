@@ -12,6 +12,7 @@ from ..conftest import DIRECTORIES_PATH
 # From --hosts parameter:
 # - host: a XCP-ng host >= 8.2
 
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD package xcp-ng-xapi-storage is not available
 class TestFSPSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR

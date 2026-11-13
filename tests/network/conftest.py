@@ -51,7 +51,8 @@ def host_no_sdn_controller(host: Host) -> Generator[Host, None, None]:
         host.xe('sdn-controller-introduce', cfg)
 
 @pytest.fixture(scope='package')
-def hosts_with_traffic_rules(hosts_with_xo: list[Host]) -> Generator[list[Host], None, None]:
+# TBD xcp-ng-xapi-plugins is not compatible
+def hosts_with_traffic_rules(hosts_with_xo: list[Host], xfail_on_xcpng_9_0: None) -> Generator[list[Host], None, None]:
     """A list of XCP-ng hosts with proper traffic rules configuration."""
     hosts = hosts_with_xo
 

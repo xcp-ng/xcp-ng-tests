@@ -26,11 +26,13 @@ class Test:
         live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, sr, image_format)
 
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver for the destination SR
     def test_cold_intrapool_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM, xfs_sr_on_hostA2: SR,
                                       image_format: ImageFormat) -> None:
         cold_migration_then_come_back(dispatch_nfs, host, hostA2, xfs_sr_on_hostA2, image_format)
 
     @pytest.mark.parametrize('dispatch_nfs', ['vm_on_nfs_sr', 'vm_on_nfs4_sr'], indirect=True)
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver for the destination SR
     def test_live_intrapool_migration(self, host: Host, hostA2: Host, dispatch_nfs: VM, xfs_sr_on_hostA2: SR,
                                       image_format: ImageFormat) -> None:
         live_storage_migration_then_come_back(dispatch_nfs, host, hostA2, xfs_sr_on_hostA2, image_format)

@@ -39,6 +39,7 @@ class TestZFSSRCreateDestroy:
             assert False, "SR creation should not have succeeded!"
 
     @pytest.mark.usefixtures("zpool_vol0")
+    @pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no ZFS SR driver
     def test_create_and_destroy_sr(self, host: Host, image_format: ImageFormat) -> None:
         # Create and destroy tested in the same test to leave the host as unchanged as possible
         sr = host.sr_create('zfs', "ZFS-local-SR-test", {

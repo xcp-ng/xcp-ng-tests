@@ -19,6 +19,7 @@ from tests.storage import vdi_is_open, vdi_on_boot_reset
 
 
 @pytest.mark.usefixtures("cephfs_sr")
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no CephFS SR driver
 class TestCephFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, cephfs_sr: SR) -> None:

@@ -27,6 +27,7 @@ from tests.storage import (
 # - access to XCP-ng RPM repository from the host
 
 @pytest.mark.usefixtures("xfs_sr")
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no XFS SR driver
 class TestXFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, xfs_sr: SR) -> None:

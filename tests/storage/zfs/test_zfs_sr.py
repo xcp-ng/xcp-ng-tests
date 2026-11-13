@@ -29,6 +29,7 @@ from .conftest import POOL_NAME
 # - access to XCP-ng RPM repository from the host
 
 @pytest.mark.usefixtures("zpool_vol0")
+@pytest.mark.usefixtures("xfail_on_xcpng_9_0") # TBD no ZFS SR driver
 class TestZFSSR:
     @pytest.mark.quicktest
     def test_quicktest(self, zfs_sr: SR) -> None:
