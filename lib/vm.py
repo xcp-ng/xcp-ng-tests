@@ -910,9 +910,10 @@ class VM(BaseVM):
         """Checks for the install state of **any** Xen/XenServer PV devices."""
         output = self.execute_powershell_script(
             r"""Get-PnpDevice -PresentOnly |
-Where-Object CompatibleID -icontains 'PCI\VEN_5853' |
+Where-Object { $_.CompatibleID -icontains 'PCI\VEN_5853' -and $_.InstanceId -notmatch 'DEV_C201' } |
 Select-Object -ExpandProperty Problem"""
         )
+        # DEV_C201 is the xenkd debugger device, which has no driver in the test VMs: not a PV platform device.
         # There may be multiple platform PCI devices (e.g. one default, one vendor).
         # In some cases (e.g. installing our tools on VMs with vendor devices), the default and vendor
         # devices may have different statuses (default = installed, vendor = not installed).
