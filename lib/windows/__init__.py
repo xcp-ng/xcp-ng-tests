@@ -12,7 +12,7 @@ from lib.sr import SR
 from lib.vif import VIF
 from lib.vm import VM
 
-from typing import Any, Generator
+from typing import Any, Generator, Literal, TypeAlias
 
 # HACK: I originally thought that using Stop-Computer -Force would cause the SSH session to sometimes fail.
 # I could never confirm this in the end, but use a slightly delayed shutdown just to be safe anyway.
@@ -156,38 +156,43 @@ def vif_has_rss(vif: VIF) -> bool:
     return strtobool(vif_execute_powershell_script(vif, r"($adapter | Get-NetAdapterRss).MaxProcessors -gt 0"))
 
 
-def vif_get_dns(vif: VIF) -> list[str]:
+AddressFamily: TypeAlias = Literal["IPv4"] | Literal["IPv6"]
+
+
+def vif_get_dns(vif: VIF, address_family: AddressFamily) -> list[str]:
     return vif_execute_powershell_script(
         vif,
-        r"""Import-Module DnsClient;
+        rf"""Import-Module DnsClient;
 $adapter |
-Get-DnsClientServerAddress -AddressFamily IPv4 |
+Get-DnsClientServerAddress -AddressFamily {address_family} |
 Select-Object -ExpandProperty ServerAddresses""",
     ).splitlines()
 
 
-def vif_set_dns(vif: VIF, nameservers: list[str]) -> None:
+def vif_set_dns(vif: VIF, address_family: AddressFamily, nameservers: list[str]) -> None:
     vif_execute_powershell_script(
         vif,
         rf"""Import-Module DnsClient;
 $adapter |
-Get-DnsClientServerAddress -AddressFamily IPv4 |
+Get-DnsClientServerAddress -AddressFamily {address_family} |
 Set-DnsClientServerAddress -ServerAddresses {",".join(nameservers)}""",
     )
 
 
 def vif_has_static_configuration(
     vif: VIF,
-    address_family: str,
+    address_family: AddressFamily,
     address: str,
     prefix: int,
     gateway: str,
+    dns: list[str] | None = None,
     *,
     present: bool = True,
 ) -> bool:
     default_route = "0.0.0.0/0" if address_family == "IPv4" else "::/0"
     comparison = "-gt 0" if present else "-eq 0"
-    return strtobool(
+
+    has_ip = strtobool(
         vif_execute_powershell_script(
             vif,
             rf"""$addresses = @(Get-NetIPAddress `
@@ -206,6 +211,13 @@ Where-Object {{$_.DestinationPrefix -eq '{default_route}' -and $_.NextHop -eq '{
 ($addresses.Count {comparison}) -and ($gateways.Count {comparison})""",
         )
     )
+    if not has_ip:
+        return False
+
+    if dns is None:
+        return True
+
+    return set(vif_get_dns(vif, address_family=address_family)) == set(dns)
 
 
 def vif_uses_dhcp(vif: VIF) -> bool:
@@ -254,18 +266,18 @@ def wait_for_vm_xenvif_offboard(vm: VM) -> None:
     wait_for(lambda: is_vm_offboarded_xenvif(vm), timeout_secs=180, retry_delay_secs=15)
 
 
-def set_vm_dns(vm: VM) -> None:
+def vm_set_test_dnsv4(vm: VM) -> None:
     logging.info(f"Set VM DNS to {TEST_DNS_SERVER}")
     vif = vm.vifs()[0]
-    assert TEST_DNS_SERVER not in vif_get_dns(vif)
-    vif_set_dns(vif, [TEST_DNS_SERVER])
+    assert TEST_DNS_SERVER not in vif_get_dns(vif, "IPv4")
+    vif_set_dns(vif, "IPv4", [TEST_DNS_SERVER])
 
 
-def check_vm_dns(vm: VM) -> None:
+def vm_check_test_dnsv4(vm: VM) -> None:
     # The restore task takes time to fire so wait for it
     vif = vm.vifs()[0]
     wait_for(
-        lambda: TEST_DNS_SERVER in vif_get_dns(vif),
+        lambda: TEST_DNS_SERVER in vif_get_dns(vif, "IPv4"),
         f"Check VM DNS contains {TEST_DNS_SERVER}",
         timeout_secs=300,
         retry_delay_secs=30,
