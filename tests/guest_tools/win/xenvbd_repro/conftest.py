@@ -104,6 +104,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--repro-installed-tdtest", action="store_true", default=False,
                     help="The host's blktap package is a tdtest build: the live tapdisk must equal --repro-tapdisk; "
                          "no stock copy and no swap windows")
+    group.addoption("--repro-sd-resets", type=int, default=0,
+                    help="S-D: wait for this many StorPort resets (0-10; --repro-reset=timeout: ~10 s apart, or "
+                         "--repro-reset=ioctl) while reads are held, before the shutdown, so that several ring "
+                         "generations exist")
     group.addoption("--repro-run-shutdown", action="store_true", default=False,
                     help="Also run the optional, observation-only S-D shutdown-with-held-read test")
 
@@ -162,6 +166,7 @@ def repro_options(pytestconfig: pytest.Config) -> ReproOptions:
         reset=str(pytestconfig.getoption("--repro-reset")),
         artifacts=artifacts,
         run_shutdown=bool(pytestconfig.getoption("--repro-run-shutdown")),
+        sd_resets=int(pytestconfig.getoption("--repro-sd-resets")),
         installed_tdtest=bool(pytestconfig.getoption("--repro-installed-tdtest")),
     )
 

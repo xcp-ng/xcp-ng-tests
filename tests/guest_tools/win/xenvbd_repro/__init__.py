@@ -130,6 +130,7 @@ class ReproOptions:
     artifacts: Path
     run_shutdown: bool
     installed_tdtest: bool = False
+    sd_resets: int = 0
 
 
 @dataclass
