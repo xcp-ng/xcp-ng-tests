@@ -108,6 +108,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
                     help="S-D: wait for this many StorPort resets (0-10; --repro-reset=timeout: ~10 s apart, or "
                          "--repro-reset=ioctl) while reads are held, before the shutdown, so that several ring "
                          "generations exist")
+    group.addoption("--repro-sd-hold-ms", type=int, default=20000,
+                    help="S-D: how long tapdisk holds each read (1000-120000 ms; tdtest caps it). Hold longer than the frontend's "
+                         "grant-revoke wait to make it give up and recycle the grants of the dead ring")
     group.addoption("--repro-run-shutdown", action="store_true", default=False,
                     help="Also run the optional, observation-only S-D shutdown-with-held-read test")
 
@@ -167,6 +170,7 @@ def repro_options(pytestconfig: pytest.Config) -> ReproOptions:
         artifacts=artifacts,
         run_shutdown=bool(pytestconfig.getoption("--repro-run-shutdown")),
         sd_resets=int(pytestconfig.getoption("--repro-sd-resets")),
+        sd_hold_ms=int(pytestconfig.getoption("--repro-sd-hold-ms")),
         installed_tdtest=bool(pytestconfig.getoption("--repro-installed-tdtest")),
     )
 

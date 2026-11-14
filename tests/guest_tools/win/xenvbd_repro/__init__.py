@@ -131,6 +131,7 @@ class ReproOptions:
     run_shutdown: bool
     installed_tdtest: bool = False
     sd_resets: int = 0
+    sd_hold_ms: int = 20000
 
 
 @dataclass

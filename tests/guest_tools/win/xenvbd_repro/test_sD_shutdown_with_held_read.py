@@ -15,7 +15,8 @@ from tests.guest_tools.win.xenvbd_repro import W_SA_HOLD, Evidence, ReproContext
 # record what happens (clean shutdown, bugcheck 0x9F/0x133, ...). Needs --repro-run-shutdown.
 # Requirements: see README.md in this directory.
 
-HOLD_MS = 20000
+HOLD_MS = 20000       # default for --repro-sd-hold-ms
+MIN_HOLD_MS, MAX_HOLD_MS = 1000, 120000  # tapdisk tdtest caps hold at 120 s
 MAX_SD_RESETS = 10
 RESET_GAP_S = 1.5
 # With --repro-reset=timeout (the default) the resets are StorPort timeouts, ~10 s apart; --repro-reset=ioctl uses
@@ -58,9 +59,12 @@ class TestSDShutdownWithHeldRead:
         bs.fill(1, W_SA_HOLD)
         n_resets = repro.options.sd_resets
         assert 0 <= n_resets <= MAX_SD_RESETS, f"--repro-sd-resets must be 0..{MAX_SD_RESETS}"
-        repro.tdtest(read_hold_ms=HOLD_MS, read_hold_max=2 + n_resets, **tdtest_lba_window("read_hold", W_SA_HOLD),
+        hold_ms = repro.options.sd_hold_ms
+        assert MIN_HOLD_MS <= hold_ms <= MAX_HOLD_MS, f"--repro-sd-hold-ms must be {MIN_HOLD_MS}..{MAX_HOLD_MS}"
+        repro.tdtest(read_hold_ms=hold_ms, read_hold_max=2 + n_resets, **tdtest_lba_window("read_hold", W_SA_HOLD),
                      log=1, **tdtest_lba_window("log", W_SA_HOLD))
-        bs.start_load(2, W_SA_HOLD, threads=1, io_size=16 * 1024, seconds=min(300, 60 + 15 * repro.options.sd_resets), read_percent=100)
+        load_seconds = min(300, 60 + 15 * n_resets + hold_ms // 1000)
+        bs.start_load(2, W_SA_HOLD, threads=1, io_size=16 * 1024, seconds=load_seconds, read_percent=100)
         repro.wait_tdtest(lambda e: e.ev == "hold", timeout=60, what="ev=hold (a read is held)")
 
         resets_ok = []
@@ -110,6 +114,13 @@ $e = Get-WinEvent -FilterHashtable @{LogName='System'; Id=1001} -MaxEvents 3 -Er
             "xenvbd": [line for line in log_lines if "TDTEST" in line][-30:],
         }
         ev.host["gref_overlap"] = gref_overlaps(repro.xenvbd_events())
-        ev.guest = {"resets_requested": n_resets, "resets_ok": resets_ok, "seconds_to_settle": round(elapsed, 1), "restarted_by_itself": restarted, "crash_info": crash}
+        ev.guest = {
+            "hold_ms": hold_ms,
+            "resets_requested": n_resets,
+            "resets_ok": resets_ok,
+            "seconds_to_settle": round(elapsed, 1),
+            "restarted_by_itself": restarted,
+            "crash_info": crash,
+        }
         ev.notes.append("observation only")
         conclude(repro, ev)
