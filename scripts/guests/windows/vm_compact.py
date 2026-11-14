@@ -9,6 +9,7 @@ import pathlib
 import re
 import subprocess
 import tempfile
+from collections.abc import Generator
 
 from lib.commands import SSHCommandFailed
 from lib.common import wait_for
@@ -16,11 +17,10 @@ from lib.pool import Pool
 from lib.vbd import VBD
 from lib.vm import VM
 
-from typing import Generator
-
 # Tool to compact Windows VMs prior to test XVA creation.
 # Requirements:
-# - ntfsclone (part of ntfs-3g) and sfdisk should be installed.
+# - The system should support mounting NTFS partitions as read-write.
+# - partclone and sfdisk should be installed.
 # - This tool should run on a VM in the same pool as the Windows VMs, so that Windows VDIs could be automatically
 #   plugged and compacted.
 # - The tool should be able to connect to and control the pool via XAPI.
@@ -30,11 +30,11 @@ def get_partitions(part_table: str) -> Generator[dict[str, str], None, None]:
     for line in part_table.splitlines():
         match = re.match(
             (
-                r'^(?P<device>[^\s]+) : '
-                r'start=\s*(?P<start>[\d]+), '
-                r'size=\s+(?P<size>[\d]+), '
-                r'type=(?P<type>[A-F0-9\-]+), '
-                r'uuid=(?P<uuid>[A-F0-9\-]+)(, .*)?$'
+                r"^(?P<device>[^\s]+) : "
+                r"start=\s*(?P<start>[\d]+), "
+                r"size=\s+(?P<size>[\d]+), "
+                r"type=(?P<type>[A-F0-9\-]+), "
+                r"uuid=(?P<uuid>[A-F0-9\-]+)(, .*)?$"
             ),
             line,
         )
@@ -49,17 +49,37 @@ def get_device_path(vbd: VBD) -> str:
     return "/dev/" + device
 
 
+def partclone(partclone: str, part_type: str, source_part: str, dest_part: str) -> None:
+    subprocess.run(
+        [
+            partclone + "." + part_type,
+            "--dev-to-dev",
+            "--source",
+            source_part,
+            "--output",
+            dest_part,
+        ],
+        check=True,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", required=True, metavar="HOST", help="host IP or hostname")
-    parser.add_argument("--vm", nargs="+", required=True, metavar="VM_UUID", help="UUIDs of VMs to compact")
-    parser.add_argument("--ntfsclone", default="ntfsclone", metavar="PATH", help="path to ntfsclone")
+    parser.add_argument(
+        "--vm",
+        nargs="+",
+        required=True,
+        metavar="VM_UUID",
+        help="UUIDs of VMs to compact",
+    )
+    parser.add_argument("--partclone", default="partclone", metavar="PATH", help="path to partclone")
     parser.add_argument("--delete", action="store_true", help="delete original VDI after compacting")
     args = parser.parse_args()
 
     logging.getLogger().setLevel(logging.INFO)
 
-    with open('/sys/hypervisor/uuid') as uuid_file:
+    with open("/sys/hypervisor/uuid") as uuid_file:
         my_uuid = uuid_file.readline().strip()
     logging.info(f"My UUID is {my_uuid}")
     if not my_uuid:
@@ -98,7 +118,7 @@ def main() -> None:
             # we don't use sfdisk -j since sfdisk can't consume that for the partition table copying
             logging.info("Reading original partition table")
             part_table = subprocess.run(
-                ["sfdisk", "-d", orig_device_path],
+                ["sfdisk", "--dump", orig_device_path],
                 capture_output=True,
                 check=True,
                 encoding="utf-8",
@@ -115,19 +135,19 @@ def main() -> None:
             logging.info("Cloning partitions")
             for partition in get_partitions(part_table):
                 logging.info(partition)
-                orig_part = partition["device"]
-                compact_part = partition["device"].replace(orig_device_path, compact_device_path)
-                assert compact_part != orig_part
+                source_part = partition["device"]
+                dest_part = partition["device"].replace(orig_device_path, compact_device_path)
+                assert dest_part != source_part
                 part_type = subprocess.run(
-                    ["blkid", "-s", "TYPE", "-o", "value", orig_part],
+                    ["blkid", "--match-tag", "TYPE", "--output", "value", source_part],
                     capture_output=True,
                     check=True,
                     encoding="utf-8",
                 ).stdout.strip()
-                logging.info(f"Original partition {orig_part} is of type {part_type}")
+                logging.info(f"Original partition {source_part} is of type {part_type}")
+                logging.info(f"Cloning {part_type} {source_part} -> {dest_part}")
                 if part_type == "ntfs":
-                    logging.info(f"Cloning NTFS {orig_part} -> {compact_part}")
-                    subprocess.run(["mount", orig_part, mountpoint], check=True)
+                    subprocess.run(["mount", source_part, mountpoint], check=True)
                     try:
                         mountpath = pathlib.Path(mountpoint)
                         (mountpath / "pagefile.sys").unlink(missing_ok=True)
@@ -135,12 +155,26 @@ def main() -> None:
                         (mountpath / "swapfile.sys").unlink(missing_ok=True)
                     finally:
                         subprocess.run(["umount", mountpoint], check=True)
-                    subprocess.run([args.ntfsclone, "-O", compact_part, orig_part], check=True)
-                else:
-                    logging.info(f"Cloning {orig_part} -> {compact_part}")
-                    subprocess.run(
-                        ["dd", f"if={orig_part}", f"of={compact_part}", "bs=1M", "status=progress"], check=True
+                    partclone(
+                        partclone=args.partclone, part_type=part_type, source_part=source_part, dest_part=dest_part
                     )
+                elif part_type == "vfat":
+                    subprocess.run(
+                        [
+                            args.partclone + "." + part_type,
+                            "--dev-to-dev",
+                            "--source",
+                            source_part,
+                            "--output",
+                            dest_part,
+                        ],
+                        check=True,
+                    )
+                    partclone(
+                        partclone=args.partclone, part_type=part_type, source_part=source_part, dest_part=dest_part
+                    )
+                else:
+                    partclone(partclone=args.partclone, part_type="dd", source_part=source_part, dest_part=dest_part)
 
             logging.info("Finalizing cloned VDI")
             subprocess.run("sync", check=True)
