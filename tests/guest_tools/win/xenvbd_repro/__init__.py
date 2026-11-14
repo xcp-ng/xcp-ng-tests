@@ -132,6 +132,7 @@ class ReproOptions:
     installed_tdtest: bool = False
     sd_resets: int = 0
     sd_hold_ms: int = 20000
+    vcpus: int = 0
 
 
 @dataclass

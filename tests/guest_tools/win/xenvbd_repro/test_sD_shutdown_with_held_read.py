@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import logging
+import re
 import time
 
 from lib.commands import SSHCommandFailed
@@ -45,7 +46,24 @@ def gref_overlaps(events: list[XenvbdEvent]) -> dict[str, object]:
             common = sorted(gens[i] & gens[j])
             if common:
                 overlaps.append({"gens": [i, j], "count": len(common), "grefs": common[:16]})
-    return {"generations": len(gens), "per_gen_grefs": [len(g) for g in gens], "overlaps": overlaps}
+    ring_overlaps = []
+    for i in range(len(ring_gens)):
+        for j in range(i + 1, len(ring_gens)):
+            common = sorted(ring_gens[i] & ring_gens[j])
+            if common:
+                ring_overlaps.append({"gens": [i, j], "same_set": ring_gens[i] == ring_gens[j], "grefs": common})
+    return {
+        "generations": len(gens),
+        "ring_grefs": [sorted(g) for g in ring_gens],
+        "per_gen_grefs": [len(g) for g in gens],
+        "overlaps": overlaps,
+        "ring_page_overlaps": ring_overlaps,
+    }
+
+
+TAPDISK_RING_ERRORS = re.compile(
+    r"failed to grant-copy|failed to copy from guest|bad number of segments|invalid request type"
+)
 
 
 @pytest.mark.multi_vms
@@ -114,6 +132,15 @@ $e = Get-WinEvent -FilterHashtable @{LogName='System'; Id=1001} -MaxEvents 3 -Er
             "xenvbd": [line for line in log_lines if "TDTEST" in line][-30:],
         }
         ev.host["gref_overlap"] = gref_overlaps(repro.xenvbd_events())
+        ring_errors = [line for line in log_lines if "tapdisk[" in line and TAPDISK_RING_ERRORS.search(line)]
+        ev.host["tapdisk_ring_errors"] = {"count": len(ring_errors), "last": ring_errors[-10:]}
+        ring_reused = bool(ev.host["gref_overlap"]["ring_page_overlaps"])
+        # S-D at the ring level: a later ring got the dead ring's page references back, and tapdisk, which maps the
+        # old pages for the new ring, reads garbage requests from it. Either alone is host evidence.
+        ev.host_evidence = ring_reused or bool(ring_errors)
+        ev.reproduced = ring_reused and bool(ring_errors)
+        if ring_reused:
+            ev.notes.append("ring-page references reused across ring generations")
         ev.guest = {
             "hold_ms": hold_ms,
             "resets_requested": n_resets,

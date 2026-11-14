@@ -111,6 +111,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--repro-sd-hold-ms", type=int, default=20000,
                     help="S-D: how long tapdisk holds each read (1000-120000 ms; tdtest caps it). Hold longer than the frontend's "
                          "grant-revoke wait to make it give up and recycle the grants of the dead ring")
+    group.addoption("--repro-vcpus", type=int, default=0,
+                    help="Set VCPUs-max and VCPUs-at-startup of the test clone to this value (1-64) before it is "
+                         "snapshotted and started; 0 leaves the clone as it is. Only with a clone (VM caching on). "
+                         "S-D wants 1: xenbus's reference cache is per CPU, so reference reuse needs one vCPU")
     group.addoption("--repro-run-shutdown", action="store_true", default=False,
                     help="Also run the optional, observation-only S-D shutdown-with-held-read test")
 
@@ -171,6 +175,7 @@ def repro_options(pytestconfig: pytest.Config) -> ReproOptions:
         run_shutdown=bool(pytestconfig.getoption("--repro-run-shutdown")),
         sd_resets=int(pytestconfig.getoption("--repro-sd-resets")),
         sd_hold_ms=int(pytestconfig.getoption("--repro-sd-hold-ms")),
+        vcpus=int(pytestconfig.getoption("--repro-vcpus")),
         installed_tdtest=bool(pytestconfig.getoption("--repro-installed-tdtest")),
     )
 
@@ -260,6 +265,23 @@ def vm_with_test_drivers(
         assert vm.uuid == test_host_guard.vm_uuid
     assert_vm_on_host(vm, host)
     vm_shutdown_without_tools(vm)
+    vcpus = repro_options.vcpus
+    if vcpus:
+        assert CACHE_IMPORTED_VM and vm.uuid != test_host_guard.vm_uuid, "--repro-vcpus only applies to a clone"
+        assert 1 <= vcpus <= 64, "--repro-vcpus must be 1..64"
+        current = int(vm.param_get("VCPUs-max"))
+        # The startup count may not exceed the max: lower the one that must go down first.
+        if vcpus < current:
+            vm.param_set("VCPUs-at-startup", str(vcpus))
+            vm.param_set("VCPUs-max", str(vcpus))
+        else:
+            vm.param_set("VCPUs-max", str(vcpus))
+            vm.param_set("VCPUs-at-startup", str(vcpus))
+        # VCPUs-max must be a multiple of cores-per-socket (4 on the test template).
+        cps = vm.param_get("platform", key="cores-per-socket", accept_unknown_key=True)
+        if cps and vcpus % int(cps):
+            vm.param_set("platform", str(vcpus), key="cores-per-socket")
+        logging.info("test clone %s: VCPUs %d -> %d (cores-per-socket %s)", vm.uuid, current, vcpus, cps)
     snapshot = vm.snapshot(name="xenvbd-repro pre-test")
     try:
         start_vm_on_host(vm, host)
