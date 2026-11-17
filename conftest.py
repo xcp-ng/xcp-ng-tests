@@ -133,7 +133,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default="2GiB",
         help="Maximum amount of data written to a volume."
              " Accepts sizes like '1GiB', '2.5TiB', or symbolic values 'VHD_MAX', 'QCOW2_MAX'."
-             " 'FORMAT_MAX' writes the full volume; a percentage like '50%' resolves"
+             " 'FORMAT_MAX' writes the full volume; a percentage like '50%%' resolves"
              " against the resolved --volume-size for the test's image format."
     )
     parser.addoption(
