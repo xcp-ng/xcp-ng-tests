@@ -282,3 +282,13 @@ TEST_DNS_SERVER = "1.1.1.1"
 # List of NICs available on host for network tests.
 # example: HOST_FREE_NICS: list[str] = ['eth1', 'eth2']
 HOST_FREE_NICS: list[str] = []
+
+# How to connect to Xen-Orchestra.
+# XO_URL: str = "http://localhost:9000"
+# XO_AUTH_USERNAME: str = "username"
+# XO_AUTH_PASSWORD: str = "password"
+# XO_AUTH_TOKEN: str = "token"
+XO_URL: str = os.environ.get('XO_URL', '')
+XO_AUTH_USERNAME: str = os.environ.get('XO_AUTH_USERNAME', '')
+XO_AUTH_PASSWORD: str = os.environ.get('XO_AUTH_PASSWORD', '')
+XO_AUTH_TOKEN: str = os.environ.get('XO_AUTH_TOKEN', '')
