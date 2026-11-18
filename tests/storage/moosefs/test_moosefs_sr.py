@@ -11,6 +11,7 @@ from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import vdi_is_open, vdi_on_boot_reset
+from tests.storage.storage import check_critical_journal_revert, check_vdi_revert, check_vdi_revert_journal
 
 # Requirements:
 # - one XCP-ng host >= 8.2
@@ -81,6 +82,31 @@ class TestMooseFSSR:
         finally:
             if not moosefs_installed:
                 host.yum_install(['moosefs-client'])
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_moosefs_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_moosefs_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_moosefs_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str) -> None:
+        check_vdi_revert_journal(defer, vm_on_moosefs_sr, fistpoint, vm_on_moosefs_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(
+        self, vm_on_moosefs_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host
+    ) -> None:
+        check_critical_journal_revert(defer, vm_on_moosefs_sr, hostA2, "FileSR_revert_create_src")
 
     @pytest.mark.small_vm
     def test_vdi_on_boot_reset(self, vm_on_moosefs_sr: VM, defer: Defer) -> None:

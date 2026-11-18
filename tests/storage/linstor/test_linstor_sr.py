@@ -17,6 +17,7 @@ from lib.sr import SR
 from lib.vdi import VDI
 from lib.vm import VM
 from tests.storage import vdi_is_open, vdi_on_boot_reset
+from tests.storage.storage import check_critical_journal_revert, check_vdi_revert, check_vdi_revert_journal
 
 from .conftest import GROUP_NAME, LINSTOR_PACKAGE
 
@@ -225,6 +226,31 @@ class TestLinstorSR:
         vm.start()
         vm.wait_for_os_booted()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_linstor_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_linstor_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "LinstorSR_revert_create_insert",
+            "LinstorSR_revert_create_src",
+            "LinstorSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(self, vm_on_linstor_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str) -> None:
+        check_vdi_revert_journal(defer, vm_on_linstor_sr, fistpoint, vm_on_linstor_sr.host.pool.master)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_critical_journal_revert(
+        self, vm_on_linstor_sr: VM, defer: Defer, exit_on_fistpoint: None, hostA2: Host, linstor_no_monitor: None
+    ) -> None:
+        check_critical_journal_revert(defer, vm_on_linstor_sr, hostA2, "LinstorSR_revert_create_src")
 
     @pytest.mark.small_vm
     @pytest.mark.skip(reason="not supported")

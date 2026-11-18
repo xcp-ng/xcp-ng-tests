@@ -12,6 +12,12 @@ from tests.storage import (
     vdi_is_open,
     vdi_on_boot_reset,
 )
+from tests.storage.storage import (
+    check_vdi_revert,
+    check_vdi_revert_cbt,
+    check_vdi_revert_journal,
+    check_vdi_revert_journal_cbt,
+)
 
 # Requirements:
 # - one XCP-ng host with an additional unused 4KiB disk for the SR
@@ -48,6 +54,36 @@ class TestLARGEBLOCKSR:
         vm.wait_for_os_booted()
         vm.test_snapshot_on_running_vm()
         vm.shutdown(verify=True)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
+        check_vdi_revert(defer, vm_on_largeblock_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_cbt(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
+        check_vdi_revert_cbt(defer, vm_on_largeblock_sr)
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    def test_revert_journal_cbt(self, vm_on_largeblock_sr: VM, defer: Defer, exit_on_fistpoint: None) -> None:
+        check_vdi_revert_journal_cbt(defer, vm_on_largeblock_sr, "FileSR_revert_create_src")
+
+    @pytest.mark.small_vm
+    @pytest.mark.big_vm
+    @pytest.mark.parametrize(
+        "fistpoint",
+        [
+            "FileSR_revert_create_insert",
+            "FileSR_revert_create_src",
+            "FileSR_revert_create_dest",
+        ]
+    )
+    def test_revert_journal(
+        self, vm_on_largeblock_sr: VM, defer: Defer, exit_on_fistpoint: None, fistpoint: str
+    ) -> None:
+        check_vdi_revert_journal(defer, vm_on_largeblock_sr, fistpoint)
 
     @pytest.mark.small_vm
     def test_vdi_on_boot_reset(self, vm_on_largeblock_sr: VM, defer: Defer) -> None:
