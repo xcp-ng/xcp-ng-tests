@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import shlex
+import socket
 import subprocess
 import tempfile
 import uuid
@@ -572,6 +573,43 @@ class Host:
             f"[{self}] Wait for host up",
             timeout_secs=timeout_secs,
             retry_delay_secs=10,
+        )
+
+    def get_free_port(self) -> int:
+        """Ask the remote host for a free TCP port by binding to port 0."""
+        script = """\
+import socket
+s = socket.socket()
+s.bind(('', 0))
+print(s.getsockname()[1])
+s.close()
+"""
+        result = self.execute_script(script, shebang="python3")
+        return int(result)
+
+    def is_port_open(self, port: int = 22, timeout: int = 1) -> bool:
+        """
+        Return True if a TCP connection to the given port on this host succeeds, False otherwise.
+
+        port defaults to 22 (ssh), which is expected to be open on a host.
+        """
+        try:
+            socket.create_connection((self.hostname_or_ip, port), timeout=timeout).close()
+            return True
+        except OSError:
+            return False
+
+    def wait_for_port(self, port: int = 22, timeout_secs: int = 10, retry_delay_secs: int = 1) -> None:
+        """
+        Poll until the given TCP port on this host is open, or raise TimeoutError.
+
+        port defaults to 22 (ssh), which is expected to be open on a host.
+        """
+        wait_for(
+            lambda: self.is_port_open(port),
+            f"[{self}] Wait for port {port} to be open",
+            timeout_secs=timeout_secs,
+            retry_delay_secs=retry_delay_secs,
         )
 
     # Static so that an address can be checked without a Host object.
