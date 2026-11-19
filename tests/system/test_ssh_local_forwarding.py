@@ -5,7 +5,7 @@ import subprocess
 import time
 
 from lib.commands import SSHCommandFailed, ssh
-from lib.common import InterruptShield
+from lib.common import InterruptShield, skip_if_package_older_than
 from lib.host import Host
 from lib.netutil import wrap_ip
 
@@ -84,6 +84,7 @@ def test_local_forwarding_to_host_loopback(host: Host, interrupt_shield: Interru
     assert banner.startswith(b'SSH-2.0-OpenSSH_'), f"unexpected data through the tunnel: {banner!r}"
 
 def test_local_forwarding_to_other_address_refused(host: Host, interrupt_shield: InterruptShield) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     # sshd listens on the host management address too, but PermitOpen only allows
     # forwarding towards the loopback
     local_port = _free_local_port()
@@ -91,6 +92,7 @@ def test_local_forwarding_to_other_address_refused(host: Host, interrupt_shield:
     _assert_tunnel_refused(local_port, f"forwarding to {host.hostname_or_ip}:22")
 
 def test_stdio_forwarding_to_other_address_refused(host: Host) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     # ssh -W, which ssh -J relies on to use the host as a jump host, goes through
     # PermitOpen too: the host can't be used as a gateway to another machine.
     # When allowed, ssh -W would print the sshd banner then exit 0 on stdin EOF.
@@ -100,6 +102,7 @@ def test_stdio_forwarding_to_other_address_refused(host: Host) -> None:
     assert res.returncode != 0, f"ssh -W {target} should be refused, got: {res.stdout!r}"
 
 def test_remote_forwarding_refused(host: Host) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     # remote forwardings are requested before the session starts, so the refusal
     # makes ssh exit before running the command
     options = ['-o', 'ExitOnForwardFailure=yes', '-R', '0:localhost:22']
@@ -108,6 +111,7 @@ def test_remote_forwarding_refused(host: Host) -> None:
         ssh(host.hostname_or_ip, 'true', options=options, multiplexing=False)
 
 def test_unix_socket_forwarding_refused(host: Host, interrupt_shield: InterruptShield) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     local_port = _free_local_port()
     _open_local_forward(host, interrupt_shield, local_port, '/var/lib/xcp/xapi')
     _assert_tunnel_refused(local_port, "Unix socket forwarding")

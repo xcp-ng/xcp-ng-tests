@@ -1,5 +1,6 @@
 import pytest
 
+from lib.common import skip_if_package_older_than
 from lib.host import Host
 
 # Checks the hardening directives of the packaged XCP-ng sshd_config.
@@ -34,5 +35,6 @@ def sshd_effective_config(host: Host) -> dict[str, str]:
     return config
 
 @pytest.mark.parametrize("keyword,expected", HARDENING_SETTINGS.items(), ids=list(HARDENING_SETTINGS))
-def test_hardening_setting(sshd_effective_config: dict[str, str], keyword: str, expected: str) -> None:
+def test_hardening_setting(host: Host, sshd_effective_config: dict[str, str], keyword: str, expected: str) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     assert sshd_effective_config.get(keyword) == expected

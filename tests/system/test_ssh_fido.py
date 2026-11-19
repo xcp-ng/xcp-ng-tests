@@ -1,6 +1,6 @@
 import pytest
 
-from lib.common import InterruptShield
+from lib.common import InterruptShield, skip_if_package_older_than
 from lib.host import Host
 
 # We can't use a real FIDO device in CI, so we test that
@@ -33,6 +33,7 @@ def _accepted_pubkey_algorithms(host: Host) -> list[str]:
     pytest.fail("pubkeyacceptedalgorithms not found in sshd -T output")
 
 def test_fido_enabled_by_dropin(host: Host, interrupt_shield: InterruptShield) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     dropin = "/etc/ssh/sshd_config.d/99-xcp-ng-tests-fido.conf"
     with interrupt_shield() as defer:
         host.ssh(f"echo '{FIDO_DROPIN}' > {dropin}")

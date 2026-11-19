@@ -1,6 +1,8 @@
+import pytest
+
 import random
 
-from lib.common import InterruptShield
+from lib.common import InterruptShield, skip_if_package_older_than
 from lib.host import Host
 
 # Requirements:
@@ -10,6 +12,7 @@ SSH_CONFIG_D = "/etc/ssh/ssh_config.d"
 SSHD_CONFIG_D = "/etc/ssh/sshd_config.d"
 
 def test_ssh_config_d_is_included(host: Host, interrupt_shield: InterruptShield) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     marker = str(random.randint(10000, 99999))
     dropin = f"{SSH_CONFIG_D}/99-xcp-ng-tests-include-check.conf"
 

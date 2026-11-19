@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 from lib.commands import SSHCommandFailed, local_cmd, ssh, ssh_with_result
+from lib.common import skip_if_package_older_than
 from lib.host import Host
 
 from typing import Iterator
@@ -129,28 +130,34 @@ def user_keys(host: Host) -> Iterator[Path]:
 
 @pytest.mark.parametrize("algo,accepted", KEX_ALGORITHMS.items(), ids=list(KEX_ALGORITHMS))
 def test_kex_algorithm(host: Host, algo: str, accepted: bool) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     assert _can_connect(host, 'KexAlgorithms', algo) == accepted
 
 @pytest.mark.parametrize("algo,accepted", CIPHERS.items(), ids=list(CIPHERS))
 def test_cipher(host: Host, algo: str, accepted: bool) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     assert _can_connect(host, 'Ciphers', algo) == accepted
 
 @pytest.mark.parametrize("algo,accepted", MACS.items(), ids=list(MACS))
 def test_mac(host: Host, algo: str, accepted: bool) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     # MACs are only negotiated with a non-AEAD cipher
     assert _can_connect(host, 'MACs', algo, ['-o', 'Ciphers=aes256-ctr']) == accepted
 
 @pytest.mark.parametrize("algo,accepted", HOSTKEY_ALGORITHMS.items(), ids=list(HOSTKEY_ALGORITHMS))
 def test_hostkey_algorithm(host: Host, algo: str, accepted: bool) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     assert _can_connect(host, 'HostKeyAlgorithms', algo) == accepted
 
 @pytest.mark.parametrize("algo,accepted", PUBKEY_ALGORITHMS.items(), ids=list(PUBKEY_ALGORITHMS))
 def test_pubkey_algorithm(host: Host, user_keys: Path, algo: str, accepted: bool) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     # the client also restricts host key algorithms to this list, so one matching a host key must remain
     options = ['-i', str(user_keys / f"xcp-ng-ci_test_{algo}"), '-o', 'IdentitiesOnly=yes']
     assert _can_connect(host, 'PubkeyAcceptedAlgorithms', f'{algo},ssh-ed25519', options) == accepted
 
 def test_pq_kex_preferred_by_default(host: Host) -> None:
+    skip_if_package_older_than(host, "openssh", "9.9")
     # The negotiated KEX is the first one of the client's list that the host accepts,
     # so this only proves something if the client's default list starts with a PQ one.
     for line in local_cmd(['ssh', '-G', host.hostname_or_ip]).stdout.splitlines():

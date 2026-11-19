@@ -744,6 +744,10 @@ s.close()
     def is_package_installed(self, package: str) -> bool:
         return self.ssh_with_result(f'rpm -q {package}').returncode == 0
 
+    def get_installed_package_version(self, package: str) -> str | None:
+        res = self.ssh_with_result(f"rpm -q --qf '%{{VERSION}}-%{{RELEASE}}' {package}")
+        return res.stdout if res.returncode == 0 else None
+
     def yum_save_state(self) -> None:
         logging.info(f"[{self}] Save yum state for host")
         # For now, that saved state feature does not support several saved states
