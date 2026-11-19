@@ -34,6 +34,7 @@ from lib.network import Network
 from lib.pif import PIF
 from lib.sr import SR
 from lib.tunnel import Tunnel
+from lib.vdi import VDI
 from lib.vlan import VLAN
 from lib.vm import VM
 from lib.xo import xo_server_add, xo_server_remove, xo_servers
@@ -42,7 +43,6 @@ from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     from lib.pool import Pool
-    from lib.vdi import VDI
 
 XAPI_CONF_FILE = '/etc/xapi.conf'
 XAPI_CONF_DIR = '/etc/xapi.conf.d'
