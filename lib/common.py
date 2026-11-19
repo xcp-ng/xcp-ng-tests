@@ -326,8 +326,6 @@ def skip_if_package_older_than(host: Host, package: str, min_version: str) -> No
     Versions are compared like RPM does, so e.g. openssh 9.9p1 satisfies "9.9".
     """
     for name, value in (("package", package), ("min_version", min_version)):
-        if not isinstance(value, str):
-            raise TypeError(f"skip_if_package_older_than: {name} must be a str, got {type(value).__name__} {value!r}")
         if not value:
             raise ValueError(f"skip_if_package_older_than: {name} must not be empty")
     installed = host.get_installed_package_version(package)

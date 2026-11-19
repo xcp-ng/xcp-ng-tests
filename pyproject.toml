@@ -41,6 +41,7 @@ dev = [
 typeCheckingMode = "standard"
 reportMissingParameterType = "error"
 reportUnknownParameterType = "error"
+reportUnnecessaryIsInstance = "error"
 
 [tool.ty.rules]
 unused-type-ignore-comment = "ignore"
