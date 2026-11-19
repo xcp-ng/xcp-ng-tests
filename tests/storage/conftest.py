@@ -21,6 +21,16 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             items.insert(0, item)
 
 @pytest.fixture(scope='module')
+def vm_start_host(host: Host) -> Host:
+    """
+    Start the test VM on the first host, where the local SRs under test are.
+
+    The tests plug VDIs of the SR under test into a running VM: a VM running
+    on another host of the pool could not use the VDIs of a local SR.
+    """
+    return host
+
+@pytest.fixture(scope='module')
 def storage_test_vm(running_unix_vm: VM) -> Generator[VM, None, None]:
     install_randstream(running_unix_vm)
     yield running_unix_vm
