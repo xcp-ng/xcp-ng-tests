@@ -62,6 +62,7 @@ select = [
   "I",  # isort
   "SLF",  # flake8-self
   "SIM",  # flake8-simplify
+  "TC004",  # runtime-import-in-type-checking-block
   "UP006",  # non-pep585-annotation
   "UP007",  # non-pep604-annotation-union
   "UP037",  # quoted-annotation
