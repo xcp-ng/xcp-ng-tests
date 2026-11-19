@@ -769,7 +769,9 @@ s.close()
         if self.xcp_version.major == 8:
             # TODO: activate those repositories in xcp-ng 9. For now they are not available.
             repositories += ['xcp-ng-testing', 'xcp-ng-updates']
-        self.ssh(f'{self.package_manager} history rollback'
+        # An update may have replaced the package of the running kernel, which
+        # yum protects: an empty protected_packages lets the rollback restore it.
+        self.ssh(f'{self.package_manager} history rollback --setopt=protected_packages='
                  f' --enablerepo={",".join(repositories)} {self.saved_rollback_id} -y')
         pkgs = self.packages()
         if self.saved_packages_list != pkgs:
