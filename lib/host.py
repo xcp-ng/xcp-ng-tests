@@ -241,7 +241,7 @@ class Host:
             file.flush()
             self.scp(file.name, filename)
 
-    def add_xcpng_repo(self, name: str, base_repo: str = 'xcp-ng') -> None:
+    def add_xcpng_repo(self, name: str, base_repo: str = 'xcp-ng', enabled: bool = True) -> None:
         assert base_repo in ['xcp-ng', 'vates']
         base_repo_url = 'http://mirrors.xcp-ng.org/' if base_repo == 'xcp-ng' else 'https://repo.vates.tech/xcp-ng/'
         major = self.xcp_version.major
@@ -250,7 +250,7 @@ class Host:
             f"[xcp-ng-{name}]\n"
             f"name=XCP-ng {name} Repository\n"
             f"baseurl={base_repo_url}/{major}/{version}/{name}/x86_64/\n"
-            "enabled=1\n"
+            f"enabled={int(enabled)}\n"
             "gpgcheck=1\n"
             "repo_gpgcheck=1\n"
             "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-xcpng\n"
