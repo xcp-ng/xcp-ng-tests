@@ -160,9 +160,10 @@ class Pool:
         return None
 
     def first_shared_sr(self) -> SR | None:
-        uuids = safe_split(self.master.xe('sr-list', {'shared': True, 'content-type': 'user'}, minimal=True))
-        if len(uuids) > 0:
-            return SR(uuids[0], self)
+        uuids = safe_split(self.master.xe('sr-list', {'shared': True}, minimal=True))
+        srs = SR.for_vm_disks([SR(uuid, self) for uuid in uuids])
+        if len(srs) > 0:
+            return srs[0]
         return None
 
     def get_vdi_sr_uuid(self, vdi_uuid: str) -> str:

@@ -1050,13 +1050,9 @@ s.close()
         return self.ssh('cat /etc/xensource/pool.conf') == 'master'
 
     def local_vm_srs(self) -> list[SR]:
-        srs = []
         sr_uuids = safe_split(self.xe('pbd-list', {'host-uuid': self.uuid, 'params': 'sr-uuid'}, minimal=True))
-        for sr_uuid in sr_uuids:
-            sr = SR(sr_uuid, self.pool)
-            if sr.content_type() == 'user' and not sr.is_shared():
-                srs.append(sr)
-        return srs
+        srs = [SR(sr_uuid, self.pool) for sr_uuid in sr_uuids]
+        return SR.for_vm_disks([sr for sr in srs if not sr.is_shared()])
 
     def main_sr_uuid(self) -> str:
         """ Main SR is the default SR, the first local SR, or a specific SR depending on data.py's DEFAULT_SR. """
@@ -1071,11 +1067,13 @@ s.close()
                                                   'param-name': 'name-label'})
             local_sr_uuids = safe_split(
                 # xe sr-list doesn't support filtering by host UUID!
-                self.xe('sr-list', {'host': hostname, 'content-type': 'user', 'minimal': 'true'}),
+                self.xe('sr-list', {'host': hostname, 'minimal': 'true'}),
                 ','
             )
             # We don't want a SR added by the test, so choose one that already existed
-            pre_existing_local_sr_uuids = sorted(set(self.pool.pre_existing_sr_uuids) & set(local_sr_uuids))
+            pre_existing_local_srs = [SR(sr_uuid, self.pool) for sr_uuid in sorted(local_sr_uuids)
+                                      if sr_uuid in self.pool.pre_existing_sr_uuids]
+            pre_existing_local_sr_uuids = [sr.uuid for sr in SR.for_vm_disks(pre_existing_local_srs)]
             assert pre_existing_local_sr_uuids, (
                 f"DEFAULT_SR=='local' so there must be a pre-existing local SR on host {self}"
             )
