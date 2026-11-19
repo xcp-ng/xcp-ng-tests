@@ -69,7 +69,10 @@ class VM(BaseVM):
         args: XeParams = {'uuid': self.uuid}
         if on is not None:
             args['on'] = on
-        return self.host.xe('vm-start', args)
+        ret = self.host.xe('vm-start', args)
+        # xapi chooses the host when `on` is not given
+        self.host = self.get_residence_host()
+        return ret
 
     def shutdown(self, force: bool = False, verify: bool = False, force_if_fails: bool = False) -> str:
         assert not (force and force_if_fails), "force and force_if_fails cannot be both True"
@@ -226,6 +229,8 @@ class VM(BaseVM):
     def resume(self) -> None:
         logging.info("Resume VM")
         self.host.xe('vm-resume', {'uuid': self.uuid})
+        # xapi chooses the host the VM resumes on
+        self.host = self.get_residence_host()
 
     def pause(self, verify: bool = False) -> None:
         logging.info("Pause VM")
