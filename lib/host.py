@@ -764,6 +764,12 @@ s.close()
             "Can't restore previous state without a package list: no rollback id"
 
         assert isinstance(self.saved_rollback_id, int)
+        saved_packages_list = self.saved_packages_list
+        saved_rollback_id = self.saved_rollback_id
+        # Forget the saved state now, even if the rollback fails below: keeping
+        # it would only make the next yum_save_state() fail as well.
+        self.saved_packages_list = None
+        self.saved_rollback_id = None
 
         repositories = ['xcp-ng-base']
         if self.xcp_version.major == 8:
@@ -772,18 +778,15 @@ s.close()
         # An update may have replaced the package of the running kernel, which
         # yum protects: an empty protected_packages lets the rollback restore it.
         self.ssh(f'{self.package_manager} history rollback --setopt=protected_packages='
-                 f' --enablerepo={",".join(repositories)} {self.saved_rollback_id} -y')
+                 f' --enablerepo={",".join(repositories)} {saved_rollback_id} -y')
         pkgs = self.packages()
-        if self.saved_packages_list != pkgs:
-            missing = [x for x in self.saved_packages_list if x not in set(pkgs)]
-            extra = [x for x in pkgs if x not in set(self.saved_packages_list) and not x.startswith("gpg-pubkey-")]
+        if saved_packages_list != pkgs:
+            missing = [x for x in saved_packages_list if x not in set(pkgs)]
+            extra = [x for x in pkgs if x not in set(saved_packages_list) and not x.startswith("gpg-pubkey-")]
             if missing or extra:
                 raise Exception(
                     "Yum state badly restored. Missing: [%s], extra: [%s]." % (' '.join(missing), ' '.join(extra))
                 )
-        # We can resave a new state after that.
-        self.saved_packages_list = None
-        self.saved_rollback_id = None
 
     def service_started(self, name: str) -> bool:
         return self.ssh(f'systemctl is-active {name}', check=False) == 'active'
