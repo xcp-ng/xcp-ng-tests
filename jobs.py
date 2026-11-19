@@ -674,6 +674,17 @@ JOBS: dict[str, JobData] = {
         "params": {},
         "paths": ["tests/misc/test_pool.py"],
     },
+    "host-crash": {
+        "description": "Tests that crash a host on purpose, e.g. to check that crash dumps are collected",
+        "requirements": [
+            "A XCP-ng host >= 8.3, crashed and rebooted by the tests, which may leave large files.",
+            "A nested host from the install cache which is destroyed after the run.",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests"],
+        "markers": "host_crash",
+    },
     "limit-tests": {
         "description": "Tests verifying we can hit our supported limits",
         "requirements": [
