@@ -325,9 +325,6 @@ def skip_if_package_older_than(host: Host, package: str, min_version: str) -> No
 
     Versions are compared like RPM does, so e.g. openssh 9.9p1 satisfies "9.9".
     """
-    for name, value in (("package", package), ("min_version", min_version)):
-        if not value:
-            raise ValueError(f"skip_if_package_older_than: {name} must not be empty")
     installed = host.get_installed_package_version(package)
     if installed is None:
         pytest.fail(f"This test requires {package} which is not installed on host {host.hostname_or_ip}")
