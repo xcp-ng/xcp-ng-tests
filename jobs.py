@@ -189,6 +189,16 @@ JOBS: dict[str, JobData] = {
         "nb_pools": 1,
         "params": {},
         "paths": ["tests/packages"],
+        "markers": "not reboot",
+    },
+    "kernel-preview": {
+        "description": "updates to the xcp-ng-kernelpreview kernel and modules, then downgrades back (reboots)",
+        "requirements": [
+            "A disposable XCP-ng 8.3 host with access to the xcp-ng-kernelpreview repository.",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/packages/kernel_preview"],
         "markers": "",
     },
     "storage-main": {

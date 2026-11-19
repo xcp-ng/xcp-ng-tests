@@ -144,6 +144,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
              " Accepts sizes like '512', '4KiB', '1MiB'. A value of 1 is equivalent to no alignment."
     )
     parser.addoption(
+        "--kernelpreview-repo",
+        action="store",
+        default="xcp-ng-kernelpreview",
+        help="Yum repository id holding the preview kernel and modules for tests/packages/kernel_preview."
+             " If the host doesn't define it, it is added (disabled), which requires a name starting with 'xcp-ng-'."
+    )
+    parser.addoption(
+        "--kernelpreview-base-repo",
+        action="store",
+        choices=["xcp-ng", "vates"],
+        default="xcp-ng",
+        help="Where to fetch --kernelpreview-repo from when the host doesn't define it:"
+             " mirrors.xcp-ng.org (xcp-ng) or repo.vates.tech (vates)."
+    )
+    parser.addoption(
         "--no-fail-if-no-tests",
         action="store_true",
         default=False,
