@@ -1,4 +1,4 @@
-from lib.common import Defer
+from lib.common import InterruptShield
 from lib.host import Host
 
 # Regression test for sshd silently ignoring /etc/ssh/sshd_config.d/*.conf
@@ -14,12 +14,13 @@ from lib.host import Host
 
 SSHD_CONFIG_D = "/etc/ssh/sshd_config.d"
 
-def test_sshd_config_d_is_included(host: Host, defer: Defer) -> None:
+def test_sshd_config_d_is_included(host: Host, interrupt_shield: InterruptShield) -> None:
     marker = host.ssh('mktemp')
     dropin = f"{SSHD_CONFIG_D}/99-xcp-ng-tests-include-check.conf"
 
-    host.ssh(f"echo 'Banner {marker}' > {dropin}")
-    defer(lambda: host.ssh(f"rm -f {dropin}"))
+    with interrupt_shield() as defer:
+        host.ssh(f"echo 'Banner {marker}' > {dropin}")
+        defer(lambda: host.ssh(f"rm -f {dropin}"))
 
     effective_config = host.ssh("/usr/sbin/sshd -T")
     assert f"banner {marker}" in effective_config, (

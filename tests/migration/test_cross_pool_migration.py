@@ -2,15 +2,16 @@ import pytest
 
 import logging
 
-from lib.common import Defer, wait_for, wait_for_not
+from lib.common import InterruptShield, wait_for, wait_for_not
 from lib.host import Host
 from lib.vm import VM
 
 @pytest.mark.multi_vms # run on a variety of VMs
 @pytest.mark.big_vm # and also on a really big VM ideally
-def test_cross_pool_migration(hostB1: Host, imported_vm: VM, defer: Defer) -> None:
-    vm = imported_vm.clone()
-    defer(lambda: vm.destroy())
+def test_cross_pool_migration(hostB1: Host, imported_vm: VM, interrupt_shield: InterruptShield) -> None:
+    with interrupt_shield() as defer:
+        vm = imported_vm.clone()
+        defer(lambda: vm.destroy())
     vm.start()
     vm.wait_for_os_booted()
     vm.migrate(hostB1)
