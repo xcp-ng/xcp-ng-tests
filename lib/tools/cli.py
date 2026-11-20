@@ -28,7 +28,8 @@ def _command_clean(args: argparse.Namespace) -> int:
     if args.inventory:
         inventory = load_inventory(args.inventory)
     else:
-        inventory = into_inventory(args.hosts, [], args.hosting_pool)
+        # Hosting pool information is not used by the clean task
+        inventory = into_inventory(args.hosts, [], hosting_pool=None)
 
     return clean_pools(inventory, dry_run=args.dry_run)
 
@@ -105,8 +106,8 @@ def cli() -> None:
     # subparser - command: clean
     subparser_cmd_clean = subparsers.add_parser(
         name="clean",
-        description="Remove all VMs, snapshorts and VDIs on local storage from target pools",
-        help="Remove all VMs, snapshorts and VDIs on local storage from target pools",
+        description="Remove all VMs, snapshorts and VDIs on local and shared storage from target pools",
+        help="Remove all VMs, snapshorts and VDIs on local and shared storage from target pools",
     )
     cmd_clean_excl_grp = subparser_cmd_clean.add_mutually_exclusive_group(required=True)
     cmd_clean_excl_grp.add_argument(
