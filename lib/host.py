@@ -49,6 +49,10 @@ XAPI_CONF_DIR = '/etc/xapi.conf.d'
 
 CACHED_VM_UUID_KEY = "xcpng_tests.cached_vm_uuid"
 
+# Start of the lines with which xe reports the parameters a command ignored,
+# when given report-ignored-params=warn.
+IGNORED_PARAMETER_PREFIX = 'Ignored parameter: '
+
 
 def host_data(hostname_or_ip: str) -> dict[str, str]:
     # read from data.py
@@ -217,10 +221,35 @@ class Host:
 
         command: str = f'xe {action}{maybe_param_minimal}{maybe_param_force} ' + \
             ' '.join(stringify(key, value) for key, value in args.items())
+        if not self.can_report_ignored_params:
+            if simple_output:
+                return self.ssh(command, check=check, simple_output=True)
+            else:
+                return self.ssh(command, check=check, simple_output=False)
+
+        # xe reports the ignored parameters on stderr, which ssh mixes into
+        # the output: take the report lines out of it, so that callers get
+        # the same output as without the report.
+        command += ' report-ignored-params=warn'
+        result = self.ssh(command, check=False, simple_output=False)
+        lines = result.stdout.splitlines(keepends=True)
+        ignored = [line[len(IGNORED_PARAMETER_PREFIX):].strip()
+                   for line in lines if line.startswith(IGNORED_PARAMETER_PREFIX)]
+        output = ''.join(line for line in lines if not line.startswith(IGNORED_PARAMETER_PREFIX))
+
+        # A failed command may not have got as far as reading some of its
+        # parameters, so the report only counts for successful ones.
+        if result.returncode != 0:
+            if check:
+                raise commands.SSHCommandFailed(result.returncode, output.strip(), command,
+                                                ssherr=result.ssherr)
+        elif ignored:
+            logging.warning("xe ignored parameter(s) %s in: %s", ", ".join(ignored), command)
+
         if simple_output:
-            return self.ssh(command, check=check, simple_output=True)
+            return output.strip()
         else:
-            return self.ssh(command, check=check, simple_output=False)
+            return commands.SSHResult[str](result.returncode, output, ssherr=result.ssherr)
 
     @overload
     def param_get(self, param_name: str, key: str | None = ...,
