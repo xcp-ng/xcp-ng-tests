@@ -12,7 +12,6 @@ from lib.vdi import ImageFormat
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
-    from lib.common import DiskDevName
     from lib.host import Host
     from lib.pool import Pool
 
@@ -24,13 +23,13 @@ if TYPE_CHECKING:
 
 # package scope because previous test packages may have used the disk
 @pytest.fixture(scope='package')
-def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[DiskDevName]:
+def sr_disk_wiped(host: Host, unused_512B_disks: dict[Host, list[Host.BlockDeviceInfo]]) -> Generator[str]:
     """A disk on MASTER HOST OF FIRST POOL which we wipe."""
     host_disks = unused_512B_disks[host]
     assert host_disks, f"No 512B disk available on host {host}"
-    sr_disk = host_disks[0].name
+    sr_disk = host_disks[0].path
     logging.info(">> wipe disk %s" % sr_disk)
-    host.ssh(f'wipefs -a /dev/{sr_disk}')
+    host.ssh(f'wipefs -a {sr_disk}')
     yield sr_disk
 
 # package scope so that the device is unmounted before tests from the next package is executed.
@@ -41,7 +40,7 @@ def formatted_and_mounted_ext4_disk(host: Host, unused_512B_disks: dict[Host, li
     mountpoint = '/var/tmp/sr_disk_mountpoint'
     host_disks = unused_512B_disks[host]
     assert host_disks, f"No 512B disk available on host {host}"
-    sr_disk = host_disks[0].name
+    sr_disk = host_disks[0].path
     setup_formatted_and_mounted_disk(host, sr_disk, 'ext4', mountpoint)
     yield mountpoint
     teardown_formatted_and_mounted_disk(host, mountpoint)
@@ -117,9 +116,9 @@ def xfs_sr_on_hostA2(
     _xfs_config_on_hostA2: XfsConfig,
 ) -> Generator[SR, None, None]:
     """ A XFS SR on first host. """
-    sr_disk = unused_512B_disks[hostA2_with_xfsprogs][0].name
+    sr_disk = unused_512B_disks[hostA2_with_xfsprogs][0].path
     sr = hostA2_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
-                                        {'device': '/dev/' + sr_disk,
+                                        {'device': sr_disk,
                                          'preferred-image-formats': image_format})
     yield sr
     # teardown
@@ -157,9 +156,9 @@ def xfs_sr_on_hostB1(
     _xfs_config_on_hostB1: XfsConfig,
 ) -> Generator[SR, None, None]:
     """ A XFS SR on first host. """
-    sr_disk = unused_512B_disks[hostB1_with_xfsprogs][0].name
+    sr_disk = unused_512B_disks[hostB1_with_xfsprogs][0].path
     sr = hostB1_with_xfsprogs.sr_create('xfs', "XFS-local-SR-test",
-                                        {'device': '/dev/' + sr_disk,
+                                        {'device': sr_disk,
                                          'preferred-image-formats': image_format})
     yield sr
     # teardown

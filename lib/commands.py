@@ -15,6 +15,11 @@ from typing import TYPE_CHECKING, Generic, Literal, TypeVar, overload
 if TYPE_CHECKING:
     from lib.common import HostAddress
 
+# Detached commands: the commands are started in their own process group, out of the terminal's foreground job, so that
+# a Ctrl+C in a terminal only reaches pytest, as when pytest alone is sent SIGINT (see lib/graceful_interrupt.py): a
+# shielded section, or a fixture setup or teardown, isn't cut short by its commands dying. And they're given no input
+# (stdin): a process outside the foreground job reading the terminal is stopped.
+
 class BaseCommandFailed(Exception):
     __slots__ = 'returncode', 'stdout', 'cmd'
 
@@ -115,8 +120,10 @@ def _ssh(
         with tempfile.NamedTemporaryFile(suffix='.log', prefix='ssh_err_banner_', mode='r') as banner_log_file:
             banner_res = subprocess.run(
                 ['ssh', f'root@{hostname_or_ip}'] + opts + ['-E', banner_log_file.name] + ['\n'],
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                process_group=0,  # Detached command: see the top of the module
                 check=False
             )
             banner_ssherr = banner_log_file.read()
@@ -128,8 +135,10 @@ def _ssh(
         logging.debug(f"[{hostname_or_ip}] {cmd}")
         subprocess.Popen(
             ssh_cmd,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT
+            stderr=subprocess.STDOUT,
+            process_group=0,  # Detached command: see the top of the module
         )
         return None
 
@@ -140,17 +149,25 @@ def _ssh(
         logging.debug(f"[{hostname_or_ip}] {cmd}")
         process = subprocess.Popen(
             ssh_cmd,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT
+            stderr=subprocess.STDOUT,
+            process_group=0,  # Detached command: see the top of the module
         )
 
         stdout = []
         assert process.stdout is not None
-        for line in iter(process.stdout.readline, b''):
-            readable_line = line.decode(errors='replace').strip()
-            stdout.append(line)
-            logging.debug("> %s", readable_line)
-        _, stderr = process.communicate()
+        try:
+            for line in iter(process.stdout.readline, b''):
+                readable_line = line.decode(errors='replace').strip()
+                stdout.append(line)
+                logging.debug("> %s", readable_line)
+            _, stderr = process.communicate()
+        except BaseException:
+            # Interrupted (Ctrl+C in a test): abandon the command, as subprocess.run() does (the remote command goes on)
+            process.kill()
+            process.wait()
+            raise
         res = subprocess.CompletedProcess(ssh_cmd, process.returncode, b''.join(stdout), stderr)
 
         ssherr = ssh_log_file.read()
@@ -265,7 +282,7 @@ def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         # Suppress warnings and questions related to host key fingerprints
         # because on a test network IPs get reused, VMs are reinstalled, etc.
         # Based on https://unix.stackexchange.com/a/365976/257493
-        opts = ['-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', '-o', 'UserKnownHostsFile=/dev/null']
+        opts += ['-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', '-o', 'UserKnownHostsFile=/dev/null']
 
     ip = wrap_ip(hostname_or_ip)
     if local_dest:
@@ -278,6 +295,7 @@ def scp(hostname_or_ip: HostAddress, src: str, dest: str, check: bool = True,
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        process_group=0,  # Detached command: see the top of the module
         check=False
     )
 
@@ -307,6 +325,7 @@ def sftp(
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        process_group=0,  # Detached command: see the top of the module
         check=False
     )
 
@@ -337,8 +356,10 @@ def local_cmd(
     logging.debug("[local] %s", (cmd,))
     res = subprocess.run(
         cmd,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        process_group=0,  # Detached command: see the top of the module
         check=False,
         cwd=cwd,
     )

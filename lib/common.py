@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import traceback
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
@@ -23,6 +24,7 @@ from uuid import UUID
 import requests
 from passlib.hash import sha512_crypt
 from pydantic import TypeAdapter
+from rpm_version import Evr  # type: ignore[import-untyped]
 
 from typing import (
     TYPE_CHECKING,
@@ -119,6 +121,7 @@ T = TypeVar("T")
 HostAddress: TypeAlias = str
 DiskDevName: TypeAlias = str
 Defer: TypeAlias = Callable[[Callable[[], object]], None]
+InterruptShield: TypeAlias = Callable[[], AbstractContextManager[Defer]]
 XeParams: TypeAlias = dict[str, str | bool | dict[str, str]]
 
 class PackageManagerEnum(Enum):
@@ -315,15 +318,33 @@ def strip_suffix(string: str, suffix: str) -> str:
         return string[:-len(suffix)]
     return string
 
-def setup_formatted_and_mounted_disk(host: Host, sr_disk: str, fs_type: str, mountpoint: str) -> None:
+def skip_if_package_older_than(host: Host, package: str, min_version: str) -> None:
+    """
+    Skip the test if a package installed on the host is older than min_version.
+    Fail the test if the package is not installed at all.
+
+    Versions are compared like RPM does, so e.g. openssh 9.9p1 satisfies "9.9".
+    """
+    for name, value in (("package", package), ("min_version", min_version)):
+        if not isinstance(value, str):
+            raise TypeError(f"skip_if_package_older_than: {name} must be a str, got {type(value).__name__} {value!r}")
+        if not value:
+            raise ValueError(f"skip_if_package_older_than: {name} must not be empty")
+    installed = host.get_installed_package_version(package)
+    if installed is None:
+        pytest.fail(f"This test requires {package} which is not installed on host {host.hostname_or_ip}")
+    if Evr.parse(installed) < Evr.parse(min_version):
+        pytest.skip(f"This test requires {package} >= {min_version} on host {host.hostname_or_ip} "
+                    f"(found {installed})")
+
+def setup_formatted_and_mounted_disk(host: Host, device: str, fs_type: str, mountpoint: str) -> None:
     if fs_type == 'ext4':
         option_force = '-F'
     elif fs_type == 'xfs':
         option_force = '-f'
     else:
         raise Exception(f"Unsupported fs_type '{fs_type}' in this function")
-    device = '/dev/' + sr_disk
-    logging.info(f">> Format sr_disk {sr_disk} and mount it on host {host}")
+    logging.info(f">> Format sr_disk {device} and mount it on host {host}")
     host.ssh(f'mkfs.{fs_type} {option_force} {device}')
     host.ssh(f'rm -rf {mountpoint}') # Remove any existing leftover to ensure rmdir will not fail in teardown
     host.ssh(f'mkdir -p {mountpoint}')

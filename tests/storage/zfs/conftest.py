@@ -49,11 +49,11 @@ def host_with_zfs(host_without_zfs: Host,
 
 @pytest.fixture(scope='package')
 def zpool_vol0(sr_disk_wiped: str, host_with_zfs: Host) -> Generator[None, None, None]:
-    host_with_zfs.ssh(f'zpool create -f {POOL_NAME} /dev/{sr_disk_wiped}')
+    host_with_zfs.ssh(f'zpool create -f {POOL_NAME} {sr_disk_wiped}')
     yield
     # teardown
     host_with_zfs.ssh(f'zpool destroy {POOL_NAME}')
-    host_with_zfs.ssh(f'wipefs -a /dev/{sr_disk_wiped}')
+    host_with_zfs.ssh(f'wipefs -a {sr_disk_wiped}')
 
 @pytest.fixture(scope='package')
 def zfs_sr(host: Host, image_format: ImageFormat, zpool_vol0: None) -> Generator[SR, None, None]:

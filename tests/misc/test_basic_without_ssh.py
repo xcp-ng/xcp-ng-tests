@@ -2,7 +2,7 @@ import pytest
 
 import logging
 
-from lib.common import Defer, wait_for
+from lib.common import InterruptShield, wait_for
 from lib.host import Host
 from lib.sr import SR
 from lib.vm import VM
@@ -59,18 +59,20 @@ class TestBasicNoSSH:
         vm.resume()
         vm.wait_for_os_booted()
 
-    def test_snapshot(self, imported_vm: VM, defer: Defer) -> None:
+    def test_snapshot(self, imported_vm: VM, interrupt_shield: InterruptShield) -> None:
         vm = imported_vm
-        snapshot = vm.snapshot()
-        defer(lambda: snapshot.destroy(verify=True))
+        with interrupt_shield() as defer:
+            snapshot = vm.snapshot()
+            defer(lambda: snapshot.destroy(verify=True))
         snapshot.revert()
         vm.start()
         vm.wait_for_os_booted()
 
-    def test_checkpoint(self, imported_vm: VM, defer: Defer) -> None:
+    def test_checkpoint(self, imported_vm: VM, interrupt_shield: InterruptShield) -> None:
         vm = imported_vm
-        snapshot = vm.checkpoint()
-        defer(lambda: snapshot.destroy(verify=True))
+        with interrupt_shield() as defer:
+            snapshot = vm.checkpoint()
+            defer(lambda: snapshot.destroy(verify=True))
         snapshot.revert()
         vm.resume()
         vm.wait_for_os_booted()

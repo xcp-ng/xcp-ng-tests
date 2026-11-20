@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from lib.common import Defer
+from lib.common import InterruptShield
 from lib.network import Network
 from lib.vm import VM
 
@@ -15,11 +15,12 @@ from . import tcpdump
 # - A VM to import
 
 def start_vm_on_trunk(
-    defer: Defer, vm: VM, network: Network, clone_vm: bool, name: str, trunks: str = ""
+    interrupt_shield: InterruptShield, vm: VM, network: Network, clone_vm: bool, name: str, trunks: str = ""
 ) -> tuple[VM, str]:
     if clone_vm:
-        vm = vm.clone()
-        defer(lambda: vm.destroy())
+        with interrupt_shield() as defer:
+            vm = vm.clone()
+            defer(lambda: vm.destroy())
 
     vm.param_set("name-label", name)
 
@@ -38,10 +39,11 @@ def start_vm_on_trunk(
 @pytest.mark.small_vm
 class TestBasic:
     def test_passing(
-        self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM
+        self, interrupt_shield: InterruptShield, empty_network: Network, imported_vm: VM,
+        vm_with_tcpdump_scope_function: VM
     ) -> None:
         vm_writer, ifaceW = start_vm_on_trunk(
-            defer,
+            interrupt_shield,
             vm=imported_vm,
             network=empty_network,
             clone_vm=True,
@@ -49,7 +51,7 @@ class TestBasic:
         )
 
         vm_reader, ifaceR = start_vm_on_trunk(
-            defer,
+            interrupt_shield,
             vm=vm_with_tcpdump_scope_function,
             network=empty_network,
             clone_vm=False,
@@ -62,7 +64,7 @@ class TestBasic:
         vm_writer.ssh(f"ip addr add 192.168.42.1/24 dev {ifaceW}.42")
         vm_writer.ssh(f"ip link set {ifaceW}.42 up")
 
-        with tcpdump(defer, "tcpdump.pcap", vm_reader, ifaceR, "vlan 42 and arp", count=1):
+        with tcpdump(interrupt_shield, "tcpdump.pcap", vm_reader, ifaceR, "vlan 42 and arp", count=1):
             # send some packets on VLAN 42 (ARP packets will be send)
             vm_writer.ssh("ping -c1 -w1 192.168.42.2", check=False)
 
@@ -70,10 +72,11 @@ class TestBasic:
         vm_reader.ssh("test $(tcpdump -n -r tcpdump.pcap | wc -l) -gt 0")
 
     def test_filtered(
-        self, defer: Defer, empty_network: Network, imported_vm: VM, vm_with_tcpdump_scope_function: VM
+        self, interrupt_shield: InterruptShield, empty_network: Network, imported_vm: VM,
+        vm_with_tcpdump_scope_function: VM
     ) -> None:
         vm_writer, ifaceW = start_vm_on_trunk(
-            defer,
+            interrupt_shield,
             vm=imported_vm,
             network=empty_network,
             clone_vm=True,
@@ -81,7 +84,7 @@ class TestBasic:
         )
 
         vm_reader, ifaceR = start_vm_on_trunk(
-            defer,
+            interrupt_shield,
             vm=vm_with_tcpdump_scope_function,
             network=empty_network,
             clone_vm=False,
@@ -94,7 +97,7 @@ class TestBasic:
         vm_writer.ssh(f"ip addr add 192.168.42.1/24 dev {ifaceW}.42")
         vm_writer.ssh(f"ip link set {ifaceW}.42 up")
 
-        with tcpdump(defer, "tcpdump.pcap", vm_reader, ifaceR, "vlan 42 and arp", count=1):
+        with tcpdump(interrupt_shield, "tcpdump.pcap", vm_reader, ifaceR, "vlan 42 and arp", count=1):
             # send some packets on VLAN 42 (ARP packets will be send)
             vm_writer.ssh("ping -c1 -w1 192.168.42.2", check=False)
 

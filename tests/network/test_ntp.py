@@ -5,8 +5,9 @@ import pytest
 import logging
 import re
 from enum import StrEnum
+from textwrap import dedent
 
-from lib.common import Defer, safe_split
+from lib.common import InterruptShield, safe_split
 from lib.host import Host
 
 # Requirements:
@@ -115,15 +116,17 @@ def host_ntpconf(host: Host) -> NtpService:
 @pytest.mark.no_vm
 class TestNtpMode:
 
-    def test_idempotence(self, host: Host, defer: Defer) -> None:
+    def test_idempotence(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test that mode -> newmode -> mode is idempotent
         """
-        initial_mode = host_ntp_mode(host)
-        defer(lambda: host_ntp_mode(host, initial_mode))
+        with interrupt_shield() as defer:
+            initial_mode = host_ntp_mode(host)
+            defer(lambda: host_ntp_mode(host, initial_mode))
 
-        previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
-        defer(lambda: host_ntp_custom_servers(host, previous_servers))
+        with interrupt_shield() as defer:
+            previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
+            defer(lambda: host_ntp_custom_servers(host, previous_servers))
 
         for mode1 in NtpMode:
             for mode2 in NtpMode:
@@ -140,12 +143,13 @@ class TestNtpMode:
                 if configA != configB:
                     pytest.fail(f"idempotence failed in {mode1} -> {mode2} -> {mode1}")
 
-    def test_factory(self, host: Host, defer: Defer) -> None:
+    def test_factory(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=Factory
         """
-        previous = host_ntp_mode(host, NtpMode.Factory)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.Factory)
+            defer(lambda: host_ntp_mode(host, previous))
 
         factory_defaults = host_xapi_factory_ntp_servers(host)
         logging.debug(f"Default factory servers: {factory_defaults}")
@@ -165,12 +169,13 @@ class TestNtpMode:
             if server not in factory_defaults:
                 pytest.fail("configured ntp servers aren't the factory ones")
 
-    def test_dhcp(self, host: Host, defer: Defer) -> None:
+    def test_dhcp(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=DHCP
         """
-        previous = host_ntp_mode(host, NtpMode.DHCP)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.DHCP)
+            defer(lambda: host_ntp_mode(host, previous))
 
         ntpconf = host_ntpconf(host)
 
@@ -183,15 +188,131 @@ class TestNtpMode:
         if ntpconf.servers != []:
             pytest.fail("ntp configuration has static servers configured")
 
-    def test_custom(self, host: Host, defer: Defer) -> None:
+    @pytest.mark.reboot
+    def test_dhcp_with_reset(self, host: Host, interrupt_shield: InterruptShield) -> None:
+        """
+        Test for ntp-mode=DHCP
+        The host will be first rebooted to use DHCP (or the test will be skipped if it is already in DHCP).
+        The test is done offline and result read once the host rebooted again in its previous network configuration.
+        """
+        mgmt_pif = host.management_pif()
+
+        mode = mgmt_pif.ip_configuration_mode()
+        device = mgmt_pif.device()
+        vlan = mgmt_pif.vlan()
+
+        cmd_restore = [
+            "/opt/xensource/bin/xe-reset-networking",
+            f"--mode={mode}",
+            f"--device={device}",
+            "--novlan" if vlan is None else f"--vlan={vlan}",
+        ]
+        if mode == 'Static':
+            for name in ['IP', 'netmask', 'gateway', 'DNS']:
+                value = mgmt_pif.param_get(name)
+                if value:
+                    cmd_restore.append(f"--{name.lower()}={value}")
+
+        elif mode == 'DHCP':
+            pytest.skip("Skipping as already in mode=DHCP")
+
+        else:
+            pytest.fail(f"unsupported IP-configuration-mode: {mode}")
+
+        # set ntp-mode=DHCP now
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.DHCP)
+            defer(lambda: host_ntp_mode(host, previous))
+
+        # install a self-disabling systemd oneshot unit
+        with interrupt_shield() as defer:
+            host.create_file(
+                "/root/run-once.service",
+                dedent("""
+                    [Unit]
+                    Description=Run a command once on next boot
+                    After=xapi-init-complete.target
+                    Wants=xapi-init-complete.target
+                    ConditionPathExists=/root/run-once.sh
+
+                    [Service]
+                    Type=oneshot
+                    ExecStart=/bin/bash /root/run-once.sh
+
+                    [Install]
+                    WantedBy=multi-user.target
+                """),
+            )
+            defer(lambda: host.ssh("rm -f /root/run-once.service"))
+
+        # install script which will be run by the unit
+        with interrupt_shield() as defer:
+            host.create_file(
+                "/root/run-once.sh",
+                dedent(f"""
+                    #!/bin/bash
+                    PATH=/opt/xensource/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+
+                    >/root/run-once.log
+
+                    # check hook filemode
+                    if [ -x /etc/dhcp/dhclient.d/chrony.sh ]; then
+                        echo "HOOK=yes" >>/root/run-once.log
+                    else
+                        echo "HOOK=no" >>/root/run-once.log
+                    fi
+
+                    # reset to previous ntp-mode before rebooting
+                    xe host-param-set uuid={host.uuid} ntp-mode={previous}
+
+                    # restore (and reboot)
+                    mv -f /root/run-once.sh /root/run-once.sh.old
+                    echo yes | {' '.join(cmd_restore)}
+                """.strip()),
+            )
+            defer(lambda: host.ssh("rm -f /root/run-once.sh /root/run-once.sh.old /root/run-once.log"))
+
+        # enable the unit
+        with interrupt_shield() as defer:
+            host.ssh("systemctl enable /root/run-once.service")
+            defer(lambda: host.ssh("systemctl disable /root/run-once.service"))
+
+        # remove log file (to ensure that the one we will read is from this run)
+        host.ssh("rm -f /root/run-once.log")
+
+        # host will:
+        # - reboot with ntp-mode=DHCP (and alternate IP)
+        # - run `run-once.service` unit
+        # - reboot with ntp-mode={previous} and get back at the previous IP
+        cmd_reset_to_dhcp = [
+            "/opt/xensource/bin/xe-reset-networking",
+            "--mode=DHCP",
+            f"--device={device}",
+            "--novlan" if vlan is None else f"--vlan={vlan}",
+        ]
+        host.ssh(f"( sleep 1 ; echo yes | {' '.join(cmd_reset_to_dhcp)} ) &")
+
+        host.wait_for_host_down()
+        host.wait_for_host_up()
+        host.wait_for_ssh_reachable()
+        host.wait_for_xapi_enabled()
+
+        # check for results
+        output = host.ssh("cat /root/run-once.log")
+        if output != "HOOK=yes":
+            pytest.fail("ntp configuration has no DHCP enabled ntp servers")
+
+    def test_custom(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=Custom
         """
-        previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
-        defer(lambda: host_ntp_custom_servers(host, previous_servers))
+        with interrupt_shield() as defer:
+            previous_servers = host_ntp_custom_servers(host, TEST_NTP_SERVERS)
+            defer(lambda: host_ntp_custom_servers(host, previous_servers))
 
-        previous = host_ntp_mode(host, NtpMode.Custom)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.Custom)
+            defer(lambda: host_ntp_mode(host, previous))
 
         ntpconf = host_ntpconf(host)
 
@@ -206,12 +327,13 @@ class TestNtpMode:
         if servers != custom_servers:
             pytest.fail("ntp servers aren't the custom ones")
 
-    def test_disabled(self, host: Host, defer: Defer) -> None:
+    def test_disabled(self, host: Host, interrupt_shield: InterruptShield) -> None:
         """
         Test for ntp-mode=Disabled
         """
-        previous = host_ntp_mode(host, NtpMode.Disabled)
-        defer(lambda: host_ntp_mode(host, previous))
+        with interrupt_shield() as defer:
+            previous = host_ntp_mode(host, NtpMode.Disabled)
+            defer(lambda: host_ntp_mode(host, previous))
 
         ntpconf = host_ntpconf(host)
 

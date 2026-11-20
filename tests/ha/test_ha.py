@@ -13,7 +13,7 @@ import logging
 import time
 from functools import partial
 
-from lib.common import Defer
+from lib.common import Defer, InterruptShield
 from lib.host import Host
 from lib.sr import SR
 from lib.vm import VM
@@ -21,7 +21,6 @@ from tests.ha.ha import (
     HA_FAILOVER_TIMEOUT_SECS,
     HA_SETTLE_SECS,
     assert_not_rebooted,
-    cleanup_ha_scenario,
     enable_pool_ha,
     prepare_pool_for_ha,
     recover_from_fence,
@@ -48,15 +47,15 @@ class TestHaScenario:
     @pytest.mark.reboot
     @pytest.mark.parametrize('failed_role', ROLES)
     def test_host_failure(
-        self, failed_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, failed_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR,
+        interrupt_shield: InterruptShield,
     ) -> None:
         pool = host.pool
         master, slave = prepare_pool_for_ha(pool)
         failed, survivor = (master, slave) if failed_role == 'master' else (slave, master)
-        defer(lambda: cleanup_ha_scenario(pool))
 
         start_ha_vm(ha_protected_vm, on_host=failed)
-        enable_pool_ha(pool, nfs_sr)
+        enable_pool_ha(pool, nfs_sr, interrupt_shield)
         failed.hard_power_off(verify=True)
         wait_for_failover(pool, ha_protected_vm, survivor, f'after hard power-off of {failed}')
         recover_from_fence(pool, failed, survivor)
@@ -64,15 +63,15 @@ class TestHaScenario:
     @pytest.mark.reboot
     @pytest.mark.parametrize('failed_role', ROLES)
     def test_xhad_crash(
-        self, failed_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, failed_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR,
+        interrupt_shield: InterruptShield,
     ) -> None:
         pool = host.pool
         master, slave = prepare_pool_for_ha(pool)
         failed, survivor = (master, slave) if failed_role == 'master' else (slave, master)
-        defer(lambda: cleanup_ha_scenario(pool))
 
         start_ha_vm(ha_protected_vm, on_host=failed)
-        enable_pool_ha(pool, nfs_sr)
+        enable_pool_ha(pool, nfs_sr, interrupt_shield)
         boot_id = failed.boot_id()
         logging.info(f'Kill xhad on {failed}')
         failed.ssh('kill -9 "$(pidof -s xhad)"')
@@ -83,15 +82,15 @@ class TestHaScenario:
 
     @pytest.mark.parametrize('target_role', ROLES)
     def test_xapi_crash(
-        self, target_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, target_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR,
+        interrupt_shield: InterruptShield,
     ) -> None:
         pool = host.pool
         master, slave = prepare_pool_for_ha(pool)
         target = master if target_role == 'master' else slave
-        defer(lambda: cleanup_ha_scenario(pool))
 
         start_ha_vm(ha_protected_vm, on_host=target)
-        enable_pool_ha(pool, nfs_sr)
+        enable_pool_ha(pool, nfs_sr, interrupt_shield)
         boot_ids = {h: h.boot_id() for h in pool.hosts}
         old_pid = target.xapi_pid()
         logging.info(f'Kill xapi on {target}')
@@ -104,20 +103,21 @@ class TestHaScenario:
         wait_for_vm_on_host(ha_protected_vm, target, f'Wait for VM to remain on {target} after xapi restart')
 
     def test_nfs_unreachable_pool(
-        self, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer,
+        interrupt_shield: InterruptShield,
     ) -> None:
         pool = host.pool
         master, slave = prepare_pool_for_ha(pool)
         server = nfs_sr.nfs_server()
-        defer(lambda: cleanup_ha_scenario(pool))
 
         start_ha_vm(ha_protected_vm, on_host=master)
-        enable_pool_ha(pool, nfs_sr)
+        enable_pool_ha(pool, nfs_sr, interrupt_shield)
         boot_ids = {h: h.boot_id() for h in pool.hosts}
         for h in (master, slave):
             for spec in nfs_drop_specs(server):
-                insert_rule(h, spec)
-                defer(partial(delete_rule, h, spec))
+                with interrupt_shield():
+                    insert_rule(h, spec)
+                    defer(partial(delete_rule, h, spec))
 
         logging.info(f'Let HA run {HA_SETTLE_SECS}s without NFS on any host')
         time.sleep(HA_SETTLE_SECS)
@@ -139,7 +139,8 @@ class TestHaScenario:
     @pytest.mark.parametrize('failed_role', ROLES)
     @pytest.mark.parametrize('cut', ['nfs', 'network+nfs'])
     def test_nfs_unreachable(
-        self, cut: str, failed_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, cut: str, failed_role: str, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR,
+        interrupt_shield: InterruptShield,
     ) -> None:
         """Cut NFS on one host, alone or with the peer network: it loses the statefile and fences.
 
@@ -151,10 +152,9 @@ class TestHaScenario:
         rule_specs = nfs_drop_specs(nfs_sr.nfs_server())
         if cut == 'network+nfs':
             rule_specs += peer_network_drop_specs(survivor.param_get('address'))
-        defer(lambda: cleanup_ha_scenario(pool))
 
         start_ha_vm(ha_protected_vm, on_host=failed)
-        enable_pool_ha(pool, nfs_sr)
+        enable_pool_ha(pool, nfs_sr, interrupt_shield)
         boot_id = failed.boot_id()
         install_persistent_rules(failed, rule_specs)
         wait_for_failover(pool, ha_protected_vm, survivor, f'after {cut} loss on {failed}')
@@ -163,7 +163,8 @@ class TestHaScenario:
 
     @pytest.mark.reboot
     def test_network_unreachable(
-        self, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR, defer: Defer
+        self, host: Host, hostA2: Host, ha_protected_vm: VM, nfs_sr: SR,
+        interrupt_shield: InterruptShield,
     ) -> None:
         """In an equal network partition, HA keeps the host with the lowest UUID.
 
@@ -175,10 +176,9 @@ class TestHaScenario:
         survivor = min(master, slave, key=lambda h: h.uuid)
         fenced = slave if survivor is master else master
         logging.info(f'Network partition: {survivor} should survive, {fenced} should fence')
-        defer(lambda: cleanup_ha_scenario(pool))
 
         start_ha_vm(ha_protected_vm, on_host=fenced)
-        enable_pool_ha(pool, nfs_sr)
+        enable_pool_ha(pool, nfs_sr, interrupt_shield)
         boot_id = fenced.boot_id()
         install_persistent_rules(fenced, peer_network_drop_specs(survivor.param_get('address')))
         fenced.wait_for_host_down(timeout_secs=HA_FAILOVER_TIMEOUT_SECS)
