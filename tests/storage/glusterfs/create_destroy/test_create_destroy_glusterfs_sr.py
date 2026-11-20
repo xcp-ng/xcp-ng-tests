@@ -13,6 +13,7 @@ from lib.pool import Pool
 # - access to XCP-ng RPM repository from the host
 
 @pytest.mark.usefixtures("pool_with_unused_512B_disk") # don't even run the tests if there's no free disk
+@pytest.mark.xfail_on_xcpng_9_0("TBD package glusterfs-server is not available")
 class TestGlusterFSSRCreateDestroy:
     """
     Tests that do not use fixtures that setup the SR or import VMs,

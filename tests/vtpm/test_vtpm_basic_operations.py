@@ -85,6 +85,7 @@ def test_create_and_destroy_vtpm(halted_uefi_unix_vm: VM) -> None:
             vm.destroy_vtpm()
 
 @pytest.mark.small_vm
+@pytest.mark.xfail_on_xcpng_9_0("TBD emulator failed to start the VM")
 @pytest.mark.usefixtures("host_at_least_8_3")
 def test_vtpm(unix_vm_with_tpm2_tools: VM) -> None:
     global vtpm_signing_test_script

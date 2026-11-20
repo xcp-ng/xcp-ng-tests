@@ -12,6 +12,7 @@ from lib.netutil import wrap_ip
 # Requirements:
 # - an XCP-ng host
 
+@pytest.mark.xfail_on_xcpng_9_0("TBD netdata-ui not found")
 @pytest.mark.usefixtures("host_with_netdata")
 class TestsNetdata:
     @staticmethod

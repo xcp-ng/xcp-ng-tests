@@ -245,6 +245,12 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
             # multi_vms implies small_vm
             item.add_marker('small_vm')
 
+        # check marker arguments
+        for markername in ["xfail_on_xcpng_9_0"]:
+            marker = item.get_closest_marker(markername)
+            if marker is not None and not any(marker.args):
+                raise pytest.UsageError(f"{item.nodeid}: {markername} requires arguments")
+
     # -----------------------------------------------------
     # Build execution matrix: axis -> leaf package -> items
     # -----------------------------------------------------
@@ -287,6 +293,17 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
     items[:] = new_items
 
 
+HOSTA1_KEY = pytest.StashKey[Host]()
+def _xfail_on_xcpng_9_0_reason(item: pytest.Item) -> str | None:
+    """ Return the xfail reason if `item` has the xfail_on_xcpng_9_0 marker and runs on XCP-ng 9.0. """
+    marker = item.get_closest_marker("xfail_on_xcpng_9_0")
+    if marker is None:
+        return None
+    host = item.config.stash.get(HOSTA1_KEY, None)
+    if host is None or host.xcp_version < version.parse("8.99"):
+        return None
+    return f"xfail_on_xcpng_9_0 (version {host.xcp_version}), see {marker.args[0]}"
+
 # BEGIN make test results visible from fixtures
 # from https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
 
@@ -300,6 +317,19 @@ def pytest_runtest_makereport(
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     # execute all other hooks to obtain the report object
     rep = yield
+
+    # Unlike pytest.mark.xfail, the markers below also cover failures in fixtures (setup).
+    # Teardown failures are left as errors. Reports already handled by pytest.mark.xfail are kept.
+    if rep.when in ("setup", "call") and not hasattr(rep, "wasxfail") and not item.config.option.runxfail:
+        for makereason in [_xfail_on_xcpng_9_0_reason]:
+            reason = makereason(item)
+            if reason is not None:
+                if rep.failed:
+                    rep.outcome = "skipped"  # shown as XFAIL
+                    rep.wasxfail = reason
+                elif rep.when == "call" and rep.passed:
+                    rep.wasxfail = reason  # shown as XPASS
+                break
 
     # store test results for each phase of a call, which can
     # be "setup", "call", "teardown"
@@ -380,6 +410,9 @@ def hosts(pytestconfig: pytest.Config) -> Generator[list[Host], None, None]:
 
     if not host_list:
         pytest.fail("This test requires at least one --hosts parameter")
+
+    pytestconfig.stash[HOSTA1_KEY] = host_list[0]
+
     yield host_list
 
     cleanup_hosts()
@@ -757,9 +790,9 @@ def create_vms(request: pytest.FixtureRequest, host: Host, tests_git_revision: s
         if report is None:
             # user interruption during setup
             logging.warning("test setup result not available: not exporting VMs")
-        elif report["setup"].failed:
+        elif not report["setup"].passed:
             logging.warning("setting up a test failed or skipped: not exporting VMs")
-        elif ("call" not in report) or report["call"].failed:
+        elif ("call" not in report) or not report["call"].passed:
             logging.warning("executing test failed or skipped: not exporting VMs")
         else:
             # record this state
