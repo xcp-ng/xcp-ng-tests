@@ -520,10 +520,8 @@ class EFIAuth:
         for other_cert in self._other_certs:
             if isinstance(other_cert, str):
                 certs.append(other_cert)
-            elif isinstance(other_cert, Certificate):
-                certs.append(other_cert.pub)
             else:
-                raise TypeError('other_cert is not Certificate or str')
+                certs.append(other_cert.pub)
 
         return certs_to_sig_db(certs)
 
