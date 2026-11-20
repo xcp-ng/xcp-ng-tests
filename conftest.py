@@ -840,11 +840,20 @@ def _vm_from_cache(
     vms.append(vm)
 
 @pytest.fixture(scope="module")
-def started_vm(imported_vm: VM) -> VM:
+def vm_start_host() -> Host | None:
+    """
+    The host started_vm starts the VM on, or None to let xapi choose.
+
+    Override it in a conftest.py for tests that need the VM on a given host.
+    """
+    return None
+
+@pytest.fixture(scope="module")
+def started_vm(imported_vm: VM, vm_start_host: Host | None) -> VM:
     vm = imported_vm
     # may be already running if we skipped the import to use an existing VM
     if not vm.is_running():
-        vm.start()
+        vm.start(on=vm_start_host.uuid if vm_start_host is not None else None)
     wait_for(vm.is_running, '> Wait for VM running')
     wait_for(vm.try_get_and_store_ip, "> Wait for VM IP", timeout_secs=5 * 60)
     return vm
