@@ -280,6 +280,19 @@ class TestLinstorSR:
 
 # --- Test diskless resources --------------------------------------------------
 
+class LinstorVolumeState(BaseModel):
+    disk_state: str
+
+class LinstorVolume(BaseModel):
+    state: LinstorVolumeState
+
+class LinstorResource(BaseModel):
+    name: str
+    node_name: str
+    volumes: list[LinstorVolume]
+
+_linstor_resources_list_adapter = TypeAdapter(list[list[LinstorResource]])
+
 def _get_diskful_hosts(host: Host, controller_option: str, sr_group_name: str, vdi_uuid: str) -> list[str]:
     # TODO: If any resource is in a temporary creation state or unknown, then need to wait intelligently.
     attempt = 0
@@ -295,14 +308,18 @@ def _get_diskful_hosts(host: Host, controller_option: str, sr_group_name: str, v
             ).split(': ')[1].split('"')[1]
 
             # Find host where volume is UpToDate
-            # | {volume_name} | {host} | 7017 | Unused | Ok    |   UpToDate | 2023-10-24 18:52:05 |
-            lines = host.ssh(
-                f'linstor {controller_option} resource list | grep {volume_name} | grep UpToDate'
-            ).splitlines()
+            resources_list = _linstor_resources_list_adapter.validate_json(
+                host.ssh(f"linstor --machine-readable {controller_option} resource list --resources {volume_name}")
+            )
+
             diskfuls = []
-            for line in lines:
-                hostname = line.split('|')[2].strip()
-                diskfuls += [hostname]
+            for resources in resources_list:
+                for resource in resources:
+                    assert len(resource.volumes) == 1
+
+                    if resource.volumes[0].state.disk_state == "UpToDate":
+                        diskfuls.append(resource.node_name)
+
             return diskfuls
         except SSHCommandFailed as e:
             logging.error("SSH Command Failed (attempt %d/%d): %s", attempt + 1, retries, e)
