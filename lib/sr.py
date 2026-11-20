@@ -239,6 +239,23 @@ class SR:
     def content_type(self) -> str:
         return self.param_get('content-type')
 
+    def is_for_vm_disks(self) -> bool:
+        """
+        Whether the SR is meant for VM disks.
+
+        Its content type is 'user', as set by the installer and Xen Orchestra,
+        or empty, the default of `xe sr-create`, for a type that is not iso
+        nor udev.
+        """
+        content_type = self.content_type()
+        return content_type == 'user' or (content_type == '' and self.get_type() not in ('iso', 'udev'))
+
+    @staticmethod
+    def for_vm_disks(srs: list[SR]) -> list[SR]:
+        """ The SRs of `srs` meant for VM disks, those with content type 'user' first. """
+        vm_srs = [sr for sr in srs if sr.is_for_vm_disks()]
+        return sorted(vm_srs, key=lambda sr: sr.content_type() != 'user')
+
     @classmethod
     def introduce(cls, pool: Pool, type: str, shared: bool, name_label: str, sr_uuid: str) -> Self:
         return cls(
