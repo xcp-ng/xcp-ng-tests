@@ -84,6 +84,19 @@ WIN_GUEST_TOOLS_ISOS = {
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
         # What's the onboard family of our tools? This is equal to the WinPV VENDOR_NAME value
         "onboard_family": "XCP-ng",
+        # What are the expected driver version reporting via PV-drivers-version?
+        "expected_versions": {
+            "major": "9",
+            "minor": "1",
+            "micro": "2",
+            "build": "3",
+            "xenbus": "XCP_ng 9.1.2.3",
+            "xencons": "XCP_ng 9.1.2.3",
+            "xeniface": "XCP_ng 9.1.2.3",
+            "xennet": "XCP_ng 9.1.2.3",
+            "xenvbd": "XCP_ng 9.1.2.3",
+            "xenvif": "XCP_ng 9.1.2.3",
+        },
     },
     # Add more guest tool ISOs here as needed
 }
@@ -104,8 +117,12 @@ OTHER_GUEST_TOOLS = {
         "path": "xcp-ng-9.0.9000",
         # "path"-relative path of MSI or driver files to be installed
         "package": "package\\XenDrivers-x64.msi",
+        # When installing a MSI, "path"-relative list of MSP patches to install on top (optional)
+        "patches": ["XenDrivers-patch.msp"],
         # Relative path of root cert file (optional)
         "testsign_cert": "testsign\\XCP-ng_Test_Signer.crt",
+        # If this is a XenServer MSI package, we'll wait for the XenServer install service to complete
+        "is_xenserver_msi": False,
         # Whether this guest tool version wants vendor device to be activated (optional, defaults to False)
         # Note: other guest tools may not install correctly with this setting enabled
         "vendor_device": False,
