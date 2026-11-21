@@ -191,6 +191,16 @@ JOBS: dict[str, JobData] = {
         "paths": ["tests/packages"],
         "markers": "",
     },
+    "kernel": {
+        "description": "dom0 kernel regression tests: userspace crypto (AF_ALG), IPsec and TCP (about 5 minutes)",
+        "requirements": [
+            "Any pool. The tests only run in the dom0 of the master, in network namespaces.",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/kernel"],
+        "markers": "",
+    },
     "storage-main": {
         "description": "tests all storage drivers, but avoids migrations and reboots",
         "requirements": [
