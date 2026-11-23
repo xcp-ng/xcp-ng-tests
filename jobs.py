@@ -674,6 +674,16 @@ JOBS: dict[str, JobData] = {
         "params": {},
         "paths": ["tests/misc/test_pool.py"],
     },
+    "system-reboots": {
+        "description": "system tests that involve rebooting hosts",
+        "requirements": [
+            "An XCP-ng host that can be rebooted.",
+        ],
+        "nb_pools": 1,
+        "params": {},
+        "paths": ["tests/system"],
+        "markers": "reboot",
+    },
     "limit-tests": {
         "description": "Tests verifying we can hit our supported limits",
         "requirements": [
