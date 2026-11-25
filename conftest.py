@@ -274,7 +274,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
     for item in items:
         axis_order = axis_ordering[get_axis(item)]
         package = item.getparent(pytest.Package)
-        assert package is not None, "all items must come from a package"
+        assert package is not None, f"item {item} must come from a package"
         grouped[axis_order][package].append(item)
 
     # Flatten back to a list of items
