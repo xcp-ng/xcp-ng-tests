@@ -852,14 +852,14 @@ wheels = [
 
 [[package]]
 name = "rpm-version"
-version = "0.5.1"
+version = "0.5.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/24/f9/f4042715f9cba089926c76858c424fd9701b34f55d748a565d9d726abddb/rpm_version-0.5.1.tar.gz", hash = "sha256:8f55e499bd93d878f98d9cb5e53ccbb19794997941ebd5f3848133a9bdfadb4a", size = 29855, upload-time = "2026-07-24T21:06:12.94Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/fb/be1aeb4922ce05b5fe9a0be0b75a5e4de73f3e147283a5bef9649ea38f0a/rpm_version-0.5.2.tar.gz", hash = "sha256:af9847bc112b18f6512d216486a1125f133d0da0a0700612401a426a62f05e49", size = 35992, upload-time = "2026-11-14T03:34:25.181Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/5f/a90090877736926af5572f45d59155a3f4db3d444c0d6a3556c572af7734/rpm_version-0.5.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:fcdb88d85541a54d337daf18070e978f06df653a4ebfb08da0cb9f49cfcb5a59", size = 282363, upload-time = "2026-07-24T21:06:06.653Z" },
-    { url = "https://files.pythonhosted.org/packages/26/5f/c7b6c6dd759abac18bf2634a8e9d40b95ff414fbfc91cfebeb9c3e8bc06b/rpm_version-0.5.1-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:1381a3dce1713a8320da21e193b95593989b7bf5c01559a81881e0c9f318436f", size = 312904, upload-time = "2026-07-24T21:06:08.362Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/56/58f114ccd1687d49bd2987bd3c911132d392a5166107e9862c92c535023e/rpm_version-0.5.1-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:54619ce73b9b8d23460a5e73fd0be1b3c2923f32252e6b42c4988b91f6ad3102", size = 315585, upload-time = "2026-07-24T21:06:09.883Z" },
-    { url = "https://files.pythonhosted.org/packages/9d/45/03e4e3c0384874100ed308682a157fadc45e58b2262a54a0caf452baf295/rpm_version-0.5.1-cp310-abi3-win_amd64.whl", hash = "sha256:78fa7ed2f588a164b87c4ee2e814445aaf4932f3dc82ab82ba07e574e585f1d2", size = 167962, upload-time = "2026-07-24T21:06:11.423Z" },
+    { url = "https://files.pythonhosted.org/packages/59/2b/606c44073ea535a5b4d974f161fa9be40e3c44d57749eafeefb14d379b7b/rpm_version-0.5.2-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:9ad9798b95cca0ca2bed33ec23ff0b52c067f4e09c3738ad01b105f4867eb2e4", size = 282496, upload-time = "2026-11-14T03:34:19.842Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/8e/f108a1ce5e948c34d1e525cfafd1345cd54820056c29869a5f18e8ca2306/rpm_version-0.5.2-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:8356aa9ada2e9c6fe2a979a199c27ba645f3dbc8a35bdd408059f15b7d5624d0", size = 313858, upload-time = "2026-11-14T03:34:21.24Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/a5/d6739e6727861bbc55bec33147632dfc5360a06daf34930b6b2113d3ae71/rpm_version-0.5.2-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:d78b46e7691cabedb4950b2ef62d063ef4675a12d088d350f96a212ab4524a6e", size = 319337, upload-time = "2026-11-14T03:34:22.555Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/8f/0b8c2445101d2abe66b3f3652f57aa77d717e19b714ef4b680d50bd3dba1/rpm_version-0.5.2-cp310-abi3-win_amd64.whl", hash = "sha256:c886095abb00949d9b6e77202524fab4fb5d18d2fa508eb20f56afd3841f7ffa", size = 173343, upload-time = "2026-11-14T03:34:24.011Z" },
 ]
 
 [[package]]
