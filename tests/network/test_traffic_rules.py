@@ -219,6 +219,37 @@ def xo_vm_power_state(vm: VM, power_state: str) -> Callable[[], bool]:
 
     return vm_power_state
 
+def vm_start_xo_synced(vm: VM, on: str | None = None) -> None:
+    """
+    Start the VM, and wait for have it properly set up and seen by XO
+    """
+    vm.start(on=on)
+    vm.wait_for_vm_running_and_ssh_up()
+    wait_for(
+        xo_vm_power_state(vm, "Running"),
+        msg="Waiting for XO to see VM is running",
+    )
+
+def vm_shutdown_xo_synced(vm: VM, force: bool = False) -> None:
+    """
+    Shutdown the VM, and wait for have it properly stopped and seen by XO
+    """
+    vm.shutdown(verify=True, force=force)
+    wait_for(
+        xo_vm_power_state(vm, "Halted"),
+        msg="Waiting for XO to see VM is halted",
+    )
+
+def vm_migrate_xo_synced(vm: VM, target_host: Host, sr: SR) -> None:
+    """
+    Migrate the VM, and wait for have it properly set up and seen by XO
+    """
+    vm.migrate(target_host, sr)
+    wait_for(
+        xo_vm_power_state(vm, "Running"),
+        msg="Waiting for XO to see VM is running",
+    )
+
 def has_running_vm_on_network(host: Host, network_uuid: str) -> bool:
     # running VMs on the host
     vms = safe_split(host.xe('vm-list', {
@@ -271,8 +302,7 @@ class TestSimple:
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
 
         # start the VM and wait for XO to see the VM
-        vm.start()
-        vm.wait_for_os_booted()
+        vm_start_xo_synced(vm)
 
         # right after VM booted
         assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
@@ -305,20 +335,19 @@ class TestSimple:
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
         assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
 
-        vm.shutdown(verify=True)
+        vm_shutdown_xo_synced(vm)
 
         # after shutdown, two rules removed (vif not here anymore)
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
 
-        vm.start()
-        vm.wait_for_os_booted()
+        vm_start_xo_synced(vm)
 
         # after restarted, only the second rule apply
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=80,dl_src={macAddress}")
         assert ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
 
-        vm.shutdown(verify=True)
+        vm_shutdown_xo_synced(vm)
 
         # delete OF rule (while stopped)
         sync_sdnController_action(host, 'deleteRule', {
@@ -373,10 +402,7 @@ class TestSimple:
         assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
 
         # start the VM
-        vm.start()
-
-        # wait for XO to see the VM
-        vm.wait_for_os_booted()
+        vm_start_xo_synced(vm)
 
         # the rule is applied (after booting VM)
         assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
@@ -418,15 +444,14 @@ class TestSimple:
         assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
 
         # restart the VM
-        vm.shutdown(verify=True)
-        vm.start()
-        vm.wait_for_os_booted()
+        vm_shutdown_xo_synced(vm)
+        vm_start_xo_synced(vm)
 
         # same as previous (after VM restart)
         assert not ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.1")
         assert ofproto_trace_drop(host, hostBr, "icmp,nw_dst=10.0.0.2")
 
-        vm.shutdown(verify=True)
+        vm_shutdown_xo_synced(vm)
 
         # delete OF rule (while stopped)
         sync_sdnController_action(host, 'deleteNetworkRule', {
@@ -458,8 +483,7 @@ class TestMigrate:
         with interrupt_shield() as defer:
             vm = imported_vm.clone()
             defer(lambda: vm.destroy())
-        vm.start()
-        vm.wait_for_vm_running_and_ssh_up()
+        vm_start_xo_synced(vm)
 
         vif = vm.vifs()[0]
         vifId = vif.uuid
@@ -485,7 +509,7 @@ class TestMigrate:
             # drop after adding the rule
             assert ofproto_trace_drop(hostA1, hostBr, f"icmp,dl_src={macAddress}")
 
-            vm.migrate(hostA2, local_sr_on_hostA2)
+            vm_migrate_xo_synced(vm, hostA2, local_sr_on_hostA2)
 
             wait_for(
                 lambda: ofproto_trace_drop(hostA2, hostBr, f"icmp,dl_src={macAddress}"),
@@ -522,8 +546,7 @@ class TestMigrate:
         with interrupt_shield() as defer:
             vm = imported_vm.clone()
             defer(lambda: vm.destroy())
-        vm.start(on=hostA1.name()) # the test is assymetric, start with the VM on know host
-        vm.wait_for_vm_running_and_ssh_up()
+        vm_start_xo_synced(vm, on=hostA1.name()) # the test is assymetric, start with the VM on know host
 
         networkId = hostA1.management_network()
         hostA1Br = Network(hostA1, networkId).bridge()
@@ -552,7 +575,7 @@ class TestMigrate:
                 timeout_secs=30,
             )
 
-            vm.migrate(hostA2, local_sr_on_hostA2)
+            vm_migrate_xo_synced(vm, hostA2, local_sr_on_hostA2)
 
             logging.info("check post-migrate")
             wait_for(
@@ -602,7 +625,7 @@ class TestVLAN:
 
         vif = vm.create_vif(1, network_uuid=network.uuid)
         macAddress = vif.mac_address()
-        vm.start()
+        vm_start_xo_synced(vm)
 
         # no rule applied
         assert not ofproto_trace_drop(
@@ -626,8 +649,6 @@ class TestVLAN:
             'port': 'json:81',
             'allow': 'false',
         })
-
-        vm.wait_for_os_booted()
 
         # rule applied
         assert ofproto_trace_drop(
@@ -763,8 +784,7 @@ class TestVLAN:
             )
 
             # start the VM
-            vm.start()
-            wait_for(xo_vm_power_state(vm, "Running"), msg="Waiting for XO to see VM is running")
+            vm_start_xo_synced(vm)
 
             # rule is applied
             logging.info("check post-start")
@@ -778,8 +798,7 @@ class TestVLAN:
                 timeout_secs=30,
             )
 
-            vm.shutdown(verify=True, force=True)
-            wait_for(xo_vm_power_state(vm, "Halted"), msg="Waiting for XO to see VM is halted")
+            vm_shutdown_xo_synced(vm, force=True)
 
             # XXX weird, but no OF so seems expected
             logging.info("check post-shutdown")
@@ -828,7 +847,7 @@ class TestTunnel:
 
         vif = vm.create_vif(1, network_uuid=network.uuid)
         macAddress = vif.mac_address()
-        vm.start()
+        vm_start_xo_synced(vm)
 
         # no rule applied
         assert not ofproto_trace_drop(host, hostBr, f"tcp,tp_dst=81,dl_src={macAddress}")
@@ -906,8 +925,7 @@ class TestTunnel:
             )
 
             # start the VM
-            vm.start()
-            wait_for(xo_vm_power_state(vm, "Running"), msg="Waiting for XO to see VM is running")
+            vm_start_xo_synced(vm)
 
             # rule is applied
             logging.info("check post-start")
@@ -917,8 +935,7 @@ class TestTunnel:
                 timeout_secs=30,
             )
 
-            vm.shutdown(verify=True, force=True)
-            wait_for(xo_vm_power_state(vm, "Halted"), msg="Waiting for XO to see VM is halted")
+            vm_shutdown_xo_synced(vm, force=True)
 
             # XXX weird, but no OF so seems expected
             logging.info("check post-shutdown")
