@@ -74,6 +74,7 @@ def ofproto_trace_drop(
         return not portname.startswith(f"{br}_port")
 
     ports = host.ssh(f"ovs-vsctl list-ports {network_br or br}").splitlines()
+    ports = filter(lambda n: not n.startswith('tap'), ports) # remove tap* device: the interface could be gone
     ports = list(filter(is_not_xapi_port, ports))
     if len(ports) == 0:
         # no ports on bridge, packet will pass
