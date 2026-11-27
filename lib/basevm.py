@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.host import Host
 
-from lib.common import XeParams, _param_add, _param_clear, _param_get, _param_remove, _param_set
+from lib.common import XeObject, XeParams
 from lib.sr import SR
 
-class BaseVM:
+class BaseVM(XeObject):
     """ Base class for VM and Snapshot. """
 
     xe_prefix = "vm"
@@ -18,39 +18,8 @@ class BaseVM:
 
     def __init__(self, uuid: str, host: Host):
         logging.info("New %s: %s", type(self).__name__, uuid)
-        self.uuid = uuid
+        super().__init__(host, uuid)
         self.host = host
-
-    @overload
-    def param_get(self, param_name: str, key: str | None = ...,
-                  accept_unknown_key: Literal[False] = ...) -> str:
-        ...
-
-    @overload
-    def param_get(self, param_name: str, key: str | None = ...,
-                  accept_unknown_key: Literal[True] = ...) -> str | None:
-        ...
-
-    def param_get(self, param_name: str, key: str | None = None,
-                  accept_unknown_key: bool = False) -> str | None:
-        return _param_get(self.host, self.xe_prefix, self.uuid,
-                          param_name, key, accept_unknown_key)
-
-    def param_set(self, param_name: str, value: str | bool | dict[str, str], key: str | None = None) -> None:
-        _param_set(self.host, self.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_remove(self, param_name: str, key: str, accept_unknown_key: bool = False) -> None:
-        _param_remove(self.host, self.xe_prefix, self.uuid,
-                      param_name, key, accept_unknown_key)
-
-    def param_add(self, param_name: str, value: str, key: str | None = None) -> None:
-        _param_add(self.host, self.xe_prefix, self.uuid,
-                   param_name, value, key)
-
-    def param_clear(self, param_name: str) -> None:
-        _param_clear(self.host, self.xe_prefix, self.uuid,
-                     param_name)
 
     def name(self) -> str:
         n = self.param_get('name-label')
