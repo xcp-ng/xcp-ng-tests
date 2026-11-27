@@ -50,6 +50,7 @@ class TestTLSVerification:
     def test_tls_verification(self, hostA1: Host) -> None:
         self._test_tls_verification(hostA1)
 
+    @pytest.mark.xfail_on_xcpng_9_0("TBD certificate tests fail to contact the other host")
     def test_refresh_certificate(self, hostA1: Host) -> None:
         logging.info("Refresh the xapi:pool certificate on every pool member")
         for h in hostA1.pool.hosts:

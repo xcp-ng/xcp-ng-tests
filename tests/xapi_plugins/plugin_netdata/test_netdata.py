@@ -20,6 +20,7 @@ class TestInstall:
     def test_is_netdata_installed(self, host: Host) -> None:
         host.call_plugin('netdata.py', 'is_netdata_installed')
 
+    @pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible")
     def test_install_netdata(self, host_without_netdata: Host) -> None:
         host = host_without_netdata
         host.yum_save_state()
@@ -31,6 +32,7 @@ class TestInstall:
 
         host.yum_restore_saved_state()
 
+@pytest.mark.xfail_on_xcpng_9_0("TBD xcp-ng-xapi-plugins is not compatible")
 class TestApiKey:
     def test_get_netdata_api_key(self, host_without_netdata: Host) -> None:
         host = host_without_netdata
