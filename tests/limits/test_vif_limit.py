@@ -7,7 +7,6 @@ import tempfile
 
 from lib.host import Host
 from lib.vm import VM
-from pkgfixtures import host_with_saved_yum_state
 
 # Requirements:
 # - one XCP-ng host (--host) >= 8.2
