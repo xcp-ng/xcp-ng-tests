@@ -6,8 +6,8 @@ from lib.commands import SSHCommandFailed
 from lib.vm import VM
 from lib.windows import (
     PowerAction,
-    check_vm_dns,
-    set_vm_dns,
+    vm_check_test_dnsv4,
+    vm_set_test_dnsv4,
     vm_shutdown_without_tools,
     wait_for_vm_running_and_ssh_up_without_tools,
 )
@@ -33,12 +33,12 @@ class TestGuestToolsWindowsDestructive:
         vm.start()
         wait_for_vm_running_and_ssh_up_without_tools(vm)
 
-        set_vm_dns(vm)
+        vm_set_test_dnsv4(vm)
         logging.info("Uninstall Windows PV drivers")
         uninstall_guest_tools(vm, action=PowerAction.Reboot)
         logging.info("Check tools uninstalled")
         assert vm.are_windows_tools_uninstalled()
-        check_vm_dns(vm)
+        vm_check_test_dnsv4(vm)
 
     def test_uninstall_tools_early(self, vm_install_test_tools_no_reboot: VM) -> None:
         vm = vm_install_test_tools_no_reboot
