@@ -102,6 +102,9 @@ class Host:
         self._can_report_ignored_params: bool | None = None
         self.uuid = self.inventory['INSTALLATION_UUID']
         self.xcp_version = version.parse(self.inventory['PRODUCT_VERSION'])
+        if self.xcp_version.release[:2] == (8, 99):
+            # 8.99 is the development version of XCP-ng 9
+            self.xcp_version = version.parse('9.0')
         self.xcp_version_short = f"{self.xcp_version.major}.{self.xcp_version.minor}"
         self._dom0: VM | None = None
 
