@@ -8,6 +8,7 @@ import shlex
 import time
 
 from pydantic import BaseModel, Field, TypeAdapter
+from rpm_version import Evr  # type: ignore[import-untyped]
 
 from lib.commands import SSHCommandFailed
 from lib.common import InterruptShield, safe_split, vm_image, wait_for
@@ -264,6 +265,20 @@ class TestLinstorSR:
             assert not sr.all_pbds_attached()
             host.yum_install(['xcp-ng-linstor'])
             linstor_installed = True
+
+            satellite_version = host.get_installed_package_version("linstor-satellite")
+            satellite_status = host.ssh("systemctl is-active linstor-satellite", check=False)
+
+            if Evr.parse(satellite_version) >= Evr.parse("1.35.3"):
+                # Needed because the `xcp-ng-linstor` package provides a systemd
+                # drop-in that is required to start the LINSTOR satellite since the
+                # LINSTOR v1.35.3 update.
+                assert satellite_status == "failed"
+
+                host.ssh("systemctl start linstor-satellite")
+                satellite_status = host.ssh("systemctl is-active linstor-satellite", check=False)
+
+            assert satellite_status == "active"
 
             # Needed because the linstor driver is not in the xapi
             # sm-plugins list because xcp-ng-linstor RPM has been
